@@ -2,7 +2,7 @@
 
 Granular checklist. Check items off as they land. This file is the first thing to read in a new session — it tells you exactly what's done and what's next. Full rationale for any step lives in `PLAN.md`.
 
-**Status: Steps 0-2 done. Next up: Step 3 (tournament + pod CRUD).**
+**Status: Steps 0-3 done. Next up: Step 4 (pairing engine).**
 
 ## Step 0 — Project bootstrap ✅
 - [x] Create `~/Projects/LimitedGauntlet/`, `git init`
@@ -33,12 +33,15 @@ Granular checklist. Check items off as they land. This file is the first thing t
 - [x] `Player` roster CRUD (`GET/POST/PATCH/DELETE /api/players`) — org-scoped; update/delete use `updateMany`/`deleteMany` with `{id, orgId}` in the `where` clause (not a plain `update`/`delete` by id) so a request can never touch another org's row, by construction not just convention
 - [x] Verify: full live exercise against a real running stack (not just reasoning about the code) — created two separate orgs, confirmed each only lists their own players, confirmed Org B's PATCH/DELETE against Org A's known player ID both return 404 (not a leak, not a silent no-op) while Org A's own PATCH/DELETE succeed, confirmed `/api/auth/me` and `/api/players` both 401 after logout and with no cookie, confirmed duplicate org slug and wrong password are rejected with the right status codes
 
-## Step 3 — Tournament + Pod CRUD
-- [ ] Tournament CRUD: create/edit within an org (name, startDate, endDate, location, status)
-- [ ] `TournamentPlayer`: attach/detach roster players to a specific tournament (who's attending this weekend)
-- [ ] Pod CRUD within a tournament: name, date, format enum, sequenceOrder, isTeamEvent, teamSize, roundCount, matchFormat, pointsWin/Draw/Loss, roundLengthMinutes, packConfig, rarepicUrl
-- [ ] `Entrant` creation: attach players (or form ad-hoc Teams + TeamMembers) to a specific pod
-- [ ] Verify: recreate one real historical pod's setup (e.g. 2025 Sommer's Battlebond: 4 teams of 2-3, 3 rounds) purely through the CRUD UI
+## Step 3 — Tournament + Pod CRUD ✅
+- [x] Tournament CRUD (`server/src/routes/tournaments.ts`): create/get/list/update/delete, org-scoped via `updateMany`/`deleteMany` with `{id, orgId}`, same pattern as Player
+- [x] `TournamentPlayer` attach/detach (`POST`/`DELETE /api/tournaments/:id/players`), upsert-based so attaching twice is a no-op not an error
+- [x] Pod CRUD (`server/src/routes/pods.ts`) nested under tournament — org-scoping here is one hop deeper (`pod.tournament.orgId`), confirmed Prisma's relation filters work in `updateMany`/`deleteMany` `where` clauses, not just `findMany`
+- [x] Found and fixed a real bug before it shipped: the first draft of the pod-update schema used `podCreateSchema.partial()`, but Zod re-applies `.default()` values whenever a field is `undefined` — which is exactly what an omitted PATCH field looks like. That would've silently reset `pointsWin`/`pointsDraw`/`pointsLoss`/`roundCount`/etc. back to their defaults on every partial update that didn't mention them. Fixed by writing `podUpdateSchema` from scratch with plain `.optional()` (no defaults) on every field. Caught by reasoning about it before testing, then confirmed with a live PATCH that changes only `status` and checked the other fields survived untouched.
+- [x] `Entrant` creation for both individual pods (`{playerId}`) and team pods (`{teamName, playerIds[]}`, creates Team + TeamMembers + Entrant in one transaction)
+- [x] Double-booking guard: a player can't become an entrant twice in the same pod, whether individually or via two different teams — checked via `getPlayerIdsAlreadyInPod()` before creating, 409 on conflict
+- [x] `DELETE /api/entrants/:id`: team entrants delete the Team (cascades to Entrant + TeamMember rows), individual entrants delete directly
+- [x] Verify: recreated the real 2025 Sommer Battlebond pod (4 teams of 2-3 — Alex+Casey+Emery, Tobias+Harper, Devon+Finley, Bailey+Gray — 3 rounds) purely through the live API against the actual historical roster from PLAN.md. Confirmed the returned structure matches exactly, confirmed double-booking Emery into a second team 409s, confirmed the PATCH-defaults fix holds under a real request, confirmed deleting a team entrant cascades cleanly, and confirmed Org B gets 404 (not data, not a silent no-op) trying to read/delete Org A's tournament or pod by ID.
 
 ## Step 4 — Pairing engine
 - [ ] `server/services/pairing.ts`: score-group grouping + greedy pair-with-backtracking
