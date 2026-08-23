@@ -4,13 +4,9 @@ import { usePod, podFormatLabel } from "../features/pods/usePods";
 import { useAddIndividualEntrant, useAddTeamEntrant, useRemoveEntrant, entrantErrorMessage } from "../features/pods/useEntrants";
 import { usePlayers } from "../features/players/usePlayers";
 import { Button, Card, Eyebrow, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
+import { PodTabs } from "../components/PodTabs";
+import { entrantDisplayName } from "../lib/entrant";
 import type { Entrant } from "../lib/types";
-
-function entrantDisplayName(entrant: Entrant): string {
-  if (entrant.player) return entrant.player.displayName;
-  if (entrant.team) return entrant.team.name;
-  return "—";
-}
 
 function alreadyEnteredPlayerIds(entrants: Entrant[]): Set<string> {
   const ids = new Set<string>();
@@ -169,6 +165,8 @@ export function PodPage() {
           ? `Team event — teams of ${pod.teamSize}. Assign the roster into teams before pairing round 1.`
           : "Individual entrants. Add everyone playing before pairing round 1."}
       </ScreenDek>
+
+      <PodTabs podId={pod.id} />
 
       {pod.isTeamEvent ? (
         <TeamEntrants podId={pod.id} entrants={pod.entrants} />

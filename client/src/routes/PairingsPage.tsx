@@ -1,0 +1,193 @@
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { usePod } from "../features/pods/usePods";
+import {
+  useCompleteRound,
+  useExtendRound,
+  useGenerateRound,
+  useRounds,
+  useStartRound,
+  useSubmitResult,
+  roundErrorMessage,
+} from "../features/pods/useRounds";
+import { entrantDisplayName } from "../lib/entrant";
+import { Button, Eyebrow, FormError, ScreenDek, ScreenTitle } from "../components/ui";
+import { PodTabs } from "../components/PodTabs";
+import type { Entrant, Match, Round } from "../lib/types";
+
+function ResultEntry({ match, podId }: { match: Match; podId: string }) {
+  const submitResult = useSubmitResult(podId);
+  const [a, setA] = useState(0);
+  const [b, setB] = useState(0);
+
+  if (match.result !== "PENDING") {
+    const label =
+      match.result === "DRAW" ? "Draw" : match.result === "A_WINS" ? "Table win: seat A" : "Table win: seat B";
+    return (
+      <div className="text-right">
+        <div className="font-display tabular-nums text-[15px] font-bold">
+          {match.gamesWonA}–{match.gamesWonB}
+        </div>
+        <div className="text-[11px] text-ink-muted">{label}</div>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="flex items-center gap-1.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const result = a > b ? "A_WINS" : b > a ? "B_WINS" : "DRAW";
+        submitResult.mutate({ matchId: match.id, result, gamesWonA: a, gamesWonB: b });
+      }}
+    >
+      <input
+        type="number"
+        min={0}
+        value={a}
+        onChange={(e) => setA(Number(e.target.value))}
+        className="w-12 rounded border border-border-strong bg-surface px-2 py-1 text-center text-[13px] tabular-nums outline-none focus:border-accent"
+      />
+      <span className="text-ink-muted">–</span>
+      <input
+        type="number"
+        min={0}
+        value={b}
+        onChange={(e) => setB(Number(e.target.value))}
+        className="w-12 rounded border border-border-strong bg-surface px-2 py-1 text-center text-[13px] tabular-nums outline-none focus:border-accent"
+      />
+      <Button type="submit" variant="primary" disabled={submitResult.isPending} className="ml-1">
+        Submit
+      </Button>
+    </form>
+  );
+}
+
+function MatchCard({ match, entrantById, podId }: { match: Match; entrantById: Map<string, Entrant>; podId: string }) {
+  const a = entrantById.get(match.entrantAId);
+  const b = match.entrantBId ? entrantById.get(match.entrantBId) : null;
+
+  return (
+    <div className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
+      <div className="min-w-0">
+        <div className="mb-1 text-[11px] tracking-wide text-ink-muted uppercase">Table {match.tableNumber}</div>
+        <div className="font-display text-[15px] font-bold">
+          {a ? entrantDisplayName(a) : "—"}
+          {b ? (
+            <>
+              <span className="mx-2 text-[11px] font-normal text-ink-muted">vs</span>
+              {entrantDisplayName(b)}
+            </>
+          ) : (
+            <span className="ml-2 text-[11px] font-normal text-ink-muted uppercase">Bye</span>
+          )}
+        </div>
+      </div>
+      {b && <ResultEntry match={match} podId={podId} />}
+    </div>
+  );
+}
+
+function RoundCard({ round, entrantById, podId }: { round: Round; entrantById: Map<string, Entrant>; podId: string }) {
+  const startRound = useStartRound(podId);
+  const completeRound = useCompleteRound(podId);
+  const extendRound = useExtendRound(podId);
+
+  const allReported = round.matches.every((m) => !m.entrantBId || m.result !== "PENDING");
+
+  return (
+    <div className="rounded-lg border border-border bg-surface-sunken p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <div className="font-display text-[18px] font-bold">Round {round.roundNumber}</div>
+          <div className="text-[11.5px] tracking-wide text-ink-muted uppercase">{round.status}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          {round.status === "PENDING" && (
+            <Button variant="primary" onClick={() => startRound.mutate(round.id)} disabled={startRound.isPending}>
+              Start round
+            </Button>
+          )}
+          {round.status === "ACTIVE" && (
+            <>
+              <Button variant="ghost" onClick={() => extendRound.mutate({ roundId: round.id, minutes: 5 })}>
+                +5 min
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => completeRound.mutate(round.id)}
+                disabled={!allReported || completeRound.isPending}
+              >
+                Complete round
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {round.matches.map((m) => (
+          <MatchCard key={m.id} match={m} entrantById={entrantById} podId={podId} />
+        ))}
+      </div>
+
+      {completeRound.isError && <FormError>{roundErrorMessage(completeRound.error)}</FormError>}
+    </div>
+  );
+}
+
+export function PairingsPage() {
+  const { id } = useParams<{ id: string }>();
+  const { data: podData } = usePod(id);
+  const { data: roundsData, isLoading } = useRounds(id);
+  const generateRound = useGenerateRound(id ?? "");
+
+  if (isLoading || !podData) return <p className="text-ink-muted">Loading…</p>;
+
+  const pod = podData.pod;
+  const entrantById = new Map(pod.entrants.map((e) => [e.id, e]));
+  const rounds = roundsData?.rounds ?? [];
+  const lastRound = rounds[rounds.length - 1];
+  const canGenerateNext =
+    pod.entrants.length >= 2 &&
+    rounds.length < pod.roundCount &&
+    (rounds.length === 0 || lastRound?.status === "COMPLETED");
+
+  return (
+    <div>
+      <Eyebrow>
+        <Link to={`/pods/${id}`} className="hover:text-accent-strong">
+          {pod.name}
+        </Link>
+      </Eyebrow>
+      <ScreenTitle>Pairings</ScreenTitle>
+      <ScreenDek>
+        {rounds.length} of {pod.roundCount} rounds paired.
+      </ScreenDek>
+
+      <PodTabs podId={pod.id} />
+
+      {pod.entrants.length < 2 && <p className="text-ink-muted">Add at least 2 entrants before pairing round 1.</p>}
+
+      <div className="flex flex-col gap-5">
+        {[...rounds].reverse().map((round) => (
+          <RoundCard key={round.id} round={round} entrantById={entrantById} podId={pod.id} />
+        ))}
+      </div>
+
+      {canGenerateNext && (
+        <div className="mt-5">
+          <Button variant="primary" onClick={() => generateRound.mutate()} disabled={generateRound.isPending}>
+            {generateRound.isPending ? "Pairing…" : `Pair round ${rounds.length + 1}`}
+          </Button>
+          {generateRound.isError && <FormError>{roundErrorMessage(generateRound.error)}</FormError>}
+        </div>
+      )}
+
+      {rounds.length >= pod.roundCount && rounds.length > 0 && lastRound?.status === "COMPLETED" && (
+        <p className="mt-5 text-[13px] text-ink-muted">All {pod.roundCount} rounds complete.</p>
+      )}
+    </div>
+  );
+}
