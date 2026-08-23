@@ -13,6 +13,7 @@ import { tournamentRoutes } from "./routes/tournaments.js";
 import { podRoutes } from "./routes/pods.js";
 import { roundRoutes } from "./routes/rounds.js";
 import { cardPullRoutes } from "./routes/cardPulls.js";
+import { publicRoutes } from "./routes/public.js";
 import { initRealtime } from "./realtime.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -62,6 +63,7 @@ await app.register(tournamentRoutes);
 await app.register(podRoutes);
 await app.register(roundRoutes);
 await app.register(cardPullRoutes);
+await app.register(publicRoutes);
 
 // Serves the built SPA in production. During `npm run dev`, the Vite dev
 // server runs separately and this directory won't exist yet — that's fine,
