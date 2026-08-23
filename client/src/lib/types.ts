@@ -114,11 +114,18 @@ export interface StandingsRow {
   entrant: Entrant;
 }
 
+export interface GesamtwertungPod {
+  id: string;
+  name: string;
+  sequenceOrder: number;
+}
+
 export interface GesamtwertungRow {
   playerId: string;
   eventsPlayed: number;
   totalPoints: number;
   average: number;
+  perPod: Record<string, number>;
   player: Player;
 }
 

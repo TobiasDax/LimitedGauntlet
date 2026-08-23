@@ -106,6 +106,7 @@ This is the biggest single step in the plan — it's being worked in phases, eac
 
 ### Remaining phases (not started)
 - [ ] Phase C — the flagship pages: Gesamtwertung (hero ranking list), pod standings (data table), live pairings view. Also where the rest of Step 7's frontend half lands, since sockets matter most here:
+  - [x] Gesamtwertung page (`/tournaments/:id/gesamtwertung`) — hero ranking list matching the approved mockup: rank badge (gold for #1), average as the hero number, total secondary, per-pod pip row. Extended the backend's `computeGesamtwertung()` to return a `perPod` breakdown first (`GET .../gesamtwertung` now returns `{pods, gesamtwertung}`), keeping "never attended" (absent from the map) distinct from "attended and scored zero" — verified live with a seeded 2-pod/4-player scenario where one player skipped a pod: the skipped pod correctly renders as `–`, not `0`, and the average-tie tiebreak-by-total (two players tied at 3.0 avg, separated by total) renders in the right order
   - [ ] TanStack Query cache invalidation on the Socket.IO events already being broadcast (`pairings-published`, `pairings-updated`, `round-started`, `round-extended`, `round-completed`, `result-submitted`)
   - [ ] Client-side round timer: countdown from `Round.endsAt`, organizer "+5 min" button calling the already-built `POST /api/rounds/:id/extend`
   - [ ] Display Mode: audible chime via Web Audio when the timer hits zero; personal/phone views stay muted by default

@@ -154,6 +154,15 @@ export function TournamentPage() {
           : `${tournament.pods.length} pod${tournament.pods.length === 1 ? "" : "s"} · ${tournament.players.length} player${tournament.players.length === 1 ? "" : "s"} attending`}
       </ScreenDek>
 
+      {tournament.players.length > 0 && (
+        <Link
+          to={`/tournaments/${tournament.id}/gesamtwertung`}
+          className="mb-6 inline-block text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-strong"
+        >
+          View Gesamtwertung →
+        </Link>
+      )}
+
       {tournament.pods.length > 0 && (
         <div className="mb-6 flex flex-col gap-2">
           {tournament.pods.map((pod) => (
