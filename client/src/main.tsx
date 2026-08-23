@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout.tsx";
+import { PublicLayout } from "./components/PublicLayout.tsx";
 import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
 import { LoginPage } from "./routes/LoginPage.tsx";
 import { SignupPage } from "./routes/SignupPage.tsx";
@@ -16,6 +17,8 @@ import { PairingsPage } from "./routes/PairingsPage.tsx";
 import { PodValuePage } from "./routes/PodValuePage.tsx";
 import { TournamentValuePage } from "./routes/TournamentValuePage.tsx";
 import { HallOfFamePage } from "./routes/HallOfFamePage.tsx";
+import { PublicTournamentPage } from "./routes/PublicTournamentPage.tsx";
+import { PublicPodPage } from "./routes/PublicPodPage.tsx";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -25,6 +28,10 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
+          <Route element={<PublicLayout />}>
+            <Route path="/o/:slug/tournaments/:id" element={<PublicTournamentPage />} />
+            <Route path="/o/:slug/tournaments/:tournamentId/pods/:podId" element={<PublicPodPage />} />
+          </Route>
           <Route element={<Layout />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />

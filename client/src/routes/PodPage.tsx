@@ -4,6 +4,7 @@ import { usePod, podFormatLabel } from "../features/pods/usePods";
 import { useAddIndividualEntrant, useAddTeamEntrant, useRemoveEntrant, entrantErrorMessage } from "../features/pods/useEntrants";
 import { usePlayers } from "../features/players/usePlayers";
 import { useTournament } from "../features/tournaments/useTournament";
+import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
 import { entrantDisplayName } from "../lib/entrant";
@@ -150,6 +151,7 @@ export function PodPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading } = usePod(id);
   const { data: tournamentData } = useTournament(data?.pod.tournamentId);
+  const { data: me } = useMe();
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
   if (!data) return <p className="text-ink-muted">Pod not found.</p>;
@@ -175,6 +177,17 @@ export function PodPage() {
           ? `Team event — teams of ${pod.teamSize}. Assign the roster into teams before pairing round 1.`
           : "Individual entrants. Add everyone playing before pairing round 1."}
       </ScreenDek>
+
+      {me && (
+        <a
+          href={`/o/${me.organization.slug}/tournaments/${pod.tournamentId}/pods/${pod.id}`}
+          target="_blank"
+          rel="noreferrer"
+          className="mb-6 inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+        >
+          Public link ↗
+        </a>
+      )}
 
       <PodTabs podId={pod.id} />
 

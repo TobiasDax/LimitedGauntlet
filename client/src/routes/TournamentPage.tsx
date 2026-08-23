@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTournament } from "../features/tournaments/useTournament";
 import { useCreatePod, podFormatLabel } from "../features/pods/usePods";
+import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, ScreenDek, ScreenTitle, TextField } from "../components/ui";
 import type { PodFormat } from "../lib/types";
 
@@ -137,6 +138,7 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
 export function TournamentPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading } = useTournament(id);
+  const { data: me } = useMe();
   const [showPodForm, setShowPodForm] = useState(false);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
@@ -168,6 +170,16 @@ export function TournamentPage() {
           >
             Best pulls of the weekend →
           </Link>
+          {me && (
+            <a
+              href={`/o/${me.organization.slug}/tournaments/${tournament.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+            >
+              Public link ↗
+            </a>
+          )}
         </div>
       )}
 

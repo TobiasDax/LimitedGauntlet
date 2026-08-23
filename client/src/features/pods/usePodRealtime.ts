@@ -14,10 +14,11 @@ const POD_EVENTS = [
 // Joins this pod's realtime room and invalidates the relevant query
 // caches whenever the server broadcasts a change — so every open tab
 // (organizer's phone, a shared display, a player checking standings)
-// updates without anyone hitting refresh. Broad invalidation
-// (["pods", podId] covers pod detail + nested rounds/standings queries
-// via TanStack's prefix matching) rather than one handler per event,
-// since almost every one of these events plausibly changes standings.
+// updates without anyone hitting refresh. Matches by predicate (any
+// query key that contains the pod/tournament id) rather than a fixed
+// prefix, since both the authenticated ["pods", id, ...] keys and the
+// public ["public", "pods", id, ...] keys need to react to the same
+// broadcast — one pod, two possible viewers.
 export function usePodRealtime(podId: string | undefined, tournamentId?: string): void {
   const queryClient = useQueryClient();
 
@@ -27,9 +28,9 @@ export function usePodRealtime(podId: string | undefined, tournamentId?: string)
     const room = `pod:${podId}`;
 
     const onEvent = () => {
-      queryClient.invalidateQueries({ queryKey: ["pods", podId] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes(podId) });
       if (tournamentId) {
-        queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+        queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes(tournamentId) });
       }
     };
 

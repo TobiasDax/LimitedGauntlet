@@ -15,7 +15,7 @@ export function useTournamentRealtime(tournamentId: string | undefined): void {
     const room = `tournament:${tournamentId}`;
 
     const onEvent = () => {
-      queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes(tournamentId) });
     };
 
     socket.emit("join", room);
