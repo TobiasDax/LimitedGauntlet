@@ -111,6 +111,12 @@ Final placement: 1 Devon (28), 2 Gray (26), 3 Finley (24), 4 Casey (21), 5 Harpe
 
 Battlebond was a team (2HG-style) pod — confirmed team scoring source: Alex+Casey+Emery (team, 5 pts) → all three show 5 in the table above; Tobias+Harper (4 pts) → both show 4; Devon+Finley (4 pts) → both show 4; Bailey+Gray (2 pts) → both show 2. This is the data that confirmed the "full team points to each member" rule.
 
+**Battlebond round-by-round results** (used as the Step 5 standings acceptance test, `server/src/services/standings.test.ts`) — a 4-team, best-of-1, 3-round round robin. Rounds 1-2 are stated directly in the original Outline doc; Round 3 wasn't recorded there, but is uniquely determined by the stated final standings (hand-solved: both Round 3 matches were draws, which is the only combination that produces the final points exactly) — cross-checked by hand against the OMW%/GW%/OGW% formula (opponent floor 33.33%, draws contribute 0 games since no game was actually decided) before implementing, all four rows matched exactly:
+- R1: Tobias+Harper vs Devon+Finley → Devon+Finley wins 1-0. Bailey+Gray vs Alex+Casey+Emery → DRAW.
+- R2: Devon+Finley vs Alex+Casey+Emery → Alex+Casey+Emery wins 1-0. Tobias+Harper vs Bailey+Gray → Tobias+Harper wins 1-0.
+- R3 (reconstructed): Tobias+Harper vs Alex+Casey+Emery → DRAW. Bailey+Gray vs Devon+Finley → DRAW.
+- Final: Alex+Casey+Emery 5/40.74/100/44.44, Tobias+Harper 4/44.44/50/61.11, Devon+Finley 4/44.44/50/61.11, Bailey+Gray 2/48.15/0/66.67 (points/OMW%/GW%/OGW%).
+
 ### 2025 Winter GP Eichstätt — Gesamtwertung
 | | Mystery 2 Draft | Chaos Draft | Innistrad Remastered Draft | Gesamt |
 |---|---|---|---|---|

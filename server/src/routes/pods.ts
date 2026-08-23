@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedTournament, findOwnedPod } from "../services/ownership.js";
+import { computePodStandings } from "../services/standings.js";
 
 // Playing in any pod implies attending that pod's tournament — upsert
 // keeps this true even if some of the players were already attached.
@@ -159,6 +160,36 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
     reply.send({ pod });
+  });
+
+  app.get("/api/pods/:id/standings", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    const pod = await findOwnedPod(params.data.id, request.organizer!.orgId);
+    if (!pod) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    const [rows, entrants] = await Promise.all([
+      computePodStandings(pod.id),
+      prisma.entrant.findMany({
+        where: { podId: pod.id },
+        include: {
+          player: true,
+          team: { include: { members: { include: { player: true } } } },
+        },
+      }),
+    ]);
+
+    const entrantById = new Map(entrants.map((e) => [e.id, e]));
+    const standings = rows.map((row) => ({ ...row, entrant: entrantById.get(row.entrantId) }));
+
+    reply.send({ standings });
   });
 
   app.patch("/api/pods/:id", async (request, reply) => {

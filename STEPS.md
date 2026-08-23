@@ -2,7 +2,7 @@
 
 Granular checklist. Check items off as they land. This file is the first thing to read in a new session — it tells you exactly what's done and what's next. Full rationale for any step lives in `PLAN.md`.
 
-**Status: Steps 0-4 done. Next up: Step 5 (match results + pod standings page).**
+**Status: Steps 0-5 done. Next up: Step 6 (weekend Gesamtwertung).**
 
 ## Step 0 — Project bootstrap ✅
 - [x] Create `~/Projects/LimitedGauntlet/`, `git init`
@@ -54,11 +54,12 @@ Granular checklist. Check items off as they land. This file is the first thing t
 - [x] Verify — deterministic Vitest suite (`server/src/services/pairing.test.ts`) against a real throwaway Postgres, not mocks: (1) a full 8-entrant, 3-round pod never repeats an opponent, confirmed across 9 consecutive runs despite round-1's randomized draw; (2) bye assignment goes to a different entrant each round until everyone's had one; (3) given a completed Pod A where two pairs have already met, Pod B's fresh round-1 pairing for the same 4 players always avoids those pairs when an equally-valid alternative exists — this one is provably deterministic, not just probably-usually-true, because the crafted 4-player scenario has an all-zero-cost perfect matching that greedy-lowest-cost-first always finds before ever considering the higher-cost repeat option
 - [x] Verify — full HTTP round-lifecycle exercised live against a running stack (not just the pure algorithm): 6-player pod through rounds 1-2 auto-paired with a verified zero repeat opponents between them, swap tested before lock and confirmed blocked after `start`, `complete` blocked until all results are in then succeeds once they are, manual pairing's validation confirmed rejecting both an incomplete roster and a wrong bye count, and cross-org 404s confirmed on round start / match result / coverage (three hops from org: round → pod → tournament → org)
 
-## Step 5 — Match results + pod standings
-- [x] Result entry (organizer-only, per PLAN.md's v1 scope) — already built in Step 4 as necessary plumbing (`PATCH /api/matches/:id/result`), since the pairing engine's round-sequencing needed a real way to complete a round. Nothing left to do here beyond a frontend for it in Step 9.
-- [ ] `server/src/services/standings.ts`: extend `podStats.ts`'s points/opponents computation with GW% and OMW%/OGW% (33% floor per MTR) — reuse `podStats.ts` rather than recomputing points a second way
-- [ ] `GET /api/pods/:id/standings` (or fold into the existing pod GET) returning the full points/OMW/GW/OGW table, sorted correctly
-- [ ] Verify against a real historical pod: 2025 Sommer Battlebond's final standings table (Alex+Casey+Emery 5pts/40.74/100/44.44, etc. — see PLAN.md) reproduces exactly from re-entered match results
+## Step 5 — Match results + pod standings ✅
+- [x] Result entry (organizer-only, per PLAN.md's v1 scope) — already built in Step 4 as necessary plumbing (`PATCH /api/matches/:id/result`). Nothing left to do here beyond a frontend for it in Step 9.
+- [x] Extended `podStats.ts`'s core `tallyMatches()` with `matchesPlayed`/`gamesWon`/`gamesPlayed` tracking (byes count as a played round + a clean 2-0; a real match still `PENDING` correctly contributes to nothing yet, which matters for live mid-round standings even though it's a no-op for pairing since round-sequencing guarantees prior rounds are always complete by the time pairing looks at them) — added `computeAllPodStats()` alongside the existing round-cutoff `computePodStats()` rather than duplicating the tally logic
+- [x] `server/src/services/standings.ts`: `computePodStandings()` — match-win% and game-win% per entrant, then OMW%/OGW% as the average of each opponent's own (floored-at-33%) percentage, sorted points → OMW% → GW% → OGW% per MTR tiebreaker order. Pulls the full entrant list from the DB (not just entrants who've played something yet) so a fresh pod shows everyone at zero rather than an empty table
+- [x] `GET /api/pods/:id/standings` — full table with player/team names joined in
+- [x] Verify — before writing any code, hand-reconstructed the actual 2025 Sommer Battlebond round-by-round results from the original Outline doc (Rounds 1-2 were stated directly; Round 3 wasn't recorded there, but is uniquely determined by the stated final standings — both Round 3 matches were draws, confirmed by hand-solving the points backward, then cross-checked all four rows' OMW%/GW%/OGW% by hand against the planned formula before implementing). Then wrote it as a deterministic Vitest test (`standings.test.ts`) that recreates the exact pod/teams/rounds/results and asserts the computed output against the real numbers — **all four rows match exactly**: Alex+Casey+Emery 5/40.74/100/44.44, Tobias+Harper 4/44.44/50/61.11, Devon+Finley 4/44.44/50/61.11, Bailey+Gray 2/48.15/0/66.67. Also verified live over HTTP: a fresh pod shows all entrants at zero, standings update correctly as results come in (and correctly exclude a match's contribution until its result is actually submitted, even mid-round), and cross-org access to another org's standings 404s.
 
 ## Step 6 — Weekend Gesamtwertung
 - [ ] Compute eventsPlayed / totalPoints / average per player per tournament (team pods → full team points per member)
