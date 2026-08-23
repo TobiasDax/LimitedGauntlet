@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { usePod } from "../features/pods/usePods";
 import {
@@ -14,6 +14,8 @@ import { entrantDisplayName } from "../lib/entrant";
 import { Button, Eyebrow, FormError, ScreenDek, ScreenTitle } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
+import { useCountdown } from "../lib/useCountdown";
+import { playChime } from "../lib/chime";
 import type { Entrant, Match, Round } from "../lib/types";
 
 function ResultEntry({ match, podId }: { match: Match; podId: string }) {
@@ -90,7 +92,44 @@ function MatchCard({ match, entrantById, podId }: { match: Match; entrantById: M
   );
 }
 
-function RoundCard({ round, entrantById, podId }: { round: Round; entrantById: Map<string, Entrant>; podId: string }) {
+function RoundTimer({ round, displayMode }: { round: Round; displayMode: boolean }) {
+  const countdown = useCountdown(round.endsAt);
+  // Only the round's own endsAt identifies "which countdown" — a +5 min
+  // extend changes endsAt, so the ref key naturally allows the chime to
+  // fire again after an extension rather than staying silent forever
+  // after the first time this round expired.
+  const chimedForRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!displayMode || !round.endsAt) return;
+    if (countdown.expired && chimedForRef.current !== round.endsAt) {
+      chimedForRef.current = round.endsAt;
+      playChime();
+    }
+  }, [countdown.expired, displayMode, round.endsAt]);
+
+  return (
+    <div
+      className={`font-display tabular-nums font-bold ${countdown.expired ? "text-critical" : "text-accent-strong"} ${
+        displayMode ? "text-[64px]" : "text-[26px]"
+      }`}
+    >
+      {countdown.formatted}
+    </div>
+  );
+}
+
+function RoundCard({
+  round,
+  entrantById,
+  podId,
+  displayMode,
+}: {
+  round: Round;
+  entrantById: Map<string, Entrant>;
+  podId: string;
+  displayMode: boolean;
+}) {
   const startRound = useStartRound(podId);
   const completeRound = useCompleteRound(podId);
   const extendRound = useExtendRound(podId);
@@ -104,6 +143,7 @@ function RoundCard({ round, entrantById, podId }: { round: Round; entrantById: M
           <div className="font-display text-[18px] font-bold">Round {round.roundNumber}</div>
           <div className="text-[11.5px] tracking-wide text-ink-muted uppercase">{round.status}</div>
         </div>
+        {round.status === "ACTIVE" && <RoundTimer round={round} displayMode={displayMode} />}
         <div className="flex items-center gap-2">
           {round.status === "PENDING" && (
             <Button variant="primary" onClick={() => startRound.mutate(round.id)} disabled={startRound.isPending}>
@@ -144,6 +184,7 @@ export function PairingsPage() {
   const { data: roundsData, isLoading } = useRounds(id);
   const generateRound = useGenerateRound(id ?? "");
   usePodRealtime(id, podData?.pod.tournamentId);
+  const [displayMode, setDisplayMode] = useState(false);
 
   if (isLoading || !podData) return <p className="text-ink-muted">Loading…</p>;
 
@@ -163,10 +204,23 @@ export function PairingsPage() {
           {pod.name}
         </Link>
       </Eyebrow>
-      <ScreenTitle>Pairings</ScreenTitle>
-      <ScreenDek>
-        {rounds.length} of {pod.roundCount} rounds paired.
-      </ScreenDek>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <ScreenTitle>Pairings</ScreenTitle>
+          <ScreenDek>
+            {rounds.length} of {pod.roundCount} rounds paired.
+          </ScreenDek>
+        </div>
+        <Button variant={displayMode ? "primary" : "ghost"} onClick={() => setDisplayMode((v) => !v)}>
+          {displayMode ? "Exit display mode" : "Display mode"}
+        </Button>
+      </div>
+      {displayMode && (
+        <p className="mb-6 -mt-4 text-[12px] text-ink-muted">
+          This device will chime when the round timer hits zero. Leave other devices out of display mode so the room
+          doesn't fill with simultaneous beeps.
+        </p>
+      )}
 
       <PodTabs podId={pod.id} />
 
@@ -174,7 +228,7 @@ export function PairingsPage() {
 
       <div className="flex flex-col gap-5">
         {[...rounds].reverse().map((round) => (
-          <RoundCard key={round.id} round={round} entrantById={entrantById} podId={pod.id} />
+          <RoundCard key={round.id} round={round} entrantById={entrantById} podId={pod.id} displayMode={displayMode} />
         ))}
       </div>
 
