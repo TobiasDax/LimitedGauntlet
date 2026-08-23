@@ -1,1 +1,55 @@
 @import "tailwindcss";
+
+/*
+ * Design system — dark mode only for v1 (light mode is a deliberate v2).
+ * Values carried over from the validated design pass: the accent gold was
+ * re-picked after the dataviz skill's palette validator flagged the first
+ * choice as too close to the "warning" status color (ΔE 9.6, below the 15
+ * floor); ink-muted was bumped after checking contrast, not eyeballing
+ * (3.44:1 -> 4.87:1). See PLAN.md / the design artifact for the full
+ * rationale — don't re-pick these without re-running the validator.
+ */
+@theme {
+  --color-bg: #141210;
+  --color-surface: #1c1a17;
+  --color-surface-raised: #252220;
+  --color-surface-sunken: #0f0d0b;
+
+  --color-ink: #f2ede4;
+  --color-ink-secondary: #a89f8f;
+  --color-ink-muted: #8a8175;
+
+  --color-border: rgba(242, 237, 228, 0.1);
+  --color-border-strong: rgba(242, 237, 228, 0.18);
+
+  --color-accent: #a67c27;
+  --color-accent-strong: #c2953f;
+  --color-accent-wash: rgba(166, 124, 39, 0.14);
+
+  --color-good: #0ca30c;
+  --color-good-wash: rgba(12, 163, 12, 0.14);
+  --color-warning: #fab219;
+  --color-warning-wash: rgba(250, 178, 25, 0.14);
+  --color-critical: #d03b3b;
+  --color-critical-wash: rgba(208, 59, 59, 0.14);
+
+  --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+  background-color: var(--color-bg);
+  background-image: radial-gradient(ellipse 1200px 600px at 50% -10%, rgba(166, 124, 39, 0.06), transparent);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

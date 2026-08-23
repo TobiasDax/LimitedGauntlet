@@ -2,7 +2,7 @@
 
 Granular checklist. Check items off as they land. This file is the first thing to read in a new session — it tells you exactly what's done and what's next. Full rationale for any step lives in `PLAN.md`.
 
-**Status: Steps 0-8 done (backend halves of Steps 7 and 8 — frontend halves deferred to Step 9, see below). Next up: Step 9 (public pages + full UI build) — this is where the app actually becomes visible/usable.**
+**Status: Steps 0-8 done. Step 9 (the real frontend) in progress — Phase A done (auth, routing, design system, first real data page, all browser-verified). Next up: Step 9 Phase B (roster + pod setup UI).**
 
 ## Step 0 — Project bootstrap ✅
 - [x] Create `~/Projects/LimitedGauntlet/`, `git init`
@@ -84,19 +84,28 @@ Backend-first, same as Step 7 — the add-pull UI and the Hall of Fame *page* ne
 - [x] `DELETE /api/card-pulls/:id`
 - [x] Verify — confirmed real outbound network access from a container first (not assumed), then re-added the actual 5 historical 2025 Sommer Battlebond pulls (Morphic Pool, Doubling Season, Spellseeker, Diabolic Intent, Seedborn Muse) through the live API against **today's real Scryfall data**, not mocked responses. Prices came back close to but not identical to the 2025 historical figures (e.g. Morphic Pool €25.98 today vs €25.91 then) — expected and correct, since these are live current prices and the whole point of snapshotting at add-time is that history stays historical while new pulls reflect the market as it is now; matching the exact 2025 total would have meant the integration was somehow returning stale data. Confirmed the gallery total sums exactly (€81.70 for the 5 cards' current prices), confirmed autocomplete and a real card-not-found case both behave correctly, confirmed delete updates the total correctly, and confirmed cross-org isolation on all five endpoints including Hall of Fame correctly returning empty rather than leaking another org's pulls.
 
-## Step 9 — Public pages + polish
-- [ ] `/o/<slug>/tournaments/<id>` and `.../pods/<podId>` public unauthenticated read-only pages
-- [ ] **Load the `dataviz` skill before this step** — explicit ask was for Gesamtwertung/standings to be "displayed in a nice way," not just functional tables
-- [ ] Responsive pass: usable on a phone (players checking standings) and on a shared iPad/TV (Display Mode)
-- [ ] Light/dark theme support
-- [ ] Deferred from Step 7 (backend was built there, frontend needed real UI to exist first):
+## Step 9 — Public pages + polish (the real frontend build)
+This is the biggest single step in the plan — it's being worked in phases, each checked in on rather than delivered silently as one giant commit. Design direction was reviewed and approved first, via a standalone HTML mockup built with real 2025 Sommer data (see `PLAN.md`) and validated against the dataviz skill's accessibility checker — **dark mode only for v1** (light mode is a deliberate, explicitly-requested v2, not an oversight — the token structure supports adding it later without a rewrite).
+
+### Phase A — infrastructure, auth, first real page ✅
+- [x] `react-router-dom` added; client restructured into `routes/`, `features/<resource>/`, `components/`, `lib/`
+- [x] Design system ported from the approved mockup into Tailwind v4 `@theme` tokens (`client/src/index.css`) — same validated accent (`#a67c27`, re-picked after the dataviz palette validator flagged the first choice as too close to "warning"), same Georgia-for-display/system-sans-for-data type pairing
+- [x] `lib/api.ts` (typed fetch wrapper, cookie-based auth via `credentials: "include"`) and `lib/types.ts` (shared domain types matching backend response shapes)
+- [x] Auth: `useAuth.ts` (TanStack Query — `useMe`/`useSignup`/`useLogin`/`useLogout`), `LoginPage`, `SignupPage` (with live slug auto-derivation from org name), `ProtectedRoute` (redirects to `/login` when `useMe` resolves to `null`)
+- [x] `Layout` (topbar: wordmark, org context, log out) + `DashboardPage` (real tournament list + inline create-tournament form, not a stub) + minimal `TournamentPage` (tournament header, pod count) — first real end-to-end data page
+- [x] Verify — no browser automation tool was connected in this environment (`claude-in-chrome` unavailable, `chromium-cli` not installed), so followed the `run` skill's documented fallback: Playwright directly via the official `mcr.microsoft.com/playwright` Docker image against the live compose stack. Drove the actual app end-to-end — signup → dashboard → create tournament → tournament detail page → reload (session persists) → logout → confirm the protected route redirects again — and **looked at the resulting screenshots**, not just the exit code, to confirm the design actually renders correctly (dark theme, Georgia headings, gold accent, real data flowing through). The only console entries were expected 401s from the auth check while intentionally logged out, not runtime errors.
+
+### Remaining phases (not started)
+- [ ] Phase B — roster management page, pod setup/CRUD UI, entrant/team assignment
+- [ ] Phase C — the flagship pages: Gesamtwertung (hero ranking list), pod standings (data table), live pairings view. Also where the rest of Step 7's frontend half lands, since sockets matter most here:
   - [ ] TanStack Query cache invalidation on the Socket.IO events already being broadcast (`pairings-published`, `pairings-updated`, `round-started`, `round-extended`, `round-completed`, `result-submitted`)
   - [ ] Client-side round timer: countdown from `Round.endsAt`, organizer "+5 min" button calling the already-built `POST /api/rounds/:id/extend`
   - [ ] Display Mode: audible chime via Web Audio when the timer hits zero; personal/phone views stay muted by default
   - [ ] Verify with two real browser windows (organizer view + shared display): submit a result in one, confirm the other updates without a manual refresh; let a timer run out in Display Mode and confirm the chime actually fires
-- [ ] Deferred from Step 8 (backend built and verified there, needs real UI):
+- [ ] Phase D — value tracking UI, the rest of Step 8's frontend half:
   - [ ] Add-pull form: card name autocomplete (`GET /api/scryfall/autocomplete`) → confirm/preview → `POST /api/pods/:id/card-pulls`
   - [ ] Per-pod card gallery with images, per-tournament "Best Pulls of the Weekend" rollup, all-time "Hall of Fame" page
+- [ ] Phase E — public unauthenticated `/o/<slug>/tournaments/<id>` + `.../pods/<podId>` pages, plus the final responsive pass (usable on a phone checking standings and on a shared iPad/TV in Display Mode)
 
 ## Step 10 — History import
 - [ ] `scripts/legacy-data.json`: transcribe PLAN.md's historical reference section (all 4 tournaments) into structured JSON
