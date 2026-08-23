@@ -2,7 +2,7 @@
 
 Granular checklist. Check items off as they land. This file is the first thing to read in a new session — it tells you exactly what's done and what's next. Full rationale for any step lives in `PLAN.md`.
 
-**Status: Steps 0-7 done (Step 7's backend half — frontend half deferred to Step 9, see below). Next up: Step 8 (value tracking).**
+**Status: Steps 0-8 done (backend halves of Steps 7 and 8 — frontend halves deferred to Step 9, see below). Next up: Step 9 (public pages + full UI build) — this is where the app actually becomes visible/usable.**
 
 ## Step 0 — Project bootstrap ✅
 - [x] Create `~/Projects/LimitedGauntlet/`, `git init`
@@ -74,13 +74,15 @@ Per the decision to stay backend-first through Step 8, this step is scoped down 
 - [x] Broadcasts wired into `rounds.ts`: `pairings-published` (auto or manual round creation), `pairings-updated` (swap), `round-started`, `round-extended` (new `POST /api/rounds/:id/extend` endpoint — the "+5 min" nudge), `round-completed`, `result-submitted`. Card-pull broadcasts wait for Step 8, which hasn't built card pulls yet
 - [x] Verify — didn't just trust the reasoning above, actually tested the tricky part: confirmed plain HTTP routes (`/api/healthz`, the SPA, a 404 for an unknown API path) still work AND the Socket.IO engine.io handshake (`/socket.io/?EIO=4&transport=polling`) responds correctly on the same shared server. Then a real Socket.IO client (`socket.io-client`, run standalone against the live stack) joined a pod room and received all 5 broadcast events in the correct order with correct payloads while the round lifecycle was driven over HTTP — including `round-extended` showing exactly `startedAt + 5min` on `endsAt`. Finally confirmed room isolation two ways: a client that joined a *different* pod's room, and a client that joined no room at all, both received zero events while a real broadcast was firing elsewhere.
 
-## Step 8 — Value tracking
-- [ ] `server/services/scryfall.ts`: proxy `/cards/autocomplete` + `/cards/named`, short cache, proper User-Agent per Scryfall's API guidelines
-- [ ] Add-pull UI: name autocomplete → price (EUR) + image snapshot into `CardPull`
-- [ ] Per-pod card gallery, sorted by price, running total
-- [ ] Per-tournament "Best Pulls of the Weekend" rollup
-- [ ] All-time cross-tournament "Hall of Fame" page
-- [ ] Verify: re-add the 2025 Sommer Battlebond pulls (Morphic Pool, Doubling Season, Spellseeker, Diabolic Intent, Seedborn Muse — total €143.96, see PLAN.md) and confirm the gallery total matches
+## Step 8 — Value tracking (backend half) ✅
+Backend-first, same as Step 7 — the add-pull UI and the Hall of Fame *page* need real UI and move to Step 9. Everything they'd call is built and verified here.
+- [x] `server/src/services/scryfall.ts`: proxies `/cards/autocomplete` + `/cards/named` with a proper descriptive User-Agent (Scryfall's API guidelines require identifying yourself) and a short in-memory TTL cache (5 min autocomplete, 1 hour named-card lookups) — a full rate limiter would be over-engineering at this app's actual traffic scale (a handful of organizers adding a few pulls per pod), the cache is the practical mitigation
+- [x] `POST /api/pods/:id/card-pulls`: takes a card name, resolves it live via Scryfall, snapshots `scryfallId`/`setCode`/`priceEur`/`imageUri` into `CardPull` at add-time (deliberately a snapshot, not a live reference — per PLAN.md, prices fluctuate and history should stay historical)
+- [x] `GET /api/pods/:id/card-pulls`: per-pod gallery sorted by price desc, with a running total
+- [x] `GET /api/tournaments/:id/card-pulls`: "Best Pulls of the Weekend" rollup across every pod in a tournament
+- [x] `GET /api/card-pulls/hall-of-fame`: all-time, across every tournament the org has ever run, top 25 by price
+- [x] `DELETE /api/card-pulls/:id`
+- [x] Verify — confirmed real outbound network access from a container first (not assumed), then re-added the actual 5 historical 2025 Sommer Battlebond pulls (Morphic Pool, Doubling Season, Spellseeker, Diabolic Intent, Seedborn Muse) through the live API against **today's real Scryfall data**, not mocked responses. Prices came back close to but not identical to the 2025 historical figures (e.g. Morphic Pool €25.98 today vs €25.91 then) — expected and correct, since these are live current prices and the whole point of snapshotting at add-time is that history stays historical while new pulls reflect the market as it is now; matching the exact 2025 total would have meant the integration was somehow returning stale data. Confirmed the gallery total sums exactly (€81.70 for the 5 cards' current prices), confirmed autocomplete and a real card-not-found case both behave correctly, confirmed delete updates the total correctly, and confirmed cross-org isolation on all five endpoints including Hall of Fame correctly returning empty rather than leaking another org's pulls.
 
 ## Step 9 — Public pages + polish
 - [ ] `/o/<slug>/tournaments/<id>` and `.../pods/<podId>` public unauthenticated read-only pages
@@ -92,6 +94,9 @@ Per the decision to stay backend-first through Step 8, this step is scoped down 
   - [ ] Client-side round timer: countdown from `Round.endsAt`, organizer "+5 min" button calling the already-built `POST /api/rounds/:id/extend`
   - [ ] Display Mode: audible chime via Web Audio when the timer hits zero; personal/phone views stay muted by default
   - [ ] Verify with two real browser windows (organizer view + shared display): submit a result in one, confirm the other updates without a manual refresh; let a timer run out in Display Mode and confirm the chime actually fires
+- [ ] Deferred from Step 8 (backend built and verified there, needs real UI):
+  - [ ] Add-pull form: card name autocomplete (`GET /api/scryfall/autocomplete`) → confirm/preview → `POST /api/pods/:id/card-pulls`
+  - [ ] Per-pod card gallery with images, per-tournament "Best Pulls of the Weekend" rollup, all-time "Hall of Fame" page
 
 ## Step 10 — History import
 - [ ] `scripts/legacy-data.json`: transcribe PLAN.md's historical reference section (all 4 tournaments) into structured JSON

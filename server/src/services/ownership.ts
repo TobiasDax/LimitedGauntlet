@@ -21,3 +21,7 @@ export function findOwnedRound(roundId: string, orgId: string) {
 export function findOwnedMatch(matchId: string, orgId: string) {
   return prisma.match.findFirst({ where: { id: matchId, round: { pod: { tournament: { orgId } } } } });
 }
+
+export function findOwnedCardPull(cardPullId: string, orgId: string) {
+  return prisma.cardPull.findFirst({ where: { id: cardPullId, pod: { tournament: { orgId } } } });
+}
