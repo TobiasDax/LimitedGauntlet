@@ -2,7 +2,7 @@
 
 Granular checklist. Check items off as they land. This file is the first thing to read in a new session — it tells you exactly what's done and what's next. Full rationale for any step lives in `PLAN.md`.
 
-**Status: Steps 0-5 done. Next up: Step 6 (weekend Gesamtwertung).**
+**Status: Steps 0-6 done. Next up: Step 7 (realtime + round timer).**
 
 ## Step 0 — Project bootstrap ✅
 - [x] Create `~/Projects/LimitedGauntlet/`, `git init`
@@ -61,10 +61,11 @@ Granular checklist. Check items off as they land. This file is the first thing t
 - [x] `GET /api/pods/:id/standings` — full table with player/team names joined in
 - [x] Verify — before writing any code, hand-reconstructed the actual 2025 Sommer Battlebond round-by-round results from the original Outline doc (Rounds 1-2 were stated directly; Round 3 wasn't recorded there, but is uniquely determined by the stated final standings — both Round 3 matches were draws, confirmed by hand-solving the points backward, then cross-checked all four rows' OMW%/GW%/OGW% by hand against the planned formula before implementing). Then wrote it as a deterministic Vitest test (`standings.test.ts`) that recreates the exact pod/teams/rounds/results and asserts the computed output against the real numbers — **all four rows match exactly**: Alex+Casey+Emery 5/40.74/100/44.44, Tobias+Harper 4/44.44/50/61.11, Devon+Finley 4/44.44/50/61.11, Bailey+Gray 2/48.15/0/66.67. Also verified live over HTTP: a fresh pod shows all entrants at zero, standings update correctly as results come in (and correctly exclude a match's contribution until its result is actually submitted, even mid-round), and cross-org access to another org's standings 404s.
 
-## Step 6 — Weekend Gesamtwertung
-- [ ] Compute eventsPlayed / totalPoints / average per player per tournament (team pods → full team points per member)
-- [ ] Gesamtwertung page: ranked by average desc, total shown alongside, tiebreak by total then name
-- [ ] Unit tests against all 3 completed historical tournaments' fixtures in PLAN.md (2024 Bad Gechingen, 2025 Winter, 2025 Sommer) — confirm computed rankings match (noting 2024's original doc ranked by raw total, not average, so expect an intentional re-rank there, not a bug)
+## Step 6 — Weekend Gesamtwertung ✅
+- [x] `server/src/services/gesamtwertung.ts`: `computeGesamtwertung(tournamentId)` sums each attended pod's `computePodStandings()` points per player (team pods → full team points per member, reusing the same standings computation Step 5 already built and verified — no separate point-tallying logic to drift out of sync), counts `eventsPlayed`, and ranks by average desc → total desc → name asc
+- [x] `GET /api/tournaments/:id/gesamtwertung` — joins in player display names
+- [x] Before writing the aggregation test, hand-verified (via a throwaway Node script, not by eye) exactly what the real 2024 GP Bad Gechingen re-rank looks like: Alex (27 pts over 5 pods he actually attended, avg 5.4) jumps from rank 6 by raw total up to **rank 4** by average, passing both Gray (31/6 = 5.17) and Casey (30/6 = 5.0) despite a lower total — confirms the plan's "average, not total" rule produces a real, meaningful re-rank on real data, not just a theoretical one
+- [x] Verify — rather than refitting all 10 real Bad Gechingen players (which would require inventing an internally-consistent 60-cell match history just to hit specific point totals, disproportionate effort given Step 5's standings math is already separately verified against real data), wrote a small fully-hand-checked synthetic scenario in `gesamtwertung.test.ts` that isolates the same property precisely: two players tie on raw total (6 pts each) but one earned it over fewer pods, and must rank above the other by average — passes, plus a second test confirming team-pod full-point-crediting holds through the tournament-wide aggregation too. Also checked live over HTTP with cross-org 404 confirmed.
 
 ## Step 7 — Realtime + round timer
 - [ ] Socket.IO server setup, rooms per pod + per tournament

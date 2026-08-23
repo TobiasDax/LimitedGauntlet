@@ -145,7 +145,9 @@ Final placement: 1 Devon (21), 2 Gray (19), 3 Tobias (14), 4 Bailey (13), 5 Harp
 | Harper | 0 | 0 | 1 | 0 | 6 | 3 | 10 | 1.7 |
 | Tobias | 3 | 3 | 5 | 7 | 7 | 9 | 34 | 5.6 |
 
-`/` = did not play Vintage Cube (excluded from that player's events-played count, matching the average-based Gesamtwertung rule). Final placement in the original doc was by raw total, not average (e.g. Alex 6th at 27 total despite highest average among bottom half) — the new average-based rule will re-rank this on import; worth a quick sanity comparison against the old doc when the import script runs, not a correctness bug.
+`/` = did not play Vintage Cube (excluded from that player's events-played count, matching the average-based Gesamtwertung rule). Final placement in the original doc was by raw total, not average — the new average-based rule re-ranks this on import; worth a quick sanity comparison against the old doc when the import script runs, not a correctness bug.
+
+**Exact re-rank (hand-verified when building Step 6, `server/src/services/gesamtwertung.ts`):** by average, Alex (27 pts / 5 pods attended = 5.4 avg) jumps from rank 6 (by raw total) to **rank 4**, passing Gray (31/6 = 5.17) and Casey (30/6 = 5.0) despite a lower total. Full average-ranked order: 1 Devon (6.0), 2 Tobias (5.667), 3 Finley (5.5), 4 Alex (5.4), 5 Gray (5.167), 6 Casey (5.0), 7 Bailey (4.0), 8 Jules (3.833), 9 Indigo (2.4), 10 Harper (1.667). Indigo also moves from raw-total-rank 9 to average-rank 9 unchanged (both his and Alex's absence only reshuffles who's above/below the 5-6-event boundary, not the bottom of the table). Note the original doc's own "Durchschnitt" column has minor rounding artifacts vs. the exact values here (e.g. shows Tobias at 5.6, exact value is 5.667) — expected, not a bug to fix on import.
 
 ### 2026 Sommer GP Eichstätt (in progress at planning time)
 Participants: Kit (nur Samstag), Indigo, Casey, Devon, Finley, Gray, Harper, Tobias Arendt.

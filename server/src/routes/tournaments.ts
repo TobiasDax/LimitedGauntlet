@@ -4,6 +4,7 @@ import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedTournament } from "../services/ownership.js";
 import { computePlayerPairHistory } from "../services/weekendHistory.js";
+import { computeGesamtwertung } from "../services/gesamtwertung.js";
 
 const tournamentCreateSchema = z.object({
   name: z.string().trim().min(1).max(150),
@@ -183,5 +184,28 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
     });
 
     reply.send({ players, pairs });
+  });
+
+  // The weekend "overall" table — average points per pod played, ranked
+  // (raw total shown alongside, but average is the ranking key).
+  app.get("/api/tournaments/:id/gesamtwertung", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    const tournament = await findOwnedTournament(params.data.id, request.organizer!.orgId);
+    if (!tournament) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    const rows = await computeGesamtwertung(tournament.id);
+    const players = await prisma.player.findMany({ where: { id: { in: rows.map((r) => r.playerId) } } });
+    const playerById = new Map(players.map((p) => [p.id, p]));
+
+    const gesamtwertung = rows.map((row) => ({ ...row, player: playerById.get(row.playerId) }));
+    reply.send({ gesamtwertung });
   });
 }
