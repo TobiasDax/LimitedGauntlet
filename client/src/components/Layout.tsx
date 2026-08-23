@@ -10,35 +10,35 @@ export function Layout() {
   return (
     <div className="min-h-screen">
       <div className="border-border sticky top-0 z-10 border-b bg-bg/85 backdrop-blur">
-        <div className="mx-auto flex max-w-[1180px] items-center gap-7 px-8 py-3.5">
-          <Link to="/" className="font-display flex items-baseline gap-2.5 text-[19px] font-bold whitespace-nowrap">
+        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center gap-x-7 gap-y-2 px-4 py-3 sm:px-8 sm:py-3.5">
+          <Link to="/" className="font-display flex items-baseline gap-2.5 text-[17px] font-bold whitespace-nowrap sm:text-[19px]">
             <span className="from-accent-strong to-accent inline-block h-5 w-5 rounded bg-gradient-to-br shadow-[inset_0_0_0_1px_rgba(0,0,0,0.3)]" />
             LimitedGauntlet
           </Link>
 
           {me && (
-            <div className="border-border flex flex-col gap-px border-l pl-5">
+            <div className="border-border hidden flex-col gap-px border-l pl-5 sm:flex">
               <span className="text-[13px] text-ink-secondary">{me.organization.name}</span>
             </div>
           )}
 
           {me && (
-            <nav className="flex gap-1">
+            <nav className="order-3 flex w-full gap-1 overflow-x-auto sm:order-none sm:w-auto sm:overflow-visible">
               <Link
                 to="/"
-                className="rounded px-3 py-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:bg-surface-raised hover:text-ink"
+                className="shrink-0 rounded px-3 py-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:bg-surface-raised hover:text-ink"
               >
                 Tournaments
               </Link>
               <Link
                 to="/roster"
-                className="rounded px-3 py-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:bg-surface-raised hover:text-ink"
+                className="shrink-0 rounded px-3 py-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:bg-surface-raised hover:text-ink"
               >
                 Roster
               </Link>
               <Link
                 to="/hall-of-fame"
-                className="rounded px-3 py-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:bg-surface-raised hover:text-ink"
+                className="shrink-0 rounded px-3 py-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:bg-surface-raised hover:text-ink"
               >
                 Hall of Fame
               </Link>
@@ -64,7 +64,7 @@ export function Layout() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-[1180px] px-8 pb-24 pt-10">
+      <main className="mx-auto max-w-[1180px] px-4 pb-24 pt-8 sm:px-8 sm:pt-10">
         <Outlet />
       </main>
     </div>

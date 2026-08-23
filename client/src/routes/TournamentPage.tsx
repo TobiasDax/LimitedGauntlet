@@ -44,7 +44,7 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
           });
         }}
       >
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Name">
             <TextField required value={name} onChange={(e) => setName(e.target.value)} placeholder="Battlebond" />
           </Field>
@@ -87,7 +87,7 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
           <summary className="cursor-pointer text-[12.5px] tracking-wide text-ink-secondary uppercase select-none">
             Advanced settings
           </summary>
-          <div className="mt-4 grid grid-cols-2 gap-4">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Rounds">
               <TextField
                 type="number"

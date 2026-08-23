@@ -87,7 +87,7 @@ export function DashboardPage() {
             <Field label="Name">
               <TextField required value={name} onChange={(e) => setName(e.target.value)} placeholder="2026 - Sommer GP Eichstätt" />
             </Field>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Start date">
                 <TextField type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </Field>
