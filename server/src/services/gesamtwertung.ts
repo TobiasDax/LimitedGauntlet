@@ -1,11 +1,26 @@
 import { prisma } from "../prisma.js";
 import { computePodStandings } from "./standings.js";
 
+export interface GesamtwertungPod {
+  id: string;
+  name: string;
+  sequenceOrder: number;
+}
+
 export interface GesamtwertungRow {
   playerId: string;
   eventsPlayed: number;
   totalPoints: number;
   average: number;
+  // Points earned in each pod, keyed by pod id. Absent from the map (not
+  // zero) means the player never had an entrant in that pod — distinct
+  // from attending and scoring zero.
+  perPod: Record<string, number>;
+}
+
+export interface GesamtwertungResult {
+  pods: GesamtwertungPod[];
+  rows: GesamtwertungRow[];
 }
 
 // The weekend "overall" table: for each player attending the tournament,
@@ -14,20 +29,23 @@ export interface GesamtwertungRow {
 // real 2025 Sommer data, see PLAN.md), then rank by average points per
 // pod played rather than raw total, so partial attendance isn't
 // penalized (e.g. someone who only made Saturday).
-export async function computeGesamtwertung(tournamentId: string): Promise<GesamtwertungRow[]> {
+export async function computeGesamtwertung(tournamentId: string): Promise<GesamtwertungResult> {
   const [tournamentPlayers, pods] = await Promise.all([
     prisma.tournamentPlayer.findMany({ where: { tournamentId } }),
     prisma.pod.findMany({
       where: { tournamentId },
+      orderBy: { sequenceOrder: "asc" },
       include: { entrants: { include: { team: { include: { members: true } } } } },
     }),
   ]);
 
   const totals = new Map<string, number>();
   const eventsPlayed = new Map<string, number>();
+  const perPod = new Map<string, Record<string, number>>();
   for (const tp of tournamentPlayers) {
     totals.set(tp.playerId, 0);
     eventsPlayed.set(tp.playerId, 0);
+    perPod.set(tp.playerId, {});
   }
 
   for (const pod of pods) {
@@ -41,6 +59,8 @@ export async function computeGesamtwertung(tournamentId: string): Promise<Gesamt
       for (const playerId of playerIds) {
         totals.set(playerId, (totals.get(playerId) ?? 0) + points);
         eventsPlayed.set(playerId, (eventsPlayed.get(playerId) ?? 0) + 1);
+        if (!perPod.has(playerId)) perPod.set(playerId, {});
+        perPod.get(playerId)![pod.id] = points;
       }
     }
   }
@@ -57,6 +77,7 @@ export async function computeGesamtwertung(tournamentId: string): Promise<Gesamt
       eventsPlayed: events,
       totalPoints: total,
       average: events > 0 ? total / events : 0,
+      perPod: perPod.get(playerId) ?? {},
     };
   });
 
@@ -67,5 +88,8 @@ export async function computeGesamtwertung(tournamentId: string): Promise<Gesamt
       (nameById.get(a.playerId) ?? "").localeCompare(nameById.get(b.playerId) ?? ""),
   );
 
-  return rows;
+  return {
+    pods: pods.map((p) => ({ id: p.id, name: p.name, sequenceOrder: p.sequenceOrder })),
+    rows,
+  };
 }

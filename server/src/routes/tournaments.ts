@@ -201,11 +201,11 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const rows = await computeGesamtwertung(tournament.id);
+    const { pods, rows } = await computeGesamtwertung(tournament.id);
     const players = await prisma.player.findMany({ where: { id: { in: rows.map((r) => r.playerId) } } });
     const playerById = new Map(players.map((p) => [p.id, p]));
 
     const gesamtwertung = rows.map((row) => ({ ...row, player: playerById.get(row.playerId) }));
-    reply.send({ gesamtwertung });
+    reply.send({ pods, gesamtwertung });
   });
 }

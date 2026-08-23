@@ -91,14 +91,20 @@ describe("computeGesamtwertung", () => {
     // So C should rank #1 (highest average) even though A ties C on raw
     // total — this is the property under test.
     const gw = await computeGesamtwertung(tournament.id);
-    const byPlayer = new Map(gw.map((r) => [r.playerId, r]));
+    const byPlayer = new Map(gw.rows.map((r) => [r.playerId, r]));
 
     expect(byPlayer.get(c.id)).toMatchObject({ eventsPlayed: 2, totalPoints: 6, average: 3 });
     expect(byPlayer.get(a.id)).toMatchObject({ eventsPlayed: 3, totalPoints: 6, average: 2 });
     expect(byPlayer.get(d.id)).toMatchObject({ eventsPlayed: 2, totalPoints: 3, average: 1.5 });
     expect(byPlayer.get(b.id)).toMatchObject({ eventsPlayed: 2, totalPoints: 0, average: 0 });
 
-    expect(gw.map((r) => r.playerId)).toEqual([c.id, a.id, d.id, b.id]);
+    expect(gw.rows.map((r) => r.playerId)).toEqual([c.id, a.id, d.id, b.id]);
+
+    // perPod: attended-and-scored-zero must be distinct from never-attended.
+    expect(gw.pods.map((p) => p.name)).toEqual(["Pod 1", "Pod 2", "Pod 3"]);
+    expect(byPlayer.get(b.id)?.perPod).toEqual({ [pod1.id]: 0, [pod2.id]: 0 }); // never played pod3
+    expect(byPlayer.get(b.id)?.perPod[pod3.id]).toBeUndefined();
+    expect(byPlayer.get(d.id)?.perPod).toEqual({ [pod1.id]: 0, [pod3.id]: 3 }); // never played pod2
   });
 
   it("credits each team member the team's full points, matching the confirmed Gesamtwertung rule", async () => {
@@ -143,7 +149,7 @@ describe("computeGesamtwertung", () => {
     });
 
     const gw = await computeGesamtwertung(tournament.id);
-    const byPlayer = new Map(gw.map((r) => [r.playerId, r]));
+    const byPlayer = new Map(gw.rows.map((r) => [r.playerId, r]));
 
     // Team won (3 pts) -> both P1 and P2 get the FULL 3, not 1.5 each.
     expect(byPlayer.get(p1.id)?.totalPoints).toBe(3);
