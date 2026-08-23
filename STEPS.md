@@ -4,6 +4,8 @@ Granular checklist. Check items off as they land. This file is the first thing t
 
 **Status: Steps 0-8 done. Step 9 in progress — Phases A and B done (auth/routing/design system, roster/pod-setup/entrant-assignment, all browser-verified; one real post-login race condition found and fixed via browser testing). Next up: Step 9 Phase C (Gesamtwertung, pod standings, live pairings + round timer).**
 
+**Housekeeping (2026-08-24):** Tobias asked whether the repo was actually clone-and-continue ready on a different machine — verified rather than assumed, by doing a real fresh clone from the Forgejo remote and running the documented `docker compose up` from scratch (worked). That check surfaced two real gaps, both fixed and re-verified: (1) the README's status section was badly stale, still describing pre-Step-9 state; (2) the documented `npm run dev:server` local-dev path didn't actually work — no `DATABASE_URL` was ever available outside Docker, and the `dev` script didn't load `.env` at all. Fixed by publishing the `db` service's port in `docker-compose.yml`, adding `--env-file=../.env` to the server's `dev` script, and adding a working local-dev `DATABASE_URL` to `.env.example`. Re-verified the fixed path end-to-end (`docker compose up -d db` + `npm run dev:server` genuinely boots and serves `/api/healthz` against real Postgres), not just that it looked more complete.
+
 ## Step 0 — Project bootstrap ✅
 - [x] Create `~/Projects/LimitedGauntlet/`, `git init`
 - [x] Write `CLAUDE.md`

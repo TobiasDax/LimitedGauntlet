@@ -16,6 +16,11 @@ services:
 
   db:
     image: postgres:16-alpine
+    ports:
+      # Host access for local (non-Docker) dev — `npm run dev:server` needs
+      # to reach this directly. The app container above never uses this
+      # port; it talks to `db` over the internal compose network.
+      - "5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-limitedgauntlet}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
