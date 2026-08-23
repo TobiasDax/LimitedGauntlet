@@ -2,7 +2,7 @@
 
 Granular checklist. Check items off as they land. This file is the first thing to read in a new session — it tells you exactly what's done and what's next. Full rationale for any step lives in `PLAN.md`.
 
-**Status: Steps 0-6 done. Next up: Step 7 (realtime + round timer).**
+**Status: Steps 0-7 done (Step 7's backend half — frontend half deferred to Step 9, see below). Next up: Step 8 (value tracking).**
 
 ## Step 0 — Project bootstrap ✅
 - [x] Create `~/Projects/LimitedGauntlet/`, `git init`
@@ -67,13 +67,12 @@ Granular checklist. Check items off as they land. This file is the first thing t
 - [x] Before writing the aggregation test, hand-verified (via a throwaway Node script, not by eye) exactly what the real 2024 GP Bad Gechingen re-rank looks like: Alex (27 pts over 5 pods he actually attended, avg 5.4) jumps from rank 6 by raw total up to **rank 4** by average, passing both Gray (31/6 = 5.17) and Casey (30/6 = 5.0) despite a lower total — confirms the plan's "average, not total" rule produces a real, meaningful re-rank on real data, not just a theoretical one
 - [x] Verify — rather than refitting all 10 real Bad Gechingen players (which would require inventing an internally-consistent 60-cell match history just to hit specific point totals, disproportionate effort given Step 5's standings math is already separately verified against real data), wrote a small fully-hand-checked synthetic scenario in `gesamtwertung.test.ts` that isolates the same property precisely: two players tie on raw total (6 pts each) but one earned it over fewer pods, and must rank above the other by average — passes, plus a second test confirming team-pod full-point-crediting holds through the tournament-wide aggregation too. Also checked live over HTTP with cross-org 404 confirmed.
 
-## Step 7 — Realtime + round timer
-- [ ] Socket.IO server setup, rooms per pod + per tournament
-- [ ] Broadcast events: round started/stopped, result submitted, pairings published, card pull added
-- [ ] Frontend: TanStack Query cache invalidation on socket events
-- [ ] Round timer: `Round.startedAt`/`endsAt`, client-side countdown, organizer "+5 min" nudge
-- [ ] Display Mode: audible chime via Web Audio at zero; personal views default muted
-- [ ] Verify: two browser windows (simulating organizer phone + shared display), submit a result in one, confirm the other updates without refresh; let a timer run out in Display Mode and confirm the chime fires
+## Step 7 — Realtime + round timer (backend half) ✅
+Per the decision to stay backend-first through Step 8, this step is scoped down to what's actually backend-buildable. The frontend-dependent pieces — TanStack Query cache invalidation, the Display Mode audible chime, and the two-browser-window visual verification — move to **Step 9** alongside the rest of the UI; listed there now so they aren't lost.
+- [x] `server/src/realtime.ts`: Socket.IO server, rooms are `pod:<id>` / `tournament:<id>`. Sockets are read-only subscriptions — joining a room needs no auth (same trust model as the public HTTP pages: an unguessable id is the access control), all actual mutations still go through the authenticated HTTP API, which is the only thing that ever triggers a broadcast
+- [x] Wired into `index.ts` via Fastify's `serverFactory` + a raw `http.Server`, with the ordering called out explicitly in a comment: Socket.IO's `attach()` saves and wraps whatever `request` listeners already exist, so Fastify's listener (registered via `serverFactory`, which runs synchronously inside the `Fastify(...)` call) has to be in place *before* `initRealtime()` creates the Socket.IO server, not after. Got this backwards on the first pass while reasoning through it, caught it before writing any code by working through what `attach()` actually does, not just copying a snippet
+- [x] Broadcasts wired into `rounds.ts`: `pairings-published` (auto or manual round creation), `pairings-updated` (swap), `round-started`, `round-extended` (new `POST /api/rounds/:id/extend` endpoint — the "+5 min" nudge), `round-completed`, `result-submitted`. Card-pull broadcasts wait for Step 8, which hasn't built card pulls yet
+- [x] Verify — didn't just trust the reasoning above, actually tested the tricky part: confirmed plain HTTP routes (`/api/healthz`, the SPA, a 404 for an unknown API path) still work AND the Socket.IO engine.io handshake (`/socket.io/?EIO=4&transport=polling`) responds correctly on the same shared server. Then a real Socket.IO client (`socket.io-client`, run standalone against the live stack) joined a pod room and received all 5 broadcast events in the correct order with correct payloads while the round lifecycle was driven over HTTP — including `round-extended` showing exactly `startedAt + 5min` on `endsAt`. Finally confirmed room isolation two ways: a client that joined a *different* pod's room, and a client that joined no room at all, both received zero events while a real broadcast was firing elsewhere.
 
 ## Step 8 — Value tracking
 - [ ] `server/services/scryfall.ts`: proxy `/cards/autocomplete` + `/cards/named`, short cache, proper User-Agent per Scryfall's API guidelines
@@ -88,6 +87,11 @@ Granular checklist. Check items off as they land. This file is the first thing t
 - [ ] **Load the `dataviz` skill before this step** — explicit ask was for Gesamtwertung/standings to be "displayed in a nice way," not just functional tables
 - [ ] Responsive pass: usable on a phone (players checking standings) and on a shared iPad/TV (Display Mode)
 - [ ] Light/dark theme support
+- [ ] Deferred from Step 7 (backend was built there, frontend needed real UI to exist first):
+  - [ ] TanStack Query cache invalidation on the Socket.IO events already being broadcast (`pairings-published`, `pairings-updated`, `round-started`, `round-extended`, `round-completed`, `result-submitted`)
+  - [ ] Client-side round timer: countdown from `Round.endsAt`, organizer "+5 min" button calling the already-built `POST /api/rounds/:id/extend`
+  - [ ] Display Mode: audible chime via Web Audio when the timer hits zero; personal/phone views stay muted by default
+  - [ ] Verify with two real browser windows (organizer view + shared display): submit a result in one, confirm the other updates without a manual refresh; let a timer run out in Display Mode and confirm the chime actually fires
 
 ## Step 10 — History import
 - [ ] `scripts/legacy-data.json`: transcribe PLAN.md's historical reference section (all 4 tournaments) into structured JSON

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
@@ -11,11 +12,31 @@ import { playerRoutes } from "./routes/players.js";
 import { tournamentRoutes } from "./routes/tournaments.js";
 import { podRoutes } from "./routes/pods.js";
 import { roundRoutes } from "./routes/rounds.js";
+import { initRealtime } from "./realtime.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientDistPath = path.resolve(__dirname, "../../client/dist");
 
-const app = Fastify({ logger: true });
+// Socket.IO and Fastify have to share one raw http.Server, and the order
+// here is load-bearing: Socket.IO's attach() saves+removes whatever
+// 'request' listeners are already registered and wraps them, forwarding
+// anything that isn't a socket.io request through to them. That only
+// works if Fastify's listener is registered FIRST — hence serverFactory
+// (which runs synchronously inside the Fastify(...) call below) has to
+// happen before `initRealtime` creates the Socket.IO server. Doing this
+// in the wrong order means both frameworks try to answer the same
+// requests and one of them silently loses.
+const httpServer = createServer();
+
+const app = Fastify({
+  logger: true,
+  serverFactory: (handler) => {
+    httpServer.on("request", handler);
+    return httpServer;
+  },
+});
+
+initRealtime(httpServer);
 
 await app.register(fastifySecureSession, {
   key: config.sessionKey,

@@ -4,8 +4,13 @@ import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedPod, findOwnedRound, findOwnedMatch } from "../services/ownership.js";
 import { generatePairings, getActiveEntrants, PairingError } from "../services/pairing.js";
+import { emitPodEvent } from "../realtime.js";
 
 const idParams = z.object({ id: z.string().min(1) });
+
+const extendSchema = z.object({
+  minutes: z.number().int().min(1).max(60),
+});
 
 const manualPairSchema = z.object({
   pairs: z
@@ -111,6 +116,7 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       return tx.round.findUniqueOrThrow({ where: { id: created.id }, include: { matches: true } });
     });
 
+    emitPodEvent(pod.id, "pairings-published", { round });
     reply.code(201).send({ round });
   });
 
@@ -170,6 +176,7 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       return tx.round.findUniqueOrThrow({ where: { id: created.id }, include: { matches: true } });
     });
 
+    emitPodEvent(pod.id, "pairings-published", { round });
     reply.code(201).send({ round });
   });
 
@@ -218,6 +225,7 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       prisma.match.update({ where: { id: matchB.id }, data: { [fieldB]: valueA } }),
     ]);
 
+    emitPodEvent(round.podId, "pairings-updated", { roundId: round.id });
     reply.send({ ok: true });
   });
 
@@ -246,6 +254,31 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       where: { id: round.id },
       data: { status: "ACTIVE", startedAt, endsAt },
     });
+    emitPodEvent(round.podId, "round-started", { roundId: round.id, startedAt, endsAt });
+    reply.send({ round: updated });
+  });
+
+  app.post("/api/rounds/:id/extend", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    const body = extendSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    const round = await findOwnedRound(params.data.id, request.organizer!.orgId);
+    if (!round) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    if (round.status !== "ACTIVE" || !round.endsAt) {
+      reply.code(400).send({ error: "round_not_active" });
+      return;
+    }
+
+    const endsAt = new Date(round.endsAt.getTime() + body.data.minutes * 60_000);
+    const updated = await prisma.round.update({ where: { id: round.id }, data: { endsAt } });
+    emitPodEvent(round.podId, "round-extended", { roundId: round.id, endsAt });
     reply.send({ round: updated });
   });
 
@@ -274,6 +307,7 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const updated = await prisma.round.update({ where: { id: round.id }, data: { status: "COMPLETED" } });
+    emitPodEvent(round.podId, "round-completed", { roundId: round.id });
     reply.send({ round: updated });
   });
 
@@ -305,6 +339,7 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       where: { id: match.id },
       data: { ...body.data, reportedAt: new Date() },
     });
+    emitPodEvent(round.podId, "result-submitted", { match: updated });
     reply.send({ match: updated });
   });
 }
