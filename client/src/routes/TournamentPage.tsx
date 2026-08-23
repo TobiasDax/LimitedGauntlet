@@ -155,12 +155,20 @@ export function TournamentPage() {
       </ScreenDek>
 
       {tournament.players.length > 0 && (
-        <Link
-          to={`/tournaments/${tournament.id}/gesamtwertung`}
-          className="mb-6 inline-block text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-strong"
-        >
-          View Gesamtwertung →
-        </Link>
+        <div className="mb-6 flex gap-5">
+          <Link
+            to={`/tournaments/${tournament.id}/gesamtwertung`}
+            className="inline-block text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-strong"
+          >
+            View Gesamtwertung →
+          </Link>
+          <Link
+            to={`/tournaments/${tournament.id}/value`}
+            className="inline-block text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-strong"
+          >
+            Best pulls of the weekend →
+          </Link>
+        </div>
       )}
 
       {tournament.pods.length > 0 && (

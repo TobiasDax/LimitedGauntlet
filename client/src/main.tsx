@@ -13,6 +13,9 @@ import { PodPage } from "./routes/PodPage.tsx";
 import { GesamtwertungPage } from "./routes/GesamtwertungPage.tsx";
 import { PodStandingsPage } from "./routes/PodStandingsPage.tsx";
 import { PairingsPage } from "./routes/PairingsPage.tsx";
+import { PodValuePage } from "./routes/PodValuePage.tsx";
+import { TournamentValuePage } from "./routes/TournamentValuePage.tsx";
+import { HallOfFamePage } from "./routes/HallOfFamePage.tsx";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -30,9 +33,12 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/roster" element={<RosterPage />} />
               <Route path="/tournaments/:id" element={<TournamentPage />} />
               <Route path="/tournaments/:id/gesamtwertung" element={<GesamtwertungPage />} />
+              <Route path="/tournaments/:id/value" element={<TournamentValuePage />} />
               <Route path="/pods/:id" element={<PodPage />} />
               <Route path="/pods/:id/standings" element={<PodStandingsPage />} />
               <Route path="/pods/:id/rounds" element={<PairingsPage />} />
+              <Route path="/pods/:id/value" element={<PodValuePage />} />
+              <Route path="/hall-of-fame" element={<HallOfFamePage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

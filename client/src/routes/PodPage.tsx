@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { usePod, podFormatLabel } from "../features/pods/usePods";
 import { useAddIndividualEntrant, useAddTeamEntrant, useRemoveEntrant, entrantErrorMessage } from "../features/pods/useEntrants";
 import { usePlayers } from "../features/players/usePlayers";
+import { useTournament } from "../features/tournaments/useTournament";
 import { Button, Card, Eyebrow, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
 import { entrantDisplayName } from "../lib/entrant";
@@ -148,6 +149,7 @@ function TeamEntrants({ podId, entrants }: { podId: string; entrants: Entrant[] 
 export function PodPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading } = usePod(id);
+  const { data: tournamentData } = useTournament(data?.pod.tournamentId);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
   if (!data) return <p className="text-ink-muted">Pod not found.</p>;
@@ -157,6 +159,14 @@ export function PodPage() {
   return (
     <div>
       <Eyebrow>
+        {tournamentData && (
+          <>
+            <Link to={`/tournaments/${pod.tournamentId}`} className="hover:text-accent-strong">
+              {tournamentData.tournament.name}
+            </Link>{" "}
+            ·{" "}
+          </>
+        )}
         {podFormatLabel[pod.format]} · {pod.roundCount} rounds
       </Eyebrow>
       <ScreenTitle>{pod.name}</ScreenTitle>

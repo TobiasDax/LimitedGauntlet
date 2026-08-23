@@ -4,6 +4,7 @@ const tabs = [
   { suffix: "", label: "Entrants" },
   { suffix: "/rounds", label: "Pairings" },
   { suffix: "/standings", label: "Standings" },
+  { suffix: "/value", label: "Value" },
 ];
 
 export function PodTabs({ podId }: { podId: string }) {
