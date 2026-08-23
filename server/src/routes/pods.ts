@@ -1,7 +1,23 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
+import { findOwnedTournament, findOwnedPod } from "../services/ownership.js";
+
+// Playing in any pod implies attending that pod's tournament — upsert
+// keeps this true even if some of the players were already attached.
+function syncTournamentAttendance(tx: Prisma.TransactionClient, tournamentId: string, playerIds: string[]) {
+  return Promise.all(
+    playerIds.map((playerId) =>
+      tx.tournamentPlayer.upsert({
+        where: { tournamentId_playerId: { tournamentId, playerId } },
+        create: { tournamentId, playerId },
+        update: {},
+      }),
+    ),
+  );
+}
 
 const podFormats = ["DRAFT", "SEALED", "CHAOS_DRAFT", "CONSTRUCTED", "CUSTOM"] as const;
 const matchFormats = ["BO1", "BO3"] as const;
@@ -58,14 +74,6 @@ const teamEntrantSchema = z.object({
 });
 
 const idParams = z.object({ id: z.string().min(1) });
-
-async function findOwnedTournament(tournamentId: string, orgId: string) {
-  return prisma.tournament.findFirst({ where: { id: tournamentId, orgId } });
-}
-
-async function findOwnedPod(podId: string, orgId: string) {
-  return prisma.pod.findFirst({ where: { id: podId, tournament: { orgId } } });
-}
 
 // Players already committed to a pod, whether as a direct entrant or as a
 // member of a team-entrant — used to reject double-booking a player into
@@ -233,6 +241,10 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
             members: { create: body.data.playerIds.map((playerId) => ({ playerId })) },
           },
         });
+        // Playing in a pod implies attending the tournament — keep
+        // TournamentPlayer in sync so this doesn't quietly disappear from
+        // the weekend coverage view and Gesamtwertung.
+        await syncTournamentAttendance(tx, pod.tournamentId, body.data.playerIds);
         return tx.entrant.create({ data: { podId: pod.id, teamId: team.id } });
       });
       reply.code(201).send({ entrant });
@@ -259,8 +271,9 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const entrant = await prisma.entrant.create({
-      data: { podId: pod.id, playerId: player.id },
+    const entrant = await prisma.$transaction(async (tx) => {
+      await syncTournamentAttendance(tx, pod.tournamentId, [player.id]);
+      return tx.entrant.create({ data: { podId: pod.id, playerId: player.id } });
     });
     reply.code(201).send({ entrant });
   });

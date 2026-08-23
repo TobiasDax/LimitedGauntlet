@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
+import { findOwnedTournament } from "../services/ownership.js";
+import { computePlayerPairHistory } from "../services/weekendHistory.js";
 
 const tournamentCreateSchema = z.object({
   name: z.string().trim().min(1).max(150),
@@ -109,9 +111,7 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const tournament = await prisma.tournament.findFirst({
-      where: { id: params.data.id, orgId: request.organizer!.orgId },
-    });
+    const tournament = await findOwnedTournament(params.data.id, request.organizer!.orgId);
     if (!tournament) {
       reply.code(404).send({ error: "not_found" });
       return;
@@ -140,9 +140,7 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const tournament = await prisma.tournament.findFirst({
-      where: { id: params.data.id, orgId: request.organizer!.orgId },
-    });
+    const tournament = await findOwnedTournament(params.data.id, request.organizer!.orgId);
     if (!tournament) {
       reply.code(404).send({ error: "not_found" });
       return;
@@ -152,5 +150,38 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       where: { tournamentId: params.data.id, playerId: params.data.playerId },
     });
     reply.code(204).send();
+  });
+
+  // How many times each pair of attending players has already faced each
+  // other across every pod this weekend — the "everyone plays everyone"
+  // coverage view, and the same data the pairing engine's soft-avoid uses.
+  app.get("/api/tournaments/:id/coverage", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    const tournament = await findOwnedTournament(params.data.id, request.organizer!.orgId);
+    if (!tournament) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    const [tournamentPlayers, pairCounts] = await Promise.all([
+      prisma.tournamentPlayer.findMany({
+        where: { tournamentId: tournament.id },
+        include: { player: true },
+      }),
+      computePlayerPairHistory(tournament.id),
+    ]);
+
+    const players = tournamentPlayers.map((tp) => ({ id: tp.player.id, displayName: tp.player.displayName }));
+    const pairs = [...pairCounts.entries()].map(([key, count]) => {
+      const [playerAId, playerBId] = key.split(":") as [string, string];
+      return { playerAId, playerBId, count };
+    });
+
+    reply.send({ players, pairs });
   });
 }

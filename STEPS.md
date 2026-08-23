@@ -2,7 +2,7 @@
 
 Granular checklist. Check items off as they land. This file is the first thing to read in a new session — it tells you exactly what's done and what's next. Full rationale for any step lives in `PLAN.md`.
 
-**Status: Steps 0-3 done. Next up: Step 4 (pairing engine).**
+**Status: Steps 0-4 done. Next up: Step 5 (match results + pod standings page).**
 
 ## Step 0 — Project bootstrap ✅
 - [x] Create `~/Projects/LimitedGauntlet/`, `git init`
@@ -43,20 +43,21 @@ Granular checklist. Check items off as they land. This file is the first thing t
 - [x] `DELETE /api/entrants/:id`: team entrants delete the Team (cascades to Entrant + TeamMember rows), individual entrants delete directly
 - [x] Verify: recreated the real 2025 Sommer Battlebond pod (4 teams of 2-3 — Alex+Casey+Emery, Tobias+Harper, Devon+Finley, Bailey+Gray — 3 rounds) purely through the live API against the actual historical roster from PLAN.md. Confirmed the returned structure matches exactly, confirmed double-booking Emery into a second team 409s, confirmed the PATCH-defaults fix holds under a real request, confirmed deleting a team entrant cascades cleanly, and confirmed Org B gets 404 (not data, not a silent no-op) trying to read/delete Org A's tournament or pod by ID.
 
-## Step 4 — Pairing engine
-- [ ] `server/services/pairing.ts`: score-group grouping + greedy pair-with-backtracking
-- [ ] Hard-avoid: no repeat opponents within the same pod
-- [ ] Soft-avoid: weighted cost penalty for opponents already played elsewhere in the tournament this weekend (weekend coverage nudge)
-- [ ] Bye handling: lowest score group, no prior bye this pod, full win points
-- [ ] Manual pairing mode: organizer assigns entrants to tables directly (available any round, not just round 1)
-- [ ] Swap UI: adjust two entrants' tables before locking an auto-generated round
-- [ ] Weekend coverage matrix: player × player grid, times-played count, organizer-facing + public page
-- [ ] Verify: simulate a full 8-player, 3-round pod and confirm no repeat opponents; simulate a 2-pod weekend and confirm the coverage nudge measurably reduces cross-pod repeats vs. plain per-pod Swiss
+## Step 4 — Pairing engine ✅
+- [x] `server/src/services/podStats.ts`: per-pod match points, opponent history, and bye history computed live from `Round`/`Match` rows (no separate stored-state table, per PLAN.md's design decision)
+- [x] `server/src/services/weekendHistory.ts`: cross-pod, player-level "who's played whom this weekend" counts, resolving team entrants down to their member players so 2HG-style matches count every member of side A against every member of side B
+- [x] `server/src/services/pairing.ts`: score-group sort (shuffled on round 1 for a genuine random draw, points-desc thereafter) + greedy pair-with-backtracking. Hard-avoid (within-pod repeat) is `Infinity` cost, so it's a true constraint; soft-avoid (repeat anywhere else this weekend) is a large-but-finite weight, so it degrades gracefully instead of failing when full avoidance becomes mathematically impossible
+- [x] Bye handling: lowest score, no prior bye this pod, falls back to lowest score regardless if everyone's already had one
+- [x] `server/src/routes/rounds.ts`: full round lifecycle — auto pairing (`POST /api/pods/:id/rounds`), manual pairing (`POST /api/pods/:id/rounds/manual`, validated so every active entrant appears exactly once and the bye count matches parity — no silent partial pairings), swap two entrant slots between pending matches (`POST /api/rounds/:id/swap`, rejects swapping a bye slot), start (locks further pairing edits, computes `endsAt` from `Pod.roundLengthMinutes`), result entry (`PATCH /api/matches/:id/result`, only while the round is ACTIVE), complete (blocked until every non-bye match has a result). Round-sequencing is enforced (`previous_round_not_completed`, `round_count_exceeded`) so pairing for round N always sees complete data for rounds 1..N-1
+- [x] `GET /api/tournaments/:id/coverage`: weekend coverage matrix (player × player times-played), same underlying data the pairing soft-avoid uses
+- [x] Found and fixed a real gap during live testing: `Entrant` creation didn't attach the player to `TournamentPlayer`, so someone actively playing in a pod could be invisible in the coverage view (and would have been in Gesamtwertung later) unless the organizer separately called the roster-attach endpoint. Fixed with `syncTournamentAttendance()` — upserted inside the same transaction as entrant/team creation, both branches (individual and team)
+- [x] Verify — deterministic Vitest suite (`server/src/services/pairing.test.ts`) against a real throwaway Postgres, not mocks: (1) a full 8-entrant, 3-round pod never repeats an opponent, confirmed across 9 consecutive runs despite round-1's randomized draw; (2) bye assignment goes to a different entrant each round until everyone's had one; (3) given a completed Pod A where two pairs have already met, Pod B's fresh round-1 pairing for the same 4 players always avoids those pairs when an equally-valid alternative exists — this one is provably deterministic, not just probably-usually-true, because the crafted 4-player scenario has an all-zero-cost perfect matching that greedy-lowest-cost-first always finds before ever considering the higher-cost repeat option
+- [x] Verify — full HTTP round-lifecycle exercised live against a running stack (not just the pure algorithm): 6-player pod through rounds 1-2 auto-paired with a verified zero repeat opponents between them, swap tested before lock and confirmed blocked after `start`, `complete` blocked until all results are in then succeeds once they are, manual pairing's validation confirmed rejecting both an incomplete roster and a wrong bye count, and cross-org 404s confirmed on round start / match result / coverage (three hops from org: round → pod → tournament → org)
 
 ## Step 5 — Match results + pod standings
-- [ ] Result entry UI (organizer-only, per PLAN.md's v1 scope): win/loss/draw + games won per side
-- [ ] `server/services/standings.ts`: match points, GW%, OMW%/OGW% (33% floor per MTR)
-- [ ] Pod standings page: points/OMW/GW/OGW table, sorted correctly
+- [x] Result entry (organizer-only, per PLAN.md's v1 scope) — already built in Step 4 as necessary plumbing (`PATCH /api/matches/:id/result`), since the pairing engine's round-sequencing needed a real way to complete a round. Nothing left to do here beyond a frontend for it in Step 9.
+- [ ] `server/src/services/standings.ts`: extend `podStats.ts`'s points/opponents computation with GW% and OMW%/OGW% (33% floor per MTR) — reuse `podStats.ts` rather than recomputing points a second way
+- [ ] `GET /api/pods/:id/standings` (or fold into the existing pod GET) returning the full points/OMW/GW/OGW table, sorted correctly
 - [ ] Verify against a real historical pod: 2025 Sommer Battlebond's final standings table (Alex+Casey+Emery 5pts/40.74/100/44.44, etc. — see PLAN.md) reproduces exactly from re-entered match results
 
 ## Step 6 — Weekend Gesamtwertung
