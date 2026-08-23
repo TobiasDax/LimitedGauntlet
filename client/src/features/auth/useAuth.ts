@@ -48,9 +48,14 @@ export interface LoginInput {
 export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: LoginInput) => api.post<{ organizer: Organizer }>("/auth/login", input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["me"] });
+    mutationFn: (input: LoginInput) => api.post<MeResponse>("/auth/login", input),
+    onSuccess: ({ organizer, organization }) => {
+      // Set the cache synchronously rather than invalidating — an
+      // invalidated query still shows its previous (unauthenticated,
+      // null) data until the background refetch resolves, and
+      // ProtectedRoute reads that stale null in the gap and bounces
+      // straight back to /login before the real session ever lands.
+      queryClient.setQueryData<MeResponse>(["me"], { organizer, organization });
     },
   });
 }

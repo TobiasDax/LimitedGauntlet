@@ -8,6 +8,8 @@ import { LoginPage } from "./routes/LoginPage.tsx";
 import { SignupPage } from "./routes/SignupPage.tsx";
 import { DashboardPage } from "./routes/DashboardPage.tsx";
 import { TournamentPage } from "./routes/TournamentPage.tsx";
+import { RosterPage } from "./routes/RosterPage.tsx";
+import { PodPage } from "./routes/PodPage.tsx";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -22,7 +24,9 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/signup" element={<SignupPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<DashboardPage />} />
+              <Route path="/roster" element={<RosterPage />} />
               <Route path="/tournaments/:id" element={<TournamentPage />} />
+              <Route path="/pods/:id" element={<PodPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

@@ -90,8 +90,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
+    const organization = await prisma.organization.findUniqueOrThrow({ where: { id: account.orgId } });
+
     request.session.set("organizerId", account.id);
-    reply.send({ organizer: { id: account.id, name: account.name, email: account.email } });
+    reply.send({
+      organizer: { id: account.id, orgId: account.orgId, name: account.name, email: account.email },
+      organization: { id: organization.id, slug: organization.slug, name: organization.name },
+    });
   });
 
   app.post("/api/auth/logout", async (request, reply) => {

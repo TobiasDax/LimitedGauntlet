@@ -22,6 +22,23 @@ export function Layout() {
             </div>
           )}
 
+          {me && (
+            <nav className="flex gap-1">
+              <Link
+                to="/"
+                className="rounded px-3 py-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:bg-surface-raised hover:text-ink"
+              >
+                Tournaments
+              </Link>
+              <Link
+                to="/roster"
+                className="rounded px-3 py-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:bg-surface-raised hover:text-ink"
+              >
+                Roster
+              </Link>
+            </nav>
+          )}
+
           <div className="ml-auto flex items-center gap-2">
             {me ? (
               <Button
