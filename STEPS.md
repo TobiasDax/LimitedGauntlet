@@ -92,7 +92,7 @@ Granular checklist. Check items off as they land. This file is the first thing t
 - [ ] Run it, then diff every resulting Gesamtwertung page against the original Outline tables (expect the 2024 re-rank noted above, nothing else)
 
 ## Step 11 — README, LICENSE, packaging polish
-- [ ] `README.md`: what it is, screenshots (once there's UI to screenshot), quick start, config env vars
+- [x] `README.md`: written early (2026-08-23, before Step 11) since the repo is now pushed and visible — covers what it is, current status, quick start, dev setup. Still needs: screenshots once there's real UI, and a final pass once the feature set settles
 - [ ] `LICENSE` — MIT by default; ask Tobias if AGPL is preferred before first push (guards against closed-source SaaS forks)
 - [ ] Final `.env.example` pass — everything needed to run listed, nothing missing
 
