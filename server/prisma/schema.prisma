@@ -48,11 +48,11 @@ model Player {
   displayName String
   createdAt   DateTime @default(now())
 
-  organization       Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  tournamentPlayers   TournamentPlayer[]
-  teamMemberships     TeamMember[]
-  entrants             Entrant[]
-  cardPulls            CardPull[]
+  organization      Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tournamentPlayers TournamentPlayer[]
+  teamMemberships   TeamMember[]
+  entrants          Entrant[]
+  cardPulls         CardPull[]
 
   @@index([orgId])
 }
@@ -152,9 +152,9 @@ model Team {
   podId String
   name  String
 
-  pod      Pod          @relation(fields: [podId], references: [id], onDelete: Cascade)
-  members  TeamMember[]
-  entrant  Entrant?
+  pod     Pod          @relation(fields: [podId], references: [id], onDelete: Cascade)
+  members TeamMember[]
+  entrant Entrant?
 
   @@index([podId])
 }
@@ -175,17 +175,25 @@ model TeamMember {
 // Pod.isTeamEvent — enforced at the application layer (Prisma has no
 // portable CHECK-constraint-style XOR).
 model Entrant {
-  id                String  @id @default(cuid())
-  podId             String
-  playerId          String?
-  teamId            String? @unique
-  droppedAfterRound Int?
+  id                  String  @id @default(cuid())
+  podId               String
+  playerId            String?
+  teamId              String? @unique
+  droppedAfterRound   Int?
+  // Set only by the history-import script, for pods whose source data is a
+  // final standings table with no round-by-round detail (most pre-2026
+  // Outline docs). When present, standings computation reports this value
+  // directly instead of deriving points from Match rows — deliberately not
+  // fabricating pairings that were never recorded. Tiebreakers (OMW%/GW%/
+  // OGW%) report as 0 for these entrants since no match data exists to
+  // compute them from.
+  finalPointsOverride Int?
 
-  pod          Pod       @relation(fields: [podId], references: [id], onDelete: Cascade)
-  player       Player?   @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  team         Team?     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  matchesAsA   Match[]   @relation("MatchEntrantA")
-  matchesAsB   Match[]   @relation("MatchEntrantB")
+  pod        Pod     @relation(fields: [podId], references: [id], onDelete: Cascade)
+  player     Player? @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  team       Team?   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  matchesAsA Match[] @relation("MatchEntrantA")
+  matchesAsB Match[] @relation("MatchEntrantB")
 
   @@index([podId])
   @@index([playerId])
@@ -233,8 +241,8 @@ model Match {
   result      MatchResult @default(PENDING)
   reportedAt  DateTime?
 
-  round    Round   @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  entrantA Entrant @relation("MatchEntrantA", fields: [entrantAId], references: [id], onDelete: Cascade)
+  round    Round    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  entrantA Entrant  @relation("MatchEntrantA", fields: [entrantAId], references: [id], onDelete: Cascade)
   entrantB Entrant? @relation("MatchEntrantB", fields: [entrantBId], references: [id], onDelete: Cascade)
 
   @@index([roundId])

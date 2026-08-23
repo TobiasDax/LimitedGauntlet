@@ -32,6 +32,22 @@ export async function computePodStandings(podId: string): Promise<StandingsRow[]
   }
 
   const rows: StandingsRow[] = entrants.map((entrant) => {
+    // Imported historical pods carry final points only, no match-by-match
+    // data — report the override directly rather than deriving from Match
+    // rows (which don't exist for them). Tiebreakers have nothing to
+    // compute from, so they report as 0, matching what the original
+    // standings doc actually showed (points-only rankings).
+    if (entrant.finalPointsOverride !== null) {
+      return {
+        entrantId: entrant.id,
+        points: entrant.finalPointsOverride,
+        matchWinPct: 0,
+        gameWinPct: 0,
+        opponentsMatchWinPct: 0,
+        opponentsGameWinPct: 0,
+      };
+    }
+
     const opponents = [...(stats.opponents.get(entrant.id) ?? [])];
     const average = (table: Map<string, number>) =>
       opponents.length > 0

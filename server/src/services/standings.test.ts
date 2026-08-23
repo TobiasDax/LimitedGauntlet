@@ -147,4 +147,39 @@ describe("computePodStandings", () => {
     expect(standings[0]?.entrantId).toBe(cfk.id);
     expect(standings[3]?.entrantId).toBe(ds.id);
   });
+
+  // The history-import script (Step 10) sets Entrant.finalPointsOverride
+  // for pods where only a final standings table survives from Outline, no
+  // round-by-round data — this is the real 2024 GP Bad Gechingen "Mystery
+  // Draft" pod's points column, an ordinary case with no ties.
+  it("reports finalPointsOverride directly with zero tiebreakers, when set", async () => {
+    const org = await prisma.organization.create({
+      data: { slug: `override-${Date.now()}`, name: "Test Org" },
+    });
+    const tournament = await prisma.tournament.create({
+      data: { orgId: org.id, name: "2024 GP Bad Gechingen", startDate: new Date(), endDate: new Date() },
+    });
+    const pod = await prisma.pod.create({
+      data: { tournamentId: tournament.id, name: "Mystery Draft", format: "DRAFT", sequenceOrder: 0 },
+    });
+
+    const points: Record<string, number> = { Devon: 3, Casey: 7, Tobias: 3, Harper: 0 };
+    for (const [name, pts] of Object.entries(points)) {
+      const player = await prisma.player.create({ data: { orgId: org.id, displayName: name } });
+      await prisma.entrant.create({ data: { podId: pod.id, playerId: player.id, finalPointsOverride: pts } });
+    }
+
+    const standings = await computePodStandings(pod.id);
+    expect(standings).toHaveLength(4);
+    for (const row of standings) {
+      expect(row.matchWinPct).toBe(0);
+      expect(row.gameWinPct).toBe(0);
+      expect(row.opponentsMatchWinPct).toBe(0);
+      expect(row.opponentsGameWinPct).toBe(0);
+    }
+    // Sorted purely by points, matching the original Outline doc (no
+    // tiebreaker columns existed for these historical pods).
+    expect(standings[0]?.points).toBe(7);
+    expect(standings[standings.length - 1]?.points).toBe(0);
+  });
 });
