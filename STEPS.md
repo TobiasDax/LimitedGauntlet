@@ -2,26 +2,28 @@
 
 Granular checklist. Check items off as they land. This file is the first thing to read in a new session — it tells you exactly what's done and what's next. Full rationale for any step lives in `PLAN.md`.
 
-**Status: Step 0 done. Next up: Step 1 (repo scaffold).**
+**Status: Steps 0-1 done. Next up: Step 2 (auth + multi-tenancy).**
 
 ## Step 0 — Project bootstrap ✅
 - [x] Create `~/Projects/LimitedGauntlet/`, `git init`
 - [x] Write `CLAUDE.md`
 - [x] Write `PLAN.md` (incl. historical reference data transcribed from Outline)
 - [x] Write `STEPS.md` (this file)
-- [ ] Add `~/Projects/LimitedGauntlet/CLAUDE.md` line to claude-memory's `projects.md` "Linked CLAUDE.md files" section
-- [ ] First commit
+- [x] Add `~/Projects/LimitedGauntlet/CLAUDE.md` line to claude-memory's `projects.md` "Linked CLAUDE.md files" section
+- [x] First commit (`407c608`)
 
-## Step 1 — Repo scaffold
-- [ ] `package.json` workspace layout: decide monorepo shape — `server/` + `client/` as npm workspaces (simplest, one repo one `node_modules` tree via workspaces) vs fully separate packages. Default to npm workspaces unless a reason emerges not to.
-- [ ] `server/`: Fastify app skeleton, TypeScript strict config, `/healthz` endpoint
-- [ ] `prisma/schema.prisma`: initial schema per PLAN.md's data model section (Organization, OrganizerAccount, Player, Tournament, TournamentPlayer, Pod, Entrant, Team, TeamMember, Round, Match, CardPull)
-- [ ] First Prisma migration, verify it applies cleanly to a fresh Postgres
-- [ ] `client/`: Vite + React + TS + Tailwind skeleton, single placeholder page
-- [ ] `Dockerfile`: multi-stage (client build → server build → runtime), confirm final image serves the placeholder page + `/healthz`
-- [ ] `docker-compose.yml` + `.env.example`: `app` + `db` (postgres:16-alpine) services
-- [ ] Entrypoint script runs `prisma migrate deploy` before starting the server
-- [ ] Verify: `docker compose up` from a clean checkout, no manual steps, `/healthz` responds and placeholder page loads
+## Step 1 — Repo scaffold ✅
+- [x] `package.json` workspace layout: npm workspaces, `server/` + `client/`
+- [x] `server/`: Fastify app skeleton, TypeScript strict config, `/api/healthz` endpoint (queries the DB, not just a static 200 — proves the Prisma connection works too)
+- [x] `server/prisma/schema.prisma`: initial schema per PLAN.md's data model section (Organization, OrganizerAccount, Player, Tournament, TournamentPlayer, Pod, Team, TeamMember, Entrant, Round, Match, CardPull)
+- [x] First Prisma migration (`20260823205506_init`), verified applies cleanly via both `migrate dev` (against a live diff) and `migrate deploy` (the production/entrypoint path) against a fresh Postgres
+- [x] `client/`: Vite + React 19 + TS strict + Tailwind v4 skeleton, placeholder page that calls `/api/healthz` through TanStack Query to prove the front-to-back wiring works
+- [x] `Dockerfile`: multi-stage (deps → client-build / server-build → runtime), builds clean, final image serves the SPA + static assets + `/api/healthz`
+- [x] `docker-compose.yml` + `.env.example`: `app` + `db` (postgres:16-alpine), healthcheck-gated startup order
+- [x] `docker/entrypoint.sh` runs `prisma migrate deploy` before starting the server
+- [x] Verify: `docker compose up` from a clean checkout (fresh `.env` from the example, no manual DB steps) — confirmed migrations auto-apply, `/api/healthz` returns `{"status":"ok"}`, SPA HTML + JS/CSS assets all serve with 200s. Torn down cleanly after.
+- [x] Security: caught and fixed a path-traversal vulnerability in the pinned `@fastify/static` version during `npm audit` (was `^8.0.4`, bumped to `^10.1.3`) before it ever ran; also overrode a transitive `deepmerge-ts` vuln pulled in by Prisma's dev-only config loader (`"overrides": {"deepmerge-ts": "^8.0.0"}` in root `package.json`) — verified the override doesn't break `prisma generate`/`migrate`. `npm audit` is clean (0 vulnerabilities).
+- Note: evaluated Prisma 7 (latest stable) but it moves `datasource.url` out of `schema.prisma` into a new `prisma.config.ts` + driver-adapter system that's still quite fresh — reverted to Prisma 6.19.x (latest 6.x, still receiving fixes) to keep the stack boring and approachable. Revisit this decision once Prisma 7's config system has matured, not before.
 
 ## Step 2 — Auth + multi-tenancy
 - [ ] `OrganizerAccount` signup flow: create org (name/slug) + first organizer account together

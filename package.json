@@ -1,0 +1,18 @@
+{
+  "name": "limited-gauntlet",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
+  },
+  "scripts": {
+    "dev:server": "npm run dev --workspace server",
+    "dev:client": "npm run dev --workspace client",
+    "build": "npm run build --workspace client && npm run build --workspace server",
+    "prisma:generate": "npm run prisma:generate --workspace server",
+    "prisma:migrate": "npm run prisma:migrate --workspace server"
+  }
+}

@@ -1,0 +1,264 @@
+// LimitedGauntlet data model — see PLAN.md for the full design rationale
+// behind each entity before changing this file.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+
+  organizers  OrganizerAccount[]
+  players     Player[]
+  tournaments Tournament[]
+}
+
+model OrganizerAccount {
+  id           String   @id @default(cuid())
+  orgId        String
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+// ---------------------------------------------------------------------------
+// Roster
+// ---------------------------------------------------------------------------
+
+model Player {
+  id          String   @id @default(cuid())
+  orgId       String
+  displayName String
+  createdAt   DateTime @default(now())
+
+  organization       Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tournamentPlayers   TournamentPlayer[]
+  teamMemberships     TeamMember[]
+  entrants             Entrant[]
+  cardPulls            CardPull[]
+
+  @@index([orgId])
+}
+
+// ---------------------------------------------------------------------------
+// Tournament (one yearly weekend / GP)
+// ---------------------------------------------------------------------------
+
+enum TournamentStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+}
+
+model Tournament {
+  id        String           @id @default(cuid())
+  orgId     String
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  location  String?
+  status    TournamentStatus @default(PLANNING)
+  createdAt DateTime         @default(now())
+
+  organization Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  players      TournamentPlayer[]
+  pods         Pod[]
+
+  @@index([orgId])
+}
+
+model TournamentPlayer {
+  tournamentId String
+  playerId     String
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player     Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@id([tournamentId, playerId])
+}
+
+// ---------------------------------------------------------------------------
+// Pod (one session: Freitag, Samstag 1, Chaosdraft, ...)
+// ---------------------------------------------------------------------------
+
+enum PodFormat {
+  DRAFT
+  SEALED
+  CHAOS_DRAFT
+  CONSTRUCTED
+  CUSTOM
+}
+
+enum MatchFormat {
+  BO1
+  BO3
+}
+
+enum PodStatus {
+  SETUP
+  PAIRING
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Pod {
+  id                 String      @id @default(cuid())
+  tournamentId       String
+  name               String
+  date               DateTime?
+  format             PodFormat
+  sequenceOrder      Int
+  isTeamEvent        Boolean     @default(false)
+  teamSize           Int?
+  roundCount         Int         @default(3)
+  matchFormat        MatchFormat @default(BO3)
+  pointsWin          Int         @default(3)
+  pointsDraw         Int         @default(1)
+  pointsLoss         Int         @default(0)
+  roundLengthMinutes Int         @default(50)
+  packConfig         String?
+  rarepicUrl         String?
+  status             PodStatus   @default(SETUP)
+  createdAt          DateTime    @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teams      Team[]
+  entrants   Entrant[]
+  rounds     Round[]
+  cardPulls  CardPull[]
+
+  @@index([tournamentId])
+}
+
+model Team {
+  id    String @id @default(cuid())
+  podId String
+  name  String
+
+  pod      Pod          @relation(fields: [podId], references: [id], onDelete: Cascade)
+  members  TeamMember[]
+  entrant  Entrant?
+
+  @@index([podId])
+}
+
+model TeamMember {
+  teamId   String
+  playerId String
+
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, playerId])
+}
+
+// Entrant unifies individual players and ad-hoc teams as "the thing that
+// gets paired" so standings/pairing logic doesn't need separate code paths
+// for 1v1 vs team pods. Exactly one of playerId/teamId is set, matching
+// Pod.isTeamEvent — enforced at the application layer (Prisma has no
+// portable CHECK-constraint-style XOR).
+model Entrant {
+  id                String  @id @default(cuid())
+  podId             String
+  playerId          String?
+  teamId            String? @unique
+  droppedAfterRound Int?
+
+  pod          Pod       @relation(fields: [podId], references: [id], onDelete: Cascade)
+  player       Player?   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  team         Team?     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  matchesAsA   Match[]   @relation("MatchEntrantA")
+  matchesAsB   Match[]   @relation("MatchEntrantB")
+
+  @@index([podId])
+  @@index([playerId])
+}
+
+// ---------------------------------------------------------------------------
+// Rounds & matches
+// ---------------------------------------------------------------------------
+
+enum RoundStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+}
+
+model Round {
+  id          String      @id @default(cuid())
+  podId       String
+  roundNumber Int
+  startedAt   DateTime?
+  endsAt      DateTime?
+  status      RoundStatus @default(PENDING)
+
+  pod     Pod     @relation(fields: [podId], references: [id], onDelete: Cascade)
+  matches Match[]
+
+  @@unique([podId, roundNumber])
+}
+
+enum MatchResult {
+  PENDING
+  A_WINS
+  B_WINS
+  DRAW
+}
+
+model Match {
+  id          String      @id @default(cuid())
+  roundId     String
+  tableNumber Int
+  entrantAId  String
+  entrantBId  String? // null = bye
+  gamesWonA   Int         @default(0)
+  gamesWonB   Int         @default(0)
+  result      MatchResult @default(PENDING)
+  reportedAt  DateTime?
+
+  round    Round   @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  entrantA Entrant @relation("MatchEntrantA", fields: [entrantAId], references: [id], onDelete: Cascade)
+  entrantB Entrant? @relation("MatchEntrantB", fields: [entrantBId], references: [id], onDelete: Cascade)
+
+  @@index([roundId])
+  @@index([entrantAId])
+  @@index([entrantBId])
+}
+
+// ---------------------------------------------------------------------------
+// Value tracking
+// ---------------------------------------------------------------------------
+
+model CardPull {
+  id         String   @id @default(cuid())
+  podId      String
+  playerId   String?
+  cardName   String
+  scryfallId String?
+  setCode    String?
+  priceEur   Decimal? @db.Decimal(10, 2)
+  imageUri   String?
+  addedAt    DateTime @default(now())
+
+  pod    Pod     @relation(fields: [podId], references: [id], onDelete: Cascade)
+  player Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([podId])
+}
