@@ -7,6 +7,8 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-limitedgauntlet}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-limitedgauntlet}
       PORT: 8080
       HOST: 0.0.0.0
+      SESSION_SECRET: ${SESSION_SECRET}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
     depends_on:
       db:
         condition: service_healthy

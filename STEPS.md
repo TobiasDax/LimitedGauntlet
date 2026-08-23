@@ -2,7 +2,7 @@
 
 Granular checklist. Check items off as they land. This file is the first thing to read in a new session — it tells you exactly what's done and what's next. Full rationale for any step lives in `PLAN.md`.
 
-**Status: Steps 0-1 done. Next up: Step 2 (auth + multi-tenancy).**
+**Status: Steps 0-2 done. Next up: Step 3 (tournament + pod CRUD).**
 
 ## Step 0 — Project bootstrap ✅
 - [x] Create `~/Projects/LimitedGauntlet/`, `git init`
@@ -25,12 +25,13 @@ Granular checklist. Check items off as they land. This file is the first thing t
 - [x] Security: caught and fixed a path-traversal vulnerability in the pinned `@fastify/static` version during `npm audit` (was `^8.0.4`, bumped to `^10.1.3`) before it ever ran; also overrode a transitive `deepmerge-ts` vuln pulled in by Prisma's dev-only config loader (`"overrides": {"deepmerge-ts": "^8.0.0"}` in root `package.json`) — verified the override doesn't break `prisma generate`/`migrate`. `npm audit` is clean (0 vulnerabilities).
 - Note: evaluated Prisma 7 (latest stable) but it moves `datasource.url` out of `schema.prisma` into a new `prisma.config.ts` + driver-adapter system that's still quite fresh — reverted to Prisma 6.19.x (latest 6.x, still receiving fixes) to keep the stack boring and approachable. Revisit this decision once Prisma 7's config system has matured, not before.
 
-## Step 2 — Auth + multi-tenancy
-- [ ] `OrganizerAccount` signup flow: create org (name/slug) + first organizer account together
-- [ ] Login/logout, `@fastify/secure-session` cookie sessions, argon2 password hashing
-- [ ] Auth middleware: org-scoped route protection (an organizer can only touch their own org's data)
-- [ ] `Player` roster CRUD (add/edit/list players within an org) — org-scoped, persists across tournaments
-- [ ] Verify: two separate orgs created, confirm zero data leakage between them (can't see/edit the other org's players via API even with a valid session)
+## Step 2 — Auth + multi-tenancy ✅
+- [x] `POST /api/auth/signup`: creates Organization + first OrganizerAccount together in one Prisma transaction (no dangling org if account creation fails), zod-validated, argon2 password hashing, sets session on success
+- [x] `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
+- [x] `@fastify/secure-session` cookie sessions — key from `SESSION_SECRET` env var (32-byte hex, fails fast at boot if missing/wrong length), `SESSION_COOKIE_SECURE` env var to control the cookie's `Secure` flag (default off so local/LAN HTTP use isn't silently broken; flip on behind a TLS reverse proxy)
+- [x] `requireAuth` preHandler hook (`server/src/auth/middleware.ts`): loads the organizer from the session, attaches `request.organizer = {id, orgId, email, name}`, 401s otherwise. This is the entire multi-tenancy boundary — every org-scoped route filters by `request.organizer.orgId`
+- [x] `Player` roster CRUD (`GET/POST/PATCH/DELETE /api/players`) — org-scoped; update/delete use `updateMany`/`deleteMany` with `{id, orgId}` in the `where` clause (not a plain `update`/`delete` by id) so a request can never touch another org's row, by construction not just convention
+- [x] Verify: full live exercise against a real running stack (not just reasoning about the code) — created two separate orgs, confirmed each only lists their own players, confirmed Org B's PATCH/DELETE against Org A's known player ID both return 404 (not a leak, not a silent no-op) while Org A's own PATCH/DELETE succeed, confirmed `/api/auth/me` and `/api/players` both 401 after logout and with no cookie, confirmed duplicate org slug and wrong password are rejected with the right status codes
 
 ## Step 3 — Tournament + Pod CRUD
 - [ ] Tournament CRUD: create/edit within an org (name, startDate, endDate, location, status)
