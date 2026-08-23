@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useGesamtwertung } from "../features/tournaments/useGesamtwertung";
 import { useTournament } from "../features/tournaments/useTournament";
+import { useTournamentRealtime } from "../features/tournaments/useTournamentRealtime";
 import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 
 function rankBadgeClasses(rank: number): string {
@@ -14,6 +15,7 @@ export function GesamtwertungPage() {
   const { id } = useParams<{ id: string }>();
   const { data: tournamentData } = useTournament(id);
   const { data, isLoading } = useGesamtwertung(id);
+  useTournamentRealtime(id);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
   if (!data) return <p className="text-ink-muted">Not found.</p>;

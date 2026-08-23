@@ -4,6 +4,7 @@ import { usePod, podFormatLabel } from "../features/pods/usePods";
 import { entrantDisplayName } from "../lib/entrant";
 import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
+import { usePodRealtime } from "../features/pods/usePodRealtime";
 
 function pct(value: number): string {
   return (value * 100).toFixed(2);
@@ -13,6 +14,7 @@ export function PodStandingsPage() {
   const { id } = useParams<{ id: string }>();
   const { data: podData } = usePod(id);
   const { data, isLoading } = useStandings(id);
+  usePodRealtime(id, podData?.pod.tournamentId);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
   if (!data) return <p className="text-ink-muted">Not found.</p>;

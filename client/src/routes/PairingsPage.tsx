@@ -13,6 +13,7 @@ import {
 import { entrantDisplayName } from "../lib/entrant";
 import { Button, Eyebrow, FormError, ScreenDek, ScreenTitle } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
+import { usePodRealtime } from "../features/pods/usePodRealtime";
 import type { Entrant, Match, Round } from "../lib/types";
 
 function ResultEntry({ match, podId }: { match: Match; podId: string }) {
@@ -142,6 +143,7 @@ export function PairingsPage() {
   const { data: podData } = usePod(id);
   const { data: roundsData, isLoading } = useRounds(id);
   const generateRound = useGenerateRound(id ?? "");
+  usePodRealtime(id, podData?.pod.tournamentId);
 
   if (isLoading || !podData) return <p className="text-ink-muted">Loading…</p>;
 

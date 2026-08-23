@@ -4,7 +4,7 @@ import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedPod, findOwnedRound, findOwnedMatch } from "../services/ownership.js";
 import { generatePairings, getActiveEntrants, PairingError } from "../services/pairing.js";
-import { emitPodEvent } from "../realtime.js";
+import { emitPodEvent, emitTournamentEvent } from "../realtime.js";
 
 const idParams = z.object({ id: z.string().min(1) });
 
@@ -308,6 +308,8 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
 
     const updated = await prisma.round.update({ where: { id: round.id }, data: { status: "COMPLETED" } });
     emitPodEvent(round.podId, "round-completed", { roundId: round.id });
+    const completedPod = await prisma.pod.findUniqueOrThrow({ where: { id: round.podId }, select: { tournamentId: true } });
+    emitTournamentEvent(completedPod.tournamentId, "standings-changed", { podId: round.podId });
     reply.send({ round: updated });
   });
 
@@ -340,6 +342,8 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       data: { ...body.data, reportedAt: new Date() },
     });
     emitPodEvent(round.podId, "result-submitted", { match: updated });
+    const resultPod = await prisma.pod.findUniqueOrThrow({ where: { id: round.podId }, select: { tournamentId: true } });
+    emitTournamentEvent(resultPod.tournamentId, "standings-changed", { podId: round.podId });
     reply.send({ match: updated });
   });
 }
