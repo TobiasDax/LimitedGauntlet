@@ -150,3 +150,25 @@ This is the biggest single step in the plan — it's being worked in phases, eac
 - [x] Deployment guide written: [`docs/deploy-daxlite.md`](docs/deploy-daxlite.md) — clone-to-DaxLite steps, `.env` values, a production note about dropping the dev-only Postgres port publish, the LAN-vs-Tailscale exposure decision (left as Tobias's call, not decided here), first-boot command, and the optional history-import step (with the name-privacy flag from Step 11 repeated here since it's the moment it'd actually matter).
 - [ ] **Tobias runs this** — touches live infra outside this session's reach. Not attempted here.
 - [ ] Once live: add a `services/daxlite.md` entry in `claude-memory`
+
+## Post-1.0 improvements (backlog)
+
+Feature work requested after the initial build shipped and the history import went live. Unlike Steps 0-12 these are **not** a strict sequence — pick them up independently. Written detailed enough to implement cold in a future session. (Separate, already-shipped post-1.0 work not re-listed here: `Match.gamesDrawn` for MTR-correct game-win% on tied games, and the full round-by-round history backfill from Outline — both committed, see git log `dba4830`/`a0a8bad`.)
+
+### PI-1 — Public tournament page: "Card values" overview ✅ (implemented 2026-08-24, not yet deployed)
+- [x] The public `/o/<slug>/tournaments/<id>` page showed only the pod list + Gesamtwertung; added a "Card values" section so a shared link is a one-glance overview of the weekend's opened cards, by event and price.
+- [x] Frontend-only — the backend endpoint already existed (`GET /api/public/o/:slug/tournaments/:id/card-pulls`, price-sorted, each pull carries its `pod`). `PublicTournamentPage.tsx`: new `usePublicTournamentCardPulls` query; pulls grouped by pod, groups ordered by the tournament's own pod sequence ("by event, highest value first"); each group is a `CardGallery` with a per-pod subtotal, plus a weekend total. Reuses `CardGallery` / `formatEur`.
+- [ ] Still to do: commit, deploy to daxlite, and eyeball it on a real shared link.
+
+### PI-2 — Rename the "Hall of Fame" nav item (cards) → "Treasure Chest"
+- [ ] Today the **Hall of Fame** nav link points at the org-wide most-valuable-cards gallery (`client/src/routes/HallOfFamePage.tsx`, `useHallOfFame` → `GET /api/card-pulls/hall-of-fame`). Rename that page + label to **Treasure Chest**, freeing the "Hall of Fame" name for PI-3's player aggregate.
+- [ ] Frontend: rename `HallOfFamePage.tsx` → `TreasureChestPage.tsx`; route `/hall-of-fame` → `/treasure-chest` in `main.tsx`; nav label in `components/Layout.tsx` and the page `ScreenTitle`/dek "Hall of Fame" → "Treasure Chest".
+- [ ] Optional/backend: rename `GET /api/card-pulls/hall-of-fame` → `/api/card-pulls/treasure-chest` (`server/src/routes/cardPulls.ts`) + the `useHallOfFame` hook, for consistency — cosmetic, no data change. If skipped, drop a code comment so the endpoint name doesn't mislead once the UI says "Treasure Chest".
+
+### PI-3 — New "Hall of Fame" page: all-time player aggregate
+- [ ] Like a tournament's Gesamtwertung, but aggregated across **every** tournament the org has ever run — a career/all-time leaderboard. Reuses the "Hall of Fame" nav slot that PI-2 frees up.
+- [ ] Backend: new `computeHallOfFame(orgId)` service (mirror `server/src/services/gesamtwertung.ts`). For every pod in every tournament of the org, reuse `computePodStandings(pod.id)` for each entrant's points, resolve team entrants to their members (team pods credit each member the **full** points — same rule as Gesamtwertung, see PLAN.md), and aggregate per player: tournaments attended, events (pods) played, total points, all-time average points per pod. Rank by all-time avg pts/pod → total → name (same tiebreak chain as Gesamtwertung). Optional extra column: tournament "wins" (rank-1 in a tournament's Gesamtwertung).
+  - Efficiency: walks every pod in the org and calls `computePodStandings` per pod — fine at this scale (tens of pods); revisit only if pod counts grow large.
+- [ ] Endpoint: `GET /api/hall-of-fame` (authed, org-scoped via `request.organizer.orgId`). Add a public mirror `GET /api/public/o/:slug/hall-of-fame` if it should be shareable (see open question).
+- [ ] Frontend: new `HallOfFamePage.tsx` — a ranked table (reuse the Gesamtwertung rank-badge styling): rank, player, tournaments, events, total pts, avg pts/pod. New `useHallOfFame`-style hook. Keep the `/hall-of-fame` route pointing here once PI-2 has moved the cards page to `/treasure-chest`.
+- [ ] Open questions for Tobias: exact column set (include tournament wins?); should team-pod points still count full or be visually flagged; and should the all-time board be public (drives whether the public endpoint above is built).
