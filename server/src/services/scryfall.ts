@@ -32,10 +32,28 @@ function setCached<T>(key: string, value: T, ttlMs: number): void {
   cache.set(key, { value, expiresAt: Date.now() + ttlMs });
 }
 
-function scryfallFetch(path: string): Promise<Response> {
-  return fetch(`${SCRYFALL_BASE}${path}`, {
-    headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-  });
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// A burst of near-simultaneous lookups (e.g. bulk-syncing a decklist via
+// the MCP server, one add_card_pull call per card with no delay between
+// them) can trip Scryfall's own rate limit — a real, transient `429`, not
+// "this card doesn't exist." One retry after a short backoff (honoring
+// Retry-After when Scryfall sends one) absorbs that case before it ever
+// reaches a caller as a failure. A genuine outage (repeated 5xx) still
+// surfaces after the retry rather than looping forever.
+async function scryfallFetch(path: string): Promise<Response> {
+  const url = `${SCRYFALL_BASE}${path}`;
+  const headers = { "User-Agent": USER_AGENT, Accept: "application/json" };
+
+  const res = await fetch(url, { headers });
+  if (res.status !== 429 && res.status < 500) return res;
+
+  const retryAfterHeader = Number(res.headers.get("retry-after"));
+  const backoffMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0 ? retryAfterHeader * 1000 : 750;
+  await sleep(backoffMs);
+  return fetch(url, { headers });
 }
 
 export async function autocompleteCardNames(query: string): Promise<string[]> {
@@ -116,7 +134,15 @@ export async function lookupCardByName(name: string, options: LookupOptions = {}
   if (setCode) params.set("set", setCode.toLowerCase());
   const res = await scryfallFetch(`/cards/named?${params.toString()}`);
   if (!res.ok) {
-    setCached(key, null, NAMED_TTL_MS);
+    // Only a real 404 means "this card/set combination doesn't exist" —
+    // caching that is correct and saves a repeat lookup. Any other
+    // failure (a 429 that survived scryfallFetch's retry, a 5xx, a
+    // network error) is transient, not a verdict on the card, and must
+    // NOT be cached: caching it here previously poisoned every later
+    // lookup of the same name+set+foil for a full hour, even once
+    // Scryfall was healthy again — exactly what broke a bulk MCP sync
+    // after the first rate-limited burst.
+    if (res.status === 404) setCached(key, null, NAMED_TTL_MS);
     return null;
   }
 
