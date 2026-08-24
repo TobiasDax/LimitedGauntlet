@@ -8,9 +8,16 @@ import type {
   PlayerStatsDetail,
 } from "../../lib/types";
 
+export interface LongestWinStreak {
+  playerId: string;
+  displayName: string;
+  streak: number;
+}
+
 export interface HallOfFameOverviewResponse {
   hallOfFame: HallOfFameRow[];
   headline: HallOfFameHeadline;
+  longestWinStreak: LongestWinStreak | null;
   mostPlayedPairings: MostPlayedPairing[];
   biggestPulls: HallOfFameBiggestPull[];
 }

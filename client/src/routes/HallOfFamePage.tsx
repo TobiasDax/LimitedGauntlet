@@ -1,24 +1,43 @@
 import { Link } from "react-router-dom";
-import { useHallOfFame } from "../features/hallOfFame/useHallOfFame";
+import { useHallOfFame, type LongestWinStreak } from "../features/hallOfFame/useHallOfFame";
 import { rankBadgeClasses } from "../components/GesamtwertungList";
 import { formatEur } from "../components/CardGallery";
 import { Card, Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 import type { HallOfFameBiggestPull, HallOfFameHeadline, HallOfFameRow, MostPlayedPairing } from "../lib/types";
 
-function HeadlineStats({ headline }: { headline: HallOfFameHeadline }) {
+function HeadlineStats({
+  headline,
+  longestWinStreak,
+}: {
+  headline: HallOfFameHeadline;
+  longestWinStreak: LongestWinStreak | null;
+}) {
   const stats = [
     { label: "Tournaments", value: headline.tournaments },
     { label: "Pods played", value: headline.pods },
     { label: "Players", value: headline.players },
   ];
   return (
-    <div className="mb-8 grid grid-cols-3 gap-3">
+    <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
       {stats.map((s) => (
         <Card key={s.label} className="p-4 text-center">
           <div className="font-display text-[28px] font-bold tabular-nums">{s.value}</div>
           <div className="mt-0.5 text-[11px] tracking-wide text-ink-muted uppercase">{s.label}</div>
         </Card>
       ))}
+      {longestWinStreak && (
+        <Link
+          to={`/hall-of-fame/players/${longestWinStreak.playerId}`}
+          className="rounded-lg border border-accent/35 bg-gradient-to-br from-accent-wash to-surface p-4 text-center transition-colors hover:bg-surface-raised"
+        >
+          <div className="font-display text-[28px] font-bold text-accent-strong tabular-nums">
+            🔥 {longestWinStreak.streak}
+          </div>
+          <div className="mt-0.5 truncate text-[11px] tracking-wide text-ink-muted uppercase">
+            Win streak · {longestWinStreak.displayName}
+          </div>
+        </Link>
+      )}
     </div>
   );
 }
@@ -141,7 +160,7 @@ export function HallOfFamePage() {
         <p className="text-ink-muted">No results yet — play some pods first.</p>
       ) : (
         <>
-          <HeadlineStats headline={data.headline} />
+          <HeadlineStats headline={data.headline} longestWinStreak={data.longestWinStreak} />
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
             <HallOfFameList rows={data.hallOfFame} />
             <div className="flex flex-col gap-4">

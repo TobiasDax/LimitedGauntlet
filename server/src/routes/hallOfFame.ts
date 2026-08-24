@@ -23,6 +23,7 @@ export async function hallOfFameRoutes(app: FastifyInstance): Promise<void> {
     reply.send({
       hallOfFame,
       headline: overview.headline,
+      longestWinStreak: overview.longestWinStreak,
       mostPlayedPairings: overview.mostPlayedPairings,
       biggestPulls: overview.biggestPulls,
     });

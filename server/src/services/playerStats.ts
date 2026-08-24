@@ -21,6 +21,7 @@ export interface HallOfFameOverview {
     pods: number;
     players: number;
   };
+  longestWinStreak: { playerId: string; displayName: string; streak: number } | null;
   // Every player-pair that has met at least once, one row per unordered
   // pair, sorted by games played together — "who's faced whom the most."
   mostPlayedPairings: Array<{
@@ -199,6 +200,24 @@ async function buildLedger(orgId: string): Promise<Ledger> {
   return { matchesByPlayer, headToHead, nameById };
 }
 
+// Longest run of consecutive match wins, in chronological order — a bye
+// counts as a win (matches the MTR convention the points/standings logic
+// already uses), and is not reset at pod or tournament boundaries: it's a
+// career-spanning streak, not a per-pod one.
+function longestWinStreakFor(matches: PersonalMatch[]): number {
+  let longest = 0;
+  let current = 0;
+  for (const m of matches) {
+    if (m.result === "WIN") {
+      current++;
+      longest = Math.max(longest, current);
+    } else {
+      current = 0;
+    }
+  }
+  return longest;
+}
+
 function headToHeadEntries(ledger: Ledger, playerId: string): HeadToHeadEntry[] {
   const row = ledger.headToHead.get(playerId);
   if (!row) return [];
@@ -249,9 +268,18 @@ export async function computeHallOfFameOverview(orgId: string): Promise<HallOfFa
   }
   mostPlayedPairings.sort((a, b) => b.matches - a.matches);
 
+  let longestWinStreak: HallOfFameOverview["longestWinStreak"] = null;
+  for (const [playerId, matches] of ledger.matchesByPlayer) {
+    const streak = longestWinStreakFor(matches);
+    if (streak > 0 && (!longestWinStreak || streak > longestWinStreak.streak)) {
+      longestWinStreak = { playerId, displayName: ledger.nameById.get(playerId) ?? "Unknown", streak };
+    }
+  }
+
   return {
     rankings,
     headline: { tournaments: tournamentCount, pods: podCount, players: rankings.length },
+    longestWinStreak,
     mostPlayedPairings: mostPlayedPairings.slice(0, 5),
     biggestPulls: pulls.map((p) => ({
       id: p.id,
@@ -292,16 +320,7 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
   const gamesLost = matches.reduce((s, m) => s + m.gamesLost, 0);
   const gamesDrawn = matches.reduce((s, m) => s + m.gamesDrawn, 0);
 
-  let longestWinStreak = 0;
-  let currentStreak = 0;
-  for (const m of matches) {
-    if (m.result === "WIN") {
-      currentStreak++;
-      longestWinStreak = Math.max(longestWinStreak, currentStreak);
-    } else {
-      currentStreak = 0;
-    }
-  }
+  const longestWinStreak = longestWinStreakFor(matches);
 
   const byFormat = new Map<PodFormat, { wins: number; matches: number }>();
   const byPod = new Map<string, { losses: number }>();
