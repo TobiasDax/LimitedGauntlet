@@ -11,7 +11,11 @@ export function TreasureChestPage() {
       <ScreenTitle>Treasure Chest</ScreenTitle>
       <ScreenDek>The biggest pulls across every tournament this group has ever run.</ScreenDek>
 
-      {isLoading ? <p className="text-ink-muted">Loading…</p> : <CardGallery pulls={data?.cardPulls ?? []} />}
+      {isLoading ? (
+        <p className="text-ink-muted">Loading…</p>
+      ) : (
+        <CardGallery pulls={data?.cardPulls ?? []} tournamentLink />
+      )}
     </div>
   );
 }

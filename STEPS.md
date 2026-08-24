@@ -218,10 +218,12 @@ Turn the flat all-time leaderboard (PI-3) into a proper stats section: a Hall of
 - [x] Displayed under the title on both `TournamentPage` (authed, editable) and `PublicTournamentPage` (public, read-only).
 - [x] Deployed & verified 2026-08-24 (Tobias confirmed create/edit + public render + clickable links all work).
 
-### PI-9 — Treasure Chest: per-card tournament label linking to the tournament
-- [ ] On the Treasure Chest page (`/treasure-chest`, the org-wide most-valuable-cards gallery), each card should show a small label naming the **tournament** it was opened in, and the label links to that tournament (`/tournaments/:id`).
-- [ ] Data is already there: `GET /api/card-pulls/treasure-chest` includes `pod: { id, name, tournament: { id, name } }`, and the `CardPull` type carries `pod?.tournament`.
-- [ ] Implementation: `CardGallery` is shared (pod value / tournament value / **public** tournament & pod / treasure-chest). Don't add the label unconditionally — it's redundant where you're already in that tournament's context, and the link base differs on public pages (`/o/:slug/tournaments/:id` vs authed `/tournaments/:id`). Add an opt-in prop (e.g. `<CardGallery tournamentLink />`) and enable it **only** on `TreasureChestPage`. Render a small `<Link>` label (near the set-code line) to `/tournaments/${pull.pod.tournament.id}`.
+### PI-9 — Treasure Chest: per-card tournament label linking to the tournament ✅ (implemented 2026-08-24, not yet deployed)
+- [x] On the Treasure Chest page (`/treasure-chest`, the org-wide most-valuable-cards gallery), each card shows a small label naming the **tournament** it was opened in, linking to that tournament (`/tournaments/:id`).
+- [x] Data was already there: `GET /api/card-pulls/treasure-chest` includes `pod: { id, name, tournament: { id, name } }`, and the `CardPull` type carries `pod?.tournament` — no backend change needed.
+- [x] `CardGallery` got an opt-in `tournamentLink` prop (default off, so the label stays out of pod value / tournament value / public views where it'd be redundant) — enabled only on `TreasureChestPage`. Renders a small `<Link to={/tournaments/${pull.pod.tournament.id}}>` under the price/set-code row.
+- [x] Verify: `npm run --workspace client build` (`tsc -b && vite build`, run inside a local `node:22` container since this host has no system Node) passes clean — no type errors, build succeeds.
+- [ ] Still to do: commit, deploy to daxlite, and eyeball it on a real page.
 
 ### PI-10 — Contrast/theme pass: lighter base text + a more vibrant accent (away from gold)
 - [ ] Body text leans low-contrast: much of the UI uses `text-ink-secondary` (`--color-ink-secondary: #a89f8f`, a muted warm grey) on the dark bg. Brighten the ink ramp — `--color-ink` toward near-white and especially `--color-ink-secondary` / `--color-ink-muted` lighter — for readability. All in `client/src/index.css`'s `@theme` block (a handful of CSS variables); no component changes needed since everything references the tokens.

@@ -1,10 +1,19 @@
+import { Link } from "react-router-dom";
 import type { CardPull } from "../lib/types";
 
 export function formatEur(value: number | null): string {
   return value === null ? "—" : `€${value.toFixed(2)}`;
 }
 
-export function CardGallery({ pulls, onRemove }: { pulls: CardPull[]; onRemove?: (id: string) => void }) {
+export function CardGallery({
+  pulls,
+  onRemove,
+  tournamentLink,
+}: {
+  pulls: CardPull[];
+  onRemove?: (id: string) => void;
+  tournamentLink?: boolean;
+}) {
   if (pulls.length === 0) {
     return <p className="text-[13px] text-ink-muted">No pulls recorded yet.</p>;
   }
@@ -37,6 +46,14 @@ export function CardGallery({ pulls, onRemove }: { pulls: CardPull[]; onRemove?:
                 <span className="text-[10px] tracking-wide text-ink-muted uppercase">{pull.setCode}</span>
               )}
             </div>
+            {tournamentLink && pull.pod?.tournament && (
+              <Link
+                to={`/tournaments/${pull.pod.tournament.id}`}
+                className="mt-1 block truncate text-[10.5px] text-ink-muted hover:text-accent-strong"
+              >
+                {pull.pod.tournament.name}
+              </Link>
+            )}
           </div>
         </div>
       ))}
