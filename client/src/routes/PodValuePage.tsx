@@ -44,16 +44,12 @@ function AddPullForm({
   const addPull = useAddCardPull(podId);
 
   const { data: setsData } = useScryfallSets();
-  // Alphabetized by name (not the sets picker's release-date order — this
-  // is for finding a specific set by name, not "what's recent"), plus a
-  // name -> code lookup so the field can be typed/searched by name while
-  // still submitting the code. Falls through to the raw text as-is when it
+  // Server already returns these alphabetized by name. A name -> code
+  // lookup so the field can be typed/searched by name while still
+  // submitting the code; falls through to the raw text as-is when it
   // doesn't match any known name, so an uncommon code (e.g. a bonus-sheet
-  // set not in the "main sets" list) can still be typed directly.
-  const sets = useMemo(
-    () => [...(setsData?.sets ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
-    [setsData],
-  );
+  // set not in the list at all) can still be typed directly.
+  const sets = setsData?.sets ?? [];
   const codeByName = useMemo(() => new Map(sets.map((s) => [s.name.toLowerCase(), s.code])), [sets]);
   const nameByCode = useMemo(() => new Map(sets.map((s) => [s.code, s.name])), [sets]);
   const [setInput, setSetInput] = useState(() => nameByCode.get(defaultSetCode) ?? defaultSetCode);

@@ -149,18 +149,19 @@ interface ScryfallSetResponse {
   released_at: string | null;
 }
 
-// "Main" sets for the set pickers: real paper sets people actually draft or
-// open packs from, newest first. Verified against Scryfall's live data
-// (not assumed) which set_type values this actually needs — "expansion"/
-// "core" alone misses a whole category of commonly-drafted product:
-// Masters-line sets (Ultimate Masters, the "X Remastered" sets, Mystery
-// Booster 2 — all set_type "masters") and the special draft-format sets
-// (Modern Horizons, Jumpstart, Battlebond, Conspiracy, Commander Legends —
-// all "draft_innovation"). Still excludes commander/promo/token/box/etc.,
-// which would flood the picker with sets nobody opens fresh packs from —
-// those stay reachable via the free-text setCode override on an individual
-// pull, just not offered as a default.
-const MAIN_SET_TYPES = new Set(["expansion", "core", "masters", "draft_innovation"]);
+// Every paper set from 2000 onward, alphabetized by name. Tried curating
+// by set_type first (expansion/core, then masters/draft_innovation) and
+// kept missing real drafted product each time (Mystery Booster 2,
+// Innistrad Remastered, Modern Horizons) — not worth maintaining a
+// set_type allowlist by hand when the picker itself is a searchable
+// dropdown/datalist that handles a long alphabetized list fine. Only
+// exclusions left: digital-only sets (Alchemy/Arena reprints — not
+// something anyone's opening physical packs from) and anything before
+// 2000 (pre-2000 product isn't what this group drafts, and it's most of
+// what would otherwise pad out the list). A genuinely obscure printing
+// (a bonus sheet, an old promo) still reaches the add-pull form's
+// free-text override regardless of what's in this list.
+const CUTOFF_YEAR = "2000-01-01";
 
 export async function listMainSets(): Promise<ScryfallSetSummary[]> {
   const key = "sets:main";
@@ -172,8 +173,8 @@ export async function listMainSets(): Promise<ScryfallSetSummary[]> {
   const data = (await res.json()) as { data: ScryfallSetResponse[] };
 
   const sets = data.data
-    .filter((s) => MAIN_SET_TYPES.has(s.set_type) && !s.digital)
-    .sort((a, b) => (b.released_at ?? "").localeCompare(a.released_at ?? ""))
+    .filter((s) => !s.digital && s.released_at !== null && s.released_at >= CUTOFF_YEAR)
+    .sort((a, b) => a.name.localeCompare(b.name))
     .map((s) => ({ code: s.code, name: s.name, releasedAt: s.released_at }));
 
   setCached(key, sets, SETS_TTL_MS);
