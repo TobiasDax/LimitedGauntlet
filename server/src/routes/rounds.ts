@@ -34,6 +34,7 @@ const resultSchema = z.object({
   result: z.enum(["A_WINS", "B_WINS", "DRAW"]),
   gamesWonA: z.number().int().min(0),
   gamesWonB: z.number().int().min(0),
+  gamesDrawn: z.number().int().min(0).default(0),
 });
 
 async function checkNextRoundAllowed(

@@ -36,6 +36,7 @@ function PublicMatchRow({ match, entrantById }: { match: Match; entrantById: Map
       {b && match.result !== "PENDING" && (
         <div className="font-display text-[15px] font-bold tabular-nums">
           {match.gamesWonA}–{match.gamesWonB}
+          {match.gamesDrawn > 0 && <span className="text-ink-muted">–{match.gamesDrawn}</span>}
         </div>
       )}
     </div>

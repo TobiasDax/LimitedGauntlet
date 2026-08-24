@@ -52,6 +52,7 @@ export interface SubmitResultInput {
   result: MatchResult;
   gamesWonA: number;
   gamesWonB: number;
+  gamesDrawn: number;
 }
 
 export function useSubmitResult(podId: string) {

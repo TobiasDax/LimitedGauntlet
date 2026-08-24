@@ -90,6 +90,7 @@ export interface Match {
   entrantBId: string | null;
   gamesWonA: number;
   gamesWonB: number;
+  gamesDrawn: number;
   result: MatchResult;
   reportedAt: string | null;
 }

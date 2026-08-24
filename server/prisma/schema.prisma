@@ -238,6 +238,12 @@ model Match {
   entrantBId  String? // null = bye
   gamesWonA   Int         @default(0)
   gamesWonB   Int         @default(0)
+  // Games that were themselves drawn (e.g. a Bo3 that ends 1-1-1, or a
+  // single game timing out unfinished). Not credited to either side, but
+  // counted as games played — so game-win% is diluted the way the MTR/
+  // larger-tournament rules intend. A match DRAW is still expressed by
+  // gamesWonA === gamesWonB; this only tracks the tied games on top.
+  gamesDrawn  Int         @default(0)
   result      MatchResult @default(PENDING)
   reportedAt  DateTime?
 

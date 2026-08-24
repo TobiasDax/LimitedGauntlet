@@ -22,6 +22,7 @@ function ResultEntry({ match, podId }: { match: Match; podId: string }) {
   const submitResult = useSubmitResult(podId);
   const [a, setA] = useState(0);
   const [b, setB] = useState(0);
+  const [d, setD] = useState(0);
 
   if (match.result !== "PENDING") {
     const label =
@@ -30,6 +31,7 @@ function ResultEntry({ match, podId }: { match: Match; podId: string }) {
       <div className="text-right">
         <div className="font-display tabular-nums text-[15px] font-bold">
           {match.gamesWonA}–{match.gamesWonB}
+          {match.gamesDrawn > 0 && <span className="text-ink-muted">–{match.gamesDrawn}</span>}
         </div>
         <div className="text-[11px] text-ink-muted">{label}</div>
       </div>
@@ -42,7 +44,7 @@ function ResultEntry({ match, podId }: { match: Match; podId: string }) {
       onSubmit={(e) => {
         e.preventDefault();
         const result = a > b ? "A_WINS" : b > a ? "B_WINS" : "DRAW";
-        submitResult.mutate({ matchId: match.id, result, gamesWonA: a, gamesWonB: b });
+        submitResult.mutate({ matchId: match.id, result, gamesWonA: a, gamesWonB: b, gamesDrawn: d });
       }}
     >
       <input
@@ -59,6 +61,15 @@ function ResultEntry({ match, podId }: { match: Match; podId: string }) {
         value={b}
         onChange={(e) => setB(Number(e.target.value))}
         className="w-12 rounded border border-border-strong bg-surface px-2 py-1 text-center text-[13px] tabular-nums outline-none focus:border-accent"
+      />
+      <input
+        type="number"
+        min={0}
+        value={d}
+        onChange={(e) => setD(Number(e.target.value))}
+        title="Drawn games (counted as played, credited to neither)"
+        aria-label="Drawn games"
+        className="w-12 rounded border border-dashed border-border-strong bg-surface px-2 py-1 text-center text-[13px] tabular-nums text-ink-muted outline-none focus:border-accent"
       />
       <Button type="submit" variant="primary" disabled={submitResult.isPending} className="ml-1">
         Submit

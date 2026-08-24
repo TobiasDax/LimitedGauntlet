@@ -15,6 +15,7 @@ interface MatchLike {
   result: "PENDING" | "A_WINS" | "B_WINS" | "DRAW";
   gamesWonA: number;
   gamesWonB: number;
+  gamesDrawn: number;
 }
 
 interface PodPointConfig {
@@ -63,8 +64,11 @@ function tallyMatches(matches: MatchLike[], pod: PodPointConfig): PodStats {
     opponentSet(match.entrantBId).add(match.entrantAId);
     addMatchPlayed(match.entrantAId);
     addMatchPlayed(match.entrantBId);
-    addGames(match.entrantAId, match.gamesWonA, match.gamesWonA + match.gamesWonB);
-    addGames(match.entrantBId, match.gamesWonB, match.gamesWonA + match.gamesWonB);
+    // Drawn games count as played for both sides (diluting game-win%) but are
+    // credited to neither — the MTR convention larger tournaments use.
+    const gamesPlayed = match.gamesWonA + match.gamesWonB + match.gamesDrawn;
+    addGames(match.entrantAId, match.gamesWonA, gamesPlayed);
+    addGames(match.entrantBId, match.gamesWonB, gamesPlayed);
 
     if (match.result === "A_WINS") {
       addPoints(match.entrantAId, pod.pointsWin);
