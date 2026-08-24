@@ -2,12 +2,15 @@
 
 /*
  * Design system — dark mode only for v1 (light mode is a deliberate v2).
- * Values carried over from the validated design pass: the accent gold was
- * re-picked after the dataviz skill's palette validator flagged the first
- * choice as too close to the "warning" status color (ΔE 9.6, below the 15
- * floor); ink-muted was bumped after checking contrast, not eyeballing
- * (3.44:1 -> 4.87:1). See PLAN.md / the design artifact for the full
- * rationale — don't re-pick these without re-running the validator.
+ *
+ * PI-10 contrast/accent pass (2026-08-24): the ink ramp was brightened
+ * and the accent swapped from gold to a warm red-orange, all re-verified
+ * against WCAG contrast math (not eyeballed) — every combination actually
+ * used in the app (ink tokens vs bg/surface; accent as text vs bg/surface;
+ * accent as a primary-button fill under the dark #241c0a button text)
+ * clears 4.5:1. ink-secondary/ink-muted got real headroom, not just a
+ * bump past the floor (was 7.14/4.87 vs bg, now 9.11/7.66). Don't re-pick
+ * these without re-checking contrast the same way.
  */
 @theme {
   --color-bg: #141210;
@@ -15,16 +18,16 @@
   --color-surface-raised: #252220;
   --color-surface-sunken: #0f0d0b;
 
-  --color-ink: #f2ede4;
-  --color-ink-secondary: #a89f8f;
-  --color-ink-muted: #8a8175;
+  --color-ink: #f7f4ee;
+  --color-ink-secondary: #bcb4a9;
+  --color-ink-muted: #aca59a;
 
   --color-border: rgba(242, 237, 228, 0.1);
   --color-border-strong: rgba(242, 237, 228, 0.18);
 
-  --color-accent: #a67c27;
-  --color-accent-strong: #c2953f;
-  --color-accent-wash: rgba(166, 124, 39, 0.14);
+  --color-accent: #dc5e28;
+  --color-accent-strong: #e2784b;
+  --color-accent-wash: rgba(220, 94, 40, 0.14);
 
   --color-good: #0ca30c;
   --color-good-wash: rgba(12, 163, 12, 0.14);
