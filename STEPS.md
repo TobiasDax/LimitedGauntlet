@@ -145,5 +145,6 @@ This is the biggest single step in the plan — it's being worked in phases, eac
 - [x] **Flagging for Tobias, not deciding unilaterally**: `legacy-data.json` (committed in Step 10) contains real first names, surnames, and game results for ~12 real people who aren't Tobias — his friend group. Whether that belongs in a public OSS repo is his call, not mine. Options if it needs to come out before this repo goes fully public: rewrite history to drop the file/scrub names, replace real names with initials or pseudonyms in the JSON, or keep the repo private/internal-only. Untouched pending his decision.
 
 ## Step 12 — Deploy to DaxLite
-- [ ] Hand Tobias the exact compose file for `/opt/docker/arcane-projects/limited-gauntlet/compose.yaml` + steps — **he runs this**, not Claude (touches live infra)
+- [x] Deployment guide written: [`docs/deploy-daxlite.md`](docs/deploy-daxlite.md) — clone-to-DaxLite steps, `.env` values, a production note about dropping the dev-only Postgres port publish, the LAN-vs-Tailscale exposure decision (left as Tobias's call, not decided here), first-boot command, and the optional history-import step (with the name-privacy flag from Step 11 repeated here since it's the moment it'd actually matter).
+- [ ] **Tobias runs this** — touches live infra outside this session's reach. Not attempted here.
 - [ ] Once live: add a `services/daxlite.md` entry in `claude-memory`
