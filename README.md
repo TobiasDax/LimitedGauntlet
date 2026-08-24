@@ -1,10 +1,12 @@
 # LimitedGauntlet
 
-A self-hosted, open-source Swiss-tournament tracker for MTG Limited (and other) events. Built to replace a third-party pairing site plus a pile of manually-maintained docs for a yearly ~8-10 player weekend GP — pairing, results, live standings, a round timer, and card-pull value tracking, all in one app.
+A self-hosted, open-source Swiss-tournament tracker for MTG Limited (and other) events. Built to replace a third-party pairing site plus a pile of manually-maintained docs for a yearly ~8-10 player weekend GP — pairing, results, live standings, a round timer, card-pull value tracking, and a shareable public view, all in one app.
 
 Designed from day one as a real multi-group tool: one deployment can host several isolated organizations, each with their own login and player roster.
 
-**Status: active build, not yet feature-complete.** The full backend is built and tested end-to-end: auth/multi-tenancy, tournament/pod/entrant CRUD, Swiss pairing with weekend-wide repeat avoidance, standings, Gesamtwertung, realtime broadcasts, and Scryfall-backed value tracking. The frontend is under active construction — auth, roster management, and pod/entrant setup are working (dark-mode-only for v1, light mode is a deliberate v2); the flagship pages (Gesamtwertung, standings, live pairings + round timer) and value-tracking UI are next. See [`STEPS.md`](STEPS.md) for exactly what's done and what's next, and [`PLAN.md`](PLAN.md) for the full design rationale.
+![Gesamtwertung — the weekend-wide standings page, average-ranked with per-pod pips](docs/screenshots/gesamtwertung.png)
+
+**Status: feature-complete, pre-deploy.** Auth/multi-tenancy, tournament/pod/entrant CRUD, Swiss pairing with weekend-wide repeat avoidance, standings, Gesamtwertung, realtime broadcasts (Socket.IO), a round timer with a Display Mode chime, Scryfall-backed value tracking, public read-only pages, and a full responsive pass are all built, browser-tested, and — for the screenshot above — running against 4 real years of imported tournament history. Dark mode only for v1 (light mode is a deliberate v2, not an oversight). What's left is packaging polish and the actual deploy. See [`STEPS.md`](STEPS.md) for the detailed build log and [`PLAN.md`](PLAN.md) for the full design rationale.
 
 ## Stack
 
@@ -34,6 +36,26 @@ npm run dev:client   # Vite dev server, proxies /api and /socket.io to :8080
 
 `npm run prisma:migrate --workspace server` applies schema changes locally against that same Postgres.
 
+## History import
+
+`server/src/scripts/import-legacy.ts` + `legacy-data.json` import real past tournament history (see `PLAN.md`'s historical reference section) so Gesamtwertung and Hall of Fame have real data from day one instead of starting empty. It's idempotent — safe to re-run, existing rows are left alone rather than duplicated — and talks to the database directly via Prisma, not through the HTTP API.
+
+```sh
+docker compose exec app node server/dist/scripts/import-legacy.js
+```
+
+Creates an organization (`gp-eichstaett` by default) and one organizer login. Set these first if you want anything other than the generated defaults:
+
+```sh
+IMPORT_ORG_SLUG=gp-eichstaett
+IMPORT_ORG_NAME="GP Eichstätt"
+IMPORT_ORGANIZER_EMAIL=organizer@example.com
+IMPORT_ORGANIZER_PASSWORD=              # generated + printed once if left unset — log in and change it
+IMPORT_ORGANIZER_NAME=Organizer
+```
+
+The JSON has its own data source note worth reading before trusting it blindly: names were reconciled across years where a document used a nickname/surname/typo, and exact calendar dates aren't recorded in the original source (marked `dateApproximate`, easy to fix later via the tournament's own settings).
+
 ## License
 
-Not yet decided — defaulting to MIT unless there's a reason to prefer AGPL (see `PLAN.md`, Step 11).
+[MIT](LICENSE).
