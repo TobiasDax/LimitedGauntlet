@@ -11,6 +11,7 @@ const tournamentCreateSchema = z.object({
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   location: z.string().trim().max(200).optional(),
+  description: z.string().trim().max(4000).optional(),
 });
 
 const tournamentUpdateSchema = z.object({
@@ -18,6 +19,8 @@ const tournamentUpdateSchema = z.object({
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
   location: z.string().trim().max(200).optional(),
+  // nullable so the description can be cleared back to empty
+  description: z.string().trim().max(4000).nullable().optional(),
   status: z.enum(["PLANNING", "ACTIVE", "COMPLETED"]).optional(),
 });
 

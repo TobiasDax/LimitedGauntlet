@@ -8,6 +8,7 @@ import { useTournamentRealtime } from "../features/tournaments/useTournamentReal
 import { Card, Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 import { GesamtwertungList } from "../components/GesamtwertungList";
 import { CardGallery, formatEur } from "../components/CardGallery";
+import { RichText } from "../components/RichText";
 import { podFormatLabel } from "../features/pods/usePods";
 import type { CardPull } from "../lib/types";
 
@@ -47,6 +48,8 @@ export function PublicTournamentPage() {
         {tournament.pods.length} pod{tournament.pods.length === 1 ? "" : "s"} · {tournament.players.length} player
         {tournament.players.length === 1 ? "" : "s"} attending
       </ScreenDek>
+
+      {tournament.description && <RichText text={tournament.description} className="mb-8" />}
 
       {tournament.pods.length > 0 && (
         <div className="mb-10 flex flex-col gap-2">

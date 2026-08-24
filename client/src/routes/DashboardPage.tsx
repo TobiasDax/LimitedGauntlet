@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useCreateTournament, useTournaments } from "../features/tournaments/useTournaments";
-import { Button, Card, Eyebrow, Field, ScreenDek, ScreenTitle, TextField } from "../components/ui";
+import { Button, Card, Eyebrow, Field, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
 import type { TournamentStatus } from "../lib/types";
 
 const statusLabel: Record<TournamentStatus, string> = {
@@ -23,6 +23,7 @@ export function DashboardPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [location, setLocation] = useState("");
+  const [description, setDescription] = useState("");
 
   return (
     <div>
@@ -71,7 +72,13 @@ export function DashboardPage() {
             onSubmit={(e) => {
               e.preventDefault();
               createTournament.mutate(
-                { name, startDate, endDate, location: location || undefined },
+                {
+                  name,
+                  startDate,
+                  endDate,
+                  location: location || undefined,
+                  description: description.trim() || undefined,
+                },
                 {
                   onSuccess: () => {
                     setShowForm(false);
@@ -79,6 +86,7 @@ export function DashboardPage() {
                     setStartDate("");
                     setEndDate("");
                     setLocation("");
+                    setDescription("");
                   },
                 },
               );
@@ -97,6 +105,14 @@ export function DashboardPage() {
             </div>
             <Field label="Location" hint="Optional">
               <TextField value={location} onChange={(e) => setLocation(e.target.value)} />
+            </Field>
+            <Field label="Description" hint="Optional · URLs and [label](https://…) become clickable links">
+              <Textarea
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Links to the Outline pages, venue notes, format explainer…"
+              />
             </Field>
             <div className="flex gap-2">
               <Button type="submit" variant="primary" disabled={createTournament.isPending}>

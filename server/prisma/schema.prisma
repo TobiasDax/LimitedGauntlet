@@ -74,6 +74,10 @@ model Tournament {
   startDate DateTime
   endDate   DateTime
   location  String?
+  // Free-text blurb shown on the tournament page + its public link. May
+  // contain URLs / [label](url) links (e.g. to Outline pages); rendered
+  // safely as text-plus-links on the client, never as raw HTML.
+  description String?
   status    TournamentStatus @default(PLANNING)
   createdAt DateTime         @default(now())
 

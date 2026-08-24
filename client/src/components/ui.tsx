@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 
 type ButtonVariant = "default" | "primary" | "ghost";
 
@@ -34,6 +34,15 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 export function TextField(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
+      className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none placeholder:text-ink-muted focus:border-accent focus:ring-1 focus:ring-accent"
+      {...props}
+    />
+  );
+}
+
+export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
       className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none placeholder:text-ink-muted focus:border-accent focus:ring-1 focus:ring-accent"
       {...props}
     />

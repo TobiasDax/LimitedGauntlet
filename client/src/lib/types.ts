@@ -27,6 +27,7 @@ export interface Tournament {
   startDate: string;
   endDate: string;
   location: string | null;
+  description: string | null;
   status: TournamentStatus;
   createdAt: string;
 }

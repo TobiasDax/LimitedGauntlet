@@ -1,10 +1,64 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useTournament } from "../features/tournaments/useTournament";
+import { useTournament, type TournamentDetail } from "../features/tournaments/useTournament";
+import { useUpdateTournament } from "../features/tournaments/useTournaments";
 import { useCreatePod, podFormatLabel } from "../features/pods/usePods";
 import { useMe } from "../features/auth/useAuth";
-import { Button, Card, Eyebrow, Field, ScreenDek, ScreenTitle, TextField } from "../components/ui";
+import { Button, Card, Eyebrow, Field, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
+import { RichText } from "../components/RichText";
 import type { PodFormat } from "../lib/types";
+
+function DescriptionSection({ tournament }: { tournament: TournamentDetail }) {
+  const update = useUpdateTournament(tournament.id);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(tournament.description ?? "");
+
+  if (!editing) {
+    return (
+      <div className="mb-6">
+        {tournament.description ? (
+          <RichText text={tournament.description} />
+        ) : (
+          <p className="text-[13px] text-ink-muted">No description yet.</p>
+        )}
+        <button
+          onClick={() => {
+            setText(tournament.description ?? "");
+            setEditing(true);
+          }}
+          className="mt-1.5 text-[12px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+        >
+          {tournament.description ? "Edit description" : "+ Add description"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-6 flex flex-col gap-2">
+      <Textarea
+        rows={4}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Links to the Outline pages, venue notes, format explainer… URLs and [label](https://…) become clickable."
+      />
+      <div className="flex gap-2">
+        <Button
+          variant="primary"
+          disabled={update.isPending}
+          onClick={() =>
+            update.mutate({ description: text.trim() || null }, { onSuccess: () => setEditing(false) })
+          }
+        >
+          {update.isPending ? "Saving…" : "Save"}
+        </Button>
+        <Button variant="ghost" onClick={() => setEditing(false)}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 const podFormats: PodFormat[] = ["DRAFT", "SEALED", "CHAOS_DRAFT", "CONSTRUCTED", "CUSTOM"];
 
@@ -155,6 +209,8 @@ export function TournamentPage() {
           ? "No pods yet — add one to start pairing."
           : `${tournament.pods.length} pod${tournament.pods.length === 1 ? "" : "s"} · ${tournament.players.length} player${tournament.players.length === 1 ? "" : "s"} attending`}
       </ScreenDek>
+
+      <DescriptionSection tournament={tournament} />
 
       {tournament.players.length > 0 && (
         <div className="mb-6 flex gap-5">

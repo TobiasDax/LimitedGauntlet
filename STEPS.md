@@ -209,12 +209,10 @@ Turn the flat all-time leaderboard (PI-3) into a proper stats section: a Hall of
 - [ ] Backend: extend the PI-3 service (or a new `playerStats.ts`) to compute per-player aggregates + head-to-head from `Match` rows across the org. Endpoints `GET /api/hall-of-fame` (overview) and `GET /api/hall-of-fame/players/:id` (detail), org-scoped. Honor PI-6's exclude flag and the team-pod full-credit rule (PLAN.md), consistent with Gesamtwertung.
 - [ ] Charts: the app ships **zero** chart deps today — do the simple bars/heatmap in pure Tailwind/SVG, and only pull in a lightweight React charting lib if something genuinely curvy (e.g. win% over time) justifies it. Keep the footprint small.
 
-### PI-8 — Tournament description with clickable links (shown on the public page too)
-- [ ] Add `Tournament.description String?` (Postgres `Text`) — a short blurb per event: links to the Outline pages, venue notes, format explainer, etc. Migration.
-- [ ] Backend: add the field to the tournament create/update zod schemas (`server/src/routes/tournaments.ts`). The public endpoint already spreads `...tournament`, so a new column flows through to `PublicTournamentPage` automatically — just confirm it lands.
-- [ ] Editing: a textarea in the tournament create/edit form (pairs with PI-5's tournament-edit UI).
-- [ ] Rendering + links — must produce **clickable external links**, and it renders on the **public** page, so XSS safety is mandatory (this is untrusted-in-untrusted-out for a public URL). Options:
-  - (recommended) store **Markdown**, render with a small sanitizing renderer that escapes raw HTML and only emits safe `<a href>` (http/https/mailto) carrying `target="_blank" rel="noopener noreferrer"`; also gets bold/lists/headings for free.
-  - (minimal) store plain text and **auto-linkify** bare URLs — HTML-escape everything first, then wrap `https?://…` matches in anchors. Smallest footprint, no formatting, still safe.
-  - Do **not** store or render raw HTML.
-- [ ] Display near the top (under the title) on both `TournamentPage` (authed) and `PublicTournamentPage` (public).
+### PI-8 — Tournament description with clickable links (shown on the public page too) ✅ (implemented 2026-08-24, not yet deployed)
+- [x] `Tournament.description String?` (Postgres `TEXT`) added — migration `20260824130000_add_tournament_description`.
+- [x] Backend: `description` in the tournament create/update zod schemas (`tournaments.ts`; nullable on update so it can be cleared, max 4000). Public endpoint returns it automatically (`findPublicTournament` is an unnarrowed `findFirst`).
+- [x] Editing: description textarea in the create form (`DashboardPage`), plus an inline edit-in-place on `TournamentPage` (RichText view + "Edit description" → textarea + Save/Cancel) via a new `useUpdateTournament` hook — so it's editable now without waiting for PI-5's full tournament-edit form. New `Textarea` UI primitive.
+- [x] Rendering + links: went with the **safe minimal** route — a `RichText` component (`client/src/components/RichText.tsx`) renders the blurb as **React nodes** (plain text auto-escaped), turning only `https?://…` URLs and `[label](url)` into `<a target=_blank rel=noopener noreferrer>`. No raw HTML, no `dangerouslySetInnerHTML`, so no XSS surface — and no new dependency (skipped the Markdown lib).
+- [x] Displayed under the title on both `TournamentPage` (authed, editable) and `PublicTournamentPage` (public, read-only).
+- [ ] Still to do: deploy (rebuild — `migrate deploy` adds the column on boot) and verify a real link renders/clicks on a public link.
