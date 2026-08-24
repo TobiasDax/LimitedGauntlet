@@ -140,6 +140,7 @@ model Pod {
   packConfig         String?
   rarepicUrl         String?
   status             PodStatus   @default(SETUP)
+  excludeFromStats   Boolean     @default(false)
   createdAt          DateTime    @default(now())
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)

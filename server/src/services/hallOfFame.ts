@@ -17,8 +17,7 @@ export interface HallOfFameRow {
 // events isn't penalized.
 export async function computeHallOfFame(orgId: string): Promise<HallOfFameRow[]> {
   const pods = await prisma.pod.findMany({
-    where: { tournament: { orgId } },
-    // PI-6 (per-pod excludeFromStats) would add a filter here once it exists.
+    where: { tournament: { orgId }, excludeFromStats: false },
     include: { entrants: { include: { team: { include: { members: true } } } } },
   });
 

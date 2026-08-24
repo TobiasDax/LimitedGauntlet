@@ -162,7 +162,7 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
   // "Treasure Chest" page (the org-wide most-valuable-cards gallery).
   app.get("/api/card-pulls/treasure-chest", async (request, reply) => {
     const pulls = await prisma.cardPull.findMany({
-      where: { pod: { tournament: { orgId: request.organizer!.orgId } } },
+      where: { pod: { excludeFromStats: false, tournament: { orgId: request.organizer!.orgId } } },
       include: {
         player: true,
         pod: { select: { id: true, name: true, tournament: { select: { id: true, name: true } } } },

@@ -54,6 +54,7 @@ export interface Pod {
   packConfig: string | null;
   rarepicUrl: string | null;
   status: PodStatus;
+  excludeFromStats: boolean;
   createdAt: string;
 }
 

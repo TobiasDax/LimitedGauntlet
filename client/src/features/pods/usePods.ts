@@ -51,6 +51,7 @@ export interface UpdatePodInput {
   pointsDraw?: number;
   pointsLoss?: number;
   roundLengthMinutes?: number;
+  excludeFromStats?: boolean;
 }
 
 export function useUpdatePod(podId: string, tournamentId?: string) {

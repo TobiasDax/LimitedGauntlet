@@ -39,6 +39,7 @@ const podCreateSchema = z.object({
   roundLengthMinutes: z.number().int().min(1).default(50),
   packConfig: z.string().trim().max(2000).optional(),
   rarepicUrl: z.string().trim().url().optional(),
+  excludeFromStats: z.boolean().default(false),
 });
 
 // Deliberately NOT `podCreateSchema.partial()` — the create schema uses
@@ -63,6 +64,7 @@ const podUpdateSchema = z.object({
   packConfig: z.string().trim().max(2000).optional(),
   rarepicUrl: z.string().trim().url().optional(),
   status: z.enum(podStatuses).optional(),
+  excludeFromStats: z.boolean().optional(),
 });
 
 const individualEntrantSchema = z.object({ playerId: z.string().min(1) });

@@ -23,6 +23,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
   const [pointsDraw, setPointsDraw] = useState(pod.pointsDraw);
   const [pointsLoss, setPointsLoss] = useState(pod.pointsLoss);
   const [roundLengthMinutes, setRoundLengthMinutes] = useState(pod.roundLengthMinutes);
+  const [excludeFromStats, setExcludeFromStats] = useState(pod.excludeFromStats);
 
   return (
     <Card className="mb-6 p-6">
@@ -41,6 +42,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
               pointsDraw,
               pointsLoss,
               roundLengthMinutes,
+              excludeFromStats,
             },
             { onSuccess: onDone },
           );
@@ -107,6 +109,15 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
             />
           </Field>
         </div>
+
+        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+          <input
+            type="checkbox"
+            checked={excludeFromStats}
+            onChange={(e) => setExcludeFromStats(e.target.checked)}
+          />
+          Exclude from org-wide stats (Hall of Fame, Treasure Chest) — for one-off, joke, or test pods
+        </label>
 
         <div className="flex gap-2">
           <Button type="submit" variant="primary" disabled={updatePod.isPending}>
