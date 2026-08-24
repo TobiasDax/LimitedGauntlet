@@ -9,6 +9,7 @@ services:
       HOST: 0.0.0.0
       SESSION_SECRET: ${SESSION_SECRET}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
     depends_on:
       db:
         condition: service_healthy

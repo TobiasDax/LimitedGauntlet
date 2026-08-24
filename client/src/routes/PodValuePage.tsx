@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   useAddCardPull,
@@ -6,6 +6,7 @@ import {
   useDeleteCardPull,
   useSetCardPullAttribution,
   usePodCardPulls,
+  useScryfallSets,
   cardPullErrorMessage,
 } from "../features/pods/useCardPulls";
 import { usePod, podFormatLabel } from "../features/pods/usePods";
@@ -39,9 +40,23 @@ function AddPullForm({
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [playerId, setPlayerId] = useState("");
-  const [setCode, setSetCode] = useState(defaultSetCode);
   const [foil, setFoil] = useState(false);
   const addPull = useAddCardPull(podId);
+
+  const { data: setsData } = useScryfallSets();
+  // Alphabetized by name (not the sets picker's release-date order — this
+  // is for finding a specific set by name, not "what's recent"), plus a
+  // name -> code lookup so the field can be typed/searched by name while
+  // still submitting the code. Falls through to the raw text as-is when it
+  // doesn't match any known name, so an uncommon code (e.g. a bonus-sheet
+  // set not in the "main sets" list) can still be typed directly.
+  const sets = useMemo(
+    () => [...(setsData?.sets ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [setsData],
+  );
+  const codeByName = useMemo(() => new Map(sets.map((s) => [s.name.toLowerCase(), s.code])), [sets]);
+  const nameByCode = useMemo(() => new Map(sets.map((s) => [s.code, s.name])), [sets]);
+  const [setInput, setSetInput] = useState(() => nameByCode.get(defaultSetCode) ?? defaultSetCode);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 250);
@@ -53,8 +68,10 @@ function AddPullForm({
   const players = pullablePlayers(entrants);
 
   const submit = (name: string) => {
+    const trimmed = setInput.trim();
+    const resolvedSetCode = trimmed ? (codeByName.get(trimmed.toLowerCase()) ?? trimmed) : undefined;
     addPull.mutate(
-      { cardName: name, playerId: playerId || undefined, setCode: setCode.trim() || undefined, foil },
+      { cardName: name, playerId: playerId || undefined, setCode: resolvedSetCode, foil },
       { onSuccess: () => setQuery("") },
     );
   };
@@ -75,12 +92,18 @@ function AddPullForm({
           onChange={(e) => setQuery(e.target.value)}
         />
         <TextField
-          className="w-24"
-          placeholder="Set"
-          title="Scryfall set code (e.g. eoe) — pins the printing instead of guessing. Optional."
-          value={setCode}
-          onChange={(e) => setSetCode(e.target.value)}
+          className="w-48"
+          list="set-options"
+          placeholder="Set…"
+          title="Pick a set by name, or type a code directly (e.g. eos for a bonus sheet) — pins the printing instead of guessing. Optional."
+          value={setInput}
+          onChange={(e) => setSetInput(e.target.value)}
         />
+        <datalist id="set-options">
+          {sets.map((s) => (
+            <option key={s.code} value={s.name} />
+          ))}
+        </datalist>
         <label className="flex items-center gap-1.5 text-[12.5px] text-ink-secondary" title="Price the foil printing">
           <input type="checkbox" checked={foil} onChange={(e) => setFoil(e.target.checked)} />
           Foil

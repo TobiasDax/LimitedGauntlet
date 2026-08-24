@@ -22,6 +22,15 @@ export function useMe() {
   });
 }
 
+// Public — checked before the user is authenticated, to show a clear
+// "closed" message instead of a dead-end form.
+export function useSignupStatus() {
+  return useQuery({
+    queryKey: ["signup-status"],
+    queryFn: () => api.get<{ allowSignup: boolean }>("/auth/signup-status"),
+  });
+}
+
 export interface SignupInput {
   orgName: string;
   orgSlug: string;

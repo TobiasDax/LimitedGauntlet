@@ -25,4 +25,10 @@ export const config = {
   // session cookie. Flip to true once a TLS-terminating reverse proxy is
   // in front — see README for deployment notes.
   sessionCookieSecure: process.env.SESSION_COOKIE_SECURE === "true",
+  // Off by default — this app is meant to be shared with an existing group,
+  // not a public signup form. Flip to "true" only while someone actually
+  // needs to create an account, then flip it back. GET /api/auth/signup
+  // exposes this so the frontend can show a clear "closed" message instead
+  // of a dead-end form.
+  allowSignup: process.env.ALLOW_SIGNUP === "true",
 };

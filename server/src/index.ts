@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import fastifySecureSession from "@fastify/secure-session";
+import fastifyHelmet from "@fastify/helmet";
+import fastifyRateLimit from "@fastify/rate-limit";
 import "./auth/types.js";
 import { config } from "./config.js";
 import { prisma } from "./prisma.js";
@@ -34,6 +36,15 @@ const httpServer = createServer();
 
 const app = Fastify({
   logger: true,
+  // Cloudflare Tunnel (or any reverse proxy) is the only thing that can
+  // reach this app when deployed publicly — there's no open inbound port,
+  // so the proxy hop is trusted by construction. This makes request.ip
+  // (and therefore rate-limit's per-IP bucketing) reflect the real client
+  // IP from X-Forwarded-For/CF-Connecting-IP instead of the tunnel's own
+  // address. Note: this also means a same-LAN client could forge those
+  // headers on a direct, non-tunneled request — acceptable here since LAN
+  // access is already a trusted network in this app's threat model.
+  trustProxy: true,
   serverFactory: (handler) => {
     httpServer.on("request", handler);
     return httpServer;
@@ -41,6 +52,53 @@ const app = Fastify({
 });
 
 initRealtime(httpServer);
+
+// CSP tuned to what this app actually loads: same-origin scripts/styles
+// (Vite's build, no external CDN), Scryfall's card-image CDN, and
+// same-origin fetch/WebSocket (API + Socket.IO share this origin).
+// frameAncestors 'none' blocks embedding this app in an iframe elsewhere
+// (clickjacking) — there's no legitimate reason to embed it. HSTS only
+// turned on once SESSION_COOKIE_SECURE says we're actually behind TLS —
+// same reasoning as that flag: forcing HTTPS redirects on a plain-HTTP
+// LAN deployment would just break it for a year (HSTS is heavily cached).
+//
+// upgradeInsecureRequests is one of helmet's CSP defaults and has to be
+// explicitly disabled (not just omitted) on a plain-HTTP deployment: it
+// tells the browser to rewrite every http:// asset/API request on the page
+// to https:// before sending it — which, on a server that only speaks
+// HTTP (LAN-only, or behind a tunnel that terminates TLS upstream), turns
+// into every single asset failing with ERR_SSL_PROTOCOL_ERROR and the SPA
+// never mounting. Caught by loading the app in a real browser after adding
+// this CSP — it typechecks fine either way, this only shows up at runtime.
+await app.register(fastifyHelmet, {
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", "https://cards.scryfall.io", "data:"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+      formAction: ["'self'"],
+      upgradeInsecureRequests: config.sessionCookieSecure ? [] : null,
+    },
+  },
+  hsts: config.sessionCookieSecure,
+  // Same story as HSTS/upgradeInsecureRequests above: COOP is a
+  // browser-enforced isolation policy that only makes sense (and only
+  // avoids a console warning) once the origin is actually HTTPS.
+  crossOriginOpenerPolicy: config.sessionCookieSecure ? { policy: "same-origin" } : false,
+});
+
+// A generous default across the whole app (catches generic scraping/abuse)
+// — auth.ts sets much tighter per-route limits on login/signup specifically,
+// since those are the routes brute-force/spam actually target.
+await app.register(fastifyRateLimit, {
+  max: 200,
+  timeWindow: "1 minute",
+});
 
 await app.register(fastifySecureSession, {
   key: config.sessionKey,
@@ -52,6 +110,21 @@ await app.register(fastifySecureSession, {
     secure: config.sessionCookieSecure,
     maxAge: 60 * 60 * 24 * 30, // 30 days
   },
+});
+
+// Best-effort "please don't index this" signal on every response — robots.txt
+// below covers well-behaved crawlers at the crawl stage, this covers the
+// (stronger, binding) indexing stage even for a URL a crawler only ever
+// reaches via an external link. Neither actually stops a scraper that
+// ignores both; that's not something HTTP-layer signals can do without
+// adding a login wall, which the public pages are deliberately kept without.
+app.addHook("onSend", async (_request, reply, payload) => {
+  reply.header("X-Robots-Tag", "noindex, nofollow");
+  return payload;
+});
+
+app.get("/robots.txt", async (_request, reply) => {
+  reply.type("text/plain").send("User-agent: *\nDisallow: /\n");
 });
 
 app.get("/api/healthz", async () => {

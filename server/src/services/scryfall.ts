@@ -149,12 +149,19 @@ interface ScryfallSetResponse {
   released_at: string | null;
 }
 
-// "Main" sets for the pod set-picker: real paper expansions/core sets,
-// newest first. Excludes masters/commander/promo/token/etc. sets, which
-// would otherwise flood the picker with sets nobody drafts a fresh pod
-// from — those are still reachable via the free-text setCode override on
-// an individual pull (e.g. correcting a card that's actually from a
-// Masters reprint), just not offered as a pod-level default.
+// "Main" sets for the set pickers: real paper sets people actually draft or
+// open packs from, newest first. Verified against Scryfall's live data
+// (not assumed) which set_type values this actually needs — "expansion"/
+// "core" alone misses a whole category of commonly-drafted product:
+// Masters-line sets (Ultimate Masters, the "X Remastered" sets, Mystery
+// Booster 2 — all set_type "masters") and the special draft-format sets
+// (Modern Horizons, Jumpstart, Battlebond, Conspiracy, Commander Legends —
+// all "draft_innovation"). Still excludes commander/promo/token/box/etc.,
+// which would flood the picker with sets nobody opens fresh packs from —
+// those stay reachable via the free-text setCode override on an individual
+// pull, just not offered as a default.
+const MAIN_SET_TYPES = new Set(["expansion", "core", "masters", "draft_innovation"]);
+
 export async function listMainSets(): Promise<ScryfallSetSummary[]> {
   const key = "sets:main";
   const cached = getCached<ScryfallSetSummary[]>(key);
@@ -165,7 +172,7 @@ export async function listMainSets(): Promise<ScryfallSetSummary[]> {
   const data = (await res.json()) as { data: ScryfallSetResponse[] };
 
   const sets = data.data
-    .filter((s) => (s.set_type === "expansion" || s.set_type === "core") && !s.digital)
+    .filter((s) => MAIN_SET_TYPES.has(s.set_type) && !s.digital)
     .sort((a, b) => (b.released_at ?? "").localeCompare(a.released_at ?? ""))
     .map((s) => ({ code: s.code, name: s.name, releasedAt: s.released_at }));
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useSignup } from "../features/auth/useAuth";
+import { useSignup, useSignupStatus } from "../features/auth/useAuth";
 import { Button, Card, Field, FormError, TextField } from "../components/ui";
 import { ApiError } from "../lib/api";
 
@@ -21,6 +21,7 @@ export function SignupPage() {
   const [organizerPassword, setOrganizerPassword] = useState("");
   const signup = useSignup();
   const navigate = useNavigate();
+  const { data: signupStatus, isLoading: statusLoading } = useSignupStatus();
 
   return (
     <div className="mx-auto max-w-[420px] py-16">
@@ -29,7 +30,15 @@ export function SignupPage() {
         One organization per playgroup — your roster and tournaments live under it.
       </p>
 
-      <Card className="p-6">
+      {statusLoading ? null : !signupStatus?.allowSignup ? (
+        <Card className="p-6 text-center">
+          <p className="text-[14px] text-ink-secondary">
+            Signups are closed right now. Ask whoever's running this instance for an invite, or to open signups
+            briefly.
+          </p>
+        </Card>
+      ) : (
+        <Card className="p-6">
         <form
           className="flex flex-col gap-4"
           onSubmit={(e) => {
@@ -91,7 +100,9 @@ export function SignupPage() {
                 ? signup.error.message === "slug_taken"
                   ? "That URL slug is already taken — try a different one."
                   : "That email is already in use."
-                : "Something went wrong. Try again."}
+                : signup.error instanceof ApiError && signup.error.status === 403
+                  ? "Signups just closed — ask whoever's running this instance."
+                  : "Something went wrong. Try again."}
             </FormError>
           )}
 
@@ -99,7 +110,8 @@ export function SignupPage() {
             {signup.isPending ? "Creating…" : "Create organization"}
           </Button>
         </form>
-      </Card>
+        </Card>
+      )}
 
       <p className="mt-5 text-center text-[13px] text-ink-secondary">
         Already have an account?{" "}
