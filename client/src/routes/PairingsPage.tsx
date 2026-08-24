@@ -5,9 +5,11 @@ import {
   useCompleteRound,
   useExtendRound,
   useGenerateRound,
+  useManualPairRound,
   useRounds,
   useStartRound,
   useSubmitResult,
+  useSwapPairing,
   roundErrorMessage,
 } from "../features/pods/useRounds";
 import { entrantDisplayName } from "../lib/entrant";
@@ -105,20 +107,148 @@ function ResultEntry({ match, podId }: { match: Match; podId: string }) {
   );
 }
 
-function MatchCard({ match, entrantById, podId }: { match: Match; entrantById: Map<string, Entrant>; podId: string }) {
+// Manual pairing UI: one dropdown-pair row per expected table, each side
+// filtering out entrants already picked elsewhere so a duplicate is
+// impossible by construction rather than caught after the fact. Backend
+// (`invalid_pairing`) is still the real guard — this is just about not
+// making the organizer hit it in the first place.
+function ManualPairingForm({
+  podId,
+  activeEntrants,
+  roundNumber,
+  onDone,
+  onCancel,
+}: {
+  podId: string;
+  activeEntrants: Entrant[];
+  roundNumber: number;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const manualPair = useManualPairRound(podId);
+  const pairCount = Math.ceil(activeEntrants.length / 2);
+  const [pairs, setPairs] = useState<Array<{ a: string; b: string }>>(() =>
+    Array.from({ length: pairCount }, () => ({ a: "", b: "" })),
+  );
+
+  const usedIds = new Set(pairs.flatMap((p) => [p.a, p.b]).filter(Boolean));
+  const optionsFor = (current: string) =>
+    activeEntrants.filter((e) => e.id === current || !usedIds.has(e.id));
+
+  const update = (i: number, side: "a" | "b", value: string) =>
+    setPairs((prev) => prev.map((p, idx) => (idx === i ? { ...p, [side]: value } : p)));
+
+  const allFilled = pairs.every((p) => p.a);
+
+  return (
+    <div className="mt-5 rounded-lg border border-border bg-surface-sunken p-5">
+      <div className="mb-4 font-display text-[16px] font-bold">Manual pairing — round {roundNumber}</div>
+      <div className="flex flex-col gap-2">
+        {pairs.map((pair, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="w-14 shrink-0 text-[11px] tracking-wide text-ink-muted uppercase">Table {i + 1}</span>
+            <select
+              className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+              value={pair.a}
+              onChange={(e) => update(i, "a", e.target.value)}
+            >
+              <option value="">Select…</option>
+              {optionsFor(pair.a).map((e) => (
+                <option key={e.id} value={e.id}>
+                  {entrantDisplayName(e)}
+                </option>
+              ))}
+            </select>
+            <span className="text-[11px] text-ink-muted">vs</span>
+            <select
+              className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+              value={pair.b}
+              onChange={(e) => update(i, "b", e.target.value)}
+            >
+              <option value="">— Bye —</option>
+              {optionsFor(pair.b).map((e) => (
+                <option key={e.id} value={e.id}>
+                  {entrantDisplayName(e)}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex items-center gap-2">
+        <Button
+          variant="primary"
+          disabled={!allFilled || manualPair.isPending}
+          onClick={() =>
+            manualPair.mutate(
+              pairs.map((p) => ({ entrantAId: p.a, entrantBId: p.b || null })),
+              { onSuccess: onDone },
+            )
+          }
+        >
+          {manualPair.isPending ? "Publishing…" : "Publish pairing"}
+        </Button>
+        <Button variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+      {manualPair.isError && <FormError>{roundErrorMessage(manualPair.error)}</FormError>}
+    </div>
+  );
+}
+
+// A slot an entrant occupies — identifies exactly what `useSwapPairing`
+// needs (which match, which side) to swap two of these against each
+// other. Only meaningful while the round is still PENDING (unstarted).
+interface SwapSlot {
+  matchId: string;
+  side: "A" | "B";
+}
+
+function MatchCard({
+  match,
+  entrantById,
+  podId,
+  swappable,
+  selectedSlot,
+  onSelectSlot,
+}: {
+  match: Match;
+  entrantById: Map<string, Entrant>;
+  podId: string;
+  swappable: boolean;
+  selectedSlot: SwapSlot | null;
+  onSelectSlot: (slot: SwapSlot) => void;
+}) {
   const a = entrantById.get(match.entrantAId);
   const b = match.entrantBId ? entrantById.get(match.entrantBId) : null;
+
+  const renderSeat = (entrant: Entrant | undefined, side: "A" | "B") => {
+    if (!entrant) return null;
+    if (!swappable) return entrantDisplayName(entrant);
+    const isSelected = selectedSlot?.matchId === match.id && selectedSlot.side === side;
+    return (
+      <button
+        type="button"
+        onClick={() => onSelectSlot({ matchId: match.id, side })}
+        title="Click, then click another seat to swap them"
+        className={`rounded px-1 -mx-1 hover:bg-accent-wash ${isSelected ? "bg-accent-wash ring-1 ring-accent" : ""}`}
+      >
+        {entrantDisplayName(entrant)}
+      </button>
+    );
+  };
 
   return (
     <div className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
       <div className="min-w-0">
         <div className="mb-1 text-[11px] tracking-wide text-ink-muted uppercase">Table {match.tableNumber}</div>
         <div className="font-display text-[15px] font-bold">
-          {a ? entrantDisplayName(a) : "—"}
+          {a ? renderSeat(a, "A") : "—"}
           {b ? (
             <>
               <span className="mx-2 text-[11px] font-normal text-ink-muted">vs</span>
-              {entrantDisplayName(b)}
+              {renderSeat(b, "B")}
             </>
           ) : (
             <span className="ml-2 text-[11px] font-normal text-ink-muted uppercase">Bye</span>
@@ -171,8 +301,26 @@ function RoundCard({
   const startRound = useStartRound(podId);
   const completeRound = useCompleteRound(podId);
   const extendRound = useExtendRound(podId);
+  const swapPairing = useSwapPairing(podId);
+  const [selectedSlot, setSelectedSlot] = useState<SwapSlot | null>(null);
 
   const allReported = round.matches.every((m) => !m.entrantBId || m.result !== "PENDING");
+  const swappable = round.status === "PENDING";
+
+  const handleSelectSlot = (slot: SwapSlot) => {
+    if (!selectedSlot) {
+      setSelectedSlot(slot);
+      return;
+    }
+    if (selectedSlot.matchId === slot.matchId && selectedSlot.side === slot.side) {
+      setSelectedSlot(null); // clicked the same seat again — cancel
+      return;
+    }
+    swapPairing.mutate(
+      { roundId: round.id, matchAId: selectedSlot.matchId, sideA: selectedSlot.side, matchBId: slot.matchId, sideB: slot.side },
+      { onSettled: () => setSelectedSlot(null) },
+    );
+  };
 
   return (
     <div className="rounded-lg border border-border bg-surface-sunken p-5">
@@ -205,13 +353,28 @@ function RoundCard({
         </div>
       </div>
 
+      {swappable && (
+        <p className="mb-3 text-[12px] text-ink-muted">
+          Click a name, then click another to swap their seats — only works before the round starts.
+        </p>
+      )}
+
       <div className="flex flex-col gap-2">
         {round.matches.map((m) => (
-          <MatchCard key={m.id} match={m} entrantById={entrantById} podId={podId} />
+          <MatchCard
+            key={m.id}
+            match={m}
+            entrantById={entrantById}
+            podId={podId}
+            swappable={swappable}
+            selectedSlot={selectedSlot}
+            onSelectSlot={handleSelectSlot}
+          />
         ))}
       </div>
 
       {completeRound.isError && <FormError>{roundErrorMessage(completeRound.error)}</FormError>}
+      {swapPairing.isError && <FormError>{roundErrorMessage(swapPairing.error)}</FormError>}
     </div>
   );
 }
@@ -223,6 +386,7 @@ export function PairingsPage() {
   const generateRound = useGenerateRound(id ?? "");
   usePodRealtime(id, podData?.pod.tournamentId);
   const [displayMode, setDisplayMode] = useState(false);
+  const [showManual, setShowManual] = useState(false);
 
   if (isLoading || !podData) return <p className="text-ink-muted">Loading…</p>;
 
@@ -230,10 +394,14 @@ export function PairingsPage() {
   const entrantById = new Map(pod.entrants.map((e) => [e.id, e]));
   const rounds = roundsData?.rounds ?? [];
   const lastRound = rounds[rounds.length - 1];
+  const nextRoundNumber = rounds.length + 1;
   const canGenerateNext =
     pod.entrants.length >= 2 &&
     rounds.length < pod.roundCount &&
     (rounds.length === 0 || lastRound?.status === "COMPLETED");
+  const activeEntrants = pod.entrants.filter(
+    (e) => e.droppedAfterRound === null || e.droppedAfterRound >= nextRoundNumber,
+  );
 
   return (
     <div>
@@ -270,13 +438,30 @@ export function PairingsPage() {
         ))}
       </div>
 
-      {canGenerateNext && (
-        <div className="mt-5">
+      {canGenerateNext && !showManual && (
+        <div className="mt-5 flex items-center gap-3">
           <Button variant="primary" onClick={() => generateRound.mutate()} disabled={generateRound.isPending}>
-            {generateRound.isPending ? "Pairing…" : `Pair round ${rounds.length + 1}`}
+            {generateRound.isPending ? "Pairing…" : `Pair round ${nextRoundNumber}`}
           </Button>
+          <button
+            type="button"
+            onClick={() => setShowManual(true)}
+            className="text-[12.5px] text-ink-secondary underline hover:text-accent-strong"
+          >
+            Pair manually instead
+          </button>
           {generateRound.isError && <FormError>{roundErrorMessage(generateRound.error)}</FormError>}
         </div>
+      )}
+
+      {canGenerateNext && showManual && (
+        <ManualPairingForm
+          podId={pod.id}
+          activeEntrants={activeEntrants}
+          roundNumber={nextRoundNumber}
+          onDone={() => setShowManual(false)}
+          onCancel={() => setShowManual(false)}
+        />
       )}
 
       {rounds.length >= pod.roundCount && rounds.length > 0 && lastRound?.status === "COMPLETED" && (

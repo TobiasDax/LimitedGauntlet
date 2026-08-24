@@ -22,6 +22,35 @@ export function useGenerateRound(podId: string) {
   });
 }
 
+export interface ManualPair {
+  entrantAId: string;
+  entrantBId: string | null;
+}
+
+export function useManualPairRound(podId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (pairs: ManualPair[]) => api.post<{ round: Round }>(`/pods/${podId}/rounds/manual`, { pairs }),
+    onSuccess: () => invalidatePod(queryClient, podId),
+  });
+}
+
+export interface SwapPairingInput {
+  roundId: string;
+  matchAId: string;
+  sideA: "A" | "B";
+  matchBId: string;
+  sideB: "A" | "B";
+}
+
+export function useSwapPairing(podId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roundId, ...body }: SwapPairingInput) => api.post<{ ok: true }>(`/rounds/${roundId}/swap`, body),
+    onSuccess: () => invalidatePod(queryClient, podId),
+  });
+}
+
 export function useStartRound(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -69,6 +98,10 @@ export function roundErrorMessage(err: unknown): string {
     if (err.message === "round_count_exceeded") return "This pod's rounds are all done.";
     if (err.message === "pairing_failed") return "Couldn't find a valid pairing that avoids all repeats.";
     if (err.message === "results_missing") return "Every match needs a result before completing the round.";
+    if (err.message === "invalid_pairing") return "That pairing doesn't cover every active entrant exactly once.";
+    if (err.message === "round_locked") return "This round has already started — swaps only work before it starts.";
+    if (err.message === "cannot_swap_bye") return "Can't swap into or out of a bye slot.";
+    if (err.message === "no_op") return "Pick two different seats to swap.";
   }
   return "Something went wrong.";
 }
