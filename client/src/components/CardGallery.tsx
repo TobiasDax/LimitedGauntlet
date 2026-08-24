@@ -6,27 +6,35 @@ export function formatEur(value: number | null): string {
   return value === null ? "—" : `€${value.toFixed(2)}`;
 }
 
-function InferredAttribution({
+// Covers two related cases with one control: confirming/correcting/
+// unassigning an inferred guess, and assigning a pull that has no player
+// at all (either never had one, or was just unassigned) — both need the
+// same "pick from the roster" affordance, only the button set differs
+// (unassign only makes sense when there's currently something to clear).
+function AttributionEditor({
   pull,
   players,
   onSet,
 }: {
   pull: CardPull;
   players: { id: string; name: string }[];
-  onSet: (playerId: string) => void;
+  onSet: (playerId: string | null) => void;
 }) {
   const [selected, setSelected] = useState(pull.playerId ?? "");
 
   return (
     <div className="mt-1.5 flex items-center gap-1">
-      <span title="Guessed from finish + card value — not yet confirmed" className="text-[11px]">
-        🔮
-      </span>
+      {pull.playerIdInferred && (
+        <span title="Guessed from finish + card value — not yet confirmed" className="text-[11px]">
+          🔮
+        </span>
+      )}
       <select
         className="min-w-0 flex-1 rounded border border-border-strong bg-surface px-1 py-0.5 text-[10.5px] text-ink outline-none focus:border-accent"
         value={selected}
         onChange={(e) => setSelected(e.target.value)}
       >
+        <option value="">— unassigned —</option>
         {players.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
@@ -36,11 +44,20 @@ function InferredAttribution({
       <button
         onClick={() => onSet(selected)}
         disabled={!selected}
-        title="Confirm this attribution"
+        title={pull.playerId ? "Confirm this attribution" : "Assign to this player"}
         className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10.5px] font-bold text-[#241c0a] hover:bg-accent-strong disabled:opacity-50"
       >
         ✓
       </button>
+      {pull.playerId && (
+        <button
+          onClick={() => onSet(null)}
+          title="Unassign — no real data to back up who pulled this"
+          className="shrink-0 rounded border border-border-strong px-1.5 py-0.5 text-[10.5px] text-ink-secondary hover:bg-surface-raised hover:text-ink"
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }
@@ -60,12 +77,13 @@ export function CardGallery({
   // (`/o/:slug/tournaments/:id`) contexts, so it's a function rather
   // than a boolean.
   tournamentLinkTo?: (tournamentId: string) => string;
-  // When set, an inferred (unconfirmed) pull gets an inline confirm/
-  // reassign control instead of just the read-only 🔮 marker. Only makes
-  // sense on an authenticated, organizer-editable page (PodValuePage).
+  // When set, an inferred (unconfirmed) or unassigned pull gets an inline
+  // assign/confirm/unassign control instead of just the read-only 🔮
+  // marker or nothing. Only makes sense on an authenticated,
+  // organizer-editable page (PodValuePage).
   editableAttribution?: boolean;
   attributionPlayers?: { id: string; name: string }[];
-  onSetAttribution?: (pullId: string, playerId: string) => void;
+  onSetAttribution?: (pullId: string, playerId: string | null) => void;
 }) {
   if (pulls.length === 0) {
     return <p className="text-[13px] text-ink-muted">No pulls recorded yet.</p>;
@@ -110,19 +128,20 @@ export function CardGallery({
                 </span>
               )}
             </div>
-            {pull.player &&
-              (editableAttribution && pull.playerIdInferred && attributionPlayers && onSetAttribution ? (
-                <InferredAttribution
-                  pull={pull}
-                  players={attributionPlayers}
-                  onSet={(playerId) => onSetAttribution(pull.id, playerId)}
-                />
-              ) : (
+            {editableAttribution && (pull.playerIdInferred || !pull.player) && attributionPlayers && onSetAttribution ? (
+              <AttributionEditor
+                pull={pull}
+                players={attributionPlayers}
+                onSet={(playerId) => onSetAttribution(pull.id, playerId)}
+              />
+            ) : (
+              pull.player && (
                 <div className="mt-1 truncate text-[10.5px] text-ink-muted">
                   {pull.playerIdInferred && <span title="Guessed from finish + card value — not yet confirmed">🔮 </span>}
                   {pull.player.displayName}
                 </div>
-              ))}
+              )
+            )}
             {tournamentLinkTo && pull.pod?.tournament && (
               <Link
                 to={tournamentLinkTo(pull.pod.tournament.id)}
