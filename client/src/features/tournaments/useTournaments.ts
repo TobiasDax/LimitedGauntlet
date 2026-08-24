@@ -46,3 +46,13 @@ export function useUpdateTournament(id: string) {
     },
   });
 }
+
+export function useDeleteTournament() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/tournaments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+    },
+  });
+}

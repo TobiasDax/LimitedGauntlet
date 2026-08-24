@@ -20,20 +20,35 @@ import type { Entrant, Match, Round } from "../lib/types";
 
 function ResultEntry({ match, podId }: { match: Match; podId: string }) {
   const submitResult = useSubmitResult(podId);
-  const [a, setA] = useState(0);
-  const [b, setB] = useState(0);
-  const [d, setD] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [a, setA] = useState(match.gamesWonA);
+  const [b, setB] = useState(match.gamesWonB);
+  const [d, setD] = useState(match.gamesDrawn);
 
-  if (match.result !== "PENDING") {
+  if (match.result !== "PENDING" && !editing) {
     const label =
       match.result === "DRAW" ? "Draw" : match.result === "A_WINS" ? "Table win: seat A" : "Table win: seat B";
     return (
-      <div className="text-right">
-        <div className="font-display tabular-nums text-[15px] font-bold">
-          {match.gamesWonA}–{match.gamesWonB}
-          {match.gamesDrawn > 0 && <span className="text-ink-muted">–{match.gamesDrawn}</span>}
+      <div className="flex items-center gap-3">
+        <div className="text-right">
+          <div className="font-display tabular-nums text-[15px] font-bold">
+            {match.gamesWonA}–{match.gamesWonB}
+            {match.gamesDrawn > 0 && <span className="text-ink-muted">–{match.gamesDrawn}</span>}
+          </div>
+          <div className="text-[11px] text-ink-muted">{label}</div>
         </div>
-        <div className="text-[11px] text-ink-muted">{label}</div>
+        <button
+          type="button"
+          onClick={() => {
+            setA(match.gamesWonA);
+            setB(match.gamesWonB);
+            setD(match.gamesDrawn);
+            setEditing(true);
+          }}
+          className="text-[11px] text-ink-muted underline hover:text-accent-strong"
+        >
+          Edit
+        </button>
       </div>
     );
   }
@@ -44,7 +59,10 @@ function ResultEntry({ match, podId }: { match: Match; podId: string }) {
       onSubmit={(e) => {
         e.preventDefault();
         const result = a > b ? "A_WINS" : b > a ? "B_WINS" : "DRAW";
-        submitResult.mutate({ matchId: match.id, result, gamesWonA: a, gamesWonB: b, gamesDrawn: d });
+        submitResult.mutate(
+          { matchId: match.id, result, gamesWonA: a, gamesWonB: b, gamesDrawn: d },
+          { onSuccess: () => setEditing(false) },
+        );
       }}
     >
       <input
@@ -74,6 +92,15 @@ function ResultEntry({ match, podId }: { match: Match; podId: string }) {
       <Button type="submit" variant="primary" disabled={submitResult.isPending} className="ml-1">
         Submit
       </Button>
+      {editing && (
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          className="ml-1 text-[11px] text-ink-muted underline hover:text-accent-strong"
+        >
+          Cancel
+        </button>
+      )}
     </form>
   );
 }

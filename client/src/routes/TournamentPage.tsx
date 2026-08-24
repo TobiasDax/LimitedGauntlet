@@ -1,12 +1,95 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { useTournament, type TournamentDetail } from "../features/tournaments/useTournament";
-import { useUpdateTournament } from "../features/tournaments/useTournaments";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useTournament, tournamentStatusLabel, type TournamentDetail } from "../features/tournaments/useTournament";
+import { useUpdateTournament, useDeleteTournament } from "../features/tournaments/useTournaments";
 import { useCreatePod, podFormatLabel } from "../features/pods/usePods";
 import { useMe } from "../features/auth/useAuth";
-import { Button, Card, Eyebrow, Field, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
+import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
 import { RichText } from "../components/RichText";
-import type { PodFormat } from "../lib/types";
+import type { PodFormat, TournamentStatus } from "../lib/types";
+
+const tournamentStatuses: TournamentStatus[] = ["PLANNING", "ACTIVE", "COMPLETED"];
+
+function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDetail; onDone: () => void }) {
+  const update = useUpdateTournament(tournament.id);
+  const [name, setName] = useState(tournament.name);
+  const [startDate, setStartDate] = useState(tournament.startDate.slice(0, 10));
+  const [endDate, setEndDate] = useState(tournament.endDate.slice(0, 10));
+  const [location, setLocation] = useState(tournament.location ?? "");
+  const [status, setStatus] = useState<TournamentStatus>(tournament.status);
+
+  return (
+    <Card className="mb-6 p-6">
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          update.mutate(
+            { name, startDate, endDate, location: location.trim() || null, status },
+            { onSuccess: onDone },
+          );
+        }}
+      >
+        <Field label="Name">
+          <TextField required value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Start date">
+            <TextField type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </Field>
+          <Field label="End date">
+            <TextField type="date" required value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Location" hint="Optional">
+            <TextField value={location} onChange={(e) => setLocation(e.target.value)} />
+          </Field>
+          <Field label="Status">
+            <select
+              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as TournamentStatus)}
+            >
+              {tournamentStatuses.map((s) => (
+                <option key={s} value={s}>
+                  {tournamentStatusLabel[s]}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <div className="flex gap-2">
+          <Button type="submit" variant="primary" disabled={update.isPending}>
+            {update.isPending ? "Saving…" : "Save"}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onDone}>
+            Cancel
+          </Button>
+        </div>
+        {update.isError && <FormError>Something went wrong.</FormError>}
+      </form>
+    </Card>
+  );
+}
+
+function DeleteTournamentButton({ tournament }: { tournament: TournamentDetail }) {
+  const navigate = useNavigate();
+  const deleteTournament = useDeleteTournament();
+
+  return (
+    <button
+      disabled={deleteTournament.isPending}
+      onClick={() => {
+        if (!confirm(`Delete "${tournament.name}"? This removes every pod, round, and card pull in it too.`)) return;
+        deleteTournament.mutate(tournament.id, { onSuccess: () => navigate("/") });
+      }}
+      className="text-[12.5px] tracking-wide text-critical uppercase hover:text-critical/80 disabled:opacity-50"
+    >
+      Delete tournament
+    </button>
+  );
+}
 
 function DescriptionSection({ tournament }: { tournament: TournamentDetail }) {
   const update = useUpdateTournament(tournament.id);
@@ -194,6 +277,7 @@ export function TournamentPage() {
   const { data, isLoading } = useTournament(id);
   const { data: me } = useMe();
   const [showPodForm, setShowPodForm] = useState(false);
+  const [editingTournament, setEditingTournament] = useState(false);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
   if (!data) return <p className="text-ink-muted">Tournament not found.</p>;
@@ -209,6 +293,21 @@ export function TournamentPage() {
           ? "No pods yet — add one to start pairing."
           : `${tournament.pods.length} pod${tournament.pods.length === 1 ? "" : "s"} · ${tournament.players.length} player${tournament.players.length === 1 ? "" : "s"} attending`}
       </ScreenDek>
+
+      <div className="mb-6 flex flex-wrap items-center gap-5">
+        {!editingTournament && (
+          <button
+            onClick={() => setEditingTournament(true)}
+            className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+          >
+            Edit tournament
+          </button>
+        )}
+        <DeleteTournamentButton tournament={tournament} />
+      </div>
+      {editingTournament && (
+        <EditTournamentForm tournament={tournament} onDone={() => setEditingTournament(false)} />
+      )}
 
       <DescriptionSection tournament={tournament} />
 

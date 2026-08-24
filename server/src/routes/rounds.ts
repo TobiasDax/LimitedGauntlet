@@ -333,7 +333,7 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const round = await prisma.round.findUniqueOrThrow({ where: { id: match.roundId } });
-    if (round.status !== "ACTIVE") {
+    if (round.status !== "ACTIVE" && round.status !== "COMPLETED") {
       reply.code(400).send({ error: "round_not_active" });
       return;
     }

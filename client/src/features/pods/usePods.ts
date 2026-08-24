@@ -39,6 +39,41 @@ export function useCreatePod(tournamentId: string) {
   });
 }
 
+export interface UpdatePodInput {
+  name?: string;
+  date?: string;
+  format?: PodFormat;
+  isTeamEvent?: boolean;
+  teamSize?: number;
+  roundCount?: number;
+  matchFormat?: MatchFormat;
+  pointsWin?: number;
+  pointsDraw?: number;
+  pointsLoss?: number;
+  roundLengthMinutes?: number;
+}
+
+export function useUpdatePod(podId: string, tournamentId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdatePodInput) => api.patch<{ pod: Pod }>(`/pods/${podId}`, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pods", podId] });
+      if (tournamentId) queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+    },
+  });
+}
+
+export function useDeletePod(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (podId: string) => api.delete<void>(`/pods/${podId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+    },
+  });
+}
+
 export const podFormatLabel: Record<PodFormat, string> = {
   DRAFT: "Draft",
   SEALED: "Sealed",

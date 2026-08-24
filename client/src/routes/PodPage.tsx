@@ -1,14 +1,144 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { usePod, podFormatLabel } from "../features/pods/usePods";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { usePod, podFormatLabel, useUpdatePod, useDeletePod, type PodDetail } from "../features/pods/usePods";
 import { useAddIndividualEntrant, useAddTeamEntrant, useRemoveEntrant, entrantErrorMessage } from "../features/pods/useEntrants";
 import { usePlayers } from "../features/players/usePlayers";
 import { useTournament } from "../features/tournaments/useTournament";
 import { useMe } from "../features/auth/useAuth";
-import { Button, Card, Eyebrow, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
+import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
 import { entrantDisplayName } from "../lib/entrant";
-import type { Entrant } from "../lib/types";
+import type { Entrant, MatchFormat, PodFormat } from "../lib/types";
+
+const podFormats: PodFormat[] = ["DRAFT", "SEALED", "CHAOS_DRAFT", "CONSTRUCTED", "CUSTOM"];
+
+function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
+  const updatePod = useUpdatePod(pod.id, pod.tournamentId);
+  const [name, setName] = useState(pod.name);
+  const [format, setFormat] = useState<PodFormat>(pod.format);
+  const [date, setDate] = useState(pod.date ? pod.date.slice(0, 10) : "");
+  const [roundCount, setRoundCount] = useState(pod.roundCount);
+  const [matchFormat, setMatchFormat] = useState<MatchFormat>(pod.matchFormat);
+  const [pointsWin, setPointsWin] = useState(pod.pointsWin);
+  const [pointsDraw, setPointsDraw] = useState(pod.pointsDraw);
+  const [pointsLoss, setPointsLoss] = useState(pod.pointsLoss);
+  const [roundLengthMinutes, setRoundLengthMinutes] = useState(pod.roundLengthMinutes);
+
+  return (
+    <Card className="mb-6 p-6">
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          updatePod.mutate(
+            {
+              name,
+              format,
+              date: date || undefined,
+              roundCount,
+              matchFormat,
+              pointsWin,
+              pointsDraw,
+              pointsLoss,
+              roundLengthMinutes,
+            },
+            { onSuccess: onDone },
+          );
+        }}
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Name">
+            <TextField required value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="Format">
+            <select
+              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              value={format}
+              onChange={(e) => setFormat(e.target.value as PodFormat)}
+            >
+              {podFormats.map((f) => (
+                <option key={f} value={f}>
+                  {podFormatLabel[f]}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <Field label="Date" hint="Optional">
+          <TextField type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Rounds">
+            <TextField
+              type="number"
+              min={1}
+              max={20}
+              value={roundCount}
+              onChange={(e) => setRoundCount(Number(e.target.value))}
+            />
+          </Field>
+          <Field label="Match format">
+            <select
+              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              value={matchFormat}
+              onChange={(e) => setMatchFormat(e.target.value as MatchFormat)}
+            >
+              <option value="BO1">Best of 1</option>
+              <option value="BO3">Best of 3</option>
+            </select>
+          </Field>
+          <Field label="Points — win">
+            <TextField type="number" min={0} value={pointsWin} onChange={(e) => setPointsWin(Number(e.target.value))} />
+          </Field>
+          <Field label="Points — draw">
+            <TextField type="number" min={0} value={pointsDraw} onChange={(e) => setPointsDraw(Number(e.target.value))} />
+          </Field>
+          <Field label="Points — loss">
+            <TextField type="number" min={0} value={pointsLoss} onChange={(e) => setPointsLoss(Number(e.target.value))} />
+          </Field>
+          <Field label="Round length (minutes)">
+            <TextField
+              type="number"
+              min={1}
+              value={roundLengthMinutes}
+              onChange={(e) => setRoundLengthMinutes(Number(e.target.value))}
+            />
+          </Field>
+        </div>
+
+        <div className="flex gap-2">
+          <Button type="submit" variant="primary" disabled={updatePod.isPending}>
+            {updatePod.isPending ? "Saving…" : "Save"}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onDone}>
+            Cancel
+          </Button>
+        </div>
+        {updatePod.isError && <FormError>Something went wrong.</FormError>}
+      </form>
+    </Card>
+  );
+}
+
+function DeletePodButton({ pod }: { pod: PodDetail }) {
+  const navigate = useNavigate();
+  const deletePod = useDeletePod(pod.tournamentId);
+
+  return (
+    <button
+      disabled={deletePod.isPending}
+      onClick={() => {
+        if (!confirm(`Delete "${pod.name}"? This removes its rounds, matches, and entrants too.`)) return;
+        deletePod.mutate(pod.id, { onSuccess: () => navigate(`/tournaments/${pod.tournamentId}`) });
+      }}
+      className="text-[12.5px] tracking-wide text-critical uppercase hover:text-critical/80 disabled:opacity-50"
+    >
+      Delete pod
+    </button>
+  );
+}
 
 function alreadyEnteredPlayerIds(entrants: Entrant[]): Set<string> {
   const ids = new Set<string>();
@@ -152,6 +282,7 @@ export function PodPage() {
   const { data, isLoading } = usePod(id);
   const { data: tournamentData } = useTournament(data?.pod.tournamentId);
   const { data: me } = useMe();
+  const [editing, setEditing] = useState(false);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
   if (!data) return <p className="text-ink-muted">Pod not found.</p>;
@@ -178,16 +309,29 @@ export function PodPage() {
           : "Individual entrants. Add everyone playing before pairing round 1."}
       </ScreenDek>
 
-      {me && (
-        <a
-          href={`/o/${me.organization.slug}/tournaments/${pod.tournamentId}/pods/${pod.id}`}
-          target="_blank"
-          rel="noreferrer"
-          className="mb-6 inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
-        >
-          Public link ↗
-        </a>
-      )}
+      <div className="mb-6 flex flex-wrap items-center gap-5">
+        {me && (
+          <a
+            href={`/o/${me.organization.slug}/tournaments/${pod.tournamentId}/pods/${pod.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+          >
+            Public link ↗
+          </a>
+        )}
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+          >
+            Edit pod
+          </button>
+        )}
+        <DeletePodButton pod={pod} />
+      </div>
+
+      {editing && <EditPodForm pod={pod} onDone={() => setEditing(false)} />}
 
       <PodTabs podId={pod.id} />
 
