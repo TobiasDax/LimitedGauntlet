@@ -37,10 +37,10 @@ export function Layout() {
                 Roster
               </Link>
               <Link
-                to="/hall-of-fame"
+                to="/treasure-chest"
                 className="shrink-0 rounded px-3 py-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:bg-surface-raised hover:text-ink"
               >
-                Hall of Fame
+                Treasure Chest
               </Link>
             </nav>
           )}

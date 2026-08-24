@@ -160,10 +160,11 @@ Feature work requested after the initial build shipped and the history import we
 - [x] Frontend-only — the backend endpoint already existed (`GET /api/public/o/:slug/tournaments/:id/card-pulls`, price-sorted, each pull carries its `pod`). `PublicTournamentPage.tsx`: new `usePublicTournamentCardPulls` query; pulls grouped by pod, groups ordered by the tournament's own pod sequence ("by event, highest value first"); each group is a `CardGallery` with a per-pod subtotal, plus a weekend total. Reuses `CardGallery` / `formatEur`.
 - [ ] Still to do: commit, deploy to daxlite, and eyeball it on a real shared link.
 
-### PI-2 — Rename the "Hall of Fame" nav item (cards) → "Treasure Chest"
-- [ ] Today the **Hall of Fame** nav link points at the org-wide most-valuable-cards gallery (`client/src/routes/HallOfFamePage.tsx`, `useHallOfFame` → `GET /api/card-pulls/hall-of-fame`). Rename that page + label to **Treasure Chest**, freeing the "Hall of Fame" name for PI-3's player aggregate.
-- [ ] Frontend: rename `HallOfFamePage.tsx` → `TreasureChestPage.tsx`; route `/hall-of-fame` → `/treasure-chest` in `main.tsx`; nav label in `components/Layout.tsx` and the page `ScreenTitle`/dek "Hall of Fame" → "Treasure Chest".
-- [ ] Optional/backend: rename `GET /api/card-pulls/hall-of-fame` → `/api/card-pulls/treasure-chest` (`server/src/routes/cardPulls.ts`) + the `useHallOfFame` hook, for consistency — cosmetic, no data change. If skipped, drop a code comment so the endpoint name doesn't mislead once the UI says "Treasure Chest".
+### PI-2 — Rename the "Hall of Fame" nav item (cards) → "Treasure Chest" ✅ (implemented 2026-08-24, not yet deployed)
+- [x] The org-wide most-valuable-cards gallery is renamed to **Treasure Chest**, freeing the "Hall of Fame" name for PI-3's player aggregate.
+- [x] Frontend: `HallOfFamePage.tsx` → `TreasureChestPage.tsx` (component + title/dek); route `/hall-of-fame` → `/treasure-chest` in `main.tsx`; nav label in `components/Layout.tsx`.
+- [x] Backend renamed too (did the full rename, not the optional skip): `GET /api/card-pulls/hall-of-fame` → `/api/card-pulls/treasure-chest` (`server/src/routes/cardPulls.ts`) + the `useHallOfFame` hook → `useTreasureChest` (query key included). No data change.
+- [ ] Still to do: deploy (frontend + backend rebuild — no migration).
 
 ### PI-3 — New "Hall of Fame" page: all-time player aggregate
 - [ ] Like a tournament's Gesamtwertung, but aggregated across **every** tournament the org has ever run — a career/all-time leaderboard. Reuses the "Hall of Fame" nav slot that PI-2 frees up.

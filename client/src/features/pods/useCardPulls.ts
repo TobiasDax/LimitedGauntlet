@@ -18,10 +18,10 @@ export function useTournamentCardPulls(tournamentId: string | undefined) {
   });
 }
 
-export function useHallOfFame() {
+export function useTreasureChest() {
   return useQuery({
-    queryKey: ["card-pulls", "hall-of-fame"],
-    queryFn: () => api.get<{ cardPulls: CardPull[] }>("/card-pulls/hall-of-fame"),
+    queryKey: ["card-pulls", "treasure-chest"],
+    queryFn: () => api.get<{ cardPulls: CardPull[] }>("/card-pulls/treasure-chest"),
   });
 }
 

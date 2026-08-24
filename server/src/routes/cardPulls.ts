@@ -158,9 +158,9 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
     reply.send({ cardPulls: plain, total });
   });
 
-  // All-time, across every tournament this org has ever run — the "Hall
-  // of Fame" page.
-  app.get("/api/card-pulls/hall-of-fame", async (request, reply) => {
+  // All-time, across every tournament this org has ever run — the
+  // "Treasure Chest" page (the org-wide most-valuable-cards gallery).
+  app.get("/api/card-pulls/treasure-chest", async (request, reply) => {
     const pulls = await prisma.cardPull.findMany({
       where: { pod: { tournament: { orgId: request.organizer!.orgId } } },
       include: {
