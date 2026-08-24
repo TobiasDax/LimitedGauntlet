@@ -19,6 +19,19 @@ import { lookupCardByName } from "../services/scryfall.js";
 
 const prisma = new PrismaClient();
 
+// A single match in a legacy round. Team pods (see importTeamPod) supply only
+// {a, b, result} and games are derived from the result (Bo1). Individual
+// standings pods supply real game scores (gamesA/gamesB, plus gamesDrawn for a
+// tied game); `b: null` marks a bye.
+interface LegacyMatch {
+  a: string;
+  b: string | null;
+  result: MatchResult;
+  gamesA?: number;
+  gamesB?: number;
+  gamesDrawn?: number;
+}
+
 interface LegacyPod {
   name: string;
   format: PodFormat;
@@ -29,7 +42,7 @@ interface LegacyPod {
   roundCount?: number;
   matchFormat?: "BO1" | "BO3";
   teams?: Array<{ name: string; members: string[] }>;
-  rounds?: Array<Array<{ a: string; b: string; result: MatchResult }>>;
+  rounds?: LegacyMatch[][];
 }
 
 interface LegacyTournament {
@@ -152,26 +165,67 @@ async function importStandingsPod(
   pod: LegacyPod,
   playersByName: Map<string, { id: string }>,
 ) {
-  let record = await prisma.pod.findFirst({ where: { tournamentId, name: pod.name } });
-  if (record) {
-    console.log(`  Pod "${pod.name}" already exists, skipping entrant/points import.`);
-  } else {
-    record = await prisma.pod.create({
-      data: {
-        tournamentId,
-        name: pod.name,
-        format: pod.format,
-        sequenceOrder,
-        status: pod.points ? "COMPLETED" : "SETUP",
-      },
-    });
+  const existing = await prisma.pod.findFirst({ where: { tournamentId, name: pod.name } });
+  if (existing) {
+    console.log(`  Pod "${pod.name}" already exists, skipping entrant/round import.`);
+    await attachCardPulls(existing.id, pod.cardPulls);
+    return;
+  }
 
-    if (pod.points) {
-      for (const [name, points] of Object.entries(pod.points)) {
-        const player = playersByName.get(name);
-        if (!player) throw new Error(`Pod "${pod.name}" references unknown player "${name}"`);
-        await prisma.entrant.create({ data: { podId: record.id, playerId: player.id, finalPointsOverride: points } });
+  const hasRounds = !!pod.rounds && pod.rounds.length > 0;
+  const record = await prisma.pod.create({
+    data: {
+      tournamentId,
+      name: pod.name,
+      format: pod.format,
+      sequenceOrder,
+      status: hasRounds || pod.points ? "COMPLETED" : "SETUP",
+      ...(hasRounds ? { roundCount: pod.rounds!.length } : {}),
+    },
+  });
+
+  if (hasRounds) {
+    // Full round-by-round history: create one entrant per participant, then
+    // real Round/Match rows so standings derives points AND tiebreakers
+    // (OMW%/GW%/OGW%) from the matches — no finalPointsOverride.
+    const entrantByName = new Map<string, string>();
+    const entrantFor = async (name: string): Promise<string> => {
+      const cached = entrantByName.get(name);
+      if (cached) return cached;
+      const player = playersByName.get(name);
+      if (!player) throw new Error(`Pod "${pod.name}" references unknown player "${name}"`);
+      const entrant = await prisma.entrant.create({ data: { podId: record.id, playerId: player.id } });
+      entrantByName.set(name, entrant.id);
+      return entrant.id;
+    };
+
+    for (const [i, roundMatches] of pod.rounds!.entries()) {
+      const round = await prisma.round.create({ data: { podId: record.id, roundNumber: i + 1, status: "COMPLETED" } });
+      for (const [tableIndex, m] of roundMatches.entries()) {
+        const entrantAId = await entrantFor(m.a);
+        const entrantBId = m.b === null ? null : await entrantFor(m.b);
+        await prisma.match.create({
+          data: {
+            roundId: round.id,
+            tableNumber: tableIndex + 1,
+            entrantAId,
+            entrantBId,
+            result: m.result,
+            gamesWonA: m.gamesA ?? 0,
+            gamesWonB: m.gamesB ?? 0,
+            gamesDrawn: m.gamesDrawn ?? 0,
+            reportedAt: new Date(),
+          },
+        });
       }
+    }
+  } else if (pod.points) {
+    // Points-only source (a final standings table with no pairings): store the
+    // final total as an override; tiebreakers stay 0 since no matches exist.
+    for (const [name, points] of Object.entries(pod.points)) {
+      const player = playersByName.get(name);
+      if (!player) throw new Error(`Pod "${pod.name}" references unknown player "${name}"`);
+      await prisma.entrant.create({ data: { podId: record.id, playerId: player.id, finalPointsOverride: points } });
     }
   }
 
@@ -224,7 +278,7 @@ async function importTeamPod(
     await prisma.match.createMany({
       data: roundMatches.map((m, tableIndex) => {
         const entrantAId = entrantByTeamName.get(m.a);
-        const entrantBId = entrantByTeamName.get(m.b);
+        const entrantBId = m.b === null ? undefined : entrantByTeamName.get(m.b);
         if (!entrantAId || !entrantBId) throw new Error(`Pod "${pod.name}" round ${i + 1} references an unknown team`);
         return {
           roundId: round.id,

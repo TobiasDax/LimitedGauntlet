@@ -10,3 +10,7 @@ build/
 # their own LimitedGauntlet instance -- never belongs in git history, even
 # on a private remote. See README's "History import" section.
 /legacy-data*.json
+/legacy-data*.json.bak
+# The transcribed round-by-round history (real names + results) that feeds the
+# import. Pure-logic helpers (build-/validate-/verify-*) stay committable.
+/scripts/rounds-data.mjs
