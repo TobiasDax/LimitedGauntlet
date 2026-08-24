@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "server",
-    "client"
+    "client",
+    "mcp"
   ],
   "overrides": {
     "deepmerge-ts": "^8.0.0"
