@@ -1,12 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
-import { findPublicTournament, findPublicPod } from "../services/ownership.js";
+import { findPublicTournament, findPublicPod, findPublicOrganization } from "../services/ownership.js";
 import { computeGesamtwertung } from "../services/gesamtwertung.js";
 import { computePodStandings } from "../services/standings.js";
+import { computeHallOfFameOverview, computePlayerStats } from "../services/playerStats.js";
 
 const tournamentParams = z.object({ slug: z.string().min(1), id: z.string().min(1) });
 const podParams = z.object({ slug: z.string().min(1), id: z.string().min(1) });
+const orgParams = z.object({ slug: z.string().min(1) });
+const orgPlayerParams = z.object({ slug: z.string().min(1), playerId: z.string().min(1) });
 
 function toPlainPull(pull: { priceEur: unknown; [k: string]: unknown }) {
   return { ...pull, priceEur: pull.priceEur === null ? null : Number(pull.priceEur) };
@@ -162,5 +165,85 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     const plain = pulls.map(toPlainPull);
     const total = plain.reduce((sum, p) => sum + (p.priceEur ?? 0), 0);
     reply.send({ cardPulls: plain, total });
+  });
+
+  // Org-wide public pages — not scoped to any one tournament or pod, the
+  // slug alone is the whole access control (same as everything else in
+  // this file). This is the "share the whole group's Hall of Fame /
+  // Treasure Chest" link.
+  app.get("/api/public/o/:slug/hall-of-fame", async (request, reply) => {
+    const params = orgParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const organization = await findPublicOrganization(params.data.slug);
+    if (!organization) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    const overview = await computeHallOfFameOverview(organization.id);
+    const players = await prisma.player.findMany({
+      where: { id: { in: overview.rankings.map((r) => r.playerId) } },
+    });
+    const playerById = new Map(players.map((p) => [p.id, p]));
+    const hallOfFame = overview.rankings.map((row) => ({ ...row, player: playerById.get(row.playerId) }));
+
+    reply.send({
+      organization: { id: organization.id, slug: organization.slug, name: organization.name },
+      hallOfFame,
+      headline: overview.headline,
+      longestWinStreak: overview.longestWinStreak,
+      mostPlayedPairings: overview.mostPlayedPairings,
+      biggestPulls: overview.biggestPulls,
+    });
+  });
+
+  app.get("/api/public/o/:slug/hall-of-fame/players/:playerId", async (request, reply) => {
+    const params = orgPlayerParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const organization = await findPublicOrganization(params.data.slug);
+    if (!organization) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    const stats = await computePlayerStats(organization.id, params.data.playerId);
+    if (!stats) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    reply.send({ stats });
+  });
+
+  app.get("/api/public/o/:slug/treasure-chest", async (request, reply) => {
+    const params = orgParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const organization = await findPublicOrganization(params.data.slug);
+    if (!organization) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    const pulls = await prisma.cardPull.findMany({
+      where: { pod: { excludeFromStats: false, tournament: { orgId: organization.id } } },
+      include: {
+        player: true,
+        pod: { select: { id: true, name: true, tournament: { select: { id: true, name: true } } } },
+      },
+      orderBy: { priceEur: "desc" },
+      take: 25,
+    });
+
+    reply.send({
+      organization: { id: organization.id, slug: organization.slug, name: organization.name },
+      cardPulls: pulls.map(toPlainPull),
+    });
   });
 }

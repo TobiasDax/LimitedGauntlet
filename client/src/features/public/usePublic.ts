@@ -5,12 +5,18 @@ import type {
   Entrant,
   GesamtwertungPod,
   GesamtwertungRow,
+  HallOfFameBiggestPull,
+  HallOfFameHeadline,
+  HallOfFameRow,
+  MostPlayedPairing,
   Organization,
+  PlayerStatsDetail,
   Pod,
   Round,
   StandingsRow,
   Tournament,
 } from "../../lib/types";
+import type { LongestWinStreak } from "../hallOfFame/useHallOfFame";
 
 export interface PublicTournamentDetail extends Tournament {
   pods: Pod[];
@@ -81,5 +87,38 @@ export function usePublicPodCardPulls(slug: string | undefined, podId: string | 
     queryKey: ["public", "pods", podId, "card-pulls"],
     queryFn: () => api.get<{ cardPulls: CardPull[]; total: number }>(`/public/o/${slug}/pods/${podId}/card-pulls`),
     enabled: !!slug && !!podId,
+  });
+}
+
+export interface PublicHallOfFameResponse {
+  organization: Organization;
+  hallOfFame: HallOfFameRow[];
+  headline: HallOfFameHeadline;
+  longestWinStreak: LongestWinStreak | null;
+  mostPlayedPairings: MostPlayedPairing[];
+  biggestPulls: HallOfFameBiggestPull[];
+}
+
+export function usePublicHallOfFame(slug: string | undefined) {
+  return useQuery({
+    queryKey: ["public", "hall-of-fame", slug],
+    queryFn: () => api.get<PublicHallOfFameResponse>(`/public/o/${slug}/hall-of-fame`),
+    enabled: !!slug,
+  });
+}
+
+export function usePublicPlayerStats(slug: string | undefined, playerId: string | undefined) {
+  return useQuery({
+    queryKey: ["public", "hall-of-fame", slug, "players", playerId],
+    queryFn: () => api.get<{ stats: PlayerStatsDetail }>(`/public/o/${slug}/hall-of-fame/players/${playerId}`),
+    enabled: !!slug && !!playerId,
+  });
+}
+
+export function usePublicTreasureChest(slug: string | undefined) {
+  return useQuery({
+    queryKey: ["public", "treasure-chest", slug],
+    queryFn: () => api.get<{ organization: Organization; cardPulls: CardPull[] }>(`/public/o/${slug}/treasure-chest`),
+    enabled: !!slug,
   });
 }

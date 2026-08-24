@@ -58,10 +58,25 @@ export interface PlayerStatsDetail {
   undefeatedPods: number;
   totalValuePulled: number;
   biggestPull: { cardName: string; priceEur: number } | null;
+  cardPulls: PlayerCardPull[];
   mostPlayedOpponent: HeadToHeadEntry | null;
   nemesis: HeadToHeadEntry | null;
   victim: HeadToHeadEntry | null;
   headToHead: HeadToHeadEntry[];
+}
+
+export interface PlayerCardPull {
+  id: string;
+  podId: string;
+  playerId: string | null;
+  playerIdInferred: boolean;
+  cardName: string;
+  scryfallId: string | null;
+  setCode: string | null;
+  priceEur: number | null;
+  imageUri: string | null;
+  addedAt: Date;
+  pod: { id: string; name: string; tournament: { id: string; name: string } };
 }
 
 interface PersonalMatch {
@@ -294,15 +309,16 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
   const player = await prisma.player.findFirst({ where: { id: playerId, orgId } });
   if (!player) return null;
 
-  const [ledger, hallOfFame, valueAgg, biggestPullRow, pods, tournaments] = await Promise.all([
+  const [ledger, hallOfFame, valueAgg, playerCardPulls, pods, tournaments] = await Promise.all([
     buildLedger(orgId),
     computeHallOfFame(orgId),
     prisma.cardPull.aggregate({
       where: { playerId, pod: { excludeFromStats: false, tournament: { orgId } } },
       _sum: { priceEur: true },
     }),
-    prisma.cardPull.findFirst({
+    prisma.cardPull.findMany({
       where: { playerId, pod: { excludeFromStats: false, tournament: { orgId } } },
+      include: { pod: { select: { id: true, name: true, tournament: { select: { id: true, name: true } } } } },
       orderBy: { priceEur: "desc" },
     }),
     prisma.pod.findMany({
@@ -395,9 +411,13 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
     undefeatedPods,
     totalValuePulled: priceSum === null ? 0 : Number(priceSum),
     biggestPull:
-      biggestPullRow && biggestPullRow.priceEur !== null
-        ? { cardName: biggestPullRow.cardName, priceEur: Number(biggestPullRow.priceEur) }
+      playerCardPulls[0] && playerCardPulls[0].priceEur !== null
+        ? { cardName: playerCardPulls[0].cardName, priceEur: Number(playerCardPulls[0].priceEur) }
         : null,
+    cardPulls: playerCardPulls.map((p) => ({
+      ...p,
+      priceEur: p.priceEur === null ? null : Number(p.priceEur),
+    })),
     mostPlayedOpponent,
     nemesis,
     victim,

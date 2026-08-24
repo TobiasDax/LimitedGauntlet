@@ -37,3 +37,10 @@ export function findPublicTournament(orgSlug: string, tournamentId: string) {
 export function findPublicPod(orgSlug: string, podId: string) {
   return prisma.pod.findFirst({ where: { id: podId, tournament: { organization: { slug: orgSlug } } } });
 }
+
+// The org itself, for org-wide public pages (Hall of Fame, Treasure
+// Chest) that aren't scoped to any one tournament or pod — same trust
+// model as the rest of this file, the slug is the whole access control.
+export function findPublicOrganization(orgSlug: string) {
+  return prisma.organization.findUnique({ where: { slug: orgSlug } });
+}

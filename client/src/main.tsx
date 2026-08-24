@@ -22,6 +22,9 @@ import { PlayerStatsPage } from "./routes/PlayerStatsPage.tsx";
 import { ApiTokensPage } from "./routes/ApiTokensPage.tsx";
 import { PublicTournamentPage } from "./routes/PublicTournamentPage.tsx";
 import { PublicPodPage } from "./routes/PublicPodPage.tsx";
+import { PublicHallOfFamePage } from "./routes/PublicHallOfFamePage.tsx";
+import { PublicPlayerStatsPage } from "./routes/PublicPlayerStatsPage.tsx";
+import { PublicTreasureChestPage } from "./routes/PublicTreasureChestPage.tsx";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -34,6 +37,9 @@ createRoot(document.getElementById("root")!).render(
           <Route element={<PublicLayout />}>
             <Route path="/o/:slug/tournaments/:id" element={<PublicTournamentPage />} />
             <Route path="/o/:slug/tournaments/:tournamentId/pods/:podId" element={<PublicPodPage />} />
+            <Route path="/o/:slug/hall-of-fame" element={<PublicHallOfFamePage />} />
+            <Route path="/o/:slug/hall-of-fame/players/:playerId" element={<PublicPlayerStatsPage />} />
+            <Route path="/o/:slug/treasure-chest" element={<PublicTreasureChestPage />} />
           </Route>
           <Route element={<Layout />}>
             <Route path="/login" element={<LoginPage />} />

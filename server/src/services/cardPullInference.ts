@@ -12,19 +12,31 @@ import { computePodStandings } from "./standings.js";
 const MIN_INFERRED_PRICE = 10;
 const MAX_INFERRED_RANKS = 3;
 
-// Only infers once a pod is actually decided — every round played and
-// completed. Never touches a pull a human has already set/confirmed
-// (playerIdInferred: false, whether they picked it explicitly or
-// confirmed a prior guess) — inference only ever fills in or refreshes
-// its own unconfirmed guesses.
+// Only infers once a pod is actually decided. That means either every
+// round played and completed, OR — the imported-history case, where most
+// pre-app pods have final points but no round-by-round Match data at all
+// (deliberately, per the import script's design: no fabricating pairings
+// that were never recorded) — every entrant carries a
+// finalPointsOverride. Missing this second case entirely skips inference
+// for standings-only pods regardless of how many times it's re-run,
+// since "zero rounds" looks identical to "not decided yet." Never
+// touches a pull a human has already set/confirmed (playerIdInferred:
+// false, whether they picked it explicitly or confirmed a prior guess)
+// — inference only ever fills in or refreshes its own unconfirmed
+// guesses.
 export async function inferCardPullAttribution(podId: string): Promise<void> {
   const pod = await prisma.pod.findUnique({
     where: { id: podId },
-    include: { rounds: true },
+    include: { rounds: true, entrants: true },
   });
-  if (!pod || pod.isTeamEvent) return;
-  if (pod.rounds.length === 0 || pod.rounds.length < pod.roundCount) return;
-  if (pod.rounds.some((r) => r.status !== "COMPLETED")) return;
+  if (!pod || pod.isTeamEvent || pod.entrants.length === 0) return;
+
+  const roundsDecided =
+    pod.rounds.length > 0 &&
+    pod.rounds.length >= pod.roundCount &&
+    pod.rounds.every((r) => r.status === "COMPLETED");
+  const standingsOnlyDecided = pod.entrants.every((e) => e.finalPointsOverride !== null);
+  if (!roundsDecided && !standingsOnlyDecided) return;
 
   const [standings, entrants, pulls] = await Promise.all([
     computePodStandings(podId),

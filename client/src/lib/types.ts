@@ -199,6 +199,7 @@ export interface PlayerStatsDetail {
   undefeatedPods: number;
   totalValuePulled: number;
   biggestPull: { cardName: string; priceEur: number } | null;
+  cardPulls: CardPull[];
   mostPlayedOpponent: HeadToHeadEntry | null;
   nemesis: HeadToHeadEntry | null;
   victim: HeadToHeadEntry | null;

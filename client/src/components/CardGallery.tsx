@@ -48,14 +48,18 @@ function InferredAttribution({
 export function CardGallery({
   pulls,
   onRemove,
-  tournamentLink,
+  tournamentLinkTo,
   editableAttribution,
   attributionPlayers,
   onSetAttribution,
 }: {
   pulls: CardPull[];
   onRemove?: (id: string) => void;
-  tournamentLink?: boolean;
+  // Builds the href for the small "which tournament" label — differs
+  // between the authed (`/tournaments/:id`) and public
+  // (`/o/:slug/tournaments/:id`) contexts, so it's a function rather
+  // than a boolean.
+  tournamentLinkTo?: (tournamentId: string) => string;
   // When set, an inferred (unconfirmed) pull gets an inline confirm/
   // reassign control instead of just the read-only 🔮 marker. Only makes
   // sense on an authenticated, organizer-editable page (PodValuePage).
@@ -108,9 +112,9 @@ export function CardGallery({
                   {pull.player.displayName}
                 </div>
               ))}
-            {tournamentLink && pull.pod?.tournament && (
+            {tournamentLinkTo && pull.pod?.tournament && (
               <Link
-                to={`/tournaments/${pull.pod.tournament.id}`}
+                to={tournamentLinkTo(pull.pod.tournament.id)}
                 className="mt-1 block truncate text-[10.5px] text-ink-muted hover:text-accent-strong"
               >
                 {pull.pod.tournament.name}

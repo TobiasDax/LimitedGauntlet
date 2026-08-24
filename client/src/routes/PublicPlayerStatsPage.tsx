@@ -1,11 +1,11 @@
 import { Link, useParams } from "react-router-dom";
-import { usePlayerStats } from "../features/hallOfFame/useHallOfFame";
+import { usePublicPlayerStats } from "../features/public/usePublic";
 import { PlayerStatsBody } from "../components/PlayerStatsBody";
 import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 
-export function PlayerStatsPage() {
-  const { playerId } = useParams<{ playerId: string }>();
-  const { data, isLoading } = usePlayerStats(playerId);
+export function PublicPlayerStatsPage() {
+  const { slug, playerId } = useParams<{ slug: string; playerId: string }>();
+  const { data, isLoading } = usePublicPlayerStats(slug, playerId);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
   if (!data) return <p className="text-ink-muted">Player not found.</p>;
@@ -15,7 +15,7 @@ export function PlayerStatsPage() {
   return (
     <div>
       <Eyebrow>
-        <Link to="/hall-of-fame" className="hover:text-accent-strong">
+        <Link to={`/o/${slug}/hall-of-fame`} className="hover:text-accent-strong">
           Hall of Fame
         </Link>
       </Eyebrow>
@@ -25,7 +25,7 @@ export function PlayerStatsPage() {
         {s.podsPlayed === 1 ? "" : "s"} and {s.tournamentsPlayed} tournament{s.tournamentsPlayed === 1 ? "" : "s"}.
       </ScreenDek>
 
-      <PlayerStatsBody stats={s} tournamentLinkTo={(id) => `/tournaments/${id}`} />
+      <PlayerStatsBody stats={s} tournamentLinkTo={(id) => `/o/${slug}/tournaments/${id}`} />
     </div>
   );
 }
