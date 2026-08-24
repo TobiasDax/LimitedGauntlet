@@ -30,7 +30,7 @@ Key business rules (confirmed against real historical data, do not change withou
 
 - TypeScript strict mode everywhere, both frontend and backend.
 - Prisma schema is the single source of truth for the data model — generate types from it, don't hand-maintain parallel interfaces.
-- Standings/pairing math must have test coverage against the real historical fixtures in `PLAN.md`'s "Historical reference data" section (e.g. 2025 Sommer: Devon totals 28, ranked #1) — these are known-good numbers from the actual Outline docs, not invented test data.
+- Standings/pairing math must have test coverage against real historical numbers (pseudonymized in the test fixtures — the real data lives outside this repo, see README's "History import" section) — known-good numbers from actual tournament results, not invented test data.
 - No auth dependency beyond the DB — sessions are encrypted cookies (`@fastify/secure-session`), not a separate session store.
 - Public tournament/pod pages must stay unauthenticated (`/o/<slug>/tournaments/<id>/...`) — this is a hard requirement, not a default that can quietly grow a login wall.
 

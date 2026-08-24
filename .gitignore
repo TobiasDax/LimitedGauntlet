@@ -5,3 +5,8 @@ build/
 *.log
 *.tsbuildinfo
 .DS_Store
+
+# Real historical tournament data (names, results) for whoever's running
+# their own LimitedGauntlet instance -- never belongs in git history, even
+# on a private remote. See README's "History import" section.
+/legacy-data*.json

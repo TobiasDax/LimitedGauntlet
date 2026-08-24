@@ -38,10 +38,13 @@ npm run dev:client   # Vite dev server, proxies /api and /socket.io to :8080
 
 ## History import
 
-`server/src/scripts/import-legacy.ts` + `legacy-data.json` import real past tournament history (see `PLAN.md`'s historical reference section) so Gesamtwertung and Hall of Fame have real data from day one instead of starting empty. It's idempotent — safe to re-run, existing rows are left alone rather than duplicated — and talks to the database directly via Prisma, not through the HTTP API.
+`server/src/scripts/import-legacy.ts` reads a JSON file of past tournament history — names, pods, points, card pulls — and inserts it via Prisma. It's idempotent (safe to re-run, existing rows are left alone rather than duplicated) and never goes through the HTTP API.
+
+**The data file is not part of this repo.** Real tournament history is real people's names and results, and doesn't belong in a git history — even a private one. Supply your own as `legacy-data.local.json` at the repo root (gitignored) matching the shape in `server/src/scripts/import-legacy.ts`'s `LegacyData` interface, or point at a file anywhere else:
 
 ```sh
-docker compose exec app node server/dist/scripts/import-legacy.js
+docker compose exec app node server/dist/scripts/import-legacy.js /path/to/your-data.json
+# or: LEGACY_DATA_PATH=/path/to/your-data.json docker compose exec app node server/dist/scripts/import-legacy.js
 ```
 
 Creates an organization (`gp-eichstaett` by default) and one organizer login. Set these first if you want anything other than the generated defaults:

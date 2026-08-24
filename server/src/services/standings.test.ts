@@ -13,13 +13,14 @@ function closeTo(actual: number, expectedPct: number) {
 }
 
 describe("computePodStandings", () => {
-  // Reproduces the real 2025 Sommer GP Eichstätt "Battlebond" pod exactly
-  // as recorded in Outline (see PLAN.md's historical reference section
-  // and the source doc) — a 4-team, 3-round, best-of-1 round robin.
-  // Round 1 and 2 results are stated directly in the doc; Round 3's
-  // results weren't recorded there, but are uniquely determined by the
-  // stated final standings (both Round 3 matches were draws) — verified
-  // by hand before writing this test, see conversation/commit history.
+  // Reproduces a real 2-headed-giant team pod exactly as recorded in a
+  // real tournament's results doc (player names pseudonymized here — the
+  // real data lives outside this repo, see README's "History import"
+  // section) — a 4-team, 3-round, best-of-1 round robin. Round 1 and 2
+  // results are stated directly in the source doc; Round 3's results
+  // weren't recorded there, but are uniquely determined by the stated
+  // final standings (both Round 3 matches were draws) — verified by hand
+  // before writing this test.
   //
   // This is the concrete cross-check the whole standings engine is built
   // against: if this test passes, the points/MW%/GW%/OMW%/OGW% formulas

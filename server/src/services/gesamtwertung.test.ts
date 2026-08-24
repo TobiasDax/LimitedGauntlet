@@ -9,18 +9,19 @@ afterAll(async () => {
 });
 
 describe("computeGesamtwertung", () => {
-  // Isolates the exact property the real 2024 GP Bad Gechingen data
+  // Isolates the exact property a real tournament's historical data
   // needed: ranking by average-per-pod-played, not raw total, so a
-  // player who attended fewer pods isn't penalized for it. (Real numbers:
-  // Alex went 27 total over 5 pods (avg 5.4) vs Gray's 31 over 6
-  // pods (avg 5.17) — Alex should rank ABOVE Gray by average
-  // despite a lower total; hand-verified against every player's real
-  // number before writing this test, see PLAN.md and STEPS.md. This test
-  // reproduces the same shape of case with a small, fully-controlled
-  // scenario instead of refitting all 10 real players, since Step 5's
-  // standings math — the harder part — is already verified separately
-  // against real data (standings.test.ts); Step 6 only needs to prove the
-  // cross-pod aggregation and re-ranking are correct.
+  // player who attended fewer pods isn't penalized for it. (A real case
+  // from that data: one player with a lower raw total but fewer pods
+  // attended out-ranked another player with a higher total by average —
+  // hand-verified against every player's real number before writing this
+  // test; the real data itself lives outside this repo, see README's
+  // "History import" section.) This test reproduces the same shape of
+  // case with a small, fully-controlled scenario instead of refitting
+  // real players, since Step 5's standings math — the harder part — is
+  // already verified separately against real data (standings.test.ts);
+  // Step 6 only needs to prove the cross-pod aggregation and re-ranking
+  // are correct.
   it("ranks by average points per pod played, not raw total", async () => {
     const org = await prisma.organization.create({ data: { slug: `gw-${Date.now()}`, name: "Test Org" } });
     const tournament = await prisma.tournament.create({

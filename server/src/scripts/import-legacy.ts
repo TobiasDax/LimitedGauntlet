@@ -1,17 +1,21 @@
-// One-time history import: reads legacy-data.json (hand-transcribed from
-// the real Outline "GP Eichstätt" collection, see PLAN.md's historical
-// reference section) and inserts it via the Prisma client directly --
-// this script never goes through the HTTP API. Idempotent: safe to re-run,
-// existing rows (matched by org slug / tournament name / pod name / player
-// name) are left alone rather than duplicated.
+// One-time history import: reads a legacy-data JSON file (see
+// PLAN.md's historical reference section for the shape this expects, and
+// the transcription notes for LimitedGauntlet's own real tournament
+// history) and inserts it via the Prisma client directly -- this script
+// never goes through the HTTP API. Idempotent: safe to re-run, existing
+// rows (matched by org slug / tournament name / pod name / player name)
+// are left alone rather than duplicated.
 //
-// Run once after first deploy:
-//   docker compose exec app node server/dist/scripts/import-legacy.js
+// The data file is deliberately NOT part of this repo (real names/results
+// belong to whoever ran the tournaments, not in a public git history) --
+// it's supplied at runtime, not compiled in. Run once after first deploy:
+//   docker compose exec app node server/dist/scripts/import-legacy.js /path/to/legacy-data.json
+// (or set LEGACY_DATA_PATH instead of passing an argument)
 import { randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { PrismaClient, type PodFormat, type MatchResult, type TournamentStatus } from "@prisma/client";
 import { hashPassword } from "../auth/password.js";
 import { lookupCardByName } from "../services/scryfall.js";
-import legacyData from "./legacy-data.json" with { type: "json" };
 
 const prisma = new PrismaClient();
 
@@ -38,7 +42,23 @@ interface LegacyTournament {
   pods: LegacyPod[];
 }
 
-const data = legacyData as unknown as { players: string[]; tournaments: LegacyTournament[] };
+interface LegacyData {
+  players: string[];
+  tournaments: LegacyTournament[];
+}
+
+async function loadLegacyData(): Promise<LegacyData> {
+  const path = process.argv[2] ?? process.env.LEGACY_DATA_PATH;
+  if (!path) {
+    throw new Error(
+      "No data file given. Pass a path as the first argument, or set LEGACY_DATA_PATH -- " +
+        "see the README's 'History import' section. This file isn't part of the repo on " +
+        "purpose (it's someone's real tournament history, not a fixture).",
+    );
+  }
+  const raw = await readFile(path, "utf-8");
+  return JSON.parse(raw) as LegacyData;
+}
 
 async function upsertOrg() {
   const slug = process.env.IMPORT_ORG_SLUG ?? "gp-eichstaett";
@@ -259,6 +279,7 @@ async function importTournament(orgId: string, allPlayersByName: Map<string, { i
 }
 
 async function main() {
+  const data = await loadLegacyData();
   const org = await upsertOrg();
   const playersByName = await upsertPlayers(org.id, data.players);
   for (const tournament of data.tournaments) {
