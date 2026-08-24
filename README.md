@@ -1,35 +1,52 @@
 # LimitedGauntlet
 
-A self-hosted, open-source Swiss-tournament tracker for MTG Limited (and other) events. Built to replace a third-party pairing site plus a pile of manually-maintained docs for a yearly ~8-10 player weekend GP — pairing, results, live standings, a round timer, card-pull value tracking, and a shareable public view, all in one app.
+A self-hosted, open-source Swiss-tournament tracker for MTG Limited (and other) events. Built to replace a third-party pairing site plus a pile of manually-maintained docs for a yearly weekend GP — pairing, results, live standings, a round timer, card-pull value tracking, and shareable public views, all in one app.
 
-Designed from day one as a real multi-group tool: one deployment can host several isolated organizations, each with their own login and player roster.
+Designed from day one as a real multi-group tool: one deployment can host several isolated organizations, each with their own login, player roster, and public share link.
 
 ![Gesamtwertung — the weekend-wide standings page, average-ranked with per-pod pips](docs/screenshots/gesamtwertung.png)
 
-**Status: feature-complete, pre-deploy.** Auth/multi-tenancy, tournament/pod/entrant CRUD, Swiss pairing with weekend-wide repeat avoidance, standings, Gesamtwertung, realtime broadcasts (Socket.IO), a round timer with a Display Mode chime, Scryfall-backed value tracking, public read-only pages, and a full responsive pass are all built, browser-tested, and — for the screenshot above — running against 4 real years of imported tournament history. Dark mode only for v1 (light mode is a deliberate v2, not an oversight). What's left is packaging polish and the actual deploy. See [`STEPS.md`](STEPS.md) for the detailed build log and [`PLAN.md`](PLAN.md) for the full design rationale.
+**Status: solid beta, running in production.** Built over a few days with an AI pair-programmer (Claude Code — see [`PLAN.md`](PLAN.md) for the design rationale and [`STEPS.md`](STEPS.md) for the full build log, every entry verified live against a running instance, not just typechecked), then hardened through real weekend-tournament use. Auth/multi-tenancy, Swiss pairing (auto *and* manual, with weekend-wide repeat avoidance and pre-lock swaps), standings, Gesamtwertung, an all-time Hall of Fame, Scryfall-backed card value tracking (the "Treasure Chest"), realtime broadcasts (Socket.IO), a round timer with a Display Mode chime, one-link public read-only sharing per org, and a security-hardened public-exposure posture (rate limiting, closed signup by default, CSP headers, anti-scraping) are all built and browser-tested. Dark mode only for now — light mode is a deliberate v2, not an oversight.
+
+## Features
+
+- **Multi-tenant**: one deployment hosts several independent organizations, each with its own roster, login, and public link.
+- **Swiss pairing**: automatic pairing with weekend-wide repeat-opponent avoidance, or hand-pair a round yourself; swap two entrants' seats before a round locks.
+- **Live everything**: pairings, standings, and the round timer update over Socket.IO on every connected device — no manual refresh.
+- **Standings that actually add up**: per-pod Swiss standings (OMW%/GW%/OGW% tiebreakers, with a manual override for intentional-draw endgames), plus a weekend-wide Gesamtwertung ranked by average points per pod (so missing an event doesn't tank your rank).
+- **Hall of Fame & Treasure Chest**: an all-time cross-tournament leaderboard (with a longest-win-streak spotlight and main-event crowns), and a Scryfall-backed card-pull value tracker with set/foil-accurate pricing and lightweight auto-attribution for who pulled what.
+- **One public link per org**: `/o/<slug>` gives your group a read-only mirror of everything the organizer sees — tournaments, roster, standings, Hall of Fame, Treasure Chest — no login required, and nothing editable.
+- **MCP server**: an AI agent can run pairing/results/standings/card-pulls through the same authenticated API the web app uses — see [API tokens & MCP server](#api-tokens--mcp-server) below.
+- **Built for public exposure**: rate limiting, a closed-by-default signup form, security headers (CSP/HSTS), anti-scraping headers, and trusted-proxy support out of the box — see [`docs/deployment.md`](docs/deployment.md) for the full exposure guide.
 
 ## Stack
 
 Node.js + TypeScript throughout — Fastify + Prisma + PostgreSQL on the backend, React + Vite + Tailwind on the frontend, Socket.IO for realtime. Ships as a single Docker image plus a Postgres container; migrations run automatically on startup.
 
-## Running it
+## Setup
+
+Prerequisites: Docker + Docker Compose (the `docker compose` subcommand, not the old standalone `docker-compose`). Nothing else — Postgres runs in its own container.
 
 ```sh
+git clone <your-fork-or-this-repo-url> LimitedGauntlet
+cd LimitedGauntlet
 cp .env.example .env
 # edit .env: set POSTGRES_PASSWORD and SESSION_SECRET (openssl rand -hex 32)
-docker compose up -d
+docker compose up -d --build
 ```
 
-The app comes up on `http://localhost:8080` (configurable via `PORT` in `.env`). No manual database setup — migrations apply automatically before the server starts.
+The app comes up at `http://localhost:8080` (configurable via `PORT` in `.env`). No manual database setup — migrations apply automatically before the server starts.
 
-For a real deployment (production hardening, reverse proxy / TLS exposure options, updating), see [`docs/deployment.md`](docs/deployment.md).
+**Creating your first account:** signup is closed by default (`ALLOW_SIGNUP=false` in `.env.example`) — this app is meant for an existing group, not an open public signup form. To create your organization, set `ALLOW_SIGNUP=true` in `.env`, restart (`docker compose up -d`), sign up once, then set it back to `false` and restart again. (If you're migrating from spreadsheets/docs instead of starting fresh, see [History import](#history-import) below — it creates your first organization directly, no signup step needed.)
+
+For a real deployment — production hardening details, reverse proxy / TLS exposure options, updating an existing install — see [`docs/deployment.md`](docs/deployment.md).
 
 ## Development
 
 ```sh
 cp .env.example .env
 # edit .env: set POSTGRES_PASSWORD and SESSION_SECRET, as above
-docker compose up -d db   # just Postgres, published on localhost:5432
+docker compose up -d db   # just Postgres, published on localhost:5432 (add a docker-compose.override.yml — see .env.example — since the base file publishes no host port by default)
 
 npm install
 npm run dev:server   # Fastify on :8080, loads ../.env for DATABASE_URL etc.
@@ -37,6 +54,11 @@ npm run dev:client   # Vite dev server, proxies /api and /socket.io to :8080
 ```
 
 `npm run prisma:migrate --workspace server` applies schema changes locally against that same Postgres.
+
+```sh
+npm run --workspace server test   # server unit/integration tests, needs a live Postgres
+npm run --workspace server build && npm run --workspace client build   # typecheck + build both
+```
 
 ## History import
 
@@ -49,17 +71,17 @@ docker compose exec app node server/dist/scripts/import-legacy.js /path/to/your-
 # or: LEGACY_DATA_PATH=/path/to/your-data.json docker compose exec app node server/dist/scripts/import-legacy.js
 ```
 
-Creates an organization (`gp-eichstaett` by default) and one organizer login. Set these first if you want anything other than the generated defaults:
+Creates an organization and one organizer login — this is the one path into the app that works regardless of `ALLOW_SIGNUP`. Defaults to an org slugged `gp-eichstaett` (the original author's own group — harmless as a default, but you'll want your own group's details); set these first:
 
 ```sh
-IMPORT_ORG_SLUG=gp-eichstaett
-IMPORT_ORG_NAME="GP Eichstätt"
+IMPORT_ORG_SLUG=your-group
+IMPORT_ORG_NAME="Your Group's Name"
 IMPORT_ORGANIZER_EMAIL=organizer@example.com
 IMPORT_ORGANIZER_PASSWORD=              # generated + printed once if left unset — log in and change it
 IMPORT_ORGANIZER_NAME=Organizer
 ```
 
-The JSON has its own data source note worth reading before trusting it blindly: names were reconciled across years where a document used a nickname/surname/typo, and exact calendar dates aren't recorded in the original source (marked `dateApproximate`, easy to fix later via the tournament's own settings).
+If you've logged historical card pulls without per-player attribution (or from before that existed), a one-time backfill script guesses attribution for already-completed pods from finish + card value, marking every guess as inferred and reviewable/reassignable — see `docs/deployment.md`'s optional steps.
 
 ## API tokens & MCP server
 
