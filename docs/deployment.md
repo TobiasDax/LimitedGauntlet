@@ -76,8 +76,30 @@ Safe to re-run — it's idempotent and never overwrites an attribution a human h
 ## Updating
 
 ```sh
+git status                    # see below if this isn't clean
 git pull
 docker compose up -d --build
 ```
 
-New migrations apply automatically on the next container start, same as first boot. There's no separate migration step to remember.
+That's it for the common case. A few things worth knowing:
+
+**Migrations apply automatically, same as first boot.** The container runs `prisma migrate deploy` before the server starts, every time it (re)starts — so a `git pull` that brings in new migrations needs no separate step. Migrations only ever go forward: there's no automatic rollback. If you need to undo a schema change after the fact, that's a manual Prisma operation (or restoring a database backup) — reason enough to have a recent backup before updating, same as before any schema-changing update to anything.
+
+**If you've customized `docker-compose.yml` locally** (e.g. the production hardening from step 3, or wiring in your own reverse-proxy labels), `git pull` can conflict if a future update also touches that file — Git will refuse to overwrite your uncommitted changes rather than silently discarding them, so check `git status` before pulling if you're not sure. The cleaner long-term fix: put your local customizations in a `docker-compose.override.yml` file instead of editing `docker-compose.yml` directly. Compose automatically merges `docker-compose.override.yml` on top of `docker-compose.yml` (no extra flag needed — `docker compose up` picks it up by itself), so your customizations live in a file `git pull` never touches at all, no matter how much the base file changes upstream. Example, dropping the Postgres port publish from step 3 this way instead of editing the base file:
+
+```yaml
+# docker-compose.override.yml — not tracked by this repo's git history,
+# keep your own copy of this file outside of `git pull`'s reach.
+services:
+  db:
+    ports: []
+```
+
+**Expect a brief restart, not downtime for the whole stack.** `docker compose up -d --build` only rebuilds and recreates the `app` service (unless the update touched `docker-compose.yml`'s `db` config, which is rare) — `db` and its data volume are untouched, so there's no data-loss risk from an update itself. The app container will be briefly unreachable while it restarts (typically a few seconds).
+
+**Verify it actually came back up:**
+
+```sh
+docker compose logs -f app   # watch for startup errors, Ctrl-C once it looks healthy
+curl http://localhost:8080/api/healthz   # expect {"status":"ok"}
+```
