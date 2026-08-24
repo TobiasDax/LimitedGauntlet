@@ -11,10 +11,25 @@ import { usePod, podFormatLabel } from "../features/pods/usePods";
 import { CardGallery, formatEur } from "../components/CardGallery";
 import { Button, Eyebrow, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
+import type { Entrant } from "../lib/types";
 
-function AddPullForm({ podId }: { podId: string }) {
+// Flat (id, name) list of the real players behind a pod's entrants —
+// individual entrants directly, team entrants resolved to their members —
+// so "who pulled this" can attribute a card to a person even in a team
+// pod, not just to the team as a whole.
+function pullablePlayers(entrants: Entrant[]): { id: string; name: string }[] {
+  const out: { id: string; name: string }[] = [];
+  for (const e of entrants) {
+    if (e.player) out.push({ id: e.player.id, name: e.player.displayName });
+    else if (e.team) for (const m of e.team.members) out.push({ id: m.playerId, name: m.player.displayName });
+  }
+  return out;
+}
+
+function AddPullForm({ podId, entrants }: { podId: string; entrants: Entrant[] }) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [playerId, setPlayerId] = useState("");
   const addPull = useAddCardPull(podId);
 
   useEffect(() => {
@@ -24,9 +39,10 @@ function AddPullForm({ podId }: { podId: string }) {
 
   const { data: suggestions } = useAutocompleteCard(debouncedQuery);
   const showSuggestions = query === debouncedQuery && (suggestions?.names.length ?? 0) > 0;
+  const players = pullablePlayers(entrants);
 
   const submit = (name: string) => {
-    addPull.mutate(name, { onSuccess: () => setQuery("") });
+    addPull.mutate({ cardName: name, playerId: playerId || undefined }, { onSuccess: () => setQuery("") });
   };
 
   return (
@@ -44,6 +60,21 @@ function AddPullForm({ podId }: { podId: string }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+        {players.length > 0 && (
+          <select
+            className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+            value={playerId}
+            onChange={(e) => setPlayerId(e.target.value)}
+            title="Pulled by (optional) — feeds the Hall of Fame's value stats"
+          >
+            <option value="">Pulled by…</option>
+            {players.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        )}
         <Button type="submit" variant="primary" disabled={!query.trim() || addPull.isPending}>
           {addPull.isPending ? "Looking up…" : "+ Add pull"}
         </Button>
@@ -88,7 +119,7 @@ export function PodValuePage() {
 
       <PodTabs podId={id ?? ""} />
 
-      {id && <AddPullForm podId={id} />}
+      {id && <AddPullForm podId={id} entrants={pod?.entrants ?? []} />}
 
       {isLoading ? (
         <p className="text-ink-muted">Loading…</p>

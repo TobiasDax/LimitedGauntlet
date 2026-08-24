@@ -37,7 +37,8 @@ export function useAutocompleteCard(query: string) {
 export function useAddCardPull(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (cardName: string) => api.post<{ cardPull: CardPull }>(`/pods/${podId}/card-pulls`, { cardName }),
+    mutationFn: (input: { cardName: string; playerId?: string }) =>
+      api.post<{ cardPull: CardPull }>(`/pods/${podId}/card-pulls`, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId, "card-pulls"] }),
   });
 }

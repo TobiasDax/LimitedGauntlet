@@ -147,6 +147,64 @@ export interface CoveragePair {
   count: number;
 }
 
+export interface HallOfFameHeadline {
+  tournaments: number;
+  pods: number;
+  players: number;
+}
+
+export interface MostPlayedPairing {
+  playerAId: string;
+  playerAName: string;
+  playerBId: string;
+  playerBName: string;
+  matches: number;
+}
+
+export interface HallOfFameBiggestPull {
+  id: string;
+  cardName: string;
+  priceEur: number | null;
+  imageUri: string | null;
+}
+
+export interface HeadToHeadEntry {
+  playerId: string;
+  displayName: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  matches: number;
+  winPct: number;
+}
+
+export type PodFormatCode = "DRAFT" | "SEALED" | "CHAOS_DRAFT" | "CONSTRUCTED" | "CUSTOM";
+
+export interface PlayerStatsDetail {
+  playerId: string;
+  displayName: string;
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  matchWinPct: number;
+  gameWinPct: number;
+  podsPlayed: number;
+  tournamentsPlayed: number;
+  podWins: number;
+  weekendWins: number;
+  longestWinStreak: number;
+  bestFormat: { format: PodFormatCode; winPct: number; matches: number } | null;
+  averageFinish: number | null;
+  undefeatedPods: number;
+  totalValuePulled: number;
+  biggestPull: { cardName: string; priceEur: number } | null;
+  mostPlayedOpponent: HeadToHeadEntry | null;
+  nemesis: HeadToHeadEntry | null;
+  victim: HeadToHeadEntry | null;
+  headToHead: HeadToHeadEntry[];
+}
+
 export interface CardPull {
   id: string;
   podId: string;
