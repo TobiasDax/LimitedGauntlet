@@ -115,6 +115,7 @@ export interface StandingsRow {
   gameWinPct: number;
   opponentsMatchWinPct: number;
   opponentsGameWinPct: number;
+  manualTiebreak: number | null;
   entrant: Entrant;
 }
 

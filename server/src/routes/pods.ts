@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
-import { findOwnedTournament, findOwnedPod } from "../services/ownership.js";
+import { findOwnedTournament, findOwnedPod, findOwnedEntrant } from "../services/ownership.js";
 import { computePodStandings } from "../services/standings.js";
 
 // Playing in any pod implies attending that pod's tournament — upsert
@@ -332,6 +332,32 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
     reply.code(201).send({ entrant });
   });
 
+  // Sets or clears the manual tiebreak order used to break a tie on
+  // points — see the schema comment on Entrant.manualTiebreak for why this
+  // exists (intentional draws to lock in placement, where the computed
+  // OMW%/GW%/OGW% tiebreakers don't necessarily reflect what the group
+  // actually decided). Never touches points themselves.
+  app.patch("/api/entrants/:id", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    const body = z.object({ manualTiebreak: z.number().int().nullable() }).safeParse(request.body);
+    if (!params.success || !body.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    const entrant = await findOwnedEntrant(params.data.id, request.organizer!.orgId);
+    if (!entrant) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    const updated = await prisma.entrant.update({
+      where: { id: entrant.id },
+      data: { manualTiebreak: body.data.manualTiebreak },
+    });
+    reply.send({ entrant: updated });
+  });
+
   app.delete("/api/entrants/:id", async (request, reply) => {
     const params = idParams.safeParse(request.params);
     if (!params.success) {
@@ -339,9 +365,7 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const entrant = await prisma.entrant.findFirst({
-      where: { id: params.data.id, pod: { tournament: { orgId: request.organizer!.orgId } } },
-    });
+    const entrant = await findOwnedEntrant(params.data.id, request.organizer!.orgId);
     if (!entrant) {
       reply.code(404).send({ error: "not_found" });
       return;

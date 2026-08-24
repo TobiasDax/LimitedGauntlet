@@ -26,6 +26,10 @@ export function findOwnedCardPull(cardPullId: string, orgId: string) {
   return prisma.cardPull.findFirst({ where: { id: cardPullId, pod: { tournament: { orgId } } } });
 }
 
+export function findOwnedEntrant(entrantId: string, orgId: string) {
+  return prisma.entrant.findFirst({ where: { id: entrantId, pod: { tournament: { orgId } } } });
+}
+
 // Slug-scoped equivalents for the public, unauthenticated pages — same
 // shape as the orgId-scoped lookups above, but the org itself is the
 // access control (an unguessable cuid isn't the boundary here, the slug

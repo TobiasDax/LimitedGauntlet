@@ -27,6 +27,19 @@ export function useRemoveEntrant(podId: string) {
   });
 }
 
+// Sets or clears an entrant's manual tiebreak order — only ever compared
+// against entrants tied on points (see the Entrant.manualTiebreak schema
+// comment for why this exists). Invalidates standings specifically since
+// that's the only place this value is read.
+export function useSetManualTiebreak(podId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ entrantId, manualTiebreak }: { entrantId: string; manualTiebreak: number | null }) =>
+      api.patch<{ entrant: Entrant }>(`/entrants/${entrantId}`, { manualTiebreak }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId, "standings"] }),
+  });
+}
+
 export function entrantErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.status === 409) return "Already entered in this pod.";

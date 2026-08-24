@@ -8,6 +8,7 @@ export interface StandingsRow {
   gameWinPct: number;
   opponentsMatchWinPct: number;
   opponentsGameWinPct: number;
+  manualTiebreak: number | null;
 }
 
 // MTR: an opponent's win percentage is never used as less than 33% when
@@ -45,6 +46,7 @@ export async function computePodStandings(podId: string): Promise<StandingsRow[]
         gameWinPct: 0,
         opponentsMatchWinPct: 0,
         opponentsGameWinPct: 0,
+        manualTiebreak: entrant.manualTiebreak,
       };
     }
 
@@ -61,12 +63,22 @@ export async function computePodStandings(podId: string): Promise<StandingsRow[]
       gameWinPct: gameWinPct.get(entrant.id) ?? 0,
       opponentsMatchWinPct: average(matchWinPct),
       opponentsGameWinPct: average(gameWinPct),
+      manualTiebreak: entrant.manualTiebreak,
     };
   });
 
+  // manualTiebreak only ever breaks a tie that's already there on points —
+  // it can never move an entrant ahead of someone with more points. Placed
+  // before the computed tiebreakers on purpose: when an organizer has set
+  // it, that's a deliberate human call (e.g. an intentional draw to lock in
+  // placement) meant to override what OMW%/GW%/OGW% would otherwise decide,
+  // not just a fallback for when those also happen to tie.
   rows.sort(
     (a, b) =>
       b.points - a.points ||
+      (a.manualTiebreak !== null || b.manualTiebreak !== null
+        ? (a.manualTiebreak ?? Infinity) - (b.manualTiebreak ?? Infinity)
+        : 0) ||
       b.opponentsMatchWinPct - a.opponentsMatchWinPct ||
       b.gameWinPct - a.gameWinPct ||
       b.opponentsGameWinPct - a.opponentsGameWinPct,

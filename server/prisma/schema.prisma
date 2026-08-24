@@ -218,6 +218,15 @@ model Entrant {
   // OGW%) report as 0 for these entrants since no match data exists to
   // compute them from.
   finalPointsOverride Int?
+  // Manual tiebreak order, only ever compared between entrants who are
+  // ALREADY tied on points — never overrides points itself. Exists for the
+  // "intentional draw to lock in placement" case: two players draw their
+  // final match on purpose (e.g. 2W-1D = 7 points, safely clear of 3rd
+  // place's 6), and the computed OMW%/GW%/OGW% tiebreakers among a small
+  // pod don't necessarily reflect what the group actually decided —
+  // sometimes there's nothing to compute a "real" order from at all. Lower
+  // sorts first. Set via the standings page's reorder-within-a-tie UI.
+  manualTiebreak      Int?
 
   pod        Pod     @relation(fields: [podId], references: [id], onDelete: Cascade)
   player     Player? @relation(fields: [playerId], references: [id], onDelete: Cascade)
