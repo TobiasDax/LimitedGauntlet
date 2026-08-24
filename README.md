@@ -22,6 +22,8 @@ docker compose up -d
 
 The app comes up on `http://localhost:8080` (configurable via `PORT` in `.env`). No manual database setup — migrations apply automatically before the server starts.
 
+For a real deployment (production hardening, reverse proxy / TLS exposure options, updating), see [`docs/deployment.md`](docs/deployment.md).
+
 ## Development
 
 ```sh
@@ -58,6 +60,10 @@ IMPORT_ORGANIZER_NAME=Organizer
 ```
 
 The JSON has its own data source note worth reading before trusting it blindly: names were reconciled across years where a document used a nickname/surname/typo, and exact calendar dates aren't recorded in the original source (marked `dateApproximate`, easy to fix later via the tournament's own settings).
+
+## API tokens & MCP server
+
+The app exposes an MCP (Model Context Protocol) server (`mcp/`) so an AI agent can read and manage tournament data — pairing, results, standings, card pulls — through the same authenticated API the web app uses, rather than the database directly. Mint a bearer token from **API Tokens** in the top nav (shown once, revoke any time from the same page), then see [`mcp/README.md`](mcp/README.md) for how to run the server and point an MCP client at it. Destructive operations (deleting a tournament/pod/entrant, removing a card pull) require a two-step confirmation in the tool layer, independent of whatever confirmation the MCP client itself also does.
 
 ## License
 
