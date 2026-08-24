@@ -81,6 +81,14 @@ export function CardGallery({
             ) : (
               <div className="grid h-full w-full place-items-center text-[11px] text-ink-muted">No image</div>
             )}
+            {pull.foil && (
+              <span
+                title="Foil"
+                className="absolute top-1.5 left-1.5 grid h-6 w-6 place-items-center rounded bg-black/65 text-[12px]"
+              >
+                ✨
+              </span>
+            )}
             {onRemove && (
               <button
                 onClick={() => onRemove(pull.id)}
@@ -96,7 +104,10 @@ export function CardGallery({
             <div className="flex items-center justify-between">
               <span className="text-[12.5px] font-bold text-accent-strong tabular-nums">{formatEur(pull.priceEur)}</span>
               {pull.setCode && (
-                <span className="text-[10px] tracking-wide text-ink-muted uppercase">{pull.setCode}</span>
+                <span className="text-[10px] tracking-wide text-ink-muted uppercase">
+                  {pull.setCode}
+                  {pull.foil && " · foil"}
+                </span>
               )}
             </div>
             {pull.player &&

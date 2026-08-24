@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../../lib/api";
-import type { CardPull } from "../../lib/types";
+import type { CardPull, ScryfallSet } from "../../lib/types";
 
 export function usePodCardPulls(podId: string | undefined) {
   return useQuery({
@@ -34,10 +34,18 @@ export function useAutocompleteCard(query: string) {
   });
 }
 
+export function useScryfallSets() {
+  return useQuery({
+    queryKey: ["scryfall", "sets"],
+    queryFn: () => api.get<{ sets: ScryfallSet[] }>("/scryfall/sets"),
+    staleTime: 60 * 60_000,
+  });
+}
+
 export function useAddCardPull(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { cardName: string; playerId?: string }) =>
+    mutationFn: (input: { cardName: string; playerId?: string; setCode?: string; foil?: boolean }) =>
       api.post<{ cardPull: CardPull }>(`/pods/${podId}/card-pulls`, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId, "card-pulls"] }),
   });

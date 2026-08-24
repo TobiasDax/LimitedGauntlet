@@ -56,6 +56,7 @@ export interface Pod {
   status: PodStatus;
   excludeFromStats: boolean;
   isMainEvent: boolean;
+  setCode: string | null;
   createdAt: string;
 }
 
@@ -224,11 +225,18 @@ export interface CardPull {
   cardName: string;
   scryfallId: string | null;
   setCode: string | null;
+  foil: boolean;
   priceEur: number | null;
   imageUri: string | null;
   addedAt: string;
   player?: Player | null;
   pod?: { id: string; name: string; tournament?: { id: string; name: string } };
+}
+
+export interface ScryfallSet {
+  code: string;
+  name: string;
+  releasedAt: string | null;
 }
 
 export interface ScryfallCardSummary {

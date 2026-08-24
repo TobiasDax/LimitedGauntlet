@@ -7,6 +7,7 @@ import { useTournament } from "../features/tournaments/useTournament";
 import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
+import { SetPicker } from "../components/SetPicker";
 import { entrantDisplayName } from "../lib/entrant";
 import type { Entrant, MatchFormat, PodFormat } from "../lib/types";
 
@@ -25,6 +26,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
   const [roundLengthMinutes, setRoundLengthMinutes] = useState(pod.roundLengthMinutes);
   const [excludeFromStats, setExcludeFromStats] = useState(pod.excludeFromStats);
   const [isMainEvent, setIsMainEvent] = useState(pod.isMainEvent);
+  const [setCode, setSetCode] = useState(pod.setCode ?? "");
 
   return (
     <Card className="mb-6 p-6">
@@ -45,6 +47,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
               roundLengthMinutes,
               excludeFromStats,
               isMainEvent,
+              setCode: setCode || null,
             },
             { onSuccess: onDone },
           );
@@ -72,6 +75,8 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
         <Field label="Date" hint="Optional">
           <TextField type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
+
+        {(format === "DRAFT" || format === "SEALED") && <SetPicker value={setCode} onChange={setSetCode} />}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Rounds">

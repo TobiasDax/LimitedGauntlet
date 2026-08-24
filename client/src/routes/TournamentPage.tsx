@@ -6,6 +6,7 @@ import { useCreatePod, podFormatLabel } from "../features/pods/usePods";
 import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
 import { RichText } from "../components/RichText";
+import { SetPicker } from "../components/SetPicker";
 import type { PodFormat, TournamentStatus } from "../lib/types";
 
 const tournamentStatuses: TournamentStatus[] = ["PLANNING", "ACTIVE", "COMPLETED"];
@@ -159,6 +160,7 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
   const [pointsLoss, setPointsLoss] = useState(0);
   const [roundLengthMinutes, setRoundLengthMinutes] = useState(50);
   const [isMainEvent, setIsMainEvent] = useState(false);
+  const [setCode, setSetCode] = useState("");
 
   return (
     <Card className="p-6">
@@ -180,6 +182,7 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
             pointsLoss,
             roundLengthMinutes,
             isMainEvent,
+            setCode: setCode || undefined,
           });
         }}
       >
@@ -205,6 +208,8 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
         <Field label="Date" hint="Optional">
           <TextField type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
+
+        {(format === "DRAFT" || format === "SEALED") && <SetPicker value={setCode} onChange={setSetCode} />}
 
         <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
           <input type="checkbox" checked={isTeamEvent} onChange={(e) => setIsTeamEvent(e.target.checked)} />

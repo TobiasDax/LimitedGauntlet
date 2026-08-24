@@ -339,9 +339,27 @@ registerReadWriteTool(
 
 registerReadWriteTool(
   "add_card_pull",
-  "Add a card pull to a pod — resolves the card live via Scryfall for image/set/price.",
-  { podId: z.string(), cardName: z.string(), playerId: z.string().optional() },
+  "Add a card pull to a pod — resolves the card live via Scryfall for image/price. Pass setCode to pin a specific printing (e.g. a card reprinted across many sets would otherwise resolve to Scryfall's arbitrary 'default' printing, which is often wrong for the actual pod).",
+  {
+    podId: z.string(),
+    cardName: z.string(),
+    playerId: z.string().optional(),
+    setCode: z.string().describe("Scryfall set code, e.g. 'eoe' — pins the printing instead of guessing").optional(),
+    foil: z.boolean().optional(),
+  },
   ({ podId, ...body }) => api.post(`/pods/${podId}/card-pulls`, body),
+);
+
+registerReadWriteTool(
+  "update_card_pull",
+  "Correct an existing card pull's attribution and/or printing (setCode/foil) without losing its playerId/addedAt history — use this instead of delete + re-add when a pull resolved to the wrong printing.",
+  {
+    cardPullId: z.string(),
+    playerId: z.string().nullable().optional(),
+    setCode: z.string().describe("Scryfall set code, e.g. 'eoe' — re-resolves the same card name in this set").optional(),
+    foil: z.boolean().optional(),
+  },
+  ({ cardPullId, ...body }) => api.patch(`/card-pulls/${cardPullId}`, body),
 );
 
 // -----------------------------------------------------------------------

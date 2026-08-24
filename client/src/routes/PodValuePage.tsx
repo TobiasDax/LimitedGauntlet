@@ -27,10 +27,20 @@ function pullablePlayers(entrants: Entrant[]): { id: string; name: string }[] {
   return out;
 }
 
-function AddPullForm({ podId, entrants }: { podId: string; entrants: Entrant[] }) {
+function AddPullForm({
+  podId,
+  entrants,
+  defaultSetCode,
+}: {
+  podId: string;
+  entrants: Entrant[];
+  defaultSetCode: string;
+}) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [playerId, setPlayerId] = useState("");
+  const [setCode, setSetCode] = useState(defaultSetCode);
+  const [foil, setFoil] = useState(false);
   const addPull = useAddCardPull(podId);
 
   useEffect(() => {
@@ -43,24 +53,38 @@ function AddPullForm({ podId, entrants }: { podId: string; entrants: Entrant[] }
   const players = pullablePlayers(entrants);
 
   const submit = (name: string) => {
-    addPull.mutate({ cardName: name, playerId: playerId || undefined }, { onSuccess: () => setQuery("") });
+    addPull.mutate(
+      { cardName: name, playerId: playerId || undefined, setCode: setCode.trim() || undefined, foil },
+      { onSuccess: () => setQuery("") },
+    );
   };
 
   return (
     <div className="relative mb-6">
       <form
-        className="flex gap-2"
+        className="flex flex-wrap items-center gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           if (query.trim()) submit(query.trim());
         }}
       >
         <TextField
-          className="flex-1"
+          className="min-w-[180px] flex-1"
           placeholder="Card name…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+        <TextField
+          className="w-24"
+          placeholder="Set"
+          title="Scryfall set code (e.g. eoe) — pins the printing instead of guessing. Optional."
+          value={setCode}
+          onChange={(e) => setSetCode(e.target.value)}
+        />
+        <label className="flex items-center gap-1.5 text-[12.5px] text-ink-secondary" title="Price the foil printing">
+          <input type="checkbox" checked={foil} onChange={(e) => setFoil(e.target.checked)} />
+          Foil
+        </label>
         {players.length > 0 && (
           <select
             className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
@@ -122,7 +146,7 @@ export function PodValuePage() {
 
       <PodTabs podId={id ?? ""} />
 
-      {id && <AddPullForm podId={id} entrants={pod?.entrants ?? []} />}
+      {pod && <AddPullForm podId={pod.id} entrants={pod.entrants} defaultSetCode={pod.setCode ?? ""} />}
 
       {isLoading ? (
         <p className="text-ink-muted">Loading…</p>

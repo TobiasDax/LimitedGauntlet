@@ -28,6 +28,7 @@ export interface CreatePodInput {
   pointsLoss: number;
   roundLengthMinutes: number;
   isMainEvent?: boolean;
+  setCode?: string;
 }
 
 export function useCreatePod(tournamentId: string) {
@@ -54,6 +55,7 @@ export interface UpdatePodInput {
   roundLengthMinutes?: number;
   excludeFromStats?: boolean;
   isMainEvent?: boolean;
+  setCode?: string | null;
 }
 
 export function useUpdatePod(podId: string, tournamentId?: string) {

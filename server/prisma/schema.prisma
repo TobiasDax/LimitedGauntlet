@@ -146,6 +146,13 @@ model Pod {
   name               String
   date               DateTime?
   format             PodFormat
+  // Default Scryfall set code for this pod's card pulls (e.g. "eoe") —
+  // pre-fills the add-pull form's set picker so a whole draft/sealed pod's
+  // worth of pulls don't each need the set typed in by hand. Purely a
+  // frontend convenience; never used server-side to resolve a pull, and
+  // always overridable per pull (e.g. a bonus-sheet card from a linked
+  // companion set).
+  setCode            String?
   sequenceOrder      Int
   isTeamEvent        Boolean     @default(false)
   teamSize           Int?
@@ -311,6 +318,11 @@ model CardPull {
   cardName   String
   scryfallId String?
   setCode    String?
+  // Reflects the finish the stored priceEur actually came from, which may
+  // differ from what was requested when a print doesn't have that finish
+  // (see scryfall.ts's resolvePrice) — never trust this as "what the
+  // organizer typed," it's "what price this actually is."
+  foil       Boolean  @default(false)
   priceEur   Decimal? @db.Decimal(10, 2)
   imageUri   String?
   addedAt    DateTime @default(now())

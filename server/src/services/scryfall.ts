@@ -10,6 +10,7 @@ const SCRYFALL_BASE = "https://api.scryfall.com";
 
 const AUTOCOMPLETE_TTL_MS = 5 * 60_000;
 const NAMED_TTL_MS = 60 * 60_000;
+const SETS_TTL_MS = 24 * 60 * 60_000;
 
 interface CacheEntry<T> {
   value: T;
@@ -54,6 +55,13 @@ export interface ScryfallCardSummary {
   name: string;
   setCode: string;
   priceEur: number | null;
+  // The finish the priceEur above actually reflects — not necessarily
+  // whatever was requested. A foil price requested on a nonfoil-only
+  // print (or vice versa) falls back to whichever finish the print
+  // actually has, rather than silently storing a null/wrong price; this
+  // records which one that ended up being so the caller never mislabels
+  // a nonfoil price as foil or vice versa.
+  foil: boolean;
   imageUri: string | null;
 }
 
@@ -61,31 +69,106 @@ interface ScryfallCardResponse {
   id: string;
   name: string;
   set: string;
-  prices?: { eur?: string | null };
+  finishes?: string[];
+  prices?: { eur?: string | null; eur_foil?: string | null };
   image_uris?: { normal?: string };
   card_faces?: Array<{ image_uris?: { normal?: string } }>;
 }
 
-export async function lookupCardByName(name: string): Promise<ScryfallCardSummary | null> {
-  const key = `named:${name.toLowerCase()}`;
+function resolvePrice(card: ScryfallCardResponse, foilRequested: boolean): { priceEur: number | null; foil: boolean } {
+  const finishes = card.finishes ?? [];
+  const eur = card.prices?.eur ? Number(card.prices.eur) : null;
+  const eurFoil = card.prices?.eur_foil ? Number(card.prices.eur_foil) : null;
+
+  if (foilRequested && finishes.includes("foil")) return { priceEur: eurFoil, foil: true };
+  if (!foilRequested && finishes.includes("nonfoil")) return { priceEur: eur, foil: false };
+
+  // The requested finish isn't actually a real option on this print (e.g.
+  // foil requested on a nonfoil-only common, or nonfoil requested on a
+  // foil-only showcase/promo treatment) — fall back to whichever finish
+  // the print actually has, rather than storing a null price for a finish
+  // that was never available here.
+  if (finishes.includes("foil") && eurFoil !== null) return { priceEur: eurFoil, foil: true };
+  return { priceEur: eur, foil: false };
+}
+
+export interface LookupOptions {
+  // Restricts resolution to one specific set (Scryfall's three-to-five
+  // letter set code, e.g. "eoe") instead of Scryfall's own "best guess"
+  // default printing — the whole point of this option: a card reprinted
+  // across many sets (lands, staples) would otherwise silently resolve to
+  // an unrelated set's printing.
+  setCode?: string;
+  foil?: boolean;
+}
+
+// Deliberately does NOT fall back to a different set if `name` doesn't
+// exist in `setCode` — that silent fallback to an unrelated printing is
+// exactly the bug this option exists to prevent. Returns null (same as
+// "card not found") rather than guessing.
+export async function lookupCardByName(name: string, options: LookupOptions = {}): Promise<ScryfallCardSummary | null> {
+  const { setCode, foil = false } = options;
+  const key = `named:${name.toLowerCase()}:${setCode?.toLowerCase() ?? ""}:${foil ? "foil" : "nonfoil"}`;
   const cached = getCached<ScryfallCardSummary | null>(key);
   if (cached !== undefined) return cached;
 
-  const res = await scryfallFetch(`/cards/named?fuzzy=${encodeURIComponent(name)}`);
+  const params = new URLSearchParams({ fuzzy: name });
+  if (setCode) params.set("set", setCode.toLowerCase());
+  const res = await scryfallFetch(`/cards/named?${params.toString()}`);
   if (!res.ok) {
     setCached(key, null, NAMED_TTL_MS);
     return null;
   }
 
   const card = (await res.json()) as ScryfallCardResponse;
+  const { priceEur, foil: resolvedFoil } = resolvePrice(card, foil);
   const summary: ScryfallCardSummary = {
     scryfallId: card.id,
     name: card.name,
     setCode: card.set,
-    priceEur: card.prices?.eur ? Number(card.prices.eur) : null,
+    priceEur,
+    foil: resolvedFoil,
     imageUri: card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal ?? null,
   };
 
   setCached(key, summary, NAMED_TTL_MS);
   return summary;
+}
+
+export interface ScryfallSetSummary {
+  code: string;
+  name: string;
+  releasedAt: string | null;
+}
+
+interface ScryfallSetResponse {
+  code: string;
+  name: string;
+  set_type: string;
+  digital: boolean;
+  released_at: string | null;
+}
+
+// "Main" sets for the pod set-picker: real paper expansions/core sets,
+// newest first. Excludes masters/commander/promo/token/etc. sets, which
+// would otherwise flood the picker with sets nobody drafts a fresh pod
+// from — those are still reachable via the free-text setCode override on
+// an individual pull (e.g. correcting a card that's actually from a
+// Masters reprint), just not offered as a pod-level default.
+export async function listMainSets(): Promise<ScryfallSetSummary[]> {
+  const key = "sets:main";
+  const cached = getCached<ScryfallSetSummary[]>(key);
+  if (cached) return cached;
+
+  const res = await scryfallFetch("/sets");
+  if (!res.ok) return [];
+  const data = (await res.json()) as { data: ScryfallSetResponse[] };
+
+  const sets = data.data
+    .filter((s) => (s.set_type === "expansion" || s.set_type === "core") && !s.digital)
+    .sort((a, b) => (b.released_at ?? "").localeCompare(a.released_at ?? ""))
+    .map((s) => ({ code: s.code, name: s.name, releasedAt: s.released_at }));
+
+  setCached(key, sets, SETS_TTL_MS);
+  return sets;
 }

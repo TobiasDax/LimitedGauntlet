@@ -1,9 +1,10 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedPod, findOwnedTournament, findOwnedCardPull } from "../services/ownership.js";
-import { autocompleteCardNames, lookupCardByName } from "../services/scryfall.js";
+import { autocompleteCardNames, lookupCardByName, listMainSets } from "../services/scryfall.js";
 import { inferCardPullAttribution } from "../services/cardPullInference.js";
 
 const idParams = z.object({ id: z.string().min(1) });
@@ -11,9 +12,13 @@ const idParams = z.object({ id: z.string().min(1) });
 const autocompleteQuerySchema = z.object({ q: z.string().trim().min(1).max(100) });
 const cardQuerySchema = z.object({ name: z.string().trim().min(1).max(200) });
 
+const setCodeSchema = z.string().trim().toLowerCase().min(2).max(10);
+
 const addPullSchema = z.object({
   cardName: z.string().trim().min(1).max(200),
   playerId: z.string().min(1).optional(),
+  setCode: setCodeSchema.optional(),
+  foil: z.boolean().default(false),
 });
 
 function toPlainPull(pull: { priceEur: unknown; [k: string]: unknown }) {
@@ -31,6 +36,14 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
     }
     const names = await autocompleteCardNames(query.data.q);
     reply.send({ names });
+  });
+
+  // "Main" paper expansion/core sets, newest first — populates the pod
+  // set-picker (see Pod.setCode). Cached a full day server-side, this list
+  // barely changes.
+  app.get("/api/scryfall/sets", async (_request, reply) => {
+    const sets = await listMainSets();
+    reply.send({ sets });
   });
 
   app.get("/api/scryfall/card", async (request, reply) => {
@@ -71,7 +84,7 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const card = await lookupCardByName(body.data.cardName);
+    const card = await lookupCardByName(body.data.cardName, { setCode: body.data.setCode, foil: body.data.foil });
     if (!card) {
       reply.code(404).send({ error: "card_not_found" });
       return;
@@ -84,6 +97,7 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
         cardName: card.name,
         scryfallId: card.scryfallId,
         setCode: card.setCode,
+        foil: card.foil,
         priceEur: card.priceEur,
         imageUri: card.imageUri,
       },
@@ -123,15 +137,24 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
     reply.send({ cardPulls: plain, total });
   });
 
-  // Confirm or reassign a pull's attribution — used both for "yes, that
-  // inferred guess is right" (same playerId, just clears the inferred
-  // flag) and for picking someone else entirely. Either way, setting it
-  // through here always marks it human-confirmed so inference never
-  // touches it again.
+  // Two independent things a pull can be corrected on, either together or
+  // separately in one call:
+  // - playerId: confirms an inferred guess as-is (pass the same id back)
+  //   or reassigns to someone else — either way always marks it
+  //   human-confirmed so inference never overwrites it again.
+  // - setCode/foil: re-resolves the pull against Scryfall for a specific
+  //   printing, overwriting scryfallId/setCode/priceEur/foil/imageUri in
+  //   place — fixes a wrong-set pull (e.g. a card silently resolved to an
+  //   unrelated reprint) without losing playerId/playerIdInferred/addedAt
+  //   the way a delete-and-recreate would.
   app.patch("/api/card-pulls/:id", async (request, reply) => {
     const params = idParams.safeParse(request.params);
     const body = z
-      .object({ playerId: z.string().min(1).nullable() })
+      .object({
+        playerId: z.string().min(1).nullable().optional(),
+        setCode: setCodeSchema.optional(),
+        foil: z.boolean().optional(),
+      })
       .safeParse(request.body);
     if (!params.success || !body.success) {
       reply.code(400).send({ error: "invalid_input" });
@@ -154,10 +177,33 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const updated = await prisma.cardPull.update({
-      where: { id: pull.id },
-      data: { playerId: body.data.playerId, playerIdInferred: false },
-    });
+    const data: Prisma.CardPullUncheckedUpdateInput = {};
+    if (body.data.playerId !== undefined) {
+      data.playerId = body.data.playerId;
+      data.playerIdInferred = false;
+    }
+
+    if (body.data.setCode !== undefined || body.data.foil !== undefined) {
+      const card = await lookupCardByName(pull.cardName, {
+        setCode: body.data.setCode,
+        foil: body.data.foil ?? pull.foil,
+      });
+      if (!card) {
+        // Don't clobber a working pull with a failed re-resolution —
+        // the name/setCode combination genuinely doesn't exist on
+        // Scryfall, report it rather than silently leaving stale data
+        // or guessing a different printing.
+        reply.code(404).send({ error: "card_not_found" });
+        return;
+      }
+      data.scryfallId = card.scryfallId;
+      data.setCode = card.setCode;
+      data.foil = card.foil;
+      data.priceEur = card.priceEur;
+      data.imageUri = card.imageUri;
+    }
+
+    const updated = await prisma.cardPull.update({ where: { id: pull.id }, data });
     reply.send({ cardPull: toPlainPull(updated) });
   });
 
