@@ -34,8 +34,26 @@ model OrganizerAccount {
   createdAt    DateTime @default(now())
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  apiTokens    ApiToken[]
 
   @@index([orgId])
+}
+
+// Bearer tokens for non-browser clients (e.g. the MCP server) — acts as
+// the minting organizer, identical blast radius to them being logged in,
+// no more. Only the hash is stored; the plaintext is shown once at mint
+// time and never again.
+model ApiToken {
+  id          String    @id @default(cuid())
+  organizerId String
+  name        String
+  tokenHash   String    @unique
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+
+  organizer OrganizerAccount @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+
+  @@index([organizerId])
 }
 
 // ---------------------------------------------------------------------------

@@ -51,7 +51,15 @@ export function Layout() {
             </nav>
           )}
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-3">
+            {me && (
+              <Link
+                to="/api-tokens"
+                className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+              >
+                API Tokens
+              </Link>
+            )}
             {me ? (
               <Button
                 variant="ghost"

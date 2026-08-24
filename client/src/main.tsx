@@ -19,6 +19,7 @@ import { TournamentValuePage } from "./routes/TournamentValuePage.tsx";
 import { TreasureChestPage } from "./routes/TreasureChestPage.tsx";
 import { HallOfFamePage } from "./routes/HallOfFamePage.tsx";
 import { PlayerStatsPage } from "./routes/PlayerStatsPage.tsx";
+import { ApiTokensPage } from "./routes/ApiTokensPage.tsx";
 import { PublicTournamentPage } from "./routes/PublicTournamentPage.tsx";
 import { PublicPodPage } from "./routes/PublicPodPage.tsx";
 import "./index.css";
@@ -50,6 +51,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/hall-of-fame" element={<HallOfFamePage />} />
               <Route path="/hall-of-fame/players/:playerId" element={<PlayerStatsPage />} />
               <Route path="/treasure-chest" element={<TreasureChestPage />} />
+              <Route path="/api-tokens" element={<ApiTokensPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
