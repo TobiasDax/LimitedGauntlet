@@ -20,6 +20,8 @@ import { TreasureChestPage } from "./routes/TreasureChestPage.tsx";
 import { HallOfFamePage } from "./routes/HallOfFamePage.tsx";
 import { PlayerStatsPage } from "./routes/PlayerStatsPage.tsx";
 import { ApiTokensPage } from "./routes/ApiTokensPage.tsx";
+import { PublicDashboardPage } from "./routes/PublicDashboardPage.tsx";
+import { PublicRosterPage } from "./routes/PublicRosterPage.tsx";
 import { PublicTournamentPage } from "./routes/PublicTournamentPage.tsx";
 import { PublicPodPage } from "./routes/PublicPodPage.tsx";
 import { PublicHallOfFamePage } from "./routes/PublicHallOfFamePage.tsx";
@@ -34,12 +36,14 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route element={<PublicLayout />}>
-            <Route path="/o/:slug/tournaments/:id" element={<PublicTournamentPage />} />
-            <Route path="/o/:slug/tournaments/:tournamentId/pods/:podId" element={<PublicPodPage />} />
-            <Route path="/o/:slug/hall-of-fame" element={<PublicHallOfFamePage />} />
-            <Route path="/o/:slug/hall-of-fame/players/:playerId" element={<PublicPlayerStatsPage />} />
-            <Route path="/o/:slug/treasure-chest" element={<PublicTreasureChestPage />} />
+          <Route path="/o/:slug" element={<PublicLayout />}>
+            <Route index element={<PublicDashboardPage />} />
+            <Route path="roster" element={<PublicRosterPage />} />
+            <Route path="tournaments/:id" element={<PublicTournamentPage />} />
+            <Route path="tournaments/:tournamentId/pods/:podId" element={<PublicPodPage />} />
+            <Route path="hall-of-fame" element={<PublicHallOfFamePage />} />
+            <Route path="hall-of-fame/players/:playerId" element={<PublicPlayerStatsPage />} />
+            <Route path="treasure-chest" element={<PublicTreasureChestPage />} />
           </Route>
           <Route element={<Layout />}>
             <Route path="/login" element={<LoginPage />} />

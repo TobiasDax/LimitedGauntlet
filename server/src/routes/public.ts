@@ -20,6 +20,51 @@ function toPlainPull(pull: { priceEur: unknown; [k: string]: unknown }) {
 // access control here, same trust model as the rest of the app's public
 // pages — there is no mutation route in this file, on purpose.
 export async function publicRoutes(app: FastifyInstance): Promise<void> {
+  // The org landing page — "send one link, browse everything the
+  // organizer sees" needs a page at the bare /o/:slug root to land on,
+  // same idea as the authed dashboard's tournament list.
+  app.get("/api/public/o/:slug", async (request, reply) => {
+    const params = orgParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const organization = await findPublicOrganization(params.data.slug);
+    if (!organization) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    const tournaments = await prisma.tournament.findMany({
+      where: { orgId: organization.id },
+      orderBy: { startDate: "desc" },
+    });
+    reply.send({
+      organization: { id: organization.id, slug: organization.slug, name: organization.name },
+      tournaments,
+    });
+  });
+
+  app.get("/api/public/o/:slug/roster", async (request, reply) => {
+    const params = orgParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const organization = await findPublicOrganization(params.data.slug);
+    if (!organization) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    const players = await prisma.player.findMany({
+      where: { orgId: organization.id },
+      orderBy: { displayName: "asc" },
+    });
+    reply.send({
+      organization: { id: organization.id, slug: organization.slug, name: organization.name },
+      players,
+    });
+  });
+
   app.get("/api/public/o/:slug/tournaments/:id", async (request, reply) => {
     const params = tournamentParams.safeParse(request.params);
     if (!params.success) {

@@ -10,6 +10,7 @@ import type {
   HallOfFameRow,
   MostPlayedPairing,
   Organization,
+  Player,
   PlayerStatsDetail,
   Pod,
   Round,
@@ -17,6 +18,25 @@ import type {
   Tournament,
 } from "../../lib/types";
 import type { LongestWinStreak } from "../hallOfFame/useHallOfFame";
+
+// The org landing page ("send one link, browse everything") and the
+// public roster — the two pages every other public page's nav links to,
+// so they're kept at the top of this file next to each other.
+export function usePublicOrganization(slug: string | undefined) {
+  return useQuery({
+    queryKey: ["public", "organization", slug],
+    queryFn: () => api.get<{ organization: Organization; tournaments: Tournament[] }>(`/public/o/${slug}`),
+    enabled: !!slug,
+  });
+}
+
+export function usePublicRoster(slug: string | undefined) {
+  return useQuery({
+    queryKey: ["public", "roster", slug],
+    queryFn: () => api.get<{ organization: Organization; players: Player[] }>(`/public/o/${slug}/roster`),
+    enabled: !!slug,
+  });
+}
 
 export interface PublicTournamentDetail extends Tournament {
   pods: Pod[];

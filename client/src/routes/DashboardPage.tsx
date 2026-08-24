@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useCreateTournament, useTournaments } from "../features/tournaments/useTournaments";
+import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
 import type { TournamentStatus } from "../lib/types";
 
@@ -17,6 +18,7 @@ function formatDateRange(start: string, end: string): string {
 
 export function DashboardPage() {
   const { data, isLoading } = useTournaments();
+  const { data: me } = useMe();
   const createTournament = useCreateTournament();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -30,6 +32,17 @@ export function DashboardPage() {
       <Eyebrow>Your organization</Eyebrow>
       <ScreenTitle>Tournaments</ScreenTitle>
       <ScreenDek>Every weekend your group has run, and the one you're planning next.</ScreenDek>
+
+      {me && (
+        <a
+          href={`/o/${me.organization.slug}`}
+          target="_blank"
+          rel="noreferrer"
+          className="mb-6 inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+        >
+          Public link (share this with your group) ↗
+        </a>
+      )}
 
       {isLoading && <p className="text-ink-muted">Loading…</p>}
 
