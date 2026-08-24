@@ -1,6 +1,6 @@
 import type { GesamtwertungPod, GesamtwertungRow } from "../lib/types";
 
-function rankBadgeClasses(rank: number): string {
+export function rankBadgeClasses(rank: number): string {
   if (rank === 1) return "bg-accent border-accent text-[#241c0a]";
   if (rank === 2) return "border-[#c8c8c8]/40 text-[#d7d5cf]";
   if (rank === 3) return "border-[#c48e58]/45 text-[#cf9a6b]";

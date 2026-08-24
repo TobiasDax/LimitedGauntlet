@@ -130,6 +130,15 @@ export interface GesamtwertungRow {
   player: Player;
 }
 
+export interface HallOfFameRow {
+  playerId: string;
+  tournamentsPlayed: number;
+  podsPlayed: number;
+  totalPoints: number;
+  average: number;
+  player: Player;
+}
+
 export interface CoveragePair {
   playerAId: string;
   playerBId: string;

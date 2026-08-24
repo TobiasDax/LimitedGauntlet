@@ -13,6 +13,7 @@ import { tournamentRoutes } from "./routes/tournaments.js";
 import { podRoutes } from "./routes/pods.js";
 import { roundRoutes } from "./routes/rounds.js";
 import { cardPullRoutes } from "./routes/cardPulls.js";
+import { hallOfFameRoutes } from "./routes/hallOfFame.js";
 import { publicRoutes } from "./routes/public.js";
 import { initRealtime } from "./realtime.js";
 
@@ -63,6 +64,7 @@ await app.register(tournamentRoutes);
 await app.register(podRoutes);
 await app.register(roundRoutes);
 await app.register(cardPullRoutes);
+await app.register(hallOfFameRoutes);
 await app.register(publicRoutes);
 
 // Serves the built SPA in production. During `npm run dev`, the Vite dev
