@@ -164,7 +164,7 @@ Feature work requested after the initial build shipped and the history import we
 - [x] The org-wide most-valuable-cards gallery is renamed to **Treasure Chest**, freeing the "Hall of Fame" name for PI-3's player aggregate.
 - [x] Frontend: `HallOfFamePage.tsx` → `TreasureChestPage.tsx` (component + title/dek); route `/hall-of-fame` → `/treasure-chest` in `main.tsx`; nav label in `components/Layout.tsx`.
 - [x] Backend renamed too (did the full rename, not the optional skip): `GET /api/card-pulls/hall-of-fame` → `/api/card-pulls/treasure-chest` (`server/src/routes/cardPulls.ts`) + the `useHallOfFame` hook → `useTreasureChest` (query key included). No data change.
-- [ ] Still to do: deploy (frontend + backend rebuild — no migration).
+- [x] Deployed & verified 2026-08-24 (Tobias confirmed the rename + both pages).
 
 ### PI-3 — New "Hall of Fame" page: all-time player aggregate ✅ (implemented 2026-08-24, not yet deployed)
 - [x] All-time leaderboard aggregated across **every** tournament the org has run, in the "Hall of Fame" nav slot PI-2 freed up.
@@ -172,7 +172,8 @@ Feature work requested after the initial build shipped and the history import we
 - [x] Endpoint: `GET /api/hall-of-fame` (authed, org-scoped) in `server/src/routes/hallOfFame.ts`, registered in `index.ts`.
 - [x] Frontend: `client/src/routes/HallOfFamePage.tsx` at `/hall-of-fame` + `useHallOfFame` hook; ranked table reusing the Gesamtwertung rank-badge styling (`rankBadgeClasses` exported from `GesamtwertungList.tsx`): rank, player, pods, tournaments, avg pts/pod, total. Nav link added back in `Layout.tsx`.
 - [x] Decisions taken: columns = rank/player/pods/tournaments/avg/total (no "tournament wins" — that richer set lands in PI-7); team-pod points count full (consistent with Gesamtwertung); board is **authed-only for now** (no public mirror built — revisit if a public all-time board is wanted).
-- [ ] Still to do: deploy (frontend + backend rebuild — no migration) and verify the numbers against the live data. A unit test (mirroring `standings.test.ts`) against a throwaway Postgres would be good coverage — not added yet since the stack can't be run in this session.
+- [x] Deployed & verified 2026-08-24 (Tobias confirmed the all-time leaderboard looks right against the imported history).
+- [ ] Nice-to-have: a unit test mirroring `standings.test.ts` against a throwaway Postgres for coverage — not added yet.
 - [ ] PI-6's exclude-from-stats filter has a marked spot in `computeHallOfFame` (comment) for when that flag exists.
 
 ### PI-4 — Built-in MCP server for agent-driven editing
@@ -215,4 +216,14 @@ Turn the flat all-time leaderboard (PI-3) into a proper stats section: a Hall of
 - [x] Editing: description textarea in the create form (`DashboardPage`), plus an inline edit-in-place on `TournamentPage` (RichText view + "Edit description" → textarea + Save/Cancel) via a new `useUpdateTournament` hook — so it's editable now without waiting for PI-5's full tournament-edit form. New `Textarea` UI primitive.
 - [x] Rendering + links: went with the **safe minimal** route — a `RichText` component (`client/src/components/RichText.tsx`) renders the blurb as **React nodes** (plain text auto-escaped), turning only `https?://…` URLs and `[label](url)` into `<a target=_blank rel=noopener noreferrer>`. No raw HTML, no `dangerouslySetInnerHTML`, so no XSS surface — and no new dependency (skipped the Markdown lib).
 - [x] Displayed under the title on both `TournamentPage` (authed, editable) and `PublicTournamentPage` (public, read-only).
-- [ ] Still to do: deploy (rebuild — `migrate deploy` adds the column on boot) and verify a real link renders/clicks on a public link.
+- [x] Deployed & verified 2026-08-24 (Tobias confirmed create/edit + public render + clickable links all work).
+
+### PI-9 — Treasure Chest: per-card tournament label linking to the tournament
+- [ ] On the Treasure Chest page (`/treasure-chest`, the org-wide most-valuable-cards gallery), each card should show a small label naming the **tournament** it was opened in, and the label links to that tournament (`/tournaments/:id`).
+- [ ] Data is already there: `GET /api/card-pulls/treasure-chest` includes `pod: { id, name, tournament: { id, name } }`, and the `CardPull` type carries `pod?.tournament`.
+- [ ] Implementation: `CardGallery` is shared (pod value / tournament value / **public** tournament & pod / treasure-chest). Don't add the label unconditionally — it's redundant where you're already in that tournament's context, and the link base differs on public pages (`/o/:slug/tournaments/:id` vs authed `/tournaments/:id`). Add an opt-in prop (e.g. `<CardGallery tournamentLink />`) and enable it **only** on `TreasureChestPage`. Render a small `<Link>` label (near the set-code line) to `/tournaments/${pull.pod.tournament.id}`.
+
+### PI-10 — Contrast/theme pass: lighter base text + a more vibrant accent (away from gold)
+- [ ] Body text leans low-contrast: much of the UI uses `text-ink-secondary` (`--color-ink-secondary: #a89f8f`, a muted warm grey) on the dark bg. Brighten the ink ramp — `--color-ink` toward near-white and especially `--color-ink-secondary` / `--color-ink-muted` lighter — for readability. All in `client/src/index.css`'s `@theme` block (a handful of CSS variables); no component changes needed since everything references the tokens.
+- [ ] Swap the gold accent (`--color-accent: #a67c27`, `--color-accent-strong: #c2953f`, `--color-accent-wash`) for a more vibrant hue. **Open question — which hue?** The whole system keys off these three tokens (rank-1 badges, primary buttons, links, accent-wash gradients), so it's a one-place change but a real brand shift. Pick the colour with Tobias, then verify contrast rather than eyeballing: the primary button uses dark text (`#241c0a`) *on* the accent, and accent-coloured links sit on the dark bg — both need to stay legible.
+- [ ] Consider the frontend-design skill for the palette pass; check WCAG contrast of the new ink + accent against `--color-bg`/`--color-surface`.
