@@ -1,6 +1,7 @@
 import { Link, Outlet, useNavigate } from "react-router-dom";
 import { useLogout, useMe } from "../features/auth/useAuth";
 import { Button } from "./ui";
+import { Logo } from "./Logo";
 
 export function Layout() {
   const { data: me } = useMe();
@@ -11,8 +12,8 @@ export function Layout() {
     <div className="min-h-screen">
       <div className="border-border sticky top-0 z-10 border-b bg-bg/85 backdrop-blur">
         <div className="mx-auto flex max-w-[1180px] flex-wrap items-center gap-x-7 gap-y-2 px-4 py-3 sm:px-8 sm:py-3.5">
-          <Link to="/" className="font-display flex items-baseline gap-2.5 text-[17px] font-bold whitespace-nowrap sm:text-[19px]">
-            <span className="from-accent-strong to-accent inline-block h-5 w-5 rounded bg-gradient-to-br shadow-[inset_0_0_0_1px_rgba(0,0,0,0.3)]" />
+          <Link to="/" className="font-display flex items-center gap-2.5 text-[17px] font-bold whitespace-nowrap sm:text-[19px]">
+            <Logo className="h-7 w-7" />
             LimitedGauntlet
           </Link>
 
