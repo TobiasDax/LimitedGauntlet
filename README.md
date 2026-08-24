@@ -28,7 +28,7 @@ Node.js + TypeScript throughout — Fastify + Prisma + PostgreSQL on the backend
 Prerequisites: Docker + Docker Compose (the `docker compose` subcommand, not the old standalone `docker-compose`). Nothing else — Postgres runs in its own container.
 
 ```sh
-git clone <your-fork-or-this-repo-url> LimitedGauntlet
+git clone https://github.com/TobiasDax/LimitedGauntlet.git
 cd LimitedGauntlet
 cp .env.example .env
 # edit .env: set POSTGRES_PASSWORD and SESSION_SECRET (openssl rand -hex 32)
