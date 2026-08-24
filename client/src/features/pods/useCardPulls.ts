@@ -43,6 +43,18 @@ export function useAddCardPull(podId: string) {
   });
 }
 
+// Confirm an inferred attribution as-is (pass the same playerId) or
+// reassign it to someone else — either way, clears playerIdInferred so
+// the auto-inference heuristic never overwrites it again.
+export function useSetCardPullAttribution(podId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pullId, playerId }: { pullId: string; playerId: string | null }) =>
+      api.patch<{ cardPull: CardPull }>(`/card-pulls/${pullId}`, { playerId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId, "card-pulls"] }),
+  });
+}
+
 export function useDeleteCardPull(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({

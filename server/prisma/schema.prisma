@@ -287,6 +287,11 @@ model CardPull {
   id         String   @id @default(cuid())
   podId      String
   playerId   String?
+  // True when playerId was set by the auto-inference heuristic (top-3
+  // finisher <-> top-3 priciest pull, both above the threshold) and not
+  // yet reviewed by a human. Sticky false once a human sets/confirms the
+  // attribution — inference never overwrites a human's call.
+  playerIdInferred Boolean @default(false)
   cardName   String
   scryfallId String?
   setCode    String?

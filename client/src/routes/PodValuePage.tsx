@@ -4,6 +4,7 @@ import {
   useAddCardPull,
   useAutocompleteCard,
   useDeleteCardPull,
+  useSetCardPullAttribution,
   usePodCardPulls,
   cardPullErrorMessage,
 } from "../features/pods/useCardPulls";
@@ -103,8 +104,10 @@ export function PodValuePage() {
   const { data: podData } = usePod(id);
   const { data, isLoading } = usePodCardPulls(id);
   const deletePull = useDeleteCardPull(id ?? "");
+  const setAttribution = useSetCardPullAttribution(id ?? "");
 
   const pod = podData?.pod;
+  const attributionPlayers = pullablePlayers(pod?.entrants ?? []);
 
   return (
     <div>
@@ -131,7 +134,13 @@ export function PodValuePage() {
             </span>
             <span className="text-[11px] tracking-wide text-ink-muted uppercase">pod total</span>
           </div>
-          <CardGallery pulls={data?.cardPulls ?? []} onRemove={(pullId) => deletePull.mutate(pullId)} />
+          <CardGallery
+            pulls={data?.cardPulls ?? []}
+            onRemove={(pullId) => deletePull.mutate(pullId)}
+            editableAttribution
+            attributionPlayers={attributionPlayers}
+            onSetAttribution={(pullId, playerId) => setAttribution.mutate({ pullId, playerId })}
+          />
         </>
       )}
     </div>

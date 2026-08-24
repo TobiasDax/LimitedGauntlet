@@ -4,6 +4,7 @@ import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedPod, findOwnedTournament, findOwnedCardPull } from "../services/ownership.js";
 import { autocompleteCardNames, lookupCardByName } from "../services/scryfall.js";
+import { inferCardPullAttribution } from "../services/cardPullInference.js";
 
 const idParams = z.object({ id: z.string().min(1) });
 
@@ -88,7 +89,14 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
       },
     });
 
-    reply.code(201).send({ cardPull: toPlainPull(pull) });
+    // A pull added to an already-completed pod can itself be inferrable
+    // right away (e.g. logging pulls after the fact) — re-fetch so the
+    // response reflects a possible inferred attribution, not the
+    // pre-inference row.
+    await inferCardPullAttribution(pod.id);
+    const finalPull = await prisma.cardPull.findUniqueOrThrow({ where: { id: pull.id } });
+
+    reply.code(201).send({ cardPull: toPlainPull(finalPull) });
   });
 
   app.get("/api/pods/:id/card-pulls", async (request, reply) => {
@@ -113,6 +121,44 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
     const plain = pulls.map(toPlainPull);
     const total = plain.reduce((sum, p) => sum + (p.priceEur ?? 0), 0);
     reply.send({ cardPulls: plain, total });
+  });
+
+  // Confirm or reassign a pull's attribution — used both for "yes, that
+  // inferred guess is right" (same playerId, just clears the inferred
+  // flag) and for picking someone else entirely. Either way, setting it
+  // through here always marks it human-confirmed so inference never
+  // touches it again.
+  app.patch("/api/card-pulls/:id", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    const body = z
+      .object({ playerId: z.string().min(1).nullable() })
+      .safeParse(request.body);
+    if (!params.success || !body.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    const pull = await findOwnedCardPull(params.data.id, request.organizer!.orgId);
+    if (!pull) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    if (body.data.playerId) {
+      const player = await prisma.player.findFirst({
+        where: { id: body.data.playerId, orgId: request.organizer!.orgId },
+      });
+      if (!player) {
+        reply.code(404).send({ error: "player_not_found" });
+        return;
+      }
+    }
+
+    const updated = await prisma.cardPull.update({
+      where: { id: pull.id },
+      data: { playerId: body.data.playerId, playerIdInferred: false },
+    });
+    reply.send({ cardPull: toPlainPull(updated) });
   });
 
   app.delete("/api/card-pulls/:id", async (request, reply) => {

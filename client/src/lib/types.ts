@@ -209,6 +209,7 @@ export interface CardPull {
   id: string;
   podId: string;
   playerId: string | null;
+  playerIdInferred: boolean;
   cardName: string;
   scryfallId: string | null;
   setCode: string | null;
