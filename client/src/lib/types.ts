@@ -55,6 +55,7 @@ export interface Pod {
   rarepicUrl: string | null;
   status: PodStatus;
   excludeFromStats: boolean;
+  isMainEvent: boolean;
   createdAt: string;
 }
 
@@ -132,12 +133,20 @@ export interface GesamtwertungRow {
   player: Player;
 }
 
+export interface MainEventWin {
+  podId: string;
+  podName: string;
+  tournamentId: string;
+  tournamentName: string;
+}
+
 export interface HallOfFameRow {
   playerId: string;
   tournamentsPlayed: number;
   podsPlayed: number;
   totalPoints: number;
   average: number;
+  mainEventWins: MainEventWin[];
   player: Player;
 }
 

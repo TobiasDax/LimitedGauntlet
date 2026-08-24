@@ -1,12 +1,20 @@
 import { prisma } from "../prisma.js";
 import { computePodStandings } from "./standings.js";
 
+export interface MainEventWin {
+  podId: string;
+  podName: string;
+  tournamentId: string;
+  tournamentName: string;
+}
+
 export interface HallOfFameRow {
   playerId: string;
   tournamentsPlayed: number;
   podsPlayed: number;
   totalPoints: number;
   average: number;
+  mainEventWins: MainEventWin[];
 }
 
 // The all-time player leaderboard across every tournament this org has ever
@@ -18,12 +26,16 @@ export interface HallOfFameRow {
 export async function computeHallOfFame(orgId: string): Promise<HallOfFameRow[]> {
   const pods = await prisma.pod.findMany({
     where: { tournament: { orgId }, excludeFromStats: false },
-    include: { entrants: { include: { team: { include: { members: true } } } } },
+    include: {
+      entrants: { include: { team: { include: { members: true } } } },
+      tournament: { select: { id: true, name: true } },
+    },
   });
 
   const totals = new Map<string, number>();
   const podsPlayed = new Map<string, number>();
   const tournamentsByPlayer = new Map<string, Set<string>>();
+  const mainEventWins = new Map<string, MainEventWin[]>();
 
   for (const pod of pods) {
     if (pod.entrants.length === 0) continue; // unplayed/empty pod — nothing to credit
@@ -41,6 +53,26 @@ export async function computeHallOfFame(orgId: string): Promise<HallOfFameRow[]>
         tournamentsByPlayer.get(playerId)!.add(pod.tournamentId);
       }
     }
+
+    // The main-event crown: whoever's on top of this pod's own standings
+    // (same "first row after the full points+tiebreaker sort" rule the
+    // rest of the app uses for "who won a pod" — see PI-7's playerStats.ts
+    // for the same pattern and its documented tie-handling caveat).
+    if (pod.isMainEvent && standings.length > 0) {
+      const winnerEntrant = pod.entrants.find((e) => e.id === standings[0]!.entrantId);
+      const winnerPlayerIds = winnerEntrant
+        ? (winnerEntrant.playerId ? [winnerEntrant.playerId] : (winnerEntrant.team?.members.map((m) => m.playerId) ?? []))
+        : [];
+      for (const playerId of winnerPlayerIds) {
+        if (!mainEventWins.has(playerId)) mainEventWins.set(playerId, []);
+        mainEventWins.get(playerId)!.push({
+          podId: pod.id,
+          podName: pod.name,
+          tournamentId: pod.tournamentId,
+          tournamentName: pod.tournament.name,
+        });
+      }
+    }
   }
 
   const playerIds = [...totals.keys()];
@@ -56,6 +88,7 @@ export async function computeHallOfFame(orgId: string): Promise<HallOfFameRow[]>
       podsPlayed: played,
       totalPoints: total,
       average: played > 0 ? total / played : 0,
+      mainEventWins: mainEventWins.get(playerId) ?? [],
     };
   });
 

@@ -29,7 +29,11 @@ export function PublicHallOfFamePage() {
             playerLinkTo={(id) => `/o/${slug}/hall-of-fame/players/${id}`}
           />
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-            <HallOfFameList rows={data.hallOfFame} playerLinkTo={(id) => `/o/${slug}/hall-of-fame/players/${id}`} />
+            <HallOfFameList
+              rows={data.hallOfFame}
+              playerLinkTo={(id) => `/o/${slug}/hall-of-fame/players/${id}`}
+              mainEventLinkTo={(win) => `/o/${slug}/tournaments/${win.tournamentId}/pods/${win.podId}`}
+            />
             <div className="flex flex-col gap-4">
               <MostPlayedPairings pairings={data.mostPlayedPairings} />
               <BiggestPulls pulls={data.biggestPulls} />

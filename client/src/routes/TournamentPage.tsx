@@ -158,6 +158,7 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
   const [pointsDraw, setPointsDraw] = useState(1);
   const [pointsLoss, setPointsLoss] = useState(0);
   const [roundLengthMinutes, setRoundLengthMinutes] = useState(50);
+  const [isMainEvent, setIsMainEvent] = useState(false);
 
   return (
     <Card className="p-6">
@@ -178,6 +179,7 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
             pointsDraw,
             pointsLoss,
             roundLengthMinutes,
+            isMainEvent,
           });
         }}
       >
@@ -219,6 +221,12 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
             />
           </Field>
         )}
+
+        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+          <input type="checkbox" checked={isMainEvent} onChange={(e) => setIsMainEvent(e.target.checked)} />
+          Mark as this tournament's main event — the pod winner earns a crown on the Hall of Fame (only one pod per
+          tournament can be the main event; checking this unchecks any other)
+        </label>
 
         <details>
           <summary className="cursor-pointer text-[12.5px] tracking-wide text-ink-secondary uppercase select-none">
@@ -344,7 +352,10 @@ export function TournamentPage() {
             <Link key={pod.id} to={`/pods/${pod.id}`}>
               <Card className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-surface-raised">
                 <div>
-                  <div className="font-display text-[16px] font-bold">{pod.name}</div>
+                  <div className="font-display text-[16px] font-bold">
+                    {pod.isMainEvent && <span title="This tournament's main event">👑 </span>}
+                    {pod.name}
+                  </div>
                   <div className="text-[12.5px] text-ink-muted">
                     {podFormatLabel[pod.format]}
                     {pod.isTeamEvent && ` · teams of ${pod.teamSize}`} · {pod.roundCount} rounds

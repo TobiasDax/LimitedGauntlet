@@ -40,6 +40,7 @@ const podCreateSchema = z.object({
   packConfig: z.string().trim().max(2000).optional(),
   rarepicUrl: z.string().trim().url().optional(),
   excludeFromStats: z.boolean().default(false),
+  isMainEvent: z.boolean().default(false),
 });
 
 // Deliberately NOT `podCreateSchema.partial()` — the create schema uses
@@ -65,6 +66,7 @@ const podUpdateSchema = z.object({
   rarepicUrl: z.string().trim().url().optional(),
   status: z.enum(podStatuses).optional(),
   excludeFromStats: z.boolean().optional(),
+  isMainEvent: z.boolean().optional(),
 });
 
 const individualEntrantSchema = z.object({ playerId: z.string().min(1) });
@@ -134,8 +136,15 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const pod = await prisma.pod.create({
-      data: { ...body.data, tournamentId: tournament.id },
+    // At most one main-event pod per tournament — unset any existing one
+    // first so the DB's partial unique index never gets a chance to reject
+    // this in normal operation (it's still the real guarantee against a
+    // race, this transaction is just what makes that race unlikely).
+    const pod = await prisma.$transaction(async (tx) => {
+      if (body.data.isMainEvent) {
+        await tx.pod.updateMany({ where: { tournamentId: tournament.id, isMainEvent: true }, data: { isMainEvent: false } });
+      }
+      return tx.pod.create({ data: { ...body.data, tournamentId: tournament.id } });
     });
     reply.code(201).send({ pod });
   });
@@ -202,16 +211,28 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const { count } = await prisma.pod.updateMany({
-      where: { id: params.data.id, tournament: { orgId: request.organizer!.orgId } },
-      data: body.data,
-    });
-    if (count === 0) {
+    // Same "unset any sibling first" rule as create — need the pod's own
+    // tournamentId to scope that, so look it up (still org-scoped) before
+    // the actual update.
+    const existing = await findOwnedPod(params.data.id, request.organizer!.orgId);
+    if (!existing) {
       reply.code(404).send({ error: "not_found" });
       return;
     }
 
-    const pod = await prisma.pod.findUnique({ where: { id: params.data.id } });
+    const pod = await prisma.$transaction(async (tx) => {
+      if (body.data.isMainEvent) {
+        await tx.pod.updateMany({
+          where: { tournamentId: existing.tournamentId, isMainEvent: true, id: { not: existing.id } },
+          data: { isMainEvent: false },
+        });
+      }
+      await tx.pod.updateMany({
+        where: { id: params.data.id, tournament: { orgId: request.organizer!.orgId } },
+        data: body.data,
+      });
+      return tx.pod.findUnique({ where: { id: params.data.id } });
+    });
     reply.send({ pod });
   });
 

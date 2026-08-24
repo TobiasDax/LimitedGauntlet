@@ -159,6 +159,13 @@ model Pod {
   rarepicUrl         String?
   status             PodStatus   @default(SETUP)
   excludeFromStats   Boolean     @default(false)
+  // At most one pod per tournament may be the "main event" (Chaos Draft
+  // for this group, but deliberately generic — any format works). Winning
+  // one earns a crown on the Hall of Fame. Application-layer enforcement
+  // (podRoutes unsets any sibling in a transaction before setting this)
+  // plus a DB-level partial unique index (see the migration) as the real
+  // guarantee — the app-layer check alone can't rule out a race.
+  isMainEvent        Boolean     @default(false)
   createdAt          DateTime    @default(now())
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)

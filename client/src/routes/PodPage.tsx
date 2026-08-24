@@ -24,6 +24,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
   const [pointsLoss, setPointsLoss] = useState(pod.pointsLoss);
   const [roundLengthMinutes, setRoundLengthMinutes] = useState(pod.roundLengthMinutes);
   const [excludeFromStats, setExcludeFromStats] = useState(pod.excludeFromStats);
+  const [isMainEvent, setIsMainEvent] = useState(pod.isMainEvent);
 
   return (
     <Card className="mb-6 p-6">
@@ -43,6 +44,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
               pointsLoss,
               roundLengthMinutes,
               excludeFromStats,
+              isMainEvent,
             },
             { onSuccess: onDone },
           );
@@ -117,6 +119,12 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
             onChange={(e) => setExcludeFromStats(e.target.checked)}
           />
           Exclude from org-wide stats (Hall of Fame, Treasure Chest) — for one-off, joke, or test pods
+        </label>
+
+        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+          <input type="checkbox" checked={isMainEvent} onChange={(e) => setIsMainEvent(e.target.checked)} />
+          Mark as this tournament's main event — the winner earns a crown on the Hall of Fame (only one pod per
+          tournament can be the main event; checking this unchecks any other)
         </label>
 
         <div className="flex gap-2">
@@ -313,7 +321,10 @@ export function PodPage() {
         )}
         {podFormatLabel[pod.format]} · {pod.roundCount} rounds
       </Eyebrow>
-      <ScreenTitle>{pod.name}</ScreenTitle>
+      <ScreenTitle>
+        {pod.isMainEvent && <span title="This tournament's main event">👑 </span>}
+        {pod.name}
+      </ScreenTitle>
       <ScreenDek>
         {pod.isTeamEvent
           ? `Team event — teams of ${pod.teamSize}. Assign the roster into teams before pairing round 1.`

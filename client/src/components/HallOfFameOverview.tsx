@@ -51,9 +51,14 @@ export function HeadlineStats({
 export function HallOfFameList({
   rows,
   playerLinkTo,
+  mainEventLinkTo,
 }: {
   rows: HallOfFameRow[];
   playerLinkTo: (playerId: string) => string;
+  // Each crown links to its own pod (a player can have several main-event
+  // wins across different tournaments) — takes the win's ids since the
+  // public route needs the tournamentId too, the authed one doesn't.
+  mainEventLinkTo: (win: HallOfFameRow["mainEventWins"][number]) => string;
 }) {
   let rank = 0;
   let prevAvg: number | null = null;
@@ -68,28 +73,48 @@ export function HallOfFameList({
         prevTotal = row.totalPoints;
 
         return (
-          <Link
+          // A full-card Link (the visible content is pointer-events-none so
+          // clicks fall through to it) plus independently-clickable crown
+          // links layered on top — can't nest a <Link> inside a <Link>, so
+          // this is the escape hatch for "whole row navigates to the
+          // player, except the crowns which navigate to their own pod."
+          <div
             key={row.playerId}
-            to={playerLinkTo(row.playerId)}
-            className={`grid grid-cols-[44px_1fr_auto] items-center gap-5 rounded-md border px-4 py-3.5 transition-colors hover:bg-surface-raised ${
+            className={`relative grid grid-cols-[44px_1fr_auto] items-center gap-5 rounded-md border px-4 py-3.5 transition-colors hover:bg-surface-raised ${
               rank === 1 ? "border-accent/35 bg-gradient-to-r from-accent-wash to-surface" : "border-border bg-surface"
             }`}
           >
+            <Link to={playerLinkTo(row.playerId)} className="absolute inset-0" aria-label={row.player.displayName} />
+
             <div
-              className={`grid h-[34px] w-[34px] place-items-center rounded border font-display text-[15px] font-bold ${rankBadgeClasses(rank)}`}
+              className={`pointer-events-none grid h-[34px] w-[34px] place-items-center rounded border font-display text-[15px] font-bold ${rankBadgeClasses(rank)}`}
             >
               {rank}
             </div>
 
             <div className="flex min-w-0 flex-col gap-0.5">
-              <span className="font-display text-[17px] font-bold">{row.player.displayName}</span>
-              <span className="text-[12px] text-ink-muted">
+              <span className="pointer-events-none font-display text-[17px] font-bold">{row.player.displayName}</span>
+              <span className="pointer-events-none text-[12px] text-ink-muted">
                 {row.podsPlayed} pod{row.podsPlayed === 1 ? "" : "s"} · {row.tournamentsPlayed} tournament
                 {row.tournamentsPlayed === 1 ? "" : "s"}
               </span>
+              {row.mainEventWins.length > 0 && (
+                <div className="relative z-10 mt-0.5 flex flex-wrap gap-1">
+                  {row.mainEventWins.map((win) => (
+                    <Link
+                      key={win.podId}
+                      to={mainEventLinkTo(win)}
+                      title={`Main event win — ${win.tournamentName}: ${win.podName}`}
+                      className="text-[13px] leading-none hover:scale-110"
+                    >
+                      👑
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="text-right">
+            <div className="pointer-events-none text-right">
               <div
                 className={`font-display tabular-nums text-[26px] leading-none font-bold ${rank === 1 ? "text-accent-strong" : ""}`}
               >
@@ -99,7 +124,7 @@ export function HallOfFameList({
                 avg · {row.totalPoints} total
               </div>
             </div>
-          </Link>
+          </div>
         );
       })}
     </div>
