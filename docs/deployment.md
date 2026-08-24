@@ -38,7 +38,7 @@ Migrations run automatically on container start (`docker/entrypoint.sh` runs `pr
 
 The app is now reachable at `http://<host>:8080` (or whatever `PORT` you set in `.env`).
 
-**Production hardening — drop the Postgres port publish.** The repo's `docker-compose.yml` publishes the `db` service on `5432:5432` so `npm run dev:server` can reach it directly from outside Docker during local development. On a live deployment, nothing needs that — the app container talks to `db` over the internal Compose network regardless. Leaving it published needlessly widens the attack surface (anyone who can reach the host on port 5432 can attempt to connect to Postgres). Before going live, either delete that `ports:` mapping from `docker-compose.yml`, or bind it to localhost only (`127.0.0.1:5432:5432`) if you still want host-side access for occasional debugging.
+**Postgres has no published port by default** — the app container reaches `db` over the internal Compose network regardless, and nothing about a normal deployment needs `5432` reachable from outside Docker. If you're doing local (non-Docker) development with `npm run dev:server`, which does need to reach it directly, see the **Updating** section below for how to add that back via a `docker-compose.override.yml` without editing the tracked file.
 
 ## 4. Exposure
 
@@ -85,15 +85,18 @@ That's it for the common case. A few things worth knowing:
 
 **Migrations apply automatically, same as first boot.** The container runs `prisma migrate deploy` before the server starts, every time it (re)starts — so a `git pull` that brings in new migrations needs no separate step. Migrations only ever go forward: there's no automatic rollback. If you need to undo a schema change after the fact, that's a manual Prisma operation (or restoring a database backup) — reason enough to have a recent backup before updating, same as before any schema-changing update to anything.
 
-**If you've customized `docker-compose.yml` locally** (e.g. the production hardening from step 3, or wiring in your own reverse-proxy labels), `git pull` can conflict if a future update also touches that file — Git will refuse to overwrite your uncommitted changes rather than silently discarding them, so check `git status` before pulling if you're not sure. The cleaner long-term fix: put your local customizations in a `docker-compose.override.yml` file instead of editing `docker-compose.yml` directly. Compose automatically merges `docker-compose.override.yml` on top of `docker-compose.yml` (no extra flag needed — `docker compose up` picks it up by itself), so your customizations live in a file `git pull` never touches at all, no matter how much the base file changes upstream. Example, dropping the Postgres port publish from step 3 this way instead of editing the base file:
+**If you've customized `docker-compose.yml` locally** (e.g. wiring in your own reverse-proxy labels, or re-publishing the Postgres port for local dev), `git pull` can conflict if a future update also touches that file — Git will refuse to overwrite your uncommitted changes rather than silently discarding them, so check `git status` before pulling if you're not sure. The cleaner long-term fix: put your local customizations in a `docker-compose.override.yml` file instead of editing `docker-compose.yml` directly. Compose automatically merges `docker-compose.override.yml` on top of `docker-compose.yml` (no extra flag needed — `docker compose up` picks it up by itself), so your customizations live in a file `git pull` never touches at all, no matter how much the base file changes upstream. Example, re-publishing the Postgres port for local (non-Docker) development this way instead of editing the base file:
 
 ```yaml
 # docker-compose.override.yml — not tracked by this repo's git history,
 # keep your own copy of this file outside of `git pull`'s reach.
 services:
   db:
-    ports: []
+    ports:
+      - "5432:5432"
 ```
+
+(Compose's merge rule for list-type fields like `ports` is additive, not a replacement — there's no equivalent override for *removing* an entry the base file already declares. Not a concern here since the base file publishes no ports on `db` to begin with; only relevant if you're overriding something the base file does declare.)
 
 **Expect a brief restart, not downtime for the whole stack.** `docker compose up -d --build` only rebuilds and recreates the `app` service (unless the update touched `docker-compose.yml`'s `db` config, which is rare) — `db` and its data volume are untouched, so there's no data-loss risk from an update itself. The app container will be briefly unreachable while it restarts (typically a few seconds).
 
