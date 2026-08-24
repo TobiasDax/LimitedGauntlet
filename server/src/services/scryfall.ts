@@ -5,7 +5,7 @@
 // organizers adding a few pulls per pod), a full rate limiter would be
 // over-engineering for that volume.
 
-const USER_AGENT = "LimitedGauntlet/1.0 (self-hosted MTG tournament tracker; +https://[redacted-private-host]/tobias/LimitedGauntlet)";
+const USER_AGENT = "LimitedGauntlet/1.0 (self-hosted MTG tournament tracker)";
 const SCRYFALL_BASE = "https://api.scryfall.com";
 
 const AUTOCOMPLETE_TTL_MS = 5 * 60_000;
