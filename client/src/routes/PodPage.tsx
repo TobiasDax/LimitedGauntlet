@@ -7,6 +7,8 @@ import { useTournament } from "../features/tournaments/useTournament";
 import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
+import { PrepTimer } from "../components/PrepTimer";
+import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { SetPicker } from "../components/SetPicker";
 import { entrantDisplayName } from "../lib/entrant";
 import type { Entrant, MatchFormat, PodFormat } from "../lib/types";
@@ -307,6 +309,7 @@ export function PodPage() {
   const { data: tournamentData } = useTournament(data?.pod.tournamentId);
   const { data: me } = useMe();
   const [editing, setEditing] = useState(false);
+  usePodRealtime(id, data?.pod.tournamentId);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
   if (!data) return <p className="text-ink-muted">Pod not found.</p>;
@@ -359,6 +362,8 @@ export function PodPage() {
       </div>
 
       {editing && <EditPodForm pod={pod} onDone={() => setEditing(false)} />}
+
+      <PrepTimer pod={pod} />
 
       <PodTabs podId={pod.id} />
 

@@ -57,6 +57,8 @@ export interface Pod {
   excludeFromStats: boolean;
   isMainEvent: boolean;
   setCode: string | null;
+  prepTimerEndsAt: string | null;
+  prepTimerLabel: string | null;
   createdAt: string;
 }
 

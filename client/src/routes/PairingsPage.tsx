@@ -15,6 +15,7 @@ import {
 import { entrantDisplayName } from "../lib/entrant";
 import { Button, Eyebrow, FormError, ScreenDek, ScreenTitle } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
+import { PrepTimerDisplay } from "../components/PrepTimer";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { useCountdown } from "../lib/useCountdown";
 import { playChime } from "../lib/chime";
@@ -429,6 +430,8 @@ export function PairingsPage() {
       )}
 
       <PodTabs podId={pod.id} />
+
+      <PrepTimerDisplay endsAt={pod.prepTimerEndsAt} label={pod.prepTimerLabel} size={displayMode ? "large" : "normal"} />
 
       {pod.entrants.length < 2 && <p className="text-ink-muted">Add at least 2 entrants before pairing round 1.</p>}
 

@@ -5,6 +5,7 @@ import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedTournament, findOwnedPod, findOwnedEntrant } from "../services/ownership.js";
 import { computePodStandings } from "../services/standings.js";
+import { emitPodEvent } from "../realtime.js";
 
 // Playing in any pod implies attending that pod's tournament — upsert
 // keeps this true even if some of the players were already attached.
@@ -81,6 +82,11 @@ const teamEntrantSchema = z.object({
 });
 
 const idParams = z.object({ id: z.string().min(1) });
+
+const prepTimerSchema = z.object({
+  minutes: z.number().int().min(1).max(600).default(50),
+  label: z.string().trim().max(60).optional(),
+});
 
 // Players already committed to a pod, whether as a direct entrant or as a
 // member of a team-entrant — used to reject double-booking a player into
@@ -251,6 +257,51 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       reply.code(404).send({ error: "not_found" });
       return;
     }
+    reply.code(204).send();
+  });
+
+  // Standalone pre-round timer (PI-33) — draft / deck-building time, before any
+  // round is paired. Start/replace with a length in minutes (default 50); the
+  // countdown ticks client-side off `prepTimerEndsAt`. Broadcasts on the pod
+  // room so every connected device (incl. public + Display Mode) updates live.
+  app.post("/api/pods/:id/prep-timer", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    const body = prepTimerSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const existing = await findOwnedPod(params.data.id, request.organizer!.orgId);
+    if (!existing) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    const prepTimerEndsAt = new Date(Date.now() + body.data.minutes * 60_000);
+    const prepTimerLabel = body.data.label?.trim() || null;
+    const pod = await prisma.pod.update({
+      where: { id: existing.id },
+      data: { prepTimerEndsAt, prepTimerLabel },
+    });
+    emitPodEvent(existing.id, "prep-timer-updated", { podId: existing.id, prepTimerEndsAt, prepTimerLabel });
+    reply.send({ pod });
+  });
+
+  // Stop / clear the pre-round timer.
+  app.delete("/api/pods/:id/prep-timer", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const { count } = await prisma.pod.updateMany({
+      where: { id: params.data.id, tournament: { orgId: request.organizer!.orgId } },
+      data: { prepTimerEndsAt: null, prepTimerLabel: null },
+    });
+    if (count === 0) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    emitPodEvent(params.data.id, "prep-timer-updated", { podId: params.data.id, prepTimerEndsAt: null, prepTimerLabel: null });
     reply.code(204).send();
   });
 

@@ -79,6 +79,27 @@ export function useDeletePod(tournamentId: string) {
   });
 }
 
+// Standalone pre-round timer (PI-33): draft / deck-building time before any
+// round is paired. Both mutations rely on the pod's realtime broadcast
+// ("prep-timer-updated") to refresh every viewer; the local invalidate keeps
+// the organizer's own tab instant even if the socket round-trips slowly.
+export function useSetPrepTimer(podId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { minutes: number; label?: string }) =>
+      api.post<{ pod: Pod }>(`/pods/${podId}/prep-timer`, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
+  });
+}
+
+export function useClearPrepTimer(podId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete<void>(`/pods/${podId}/prep-timer`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
+  });
+}
+
 export const podFormatLabel: Record<PodFormat, string> = {
   DRAFT: "Draft",
   SEALED: "Sealed",

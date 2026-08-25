@@ -9,6 +9,7 @@ import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { podFormatLabel } from "../features/pods/usePods";
 import { entrantDisplayName } from "../lib/entrant";
 import { useCountdown } from "../lib/useCountdown";
+import { PrepTimerDisplay } from "../components/PrepTimer";
 import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 import { CardGallery, formatEur } from "../components/CardGallery";
 import type { Entrant, Match, Round } from "../lib/types";
@@ -99,6 +100,8 @@ export function PublicPodPage() {
       <ScreenDek>
         {pod.isTeamEvent ? `Team event — teams of ${pod.teamSize}` : "Individual entrants"} · {pod.roundCount} rounds
       </ScreenDek>
+
+      <PrepTimerDisplay endsAt={pod.prepTimerEndsAt} label={pod.prepTimerLabel} size="large" />
 
       <section className="mb-12">
         <h2 className="font-display mb-4 text-[20px] font-bold">Pairings</h2>

@@ -82,7 +82,9 @@ Introduce a secondary link/action color, distinct from the accent — mainly for
 - [x] Added `--color-link` (#7c9cbb, muted steel blue) + `--color-link-strong` (#9bb6d0, hover) to `index.css`'s `@theme`. Contrast checked via Node, not eyeballed: link vs bg 6.52 / surface 6.06 / raised 5.52; strong 8.89 / 8.26 / 7.53 — all clear 4.5:1 with headroom.
 - [x] Applied `text-link hover:text-link-strong` to the Edit affordances: description edit + edit-tournament (`TournamentPage`), edit-pod (`PodPage`), and the reported-score Edit link (`PairingsPage`).
 
-### PI-33 — Standalone pre-round timer (draft / deck-building)
+### PI-33 — Standalone pre-round timer (draft / deck-building) ✅ (code-complete, browser-verify pending)
 The round timer today only exists once a round is paired (it counts down from `Round.endsAt`). But a pod needs a timer *before* any round — for draft + deck-building time. Add a timer an organizer can start on a pod without pairing a round.
-- [ ] Configurable length, **default 50 min**. Runs on a pod independent of rounds; startable from the pod page (and shown on the public pod page + Display Mode, same as the round timer).
-- [ ] Reuse the existing client-side countdown (`lib/useCountdown.ts`) + realtime broadcast plumbing rather than a parallel system — likely a pod-level `timerEndsAt`/`timerLabel` the same way rounds carry `endsAt`, broadcast over the existing pod socket room so every device shows it live. Should not interfere with (or require) an active round.
+- [x] Schema: `Pod.prepTimerEndsAt DateTime?` + `Pod.prepTimerLabel String?` (migration `20260825100000_add_pod_prep_timer`, additive nullable columns). Independent of rounds — works with zero rounds paired.
+- [x] Backend: `POST /api/pods/:id/prep-timer` (`{minutes (default 50), label?}`) and `DELETE .../prep-timer`, org-scoped; both broadcast `prep-timer-updated` on the pod room. `usePodRealtime` now invalidates on that event.
+- [x] Frontend: reuses `useCountdown` (ticks client-side off `prepTimerEndsAt`). `PrepTimer` control (start length + optional label + Stop) on `PodPage`; read-only `PrepTimerDisplay` on `PublicPodPage` (large) and `PairingsPage` (enlarges in Display Mode). Live across devices via the existing socket.
+- [ ] No chime wired (round-timer-only, per scope); MCP tools not added (organizer UI action, not a bulk op). Browser-verify pending.

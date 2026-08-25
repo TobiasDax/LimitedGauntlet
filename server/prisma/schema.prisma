@@ -173,6 +173,13 @@ model Pod {
   // plus a DB-level partial unique index (see the migration) as the real
   // guarantee — the app-layer check alone can't rule out a race.
   isMainEvent        Boolean     @default(false)
+  // Standalone pre-round timer (PI-33) for draft / deck-building time, before
+  // any round is paired. `prepTimerEndsAt` is when it expires (null = no timer
+  // running); `prepTimerLabel` is an optional caption ("Draft", "Deck-building").
+  // Independent of the per-round timer (Round.endsAt) — a pod can run this with
+  // zero rounds. Only the end time is stored; the countdown ticks client-side.
+  prepTimerEndsAt    DateTime?
+  prepTimerLabel     String?
   createdAt          DateTime    @default(now())
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)

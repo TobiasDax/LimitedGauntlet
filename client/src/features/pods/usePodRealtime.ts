@@ -9,6 +9,7 @@ const POD_EVENTS = [
   "round-extended",
   "round-completed",
   "result-submitted",
+  "prep-timer-updated",
 ] as const;
 
 // Joins this pod's realtime room and invalidates the relevant query
