@@ -3,6 +3,7 @@ import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 import { SettingsSection } from "../components/settings/SettingsSection";
 import { ApiTokensSection } from "../components/settings/ApiTokensSection";
 import { PublicLockSection } from "../components/settings/PublicLockSection";
+import { AccountSection } from "../components/settings/AccountSection";
 
 // Organizer settings hub (PI-26). Organizer-only (this route is inside the
 // authed/ProtectedRoute block); the API-token routes it drives are themselves
@@ -40,6 +41,10 @@ export function SettingsPage() {
         }
       >
         <ApiTokensSection />
+      </SettingsSection>
+
+      <SettingsSection title="Account" description="Change your password or email, or delete your account.">
+        <AccountSection />
       </SettingsSection>
     </div>
   );

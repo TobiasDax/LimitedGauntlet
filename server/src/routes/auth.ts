@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { Prisma } from "@prisma/client";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
@@ -126,6 +127,40 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     request.session.delete();
     reply.code(204).send();
   });
+
+  // Confirm a pending email change (PI-28). Public + token-gated: the token was
+  // emailed to the NEW address, so possessing it proves control of that inbox
+  // (the change was already password-authorized when requested). Single-use and
+  // time-limited; email uniqueness is re-checked at apply time.
+  app.post(
+    "/api/auth/verify-email-change",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const body = z.object({ token: z.string().min(1) }).safeParse(request.body);
+      if (!body.success) {
+        reply.code(400).send({ error: "invalid_input" });
+        return;
+      }
+      const tokenHash = createHash("sha256").update(body.data.token).digest("hex");
+      const change = await prisma.emailChangeRequest.findUnique({ where: { tokenHash } });
+      if (!change || change.usedAt || change.expiresAt < new Date()) {
+        reply.code(400).send({ error: "invalid_or_expired" });
+        return;
+      }
+      const taken = await prisma.organizerAccount.findFirst({
+        where: { email: change.newEmail, id: { not: change.organizerId } },
+      });
+      if (taken) {
+        reply.code(409).send({ error: "email_taken" });
+        return;
+      }
+      await prisma.$transaction([
+        prisma.organizerAccount.update({ where: { id: change.organizerId }, data: { email: change.newEmail } }),
+        prisma.emailChangeRequest.update({ where: { id: change.id }, data: { usedAt: new Date() } }),
+      ]);
+      reply.send({ ok: true, email: change.newEmail });
+    },
+  );
 
   app.get("/api/auth/me", { preHandler: requireAuth }, async (request, reply) => {
     const organization = await prisma.organization.findUniqueOrThrow({

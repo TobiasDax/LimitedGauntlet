@@ -40,8 +40,27 @@ model OrganizerAccount {
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   apiTokens    ApiToken[]
+  emailChangeRequests EmailChangeRequest[]
 
   @@index([orgId])
+}
+
+// Pending email-address changes (PI-28). A change is only applied after the
+// organizer clicks a link sent to the NEW address, proving they control it.
+// Only the token's SHA-256 hash is stored (same as ApiToken); single-use
+// (usedAt) and time-limited (expiresAt).
+model EmailChangeRequest {
+  id          String    @id @default(cuid())
+  organizerId String
+  newEmail    String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  organizer OrganizerAccount @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+
+  @@index([organizerId])
 }
 
 // Bearer tokens for non-browser clients (e.g. the MCP server) — acts as

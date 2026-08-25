@@ -55,12 +55,12 @@ Some organizers won't want fully-open public links. Let an organizer optionally 
 - [x] Frontend: `PublicLockSection` in Settings (enable/change/disable). `PublicLayout` checks lock status first and renders `PublicUnlockPrompt` when locked+not-unlocked, so gated child queries never fire; unlocking invalidates the `["public"]` cache so everything refetches. Added `api.put`.
 - [ ] Live/browser verification pending (also worth a server test for the gate once a DB is available).
 
-### PI-28 — Account management: change email / password, delete account (Settings)
-The organizer needs to manage their own account. Lives in the Settings page. **Decisions taken (2026-08-25):**
-- [ ] **Change password** — verify current password, set new. Immediate.
-- [ ] **Change email** — **verified via an email link** (send a confirmation link to the new address; the switch only happens once it's clicked). Depends on PI-29 (SMTP). Password-gated to start the change.
-- [ ] **Delete account** — since each org has one organizer today, this **cascades**: deletes the account + organization + all its tournaments/pods/cards. **Hard confirm:** re-enter password AND type the org name. (Multi-organizer + explicit org-delete is split out to PI-34.)
-- [ ] All three sensitive actions gated behind re-entering the current password.
+### PI-28 — Account management: change email / password, delete account (Settings) ✅ (code-complete, browser-verify pending)
+The organizer needs to manage their own account. Lives in the Settings page (`AccountSection`). All three sensitive actions verify the current password.
+- [x] **Change password** — `POST /api/settings/password` (verify current, set new, immediate; rate-limited 10/min). Client-side confirm-match.
+- [x] **Change email** — `POST /api/settings/email` (password-gated) creates a single-use, 1-hour `EmailChangeRequest` (SHA-256 token hash, migration `20260825120000_add_email_change_request`) and emails a `/verify-email?token=…` link to the **new** address via PI-29. Public `POST /api/auth/verify-email-change` applies it (re-checks uniqueness, marks used). New `VerifyEmailPage` route. Returns 503 if SMTP unconfigured (clear UI message).
+- [x] **Delete account** — `POST /api/settings/delete-account`: verify password AND type the exact org name, then delete the organization (cascades to organizers/players/tournaments/pods/cards). Clears the session; client clears cache and redirects to `/login`.
+- [ ] Browser + live-email verification pending. (Note: the email form shows even when SMTP is unconfigured and surfaces the 503 message on submit — could hide it proactively by exposing an `emailConfigured` flag if wanted.)
 
 ### PI-29 — Transactional email via SMTP ✅ (code-complete, live-verify pending)
 Prerequisite for PI-28's email-change verification (and any future notifications).

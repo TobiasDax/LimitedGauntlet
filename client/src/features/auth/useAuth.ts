@@ -108,3 +108,39 @@ export function useLogout() {
     },
   });
 }
+
+// Account management (PI-28).
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (input: { currentPassword: string; newPassword: string }) =>
+      api.post<{ ok: true }>("/settings/password", input),
+  });
+}
+
+export function useRequestEmailChange() {
+  return useMutation({
+    mutationFn: (input: { currentPassword: string; newEmail: string }) =>
+      api.post<{ ok: true }>("/settings/email", input),
+  });
+}
+
+export function useVerifyEmailChange() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (token: string) => api.post<{ ok: true; email: string }>("/auth/verify-email-change", { token }),
+    // If the confirming browser is also logged in, refresh its cached email.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+  });
+}
+
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { currentPassword: string; confirmName: string }) =>
+      api.post<void>("/settings/delete-account", input),
+    onSuccess: () => {
+      queryClient.setQueryData(["me"], null);
+      queryClient.clear();
+    },
+  });
+}
