@@ -18,7 +18,7 @@ import { PodTabs } from "../components/PodTabs";
 import { PrepTimerDisplay } from "../components/PrepTimer";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { useCountdown } from "../lib/useCountdown";
-import { playChime } from "../lib/chime";
+import { playChime, playEndChime } from "../lib/chime";
 import type { Entrant, Match, Round } from "../lib/types";
 
 function ResultEntry({ match, podId }: { match: Match; podId: string }) {
@@ -261,21 +261,32 @@ function MatchCard({
   );
 }
 
+const TEN_MINUTES_MS = 10 * 60 * 1000;
+
 function RoundTimer({ round, displayMode }: { round: Round; displayMode: boolean }) {
   const countdown = useCountdown(round.endsAt);
   // Only the round's own endsAt identifies "which countdown" — a +5 min
-  // extend changes endsAt, so the ref key naturally allows the chime to
+  // extend changes endsAt, so the ref keys naturally allow both chimes to
   // fire again after an extension rather than staying silent forever
-  // after the first time this round expired.
+  // after the first time this round warned/expired.
+  const warnedForRef = useRef<string | null>(null);
   const chimedForRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!displayMode || !round.endsAt) return;
-    if (countdown.expired && chimedForRef.current !== round.endsAt) {
-      chimedForRef.current = round.endsAt;
+    if (
+      countdown.remainingMs > 0 &&
+      countdown.remainingMs <= TEN_MINUTES_MS &&
+      warnedForRef.current !== round.endsAt
+    ) {
+      warnedForRef.current = round.endsAt;
       playChime();
     }
-  }, [countdown.expired, displayMode, round.endsAt]);
+    if (countdown.expired && chimedForRef.current !== round.endsAt) {
+      chimedForRef.current = round.endsAt;
+      playEndChime();
+    }
+  }, [countdown.expired, countdown.remainingMs, displayMode, round.endsAt]);
 
   return (
     <div

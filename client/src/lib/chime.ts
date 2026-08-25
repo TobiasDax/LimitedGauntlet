@@ -1,5 +1,6 @@
 // A short two-tone chime via Web Audio, synthesized rather than an
 // audio file — no asset to ship, no CSP concerns, works offline.
+// Played as the 10-minutes-remaining warning.
 export function playChime(): void {
   const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const ctx = new AudioCtx();
@@ -14,7 +15,7 @@ export function playChime(): void {
 
     const t = ctx.currentTime + startAt;
     gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.3, t + 0.02);
+    gain.gain.linearRampToValueAtTime(0.65, t + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
 
     osc.start(t);
@@ -25,4 +26,10 @@ export function playChime(): void {
   tone(1174.66, 0.18, 0.45);
 
   setTimeout(() => ctx.close(), 1200);
+}
+
+// Countdown bell played when a round's timer hits zero.
+export function playEndChime(): void {
+  const audio = new Audio("/sounds/countdown-bell.mp3");
+  void audio.play();
 }
