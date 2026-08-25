@@ -1,6 +1,6 @@
 # LimitedGauntlet — self-hosted MTG Limited tournament tracker
 
-This is the canonical architecture/design doc for the project. It was drafted collaboratively with Claude Code (planning session, 2026-08-23) against ~4 years of real tournament history pulled from Tobias's Outline instance. `STEPS.md` in this repo tracks build progress against the order laid out here — check that file for "what's done, what's next."
+This is the canonical architecture/design doc for the project. It was drafted collaboratively with Claude Code (planning session, 2026-08-23) against ~4 years of real tournament history pulled from Tobias's Outline instance. `ROADMAP.md` tracks current status and open work; `docs/BUILD-LOG.md` archives the detailed build history against the order laid out here.
 
 ## Context
 
@@ -81,7 +81,7 @@ No separate "opponent history" table — pairing and the weekend coverage matrix
 11. README, LICENSE (defaulting to MIT unless Tobias would rather AGPL to discourage closed-source SaaS forks — easy to swap before first push), final `docker-compose.yml`/`.env.example` pass.
 12. Deploy to DaxLite (`/opt/docker/arcane-projects/limited-gauntlet/compose.yaml`, Arcane-managed, matching existing convention) — Tobias runs this step since it touches his live infra; hand over the exact compose file + steps. Once live, add a `services/daxlite.md` entry in claude-memory to document it, per existing conventions there.
 
-Steps 1-12 each get checked off in `STEPS.md` as they land, so progress survives across sessions regardless of context window resets. This is a multi-session build, not a single pass — work through the numbered steps in order and check in as major pieces (pairing engine, Gesamtwertung, realtime) land, rather than going silent until everything's done.
+Steps 1-12 were checked off in the build log as they landed, so progress survived across sessions regardless of context window resets. That whole build is now done; the detailed record is archived in `docs/BUILD-LOG.md`, and current status plus open work lives in `ROADMAP.md`.
 
 ## Verification
 

@@ -1,6 +1,9 @@
-# Build steps
+# Build log (archived)
 
-Granular checklist. Check items off as they land. This file is the first thing to read in a new session — it tells you exactly what's done and what's next. Full rationale for any step lives in `PLAN.md`.
+> **This is the historical build record, kept for reference — it is no longer the file to read first.**
+> The whole numbered build (Steps 0–12) and the post-1.0 backlog (PI-1 … PI-21) below are **done**. For current status and the next actual work, read [`ROADMAP.md`](../ROADMAP.md). Full design rationale lives in [`PLAN.md`](../PLAN.md). This file stays as the detailed "how each piece was built and verified" log.
+
+Granular checklist. Full rationale for any step lives in `PLAN.md`.
 
 **Status: Steps 0-11 done — the entire local build is complete. Only Step 12 remains (deploy to DaxLite), which Tobias runs himself.**
 
@@ -339,6 +342,6 @@ Motivation: Phase C shipped auto-pairing only — the manual-pair and swap-befor
 Motivation: the repo went public on GitHub (main branch mirrored via Forgejo push-mirror, history scrubbed of the private hostname per the privacy pass), but there's no tagged release — no `package.json` has a `version` field, `git tag -l` is empty, and there's no GitHub Release with notes. Right now "the app" just means "whatever `main` currently is," which is fine for Tobias's own DaxLite deploy (tracks `main` directly) but not great for anyone else discovering this on GitHub — no changelog, no stable reference point to `git checkout` or pull a Docker tag from, no signal about what's actually been shipped vs. still in flux.
 - [ ] Decide a version scheme and starting number — semver (`v0.1.0`, given "solid beta" per the README) is the obvious default; confirm with Tobias rather than assume.
 - [ ] Add `"version"` to the root `package.json` (and `server`/`client`/`mcp` workspace ones if they should track independently, or just inherit — decide during implementation).
-- [ ] Write real release notes — STEPS.md's PI-1 through PI-21 (plus Steps 0-12) is the full detailed log; a release's job is to summarize that into a human-readable "what's in this release" for someone who wasn't here for the build, not just link the whole build log.
+- [ ] Write real release notes — this build log's PI-1 through PI-21 (plus Steps 0-12) is the full detailed log; a release's job is to summarize that into a human-readable "what's in this release" for someone who wasn't here for the build, not just link the whole build log.
 - [ ] `git tag vX.Y.Z` + push the tag, then create the actual GitHub Release from it (via the GitHub UI or `gh release create` once `gh` is available/authenticated — wasn't installed in this session's environment).
 - [ ] Consider whether Docker images should also be published (GitHub Container Registry via a release-triggered Action) so "deploy this" doesn't require a local build — currently `docker compose up -d --build` always builds from source, which is fine for self-hosting but not as frictionless as a pre-built `ghcr.io/tobiasdax/limitedgauntlet:vX.Y.Z` image would be. Separate decision from just cutting the release; don't block the first release on it.

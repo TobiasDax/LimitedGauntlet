@@ -2,7 +2,7 @@
 
 Self-hosted, open-source Swiss-tournament tracker for MTG Limited (and other) events. Built for Tobias's yearly ~8-10 player weekend GP, designed from the start as a real multi-group OSS project (multi-tenant: one deployment can host several isolated organizations).
 
-Full design rationale lives in [`PLAN.md`](PLAN.md) — read it before making architectural changes. Current build progress and the next concrete task live in [`STEPS.md`](STEPS.md) — **check that file first in any new session**, it's the source of truth for "what's done."
+Full design rationale lives in [`PLAN.md`](PLAN.md) — read it before making architectural changes. Current status and open work live in [`ROADMAP.md`](ROADMAP.md) — **check that file first in any new session**. The full, detailed build history (Steps 0–12 and the PI-1…PI-21 backlog, all shipped) is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) — reference it only when digging into how a specific past feature was built.
 
 ## What this is
 
@@ -32,7 +32,7 @@ Key business rules (confirmed against real historical data, do not change withou
 - Prisma schema is the single source of truth for the data model — generate types from it, don't hand-maintain parallel interfaces.
 - Standings/pairing math must have test coverage against real historical numbers (pseudonymized in the test fixtures — the real data lives outside this repo, see README's "History import" section) — known-good numbers from actual tournament results, not invented test data.
 - No auth dependency beyond the DB — sessions are encrypted cookies (`@fastify/secure-session`), not a separate session store.
-- Public tournament/pod pages must stay unauthenticated (`/o/<slug>/tournaments/<id>/...`) — this is a hard requirement, not a default that can quietly grow a login wall.
+- Public tournament/pod pages (`/o/<slug>/tournaments/<id>/...`) must stay open by default — no login wall that quietly grows over the frictionless slug-is-the-access-control model. The one sanctioned exception is an organizer *explicitly opting in* to a per-org password lock on their own public pages (see ROADMAP PI-27); that's a deliberate owner choice, not a creeping default, and must stay off unless the organizer turns it on.
 
 ## Deploy target
 

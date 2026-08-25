@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-// Two-step confirm for destructive tools (per PLAN.md/STEPS.md's PI-4
+// Two-step confirm for destructive tools (per PLAN.md / the build log's PI-4
 // decision): the first call is a dry run that describes what would be
 // affected and hands back a confirmation token; nothing mutates until a
 // second call passes that token, or the caller explicitly passes
