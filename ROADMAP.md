@@ -4,23 +4,11 @@
 
 ## Status
 
-The app is **feature-complete and running in production**. The whole numbered build (Steps 0–12) and post-1.0 backlog PI-1 through PI-21 are done — see `docs/BUILD-LOG.md` for the blow-by-blow. What's left is a small tail of open items plus whatever new improvements land below.
+The app is **feature-complete and running in production**, with a first tagged release out ([v0.1.0](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.1.0)). The whole numbered build (Steps 0–12) and post-1.0 backlog PI-1 through PI-21 are done — see `docs/BUILD-LOG.md` for the blow-by-blow. What's left is whatever new improvements land below.
 
 ## Open items
 
-### PI-22 — Publish a real GitHub release (not just the rolling `main`) — code-complete, Tobias runs the publish step
-The repo is public on GitHub but has no tagged release: no `version` in any `package.json`, `git tag -l` is empty, no GitHub Release with notes. Fine for a deploy that tracks `main`, but no stable reference point / changelog for anyone else.
-- [x] **Version scheme confirmed:** semver, starting at `v0.1.0`, single shared version (root `package.json` only — `server`/`client`/`mcp` stay unversioned, they're not published independently).
-- [x] `"version": "0.1.0"` added to the root `package.json`.
-- [x] Release notes written: `RELEASE_NOTES_v0.1.0.md` at the repo root (untracked — it's the `gh release create -F` input, not meant to be a permanent repo file; delete after use or keep locally, your call).
-- [x] Local annotated tag `v0.1.0` created (not pushed — sandbox can't/shouldn't push; see below).
-- [x] GHCR image publish: `.github/workflows/docker-publish.yml`, triggered on `release: published` (+ manual `workflow_dispatch`), pushes `ghcr.io/<owner>/<repo>:0.1.0`, `:0.1`, and `:latest`.
-- [ ] **Tobias runs this** — pushing a tag and creating a public GitHub Release are both outside this sandbox's reach (no `git push`, no `gh` CLI installed here):
-  ```sh
-  git push origin v0.1.0
-  gh release create v0.1.0 --title "v0.1.0" --notes-file RELEASE_NOTES_v0.1.0.md
-  ```
-  The GHCR workflow fires automatically once the Release is published (needs Actions enabled on the repo; GHCR access uses the built-in `GITHUB_TOKEN`, no extra secret needed for a public repo).
+_None currently — PI-22 (below) was the last one._
 
 ## New improvements (backlog)
 
@@ -29,6 +17,13 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 Rough groupings (interlocking work worth doing together): **nav overhaul** = PI-24 + PI-25 (do alongside PI-23); **settings page** = PI-26 is the shell that PI-27, PI-28 live in, and PI-29 (SMTP) supports PI-28's email change.
 
 > **Verification note:** this sandbox can't run the app (no Docker) or even a full `vite build` (Windows Application Control blocks rollup/esbuild native binaries), so items below are built and typechecked (`tsc -b`) here, then browser-verified separately by Tobias on a real running instance. PI-23…33 were verified live 2026-08-25. Items marked ✅ (browser-verify pending) are still waiting on that step.
+
+### PI-22 — Publish a real GitHub release (not just the rolling `main`) ✅
+The repo is public on GitHub but had no tagged release: no `version` in any `package.json`, `git tag -l` empty, no GitHub Release with notes.
+- [x] **Version scheme:** semver, starting at `v0.1.0`, single shared version (root `package.json` only — `server`/`client`/`mcp` stay unversioned).
+- [x] Release notes drafted, tag pushed, GitHub Release created by Tobias: https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.1.0.
+- [x] GHCR image publish: `.github/workflows/docker-publish.yml`, triggered on `release: published` (+ manual `workflow_dispatch`), pushes `ghcr.io/<owner>/<repo>:0.1.0`, `:0.1`, and `:latest`.
+- [x] **Forgejo→GitHub mirror gotcha, worth remembering:** `origin` here is Forgejo, not GitHub, so the tag had to actually propagate through the push-mirror before `gh release create` could see it, and `gh` needed `--repo TobiasDax/LimitedGauntlet` since it can't infer a GitHub repo from a Forgejo remote.
 
 ### PI-23 — Bug: Hall of Fame crown badge renders above the header menu ✅
 The 👑 crown badge on the Hall of Fame scrolls *over* the top-bar menu instead of under it — a z-index / stacking-context issue, so on scroll the crown overlaps the nav. Low severity, but fix down the road.
