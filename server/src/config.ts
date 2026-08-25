@@ -31,4 +31,23 @@ export const config = {
   // exposes this so the frontend can show a clear "closed" message instead
   // of a dead-end form.
   allowSignup: process.env.ALLOW_SIGNUP === "true",
+  // Base URL the app is reached at (e.g. https://gauntlet.example.com), used to
+  // build absolute links in emails. Falls back to the request origin when empty.
+  appBaseUrl: process.env.APP_BASE_URL ?? "",
+  // Optional SMTP for transactional email (PI-29) — email-change verification
+  // (PI-28). Entirely optional: if SMTP_HOST is unset, email features are
+  // disabled and degrade with a clear error rather than crashing the app.
+  smtp: {
+    host: process.env.SMTP_HOST ?? "",
+    port: Number(process.env.SMTP_PORT ?? 587),
+    user: process.env.SMTP_USER ?? "",
+    pass: process.env.SMTP_PASS ?? "",
+    from: process.env.SMTP_FROM ?? "",
+    // STARTTLS (587) vs implicit TLS (465). Default false = STARTTLS.
+    secure: process.env.SMTP_SECURE === "true",
+  },
 };
+
+export function isEmailConfigured(): boolean {
+  return config.smtp.host.length > 0 && config.smtp.from.length > 0;
+}

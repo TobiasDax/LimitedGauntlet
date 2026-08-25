@@ -62,11 +62,12 @@ The organizer needs to manage their own account. Lives in the Settings page. **D
 - [ ] **Delete account** — since each org has one organizer today, this **cascades**: deletes the account + organization + all its tournaments/pods/cards. **Hard confirm:** re-enter password AND type the org name. (Multi-organizer + explicit org-delete is split out to PI-34.)
 - [ ] All three sensitive actions gated behind re-entering the current password.
 
-### PI-29 — Transactional email via SMTP
-Prerequisite for PI-28's email-change verification (and any future notifications) — **build now.** Prefer a well-maintained library over hand-rolling.
-- [ ] Use `nodemailer` with SMTP config via env vars (host/port/user/pass/from/secure), consistent with the app's existing env-driven config convention.
-- [ ] **Security/anti-spam:** app only sends to its own organizers' addresses (no user-supplied arbitrary recipients), rate-limit sends, no open relay surface. Verification links are single-use + expiring. Fail gracefully / clearly if SMTP isn't configured (features that need it degrade, don't crash).
-- [ ] Optional for self-hosters: keep SMTP optional so the app still runs without it (email-change just unavailable until configured).
+### PI-29 — Transactional email via SMTP ✅ (code-complete, live-verify pending)
+Prerequisite for PI-28's email-change verification (and any future notifications).
+- [x] `nodemailer` transport built lazily from env config (`config.smtp`: host/port/user/pass/from/secure) + `APP_BASE_URL`. `services/mailer.ts`: `sendMail`, `isEmailConfigured`, `resolveBaseUrl`. Env documented in `.env.example` + passed through `docker-compose.yml`.
+- [x] **Optional/degrades cleanly:** if `SMTP_HOST`/`SMTP_FROM` unset, `isEmailConfigured()` is false and `sendMail` throws `email_not_configured` — the app runs fine, email-dependent features (PI-28 email change) just aren't offered.
+- [x] **Anti-spam posture:** the mailer is only wired to first-party account flows (PI-28 sends to the organizer's own new address — no user-supplied arbitrary recipients). Single-use + expiring verification tokens live in the PI-28 flow.
+- [ ] Live verification (actually sending) pending a configured SMTP + running instance.
 
 ### PI-30 — Rename "Gesamtwertung" → "Tournament Standings" ✅ (code-complete, browser-verify pending)
 The tournament-wide standings feature/page uses a German term; rename it to **"Tournament Standings"** for a broader audience (deliberately *not* "Weekend Standings" — not every tournament spans a weekend).
