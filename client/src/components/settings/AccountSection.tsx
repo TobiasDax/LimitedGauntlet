@@ -7,6 +7,7 @@ import {
   useRequestEmailChange,
   useDeleteAccount,
 } from "../../features/auth/useAuth";
+import { useDeleteOrganization } from "../../features/organizers/useOrganizers";
 import { Button, Card, FormError, TextField } from "../ui";
 
 function codeOf(err: unknown): string {
@@ -124,30 +125,45 @@ function ChangeEmailForm({ currentEmail }: { currentEmail: string }) {
   );
 }
 
-function DeleteAccountForm({ orgName }: { orgName: string }) {
+// PI-34: when co-organizers exist, "delete account" only removes THIS
+// organizer's own access — the org and everyone else's data are untouched.
+// Solo organizers keep the original behavior (deletes the whole org).
+function DeleteAccountForm({ orgName, email, organizerCount }: { orgName: string; email: string; organizerCount: number }) {
   const navigate = useNavigate();
   const deleteAccount = useDeleteAccount();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmName, setConfirmName] = useState("");
 
+  const leaving = organizerCount > 1;
+  const expected = leaving ? email : orgName;
+
   return (
     <Card className="border-critical/40 p-5">
-      <div className="mb-1 text-[14px] font-semibold text-critical">Delete account</div>
+      <div className="mb-1 text-[14px] font-semibold text-critical">{leaving ? "Leave organization" : "Delete account"}</div>
       <p className="mb-3 text-[13px] text-ink-muted">
-        This permanently deletes your organization <strong>{orgName}</strong> and everything in it — every tournament,
-        pod, result, and card pull. This cannot be undone.
+        {leaving ? (
+          <>
+            This removes your access to <strong>{orgName}</strong>. The other {organizerCount - 1 === 1 ? "organizer keeps" : "organizers keep"} theirs
+            and nothing else changes.
+          </>
+        ) : (
+          <>
+            This permanently deletes your organization <strong>{orgName}</strong> and everything in it — every tournament,
+            pod, result, and card pull. This cannot be undone.
+          </>
+        )}
       </p>
       {!open ? (
         <Button variant="ghost" onClick={() => setOpen(true)}>
-          Delete account…
+          {leaving ? "Leave organization…" : "Delete account…"}
         </Button>
       ) : (
         <form
           className="flex flex-col gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (confirmName.trim() !== orgName) return;
+            if (confirmName.trim() !== expected) return;
             deleteAccount.mutate(
               { currentPassword: password, confirmName },
               { onSuccess: () => navigate("/login") },
@@ -155,14 +171,14 @@ function DeleteAccountForm({ orgName }: { orgName: string }) {
           }}
         >
           <TextField type="password" autoComplete="current-password" placeholder="Current password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <TextField placeholder={`Type "${orgName}" to confirm`} value={confirmName} onChange={(e) => setConfirmName(e.target.value)} />
+          <TextField placeholder={`Type "${expected}" to confirm`} value={confirmName} onChange={(e) => setConfirmName(e.target.value)} />
           <div className="flex gap-2">
             <Button
               type="submit"
               variant="primary"
-              disabled={!password || confirmName.trim() !== orgName || deleteAccount.isPending}
+              disabled={!password || confirmName.trim() !== expected || deleteAccount.isPending}
             >
-              {deleteAccount.isPending ? "Deleting…" : "Permanently delete"}
+              {deleteAccount.isPending ? (leaving ? "Leaving…" : "Deleting…") : leaving ? "Leave organization" : "Permanently delete"}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
@@ -177,14 +193,74 @@ function DeleteAccountForm({ orgName }: { orgName: string }) {
   );
 }
 
+// PI-34: distinct from the (possibly softer, "leave") action above — this
+// always nukes the whole org regardless of how many organizers remain. Only
+// shown when there IS more than one organizer; for a solo organizer,
+// "Delete account" already does this, so a second identical-looking button
+// would just be confusing.
+function DeleteOrganizationForm({ orgName }: { orgName: string }) {
+  const navigate = useNavigate();
+  const deleteOrganization = useDeleteOrganization();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmName, setConfirmName] = useState("");
+
+  return (
+    <Card className="border-critical/40 p-5">
+      <div className="mb-1 text-[14px] font-semibold text-critical">Delete organization</div>
+      <p className="mb-3 text-[13px] text-ink-muted">
+        This permanently deletes <strong>{orgName}</strong> and everything in it — every organizer, tournament, pod,
+        result, and card pull. This cannot be undone.
+      </p>
+      {!open ? (
+        <Button variant="ghost" onClick={() => setOpen(true)}>
+          Delete organization…
+        </Button>
+      ) : (
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (confirmName.trim() !== orgName) return;
+            deleteOrganization.mutate(
+              { currentPassword: password, confirmName },
+              { onSuccess: () => navigate("/login") },
+            );
+          }}
+        >
+          <TextField type="password" autoComplete="current-password" placeholder="Current password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <TextField placeholder={`Type "${orgName}" to confirm`} value={confirmName} onChange={(e) => setConfirmName(e.target.value)} />
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!password || confirmName.trim() !== orgName || deleteOrganization.isPending}
+            >
+              {deleteOrganization.isPending ? "Deleting…" : "Permanently delete"}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+      {deleteOrganization.isError && (
+        <FormError>{codeOf(deleteOrganization.error) === "invalid_password" ? "Current password is incorrect." : "Something went wrong."}</FormError>
+      )}
+    </Card>
+  );
+}
+
 export function AccountSection() {
   const { data: me } = useMe();
   if (!me) return null;
+  const organizerCount = me.organizerCount ?? 1;
   return (
     <div className="flex flex-col gap-4">
       <ChangePasswordForm />
       <ChangeEmailForm currentEmail={me.organizer.email} />
-      <DeleteAccountForm orgName={me.organization.name} />
+      <DeleteAccountForm orgName={me.organization.name} email={me.organizer.email} organizerCount={organizerCount} />
+      {organizerCount > 1 && <DeleteOrganizationForm orgName={me.organization.name} />}
     </div>
   );
 }

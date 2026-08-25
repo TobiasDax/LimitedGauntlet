@@ -3,6 +3,7 @@ import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 import { SettingsSection } from "../components/settings/SettingsSection";
 import { ApiTokensSection } from "../components/settings/ApiTokensSection";
 import { PublicLockSection } from "../components/settings/PublicLockSection";
+import { OrganizersSection } from "../components/settings/OrganizersSection";
 import { AccountSection } from "../components/settings/AccountSection";
 
 // Organizer settings hub (PI-26). Organizer-only (this route is inside the
@@ -41,6 +42,13 @@ export function SettingsPage() {
         }
       >
         <ApiTokensSection />
+      </SettingsSection>
+
+      <SettingsSection
+        title="Organizers"
+        description="Everyone here has full, equal access to this organization. Invite a co-organizer by email; they set their own password."
+      >
+        <OrganizersSection />
       </SettingsSection>
 
       <SettingsSection title="Account" description="Change your password or email, or delete your account.">

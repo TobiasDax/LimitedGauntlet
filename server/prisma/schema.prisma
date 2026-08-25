@@ -28,6 +28,7 @@ model Organization {
   organizers  OrganizerAccount[]
   players     Player[]
   tournaments Tournament[]
+  organizerInvites OrganizerInvite[]
 }
 
 model OrganizerAccount {
@@ -41,6 +42,29 @@ model OrganizerAccount {
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   apiTokens    ApiToken[]
   emailChangeRequests EmailChangeRequest[]
+  sentInvites  OrganizerInvite[]
+
+  @@index([orgId])
+}
+
+// Pending co-organizer invites (PI-34). An invited address doesn't get an
+// account until they open the emailed link and set their own name/password
+// (accept-invite) — the same "possession of the link proves the address"
+// pattern as EmailChangeRequest, just scoped to the org rather than an
+// existing organizer. Roles are equal for v1: an accepted invite creates a
+// full OrganizerAccount, same access as anyone else in the org.
+model OrganizerInvite {
+  id          String    @id @default(cuid())
+  orgId       String
+  email       String
+  tokenHash   String    @unique
+  invitedById String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  organization Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invitedBy    OrganizerAccount @relation(fields: [invitedById], references: [id], onDelete: Cascade)
 
   @@index([orgId])
 }

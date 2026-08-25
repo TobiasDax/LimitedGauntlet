@@ -22,6 +22,12 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const acceptInviteSchema = z.object({
+  token: z.string().min(1),
+  name: z.string().trim().min(1).max(100),
+  password: z.string().min(8).max(200),
+});
+
 function isUniqueConstraintError(err: unknown, target: string): boolean {
   return (
     err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -78,6 +84,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           organization: { id: organization.id, slug: organization.slug, name: organization.name },
           organizer: { id: organizer.id, name: organizer.name, email: organizer.email },
           publicLockEnabled: false,
+          organizerCount: 1, // a brand-new org can't have co-organizers yet
         });
       } catch (err) {
         if (isUniqueConstraintError(err, "slug")) {
@@ -112,13 +119,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
 
-      const organization = await prisma.organization.findUniqueOrThrow({ where: { id: account.orgId } });
+      const [organization, organizerCount] = await Promise.all([
+        prisma.organization.findUniqueOrThrow({ where: { id: account.orgId } }),
+        prisma.organizerAccount.count({ where: { orgId: account.orgId } }),
+      ]);
 
       request.session.set("organizerId", account.id);
       reply.send({
         organizer: { id: account.id, orgId: account.orgId, name: account.name, email: account.email },
         organization: { id: organization.id, slug: organization.slug, name: organization.name },
         publicLockEnabled: !!organization.publicPasswordHash,
+        organizerCount,
       });
     },
   );
@@ -162,14 +173,84 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.get("/api/auth/me", { preHandler: requireAuth }, async (request, reply) => {
-    const organization = await prisma.organization.findUniqueOrThrow({
-      where: { id: request.organizer!.orgId },
+  // Look up a pending co-organizer invite by its token (PI-34) — public, so
+  // the accept-invite page can show "you're invited to join X" before the
+  // invitee has any account to authenticate with.
+  app.get("/api/auth/invite/:token", async (request, reply) => {
+    const params = z.object({ token: z.string().min(1) }).safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const tokenHash = createHash("sha256").update(params.data.token).digest("hex");
+    const invite = await prisma.organizerInvite.findUnique({
+      where: { tokenHash },
+      include: { organization: { select: { name: true } } },
     });
+    if (!invite || invite.usedAt || invite.expiresAt < new Date()) {
+      reply.code(404).send({ error: "invalid_or_expired" });
+      return;
+    }
+    reply.send({ email: invite.email, organizationName: invite.organization.name });
+  });
+
+  // Accept a co-organizer invite: the invitee sets their own name + password
+  // and a new OrganizerAccount is created in the inviting org. Roles are
+  // equal for v1 — this is a full organizer, same access as anyone else.
+  app.post(
+    "/api/auth/accept-invite",
+    { config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } },
+    async (request, reply) => {
+      const body = acceptInviteSchema.safeParse(request.body);
+      if (!body.success) {
+        reply.code(400).send({ error: "invalid_input", issues: body.error.issues });
+        return;
+      }
+      const tokenHash = createHash("sha256").update(body.data.token).digest("hex");
+      const invite = await prisma.organizerInvite.findUnique({ where: { tokenHash } });
+      if (!invite || invite.usedAt || invite.expiresAt < new Date()) {
+        reply.code(400).send({ error: "invalid_or_expired" });
+        return;
+      }
+      const taken = await prisma.organizerAccount.findUnique({ where: { email: invite.email } });
+      if (taken) {
+        reply.code(409).send({ error: "email_taken" });
+        return;
+      }
+
+      const passwordHash = await hashPassword(body.data.password);
+      const [organizer] = await prisma.$transaction([
+        prisma.organizerAccount.create({
+          data: { orgId: invite.orgId, email: invite.email, name: body.data.name, passwordHash },
+        }),
+        prisma.organizerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } }),
+      ]);
+
+      const [organization, organizerCount] = await Promise.all([
+        prisma.organization.findUniqueOrThrow({ where: { id: invite.orgId } }),
+        prisma.organizerAccount.count({ where: { orgId: invite.orgId } }),
+      ]);
+
+      request.session.set("organizerId", organizer.id);
+      reply.code(201).send({
+        organizer: { id: organizer.id, orgId: organizer.orgId, name: organizer.name, email: organizer.email },
+        organization: { id: organization.id, slug: organization.slug, name: organization.name },
+        publicLockEnabled: !!organization.publicPasswordHash,
+        organizerCount,
+      });
+    },
+  );
+
+  app.get("/api/auth/me", { preHandler: requireAuth }, async (request, reply) => {
+    const [organization, organizerCount] = await Promise.all([
+      prisma.organization.findUniqueOrThrow({ where: { id: request.organizer!.orgId } }),
+      prisma.organizerAccount.count({ where: { orgId: request.organizer!.orgId } }),
+    ]);
     reply.send({
       organizer: request.organizer,
       organization: { id: organization.id, slug: organization.slug, name: organization.name },
       publicLockEnabled: !!organization.publicPasswordHash,
+      organizerCount,
     });
   });
 }

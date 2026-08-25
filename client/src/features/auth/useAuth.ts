@@ -8,6 +8,11 @@ interface MeResponse {
   // Whether this org's public pages are behind a password (PI-27). Optional
   // because the login/signup responses don't compute it; /auth/me always does.
   publicLockEnabled?: boolean;
+  // How many organizers this org has (PI-34) — drives Settings' "delete my
+  // account" vs "leave organization" wording. Always present in practice
+  // (every response that sets this cache includes it); optional here only so
+  // reads don't need a non-null assertion before the first load.
+  organizerCount?: number;
 }
 
 export function useMe() {
@@ -141,6 +146,30 @@ export function useDeleteAccount() {
     onSuccess: () => {
       queryClient.setQueryData(["me"], null);
       queryClient.clear();
+    },
+  });
+}
+
+// Co-organizer invites (PI-34). Both public — the token in the link is the
+// proof, so these work even for someone with no account yet.
+export function useInviteInfo(token: string) {
+  return useQuery({
+    queryKey: ["invite", token],
+    queryFn: () => api.get<{ email: string; organizationName: string }>(`/auth/invite/${token}`),
+    enabled: !!token,
+    retry: false,
+  });
+}
+
+export function useAcceptInvite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { token: string; name: string; password: string }) =>
+      api.post<MeResponse>("/auth/accept-invite", input),
+    onSuccess: (data) => {
+      // Same reasoning as useLogin: set the cache synchronously so the new
+      // organizer is authenticated the instant they're redirected.
+      queryClient.setQueryData<MeResponse>(["me"], data);
     },
   });
 }

@@ -37,7 +37,7 @@ docker compose up -d --build
 
 The app comes up at `http://localhost:8080` (configurable via `PORT` in `.env`). No manual database setup — migrations apply automatically before the server starts.
 
-**Creating your first account:** signup is closed by default (`ALLOW_SIGNUP=false` in `.env.example`) — this app is meant for an existing group, not an open public signup form. To create your organization, set `ALLOW_SIGNUP=true` in `.env`, restart (`docker compose up -d`), sign up once, then set it back to `false` and restart again. (If you're migrating from spreadsheets/docs instead of starting fresh, see [History import](#history-import) below — it creates your first organization directly, no signup step needed.)
+**Creating your first account:** signup is closed by default (`ALLOW_SIGNUP=false` in `.env.example`) — this app is meant for an existing group, not an open public signup form. To create your organization, set `ALLOW_SIGNUP=true` in `.env`, restart (`docker compose up -d`), sign up once, then set it back to `false` and restart again. (If you're migrating from spreadsheets/docs instead of starting fresh, see [History import](#history-import) below — it creates your first organization directly, no signup step needed.) Once that first organizer exists, add co-organizers from Settings → Organizers (needs SMTP configured) — no need to reopen signup for teammates.
 
 For a real deployment — production hardening details, reverse proxy / TLS exposure options, updating an existing install — see [`docs/deployment.md`](docs/deployment.md).
 
