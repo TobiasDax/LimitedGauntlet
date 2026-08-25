@@ -98,3 +98,26 @@ Split out from the PI-28 account-deletion decision (2026-08-25). The data model 
 - [x] **Invite/add co-organizers** to an organization. New `OrganizerInvite` model (migration `20260825130000_add_organizer_invite`) — single-use hashed token, 7-day expiry, same pattern as PI-28's `EmailChangeRequest`. `GET/POST /api/settings/organizers[/invite]`, `DELETE .../invites/:id`, `DELETE .../organizers/:id` (session-auth only); public `GET /api/auth/invite/:token` + `POST /api/auth/accept-invite` (invitee sets their own name/password, logged in immediately). Requires SMTP (PI-29) — no other way to deliver the link. Roles equal for v1: an accepted invite is a full `OrganizerAccount`, same access as anyone else. Frontend: new "Organizers" section in Settings (invite form, organizer list, pending-invite list) + `AcceptInvitePage` at `/accept-invite`.
 - [x] **Explicit "delete organization"** action (`POST /api/settings/delete-organization`, hard-gated: password + type org name) — always deletes the whole org regardless of organizer count. Distinct from "delete my account". Only shown in Settings when `organizerCount > 1` (for a solo organizer, "Delete account" already does this — a second identical-looking danger button would just be clutter).
 - [x] Revisited PI-28's cascade: `POST /api/settings/delete-account` now checks `organizerCount` — if >1, it only removes the caller's own `OrganizerAccount` ("leave organization", confirmed by typing your own email) and leaves the org untouched; if it's the last organizer, unchanged full-org-delete behavior (confirmed by typing the org name). `organizerCount` added to `/auth/login` and `/auth/me` responses so the frontend knows which copy/behavior to show.
+
+### PI-35 — Footer bar with legal links and GitHub link
+Add a site-wide footer bar: legal links (e.g. Impressum/Privacy — decide what's actually needed for a self-hosted OSS app vs. what individual deployers should supply) and a link to the GitHub repo.
+- [ ] Decide scope: does this app need Impressum/Privacy Policy content out of the box (multi-tenant, public pages, EU self-hosters), or just placeholder links/slots a deployer fills in via config? Confirm with Tobias before building.
+- [ ] Decide footer placement: global (`Layout`/`PublicLayout` shared chrome) vs. per-surface (authed app vs. public `/o/:slug/...` pages) — likely both, sharing one `Footer` component.
+- [ ] GitHub link target: the actual public repo URL.
+
+### PI-36 — Constructed format dropdown (Standard, Modern, Legacy, etc.)
+Pods with `format: CONSTRUCTED` currently don't record *which* constructed format was played. Add a dropdown for that: Standard, Modern, Legacy, Vintage, Pioneer, Pre-Modern, Pauper, plus a **Custom** option that reveals a free-text field to record an arbitrary format name.
+- [ ] New field (e.g. `Pod.constructedFormat` enum + `Pod.constructedFormatCustom String?` for the Custom text, mirroring how other optional pod fields are modeled) — only relevant/shown when the pod's top-level `format` is `CONSTRUCTED`.
+- [ ] Decide whether this is required or optional for constructed pods, and how it displays on standings/pod pages (badge/label next to the pod name, presumably).
+- [ ] Update create/edit pod forms (`DashboardPage`/`PodPage` or wherever pod format is set) with the conditional dropdown + custom text field.
+
+### PI-37 — Multiplayer support for Constructed: 2v2 and 4-player Commander
+Bigger structural feature — support multiplayer constructed pod types beyond 1v1: **2v2** and **4-player Commander**. Tobias flagged 4-player Commander in particular as possibly a v2-scale feature, not a quick add.
+- [ ] **2v2** may mostly reuse the existing team-pod machinery (`Entrant` already unifies individuals/teams for 2HG-style events per `PLAN.md`) — check how far that gets before building anything new.
+- [ ] **4-player Commander needs a different pairing system entirely** — pod-based multiplayer pairing (4 players/table) rather than 1v1 Swiss pairing. Scope as given:
+  - Swiss pairing for the field above 16 players.
+  - Cut to Top 16 once Swiss rounds finish.
+  - Top 4 (from the Top 16 stage) form the finals table.
+  - Edge case: pods that start with fewer than 16 players need a manual way to add non-winning players into the finals table (the cut math doesn't work cleanly below 16).
+- [ ] **Research first:** look at how other cEDH tournament tools (e.g. existing bracket/pairing software used at cEDH events) handle multiplayer pairing, sub-16-player cuts, and finals-table formation before designing this — don't build pairing logic from scratch without that survey.
+- [ ] Given the scope, consider treating 4-player Commander as a separate/v2 milestone rather than bundling with the 2v2 work.
