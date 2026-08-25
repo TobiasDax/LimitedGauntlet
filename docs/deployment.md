@@ -77,7 +77,7 @@ Socket.IO (used for live pairings/standings/timer updates) shares the same port 
 
 ## 5. Optional: import past tournament history
 
-If you're migrating from spreadsheets, a pairing site, or manually-kept docs and want your past results pre-loaded rather than starting from an empty roster, see the README's **History import** section — it covers the data file format, the idempotent import script, and the env vars that control the created organization/login.
+If you're migrating from spreadsheets, a pairing site, or manually-kept docs and want your past results pre-loaded rather than starting from an empty roster, see the README's **History import** section — it covers the data file format, the idempotent import script, and the env vars that control the created organization/login. Turning your actual records into that file's exact JSON shape is the tedious part; if you're running this via Claude Code, the [`import-history`](../.claude/skills/import-history/SKILL.md) skill (`/import-history`) does that conversion interactively instead of you hand-writing it against the TypeScript interfaces.
 
 ## 6. Optional: mint an API token for the MCP server
 

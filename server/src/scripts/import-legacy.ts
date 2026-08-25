@@ -13,7 +13,7 @@
 // (or set LEGACY_DATA_PATH instead of passing an argument)
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { PrismaClient, type PodFormat, type MatchResult, type TournamentStatus } from "@prisma/client";
+import { PrismaClient, type PodFormat, type ConstructedFormat, type MatchResult, type TournamentStatus } from "@prisma/client";
 import { hashPassword } from "../auth/password.js";
 import { lookupCardByName } from "../services/scryfall.js";
 
@@ -35,6 +35,11 @@ interface LegacyMatch {
 interface LegacyPod {
   name: string;
   format: PodFormat;
+  // Only meaningful when format === "CONSTRUCTED" — which constructed
+  // format was played (PI-36). constructedFormatCustom pairs with
+  // constructedFormat === "CUSTOM" for a free-text name.
+  constructedFormat?: ConstructedFormat;
+  constructedFormatCustom?: string;
   points?: Record<string, number>;
   cardPulls?: Array<{ cardName: string; priceEur: number }>;
   isTeamEvent?: boolean;
@@ -178,6 +183,8 @@ async function importStandingsPod(
       tournamentId,
       name: pod.name,
       format: pod.format,
+      constructedFormat: pod.constructedFormat,
+      constructedFormatCustom: pod.constructedFormatCustom,
       sequenceOrder,
       status: hasRounds || pod.points ? "COMPLETED" : "SETUP",
       ...(hasRounds ? { roundCount: pod.rounds!.length } : {}),
@@ -250,6 +257,8 @@ async function importTeamPod(
       tournamentId,
       name: pod.name,
       format: pod.format,
+      constructedFormat: pod.constructedFormat,
+      constructedFormatCustom: pod.constructedFormatCustom,
       sequenceOrder,
       status: "COMPLETED",
       isTeamEvent: true,
