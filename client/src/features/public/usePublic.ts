@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import type {
   CardPull,
@@ -18,6 +18,28 @@ import type {
   Tournament,
 } from "../../lib/types";
 import type { LongestWinStreak } from "../hallOfFame/useHallOfFame";
+
+// PI-27 — public-page password lock. Ungated status check (used by PublicLayout
+// to decide whether to show the unlock prompt) + the unlock mutation.
+export function usePublicLockStatus(slug: string | undefined) {
+  return useQuery({
+    queryKey: ["public", "lock", slug],
+    queryFn: () => api.get<{ locked: boolean; unlocked: boolean }>(`/public/o/${slug}/lock`),
+    enabled: !!slug,
+  });
+}
+
+export function useUnlockPublic(slug: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (password: string) => api.post<{ ok: true }>(`/public/o/${slug}/unlock`, { password }),
+    onSuccess: () => {
+      // Re-check lock status and let every gated public query refetch now that
+      // the session cookie marks this org unlocked.
+      queryClient.invalidateQueries({ queryKey: ["public"] });
+    },
+  });
+}
 
 // The org landing page ("send one link, browse everything") and the
 // public roster — the two pages every other public page's nav links to,

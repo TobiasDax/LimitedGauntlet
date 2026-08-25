@@ -76,6 +76,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         reply.code(201).send({
           organization: { id: organization.id, slug: organization.slug, name: organization.name },
           organizer: { id: organizer.id, name: organizer.name, email: organizer.email },
+          publicLockEnabled: false,
         });
       } catch (err) {
         if (isUniqueConstraintError(err, "slug")) {
@@ -116,6 +117,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       reply.send({
         organizer: { id: account.id, orgId: account.orgId, name: account.name, email: account.email },
         organization: { id: organization.id, slug: organization.slug, name: organization.name },
+        publicLockEnabled: !!organization.publicPasswordHash,
       });
     },
   );
@@ -132,6 +134,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     reply.send({
       organizer: request.organizer,
       organization: { id: organization.id, slug: organization.slug, name: organization.name },
+      publicLockEnabled: !!organization.publicPasswordHash,
     });
   });
 }

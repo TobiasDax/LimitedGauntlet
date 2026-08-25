@@ -18,6 +18,11 @@ model Organization {
   id        String   @id @default(cuid())
   slug      String   @unique
   name      String
+  // Optional password lock for the public pages (PI-27). Null = public pages
+  // are open (the default). When set (argon2 hash), a visitor must enter the
+  // password once to view any /o/<slug>/... page — an opt-in, off-by-default
+  // exception to "public pages stay open", set only by the organizer.
+  publicPasswordHash String?
   createdAt DateTime @default(now())
 
   organizers  OrganizerAccount[]

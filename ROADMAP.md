@@ -47,11 +47,13 @@ Introduce a dedicated Settings area for organizer-scoped config. Right now only 
 - [x] Top-bar "API Tokens" link replaced with "Settings" (in the `Layout` right slot). Organizer-only via ProtectedRoute; the token routes it drives stay session-auth-only (unchanged).
 - [ ] `SettingsSection` wrapper is ready for PI-27/PI-28 sections to drop in.
 
-### PI-27 — Optional password lock for public pages (Settings)
-Some organizers won't want fully-open public links. Let an organizer optionally set a password that gates their org's public (`/o/:slug/...`) pages.
-- [ ] Decided: this is the sanctioned exception to "public pages stay open by default" — `CLAUDE.md`'s public-pages line has been softened to allow an **opt-in, off-by-default, per-org** lock. Must stay off unless the organizer explicitly turns it on.
-- [ ] Setting in the Settings page: enable/disable + set/clear password (hashed, argon2, same as organizer passwords).
-- [ ] Public routes: when a lock is set, gate access behind a lightweight password prompt (a per-visitor cookie/token once entered), without turning the slug itself into a secret. Keep it frictionless when *not* locked (unchanged behavior).
+### PI-27 — Optional password lock for public pages (Settings) ✅ (code-complete, browser-verify pending)
+Some organizers won't want fully-open public links. Let an organizer optionally set a password that gates their org's public (`/o/:slug/...`) pages. **Org-wide** (one password for the whole public surface).
+- [x] Sanctioned exception to "public pages stay open by default" — `CLAUDE.md` softened accordingly. Off by default.
+- [x] Schema: `Organization.publicPasswordHash String?` (migration `20260825110000_add_org_public_password`). Settings route (`settings.ts`, session-auth only, never bearer): `PUT /api/settings/public-lock` (argon2 hash) + `DELETE` to disable. `GET /auth/me` (and login) now return `publicLockEnabled`.
+- [x] Public gating: an encapsulated `preHandler` on `publicRoutes` 401s `{error:"locked"}` for every data route when the org has a password and the visitor hasn't unlocked. Exempt: `GET .../lock` (status) and `POST .../unlock` (verify + mark unlocked in the encrypted session cookie; rate-limited 10/min like login). Slug stays shareable — the password is the gate, not secrecy of the URL.
+- [x] Frontend: `PublicLockSection` in Settings (enable/change/disable). `PublicLayout` checks lock status first and renders `PublicUnlockPrompt` when locked+not-unlocked, so gated child queries never fire; unlocking invalidates the `["public"]` cache so everything refetches. Added `api.put`.
+- [ ] Live/browser verification pending (also worth a server test for the gate once a DB is available).
 
 ### PI-28 — Account management: change email / password, delete account (Settings)
 The organizer needs to manage their own account. Lives in the Settings page. **Decisions taken (2026-08-25):**

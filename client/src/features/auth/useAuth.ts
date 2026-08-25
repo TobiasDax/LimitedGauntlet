@@ -5,6 +5,9 @@ import type { Organizer, Organization } from "../../lib/types";
 interface MeResponse {
   organizer: Organizer;
   organization: Organization;
+  // Whether this org's public pages are behind a password (PI-27). Optional
+  // because the login/signup responses don't compute it; /auth/me always does.
+  publicLockEnabled?: boolean;
 }
 
 export function useMe() {
@@ -65,6 +68,32 @@ export function useLogin() {
       // ProtectedRoute reads that stale null in the gap and bounces
       // straight back to /login before the real session ever lands.
       queryClient.setQueryData<MeResponse>(["me"], { organizer, organization });
+    },
+  });
+}
+
+// Public-page password lock (PI-27). Both mutations patch the `me` cache's
+// publicLockEnabled directly so the Settings UI reflects the new state instantly.
+export function useSetPublicLock() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (password: string) => api.put<{ publicLockEnabled: boolean }>("/settings/public-lock", { password }),
+    onSuccess: () => {
+      queryClient.setQueryData<MeResponse | null>(["me"], (prev) =>
+        prev ? { ...prev, publicLockEnabled: true } : prev,
+      );
+    },
+  });
+}
+
+export function useClearPublicLock() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete<{ publicLockEnabled: boolean }>("/settings/public-lock"),
+    onSuccess: () => {
+      queryClient.setQueryData<MeResponse | null>(["me"], (prev) =>
+        prev ? { ...prev, publicLockEnabled: false } : prev,
+      );
     },
   });
 }
