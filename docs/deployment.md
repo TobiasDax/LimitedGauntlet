@@ -7,12 +7,29 @@ A general guide for running LimitedGauntlet on your own server — any Docker ho
 - Docker + Docker Compose (v2, the `docker compose` subcommand — not the old standalone `docker-compose`)
 - Nothing else. Postgres runs in its own container; there's no separate database to provision.
 
-## 1. Get the code
+## 1. Get the app
+
+Two ways to run it — pick one:
+
+**Option A: published image (recommended).** No git clone, no build step — just a Compose file and a `.env`.
+
+```sh
+mkdir limitedgauntlet && cd limitedgauntlet
+curl -O https://raw.githubusercontent.com/TobiasDax/LimitedGauntlet/main/docker-compose.image.yml
+mv docker-compose.image.yml docker-compose.yml
+curl -O https://raw.githubusercontent.com/TobiasDax/LimitedGauntlet/main/.env.example
+```
+
+Images are published to GHCR on every tagged release. The example file defaults to `:latest`; pin a specific version tag instead (e.g. `ghcr.io/tobiasdax/limitedgauntlet:0.1.0`) if you'd rather upgrade deliberately than automatically — see the comments in `docker-compose.image.yml` itself.
+
+**Option B: build from source.** Only worth it if you're modifying the app yourself, or on a platform without a published image.
 
 ```sh
 git clone <your-fork-or-this-repo-url> limitedgauntlet
 cd limitedgauntlet
 ```
+
+The rest of this guide applies to either option — just substitute the right `docker compose` invocation in step 3 (called out there).
 
 ## 2. Configure `.env`
 
@@ -30,11 +47,19 @@ Everything else in `.env.example` has a working default.
 
 ## 3. First boot
 
+Published image (Option A):
+
+```sh
+docker compose up -d
+```
+
+Built from source (Option B):
+
 ```sh
 docker compose up -d --build
 ```
 
-Migrations run automatically on container start (`docker/entrypoint.sh` runs `prisma migrate deploy` before the server boots) — there's no manual database setup step, ever, including after a `git pull` that brings in new migrations.
+Migrations run automatically on container start (`docker/entrypoint.sh` runs `prisma migrate deploy` before the server boots) — there's no manual database setup step, ever, including after an update that brings in new migrations.
 
 The app is now reachable at `http://<host>:8080` (or whatever `PORT` you set in `.env`).
 
@@ -75,6 +100,17 @@ Safe to re-run — it's idempotent and never overwrites an attribution a human h
 
 ## Updating
 
+**Published image (Option A):**
+
+```sh
+docker compose pull
+docker compose up -d
+```
+
+If `docker-compose.image.yml` pins a specific version tag, bump it in your `docker-compose.yml` first (check the [Releases page](https://github.com/TobiasDax/LimitedGauntlet/releases) for the latest), then run the above. On `:latest`, the `pull` alone picks up the newest published image.
+
+**Built from source (Option B):**
+
 ```sh
 git status                    # see below if this isn't clean
 git pull
@@ -83,9 +119,9 @@ docker compose up -d --build
 
 That's it for the common case. A few things worth knowing:
 
-**Migrations apply automatically, same as first boot.** The container runs `prisma migrate deploy` before the server starts, every time it (re)starts — so a `git pull` that brings in new migrations needs no separate step. Migrations only ever go forward: there's no automatic rollback. If you need to undo a schema change after the fact, that's a manual Prisma operation (or restoring a database backup) — reason enough to have a recent backup before updating, same as before any schema-changing update to anything.
+**Migrations apply automatically, same as first boot.** The container runs `prisma migrate deploy` before the server starts, every time it (re)starts — so an update that brings in new migrations needs no separate step, on either option. Migrations only ever go forward: there's no automatic rollback. If you need to undo a schema change after the fact, that's a manual Prisma operation (or restoring a database backup) — reason enough to have a recent backup before updating, same as before any schema-changing update to anything.
 
-**If you've customized `docker-compose.yml` locally** (e.g. wiring in your own reverse-proxy labels, or re-publishing the Postgres port for local dev), `git pull` can conflict if a future update also touches that file — Git will refuse to overwrite your uncommitted changes rather than silently discarding them, so check `git status` before pulling if you're not sure. The cleaner long-term fix: put your local customizations in a `docker-compose.override.yml` file instead of editing `docker-compose.yml` directly. Compose automatically merges `docker-compose.override.yml` on top of `docker-compose.yml` (no extra flag needed — `docker compose up` picks it up by itself), so your customizations live in a file `git pull` never touches at all, no matter how much the base file changes upstream. Example, re-publishing the Postgres port for local (non-Docker) development this way instead of editing the base file:
+**If you've customized `docker-compose.yml` locally** (Option B — e.g. wiring in your own reverse-proxy labels, or re-publishing the Postgres port for local dev), `git pull` can conflict if a future update also touches that file — Git will refuse to overwrite your uncommitted changes rather than silently discarding them, so check `git status` before pulling if you're not sure. The cleaner long-term fix: put your local customizations in a `docker-compose.override.yml` file instead of editing `docker-compose.yml` directly. (Option A doesn't have this problem — there's no tracked file to conflict with; just edit your own `docker-compose.yml` directly.) Compose automatically merges `docker-compose.override.yml` on top of `docker-compose.yml` (no extra flag needed — `docker compose up` picks it up by itself), so your customizations live in a file `git pull` never touches at all, no matter how much the base file changes upstream. Example, re-publishing the Postgres port for local (non-Docker) development this way instead of editing the base file:
 
 ```yaml
 # docker-compose.override.yml — not tracked by this repo's git history,

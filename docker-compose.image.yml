@@ -1,0 +1,61 @@
+# Example Compose file for running LimitedGauntlet from the published
+# image instead of building it yourself — no git clone needed, just this
+# file and a .env (copy .env.example from the repo, or see README.md /
+# docs/deployment.md for the variables). Save this as docker-compose.yml
+# in its own directory and `docker compose up -d`.
+#
+# Images are published to GHCR on every tagged release:
+# https://github.com/TobiasDax/LimitedGauntlet/pkgs/container/limitedgauntlet
+#
+# `:latest` tracks the newest release automatically. For a controlled,
+# reproducible deployment, pin a specific version instead (e.g.
+# `ghcr.io/tobiasdax/limitedgauntlet:0.1.0`) and bump it deliberately with
+# `docker compose pull && docker compose up -d` when you're ready to
+# upgrade — migrations still apply automatically on start either way.
+
+services:
+  app:
+    image: ghcr.io/tobiasdax/limitedgauntlet:latest
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-limitedgauntlet}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-limitedgauntlet}
+      PORT: 8080
+      HOST: 0.0.0.0
+      SESSION_SECRET: ${SESSION_SECRET}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
+      APP_BASE_URL: ${APP_BASE_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      LEGAL_LINK_URL: ${LEGAL_LINK_URL:-}
+      LEGAL_LINK_LABEL: ${LEGAL_LINK_LABEL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    # No host port published — the app container reaches this over the
+    # internal compose network, and Postgres has no business being
+    # reachable from outside Docker at all in a normal deployment.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-limitedgauntlet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-limitedgauntlet}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-limitedgauntlet}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  db-data:

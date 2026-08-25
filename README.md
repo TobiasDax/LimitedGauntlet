@@ -27,6 +27,22 @@ Node.js + TypeScript throughout — Fastify + Prisma + PostgreSQL on the backend
 
 Prerequisites: Docker + Docker Compose (the `docker compose` subcommand, not the old standalone `docker-compose`). Nothing else — Postgres runs in its own container.
 
+**Recommended: run the published image** — no git clone or build step needed, just a Compose file and a `.env`:
+
+```sh
+mkdir limitedgauntlet && cd limitedgauntlet
+curl -O https://raw.githubusercontent.com/TobiasDax/LimitedGauntlet/main/docker-compose.image.yml
+mv docker-compose.image.yml docker-compose.yml
+curl -O https://raw.githubusercontent.com/TobiasDax/LimitedGauntlet/main/.env.example
+cp .env.example .env
+# edit .env: set POSTGRES_PASSWORD and SESSION_SECRET (openssl rand -hex 32)
+docker compose up -d
+```
+
+See [`docker-compose.image.yml`](docker-compose.image.yml) for the file itself — it defaults to `:latest`, with a comment on pinning a specific version tag instead if you'd rather upgrade deliberately.
+
+**Building from source instead** (only needed if you're modifying the app, or on a platform without a published image):
+
 ```sh
 git clone https://github.com/TobiasDax/LimitedGauntlet.git
 cd LimitedGauntlet
@@ -35,7 +51,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-The app comes up at `http://localhost:8080` (configurable via `PORT` in `.env`). No manual database setup — migrations apply automatically before the server starts.
+Either way, the app comes up at `http://localhost:8080` (configurable via `PORT` in `.env`). No manual database setup — migrations apply automatically before the server starts.
 
 **Creating your first account:** signup is closed by default (`ALLOW_SIGNUP=false` in `.env.example`) — this app is meant for an existing group, not an open public signup form. To create your organization, set `ALLOW_SIGNUP=true` in `.env`, restart (`docker compose up -d`), sign up once, then set it back to `false` and restart again. (If you're migrating from spreadsheets/docs instead of starting fresh, see [History import](#history-import) below — it creates your first organization directly, no signup step needed.) Once that first organizer exists, add co-organizers from Settings → Organizers (needs SMTP configured) — no need to reopen signup for teammates.
 
