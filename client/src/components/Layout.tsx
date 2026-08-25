@@ -43,7 +43,7 @@ export function Layout() {
   );
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <TopBar
         brandTo="/"
         orgName={me?.organization.name}
@@ -51,7 +51,7 @@ export function Layout() {
         rightSlot={rightSlot}
       />
 
-      <main className="mx-auto max-w-[1180px] px-4 pb-24 pt-8 sm:px-8 sm:pt-10">
+      <main className="mx-auto w-full max-w-[1180px] flex-1 px-4 pb-24 pt-8 sm:px-8 sm:pt-10">
         <Outlet />
       </main>
 
