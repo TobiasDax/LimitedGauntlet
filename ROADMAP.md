@@ -54,14 +54,15 @@ Some organizers won't want fully-open public links. Let an organizer optionally 
 - [ ] Public routes: when a lock is set, gate access behind a lightweight password prompt (a per-visitor cookie/token once entered), without turning the slug itself into a secret. Keep it frictionless when *not* locked (unchanged behavior).
 
 ### PI-28 — Account management: change email / password, delete account (Settings)
-The organizer needs to manage their own account. Lives in the Settings page.
-- [ ] Change password, change email address, delete account.
-- [ ] **Destructive/sensitive actions gated behind re-entering the current password** (password change, email change, account deletion). Account deletion must handle the org's data (what happens to the organization + its tournaments — decide: block if last organizer, or cascade with a hard confirm).
-- [ ] Email change likely needs verification → depends on PI-29 (SMTP).
+The organizer needs to manage their own account. Lives in the Settings page. **Decisions taken (2026-08-25):**
+- [ ] **Change password** — verify current password, set new. Immediate.
+- [ ] **Change email** — **verified via an email link** (send a confirmation link to the new address; the switch only happens once it's clicked). Depends on PI-29 (SMTP). Password-gated to start the change.
+- [ ] **Delete account** — since each org has one organizer today, this **cascades**: deletes the account + organization + all its tournaments/pods/cards. **Hard confirm:** re-enter password AND type the org name. (Multi-organizer + explicit org-delete is split out to PI-34.)
+- [ ] All three sensitive actions gated behind re-entering the current password.
 
 ### PI-29 — Transactional email via SMTP
-Supports PI-28's email-change verification (and any future notifications). Bigger task; prefer a well-maintained library over hand-rolling.
-- [ ] Use a mature library (e.g. `nodemailer`) with SMTP config via env vars (host/port/user/pass/from), consistent with the app's existing env-driven config convention.
+Prerequisite for PI-28's email-change verification (and any future notifications) — **build now.** Prefer a well-maintained library over hand-rolling.
+- [ ] Use `nodemailer` with SMTP config via env vars (host/port/user/pass/from/secure), consistent with the app's existing env-driven config convention.
 - [ ] **Security/anti-spam:** app only sends to its own organizers' addresses (no user-supplied arbitrary recipients), rate-limit sends, no open relay surface. Verification links are single-use + expiring. Fail gracefully / clearly if SMTP isn't configured (features that need it degrade, don't crash).
 - [ ] Optional for self-hosters: keep SMTP optional so the app still runs without it (email-change just unavailable until configured).
 
@@ -88,3 +89,9 @@ The round timer today only exists once a round is paired (it counts down from `R
 - [x] Backend: `POST /api/pods/:id/prep-timer` (`{minutes (default 50), label?}`) and `DELETE .../prep-timer`, org-scoped; both broadcast `prep-timer-updated` on the pod room. `usePodRealtime` now invalidates on that event.
 - [x] Frontend: reuses `useCountdown` (ticks client-side off `prepTimerEndsAt`). `PrepTimer` control (start length + optional label + Stop) on `PodPage`; read-only `PrepTimerDisplay` on `PublicPodPage` (large) and `PairingsPage` (enlarges in Display Mode). Live across devices via the existing socket.
 - [ ] No chime wired (round-timer-only, per scope); MCP tools not added (organizer UI action, not a bulk op). Browser-verify pending.
+
+### PI-34 — Multiple organizers per org + explicit "delete organization"
+Split out from the PI-28 account-deletion decision (2026-08-25). The data model already allows multiple `OrganizerAccount`s per org, but there's no way to add one, and no standalone org-delete.
+- [ ] **Invite/add co-organizers** to an organization (invite flow — likely email-based, so depends on PI-29 SMTP). Roles TBD (all equal for v1 is fine).
+- [ ] **Explicit "delete organization"** action, available even when multiple organizers remain — hard-gated (password + type org name), deletes the whole org and all its data. Distinct from PI-28's "delete my account" (which, with one organizer, happens to do the same thing).
+- [ ] Revisit PI-28's cascade behavior once multi-organizer exists: "delete my account" as a non-last organizer should then just remove that account, not the org.
