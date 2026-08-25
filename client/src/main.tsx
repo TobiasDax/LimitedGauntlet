@@ -19,7 +19,7 @@ import { TournamentValuePage } from "./routes/TournamentValuePage.tsx";
 import { TreasureChestPage } from "./routes/TreasureChestPage.tsx";
 import { HallOfFamePage } from "./routes/HallOfFamePage.tsx";
 import { PlayerStatsPage } from "./routes/PlayerStatsPage.tsx";
-import { ApiTokensPage } from "./routes/ApiTokensPage.tsx";
+import { SettingsPage } from "./routes/SettingsPage.tsx";
 import { PublicDashboardPage } from "./routes/PublicDashboardPage.tsx";
 import { PublicRosterPage } from "./routes/PublicRosterPage.tsx";
 import { PublicTournamentPage } from "./routes/PublicTournamentPage.tsx";
@@ -61,7 +61,9 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/hall-of-fame" element={<HallOfFamePage />} />
               <Route path="/hall-of-fame/players/:playerId" element={<PlayerStatsPage />} />
               <Route path="/treasure-chest" element={<TreasureChestPage />} />
-              <Route path="/api-tokens" element={<ApiTokensPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              {/* Old standalone API-tokens link now lives inside Settings (PI-26). */}
+              <Route path="/api-tokens" element={<Navigate to="/settings" replace />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

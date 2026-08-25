@@ -18,10 +18,10 @@ export function Layout() {
   const rightSlot = me ? (
     <>
       <Link
-        to="/api-tokens"
+        to="/settings"
         className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        API Tokens
+        Settings
       </Link>
       <Button
         variant="ghost"

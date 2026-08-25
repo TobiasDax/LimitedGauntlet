@@ -41,10 +41,11 @@ Alongside the PI-24 nav work, collapse the top bar into a hamburger menu on smal
 - [x] Accessible: toggle has `aria-label`/`aria-expanded`/`aria-controls`; menu closes on Escape, on outside click, and on selecting a link.
 - [ ] Verify the phone-width overflow fix (build log Step 9 Phase E) still holds, in a real 390px viewport.
 
-### PI-26 — Organizer Settings page (shell + relocate API Tokens)
+### PI-26 — Organizer Settings page (shell + relocate API Tokens) ✅ (code-complete, browser-verify pending)
 Introduce a dedicated Settings area for organizer-scoped config. Right now only API Tokens would live there, but it declutters the top-bar nav and is the home for PI-27/PI-28.
-- [ ] New `SettingsPage` (authed) with a sub-nav/sections; move the existing API Tokens management (`ApiTokensPage`) into it and drop the standalone "API Tokens" top-bar link.
-- [ ] Route + nav link ("Settings"). Keep it organizer-only (session auth), never bearer-token-auth'd (same reasoning as the API-token routes in the build log's PI-4).
+- [x] New `SettingsPage` at `/settings` (inside the ProtectedRoute block) composing stacked `SettingsSection`s. API-token UI extracted to `components/settings/ApiTokensSection.tsx`; old `ApiTokensPage` deleted; `/api-tokens` now redirects to `/settings`.
+- [x] Top-bar "API Tokens" link replaced with "Settings" (in the `Layout` right slot). Organizer-only via ProtectedRoute; the token routes it drives stay session-auth-only (unchanged).
+- [ ] `SettingsSection` wrapper is ready for PI-27/PI-28 sections to drop in.
 
 ### PI-27 — Optional password lock for public pages (Settings)
 Some organizers won't want fully-open public links. Let an organizer optionally set a password that gates their org's public (`/o/:slug/...`) pages.

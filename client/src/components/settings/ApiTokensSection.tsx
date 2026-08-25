@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { useApiTokens, useCreateApiToken, useRevokeApiToken } from "../features/apiTokens/useApiTokens";
-import { Button, Card, Eyebrow, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
+import { useApiTokens, useCreateApiToken, useRevokeApiToken } from "../../features/apiTokens/useApiTokens";
+import { Button, Card, FormError, TextField } from "../ui";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-export function ApiTokensPage() {
+// API token management, extracted from the old standalone ApiTokensPage so it
+// can live as one section of the Settings page (PI-26).
+export function ApiTokensSection() {
   const { data, isLoading } = useApiTokens();
   const createToken = useCreateApiToken();
   const revokeToken = useRevokeApiToken();
@@ -15,14 +17,6 @@ export function ApiTokensPage() {
 
   return (
     <div>
-      <Eyebrow>Your organization</Eyebrow>
-      <ScreenTitle>API Tokens</ScreenTitle>
-      <ScreenDek>
-        Bearer tokens for non-browser clients (e.g. the MCP server) — a token acts as you, with the same access your
-        login has. Keep it as secret as your password; anyone in this browser session can mint or revoke tokens, but
-        the token itself only ever works over the API, never to log into the app directly.
-      </ScreenDek>
-
       {justMinted && (
         <Card className="mb-6 border-accent/40 p-5">
           <div className="mb-2 text-[12px] font-semibold tracking-wide text-accent uppercase">
