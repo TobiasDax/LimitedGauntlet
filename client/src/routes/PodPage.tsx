@@ -350,7 +350,7 @@ export function PodPage() {
         {!editing && (
           <button
             onClick={() => setEditing(true)}
-            className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+            className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-strong"
           >
             Edit pod
           </button>

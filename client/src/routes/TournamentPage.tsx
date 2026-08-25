@@ -110,7 +110,7 @@ function DescriptionSection({ tournament }: { tournament: TournamentDetail }) {
             setText(tournament.description ?? "");
             setEditing(true);
           }}
-          className="mt-1.5 text-[12px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+          className="mt-1.5 text-[12px] tracking-wide text-link uppercase hover:text-link-strong"
         >
           {tournament.description ? "Edit description" : "+ Add description"}
         </button>
@@ -311,7 +311,7 @@ export function TournamentPage() {
         {!editingTournament && (
           <button
             onClick={() => setEditingTournament(true)}
-            className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+            className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-strong"
           >
             Edit tournament
           </button>

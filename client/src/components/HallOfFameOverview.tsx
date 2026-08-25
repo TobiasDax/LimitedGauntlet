@@ -99,7 +99,7 @@ export function HallOfFameList({
                 {row.tournamentsPlayed === 1 ? "" : "s"}
               </span>
               {row.mainEventWins.length > 0 && (
-                <div className="relative z-10 mt-0.5 flex flex-wrap gap-1">
+                <div className="relative z-[1] mt-0.5 flex flex-wrap gap-1">
                   {row.mainEventWins.map((win) => (
                     <Link
                       key={win.podId}

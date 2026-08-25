@@ -47,7 +47,7 @@ function ResultEntry({ match, podId }: { match: Match; podId: string }) {
             setD(match.gamesDrawn);
             setEditing(true);
           }}
-          className="text-[11px] text-ink-muted underline hover:text-accent-strong"
+          className="text-[11px] text-link underline hover:text-link-strong"
         >
           Edit
         </button>

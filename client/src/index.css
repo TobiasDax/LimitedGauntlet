@@ -29,6 +29,16 @@
   --color-accent-strong: #e2784b;
   --color-accent-wash: rgba(220, 94, 40, 0.14);
 
+  /*
+   * Secondary link/action color (PI-32) — a muted steel blue for lower-weight
+   * affordances (the "Edit" links on descriptions/pods/tournaments) so they read
+   * as secondary next to the warm accent, not competing with it. Contrast checked
+   * (not eyeballed), same as the accent above: link vs bg 6.52 / surface 6.06 /
+   * raised 5.52; link-strong (hover) 8.89 / 8.26 / 7.53 — all clear 4.5:1.
+   */
+  --color-link: #7c9cbb;
+  --color-link-strong: #9bb6d0;
+
   --color-good: #0ca30c;
   --color-good-wash: rgba(12, 163, 12, 0.14);
   --color-warning: #fab219;
