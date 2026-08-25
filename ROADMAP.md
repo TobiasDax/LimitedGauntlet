@@ -8,13 +8,19 @@ The app is **feature-complete and running in production**. The whole numbered bu
 
 ## Open items
 
-### PI-22 — Publish a real GitHub release (not just the rolling `main`)
+### PI-22 — Publish a real GitHub release (not just the rolling `main`) — code-complete, Tobias runs the publish step
 The repo is public on GitHub but has no tagged release: no `version` in any `package.json`, `git tag -l` is empty, no GitHub Release with notes. Fine for a deploy that tracks `main`, but no stable reference point / changelog for anyone else.
-- [ ] Decide a version scheme + starting number — semver `v0.1.0` (README calls it "solid beta") is the obvious default; confirm with Tobias.
-- [ ] Add `"version"` to the root `package.json` (decide whether `server`/`client`/`mcp` track independently or inherit).
-- [ ] Write human-readable release notes summarizing PI-1…PI-21 + Steps 0-12 (the build log is the source; the release is the summary).
-- [ ] `git tag vX.Y.Z` + push, then create the GitHub Release (`gh release create` once `gh` is available/authed).
-- [ ] Optional, don't block the first release: publish Docker images to GHCR via a release-triggered Action so "deploy this" doesn't require a local build.
+- [x] **Version scheme confirmed:** semver, starting at `v0.1.0`, single shared version (root `package.json` only — `server`/`client`/`mcp` stay unversioned, they're not published independently).
+- [x] `"version": "0.1.0"` added to the root `package.json`.
+- [x] Release notes written: `RELEASE_NOTES_v0.1.0.md` at the repo root (untracked — it's the `gh release create -F` input, not meant to be a permanent repo file; delete after use or keep locally, your call).
+- [x] Local annotated tag `v0.1.0` created (not pushed — sandbox can't/shouldn't push; see below).
+- [x] GHCR image publish: `.github/workflows/docker-publish.yml`, triggered on `release: published` (+ manual `workflow_dispatch`), pushes `ghcr.io/<owner>/<repo>:0.1.0`, `:0.1`, and `:latest`.
+- [ ] **Tobias runs this** — pushing a tag and creating a public GitHub Release are both outside this sandbox's reach (no `git push`, no `gh` CLI installed here):
+  ```sh
+  git push origin v0.1.0
+  gh release create v0.1.0 --title "v0.1.0" --notes-file RELEASE_NOTES_v0.1.0.md
+  ```
+  The GHCR workflow fires automatically once the Release is published (needs Actions enabled on the repo; GHCR access uses the built-in `GITHUB_TOKEN`, no extra secret needed for a public repo).
 
 ## New improvements (backlog)
 
