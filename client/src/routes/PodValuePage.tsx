@@ -9,7 +9,7 @@ import {
   useScryfallSets,
   cardPullErrorMessage,
 } from "../features/pods/useCardPulls";
-import { usePod, podFormatLabel } from "../features/pods/usePods";
+import { usePod, podFormatDisplay } from "../features/pods/usePods";
 import { CardGallery, formatEur } from "../components/CardGallery";
 import { Button, Eyebrow, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
@@ -158,7 +158,7 @@ export function PodValuePage() {
         <Link to={`/pods/${id}`} className="hover:text-accent-strong">
           {pod ? pod.name : "Pod"}
         </Link>
-        {pod && ` · ${podFormatLabel[pod.format]}`}
+        {pod && ` · ${podFormatDisplay(pod)}`}
       </Eyebrow>
       <ScreenTitle>Value</ScreenTitle>
       <ScreenDek>Live Scryfall lookups, snapshotted at add-time — prices reflect the market when the card was logged.</ScreenDek>

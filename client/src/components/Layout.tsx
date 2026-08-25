@@ -2,6 +2,7 @@ import { Link, Outlet, useNavigate } from "react-router-dom";
 import { useLogout, useMe } from "../features/auth/useAuth";
 import { Button } from "./ui";
 import { TopBar, type NavItem } from "./TopBar";
+import { Footer } from "./Footer";
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Tournaments", end: true },
@@ -53,6 +54,8 @@ export function Layout() {
       <main className="mx-auto max-w-[1180px] px-4 pb-24 pt-8 sm:px-8 sm:pt-10">
         <Outlet />
       </main>
+
+      <Footer />
     </div>
   );
 }

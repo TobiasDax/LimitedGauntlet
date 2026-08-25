@@ -6,7 +6,7 @@ import {
   usePublicStandings,
 } from "../features/public/usePublic";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
-import { podFormatLabel } from "../features/pods/usePods";
+import { podFormatDisplay } from "../features/pods/usePods";
 import { entrantDisplayName } from "../lib/entrant";
 import { useCountdown } from "../lib/useCountdown";
 import { PrepTimerDisplay } from "../components/PrepTimer";
@@ -93,7 +93,7 @@ export function PublicPodPage() {
     <div>
       <Eyebrow>
         <Link to={`/o/${slug}/tournaments/${tournamentId}`} className="hover:text-accent-strong">
-          {podFormatLabel[pod.format]}
+          {podFormatDisplay(pod)}
         </Link>
       </Eyebrow>
       <ScreenTitle>{pod.name}</ScreenTitle>

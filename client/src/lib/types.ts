@@ -33,6 +33,15 @@ export interface Tournament {
 }
 
 export type PodFormat = "DRAFT" | "SEALED" | "CHAOS_DRAFT" | "CONSTRUCTED" | "CUSTOM";
+export type ConstructedFormat =
+  | "STANDARD"
+  | "MODERN"
+  | "LEGACY"
+  | "VINTAGE"
+  | "PIONEER"
+  | "PRE_MODERN"
+  | "PAUPER"
+  | "CUSTOM";
 export type MatchFormat = "BO1" | "BO3";
 export type PodStatus = "SETUP" | "PAIRING" | "IN_PROGRESS" | "COMPLETED";
 
@@ -57,6 +66,8 @@ export interface Pod {
   excludeFromStats: boolean;
   isMainEvent: boolean;
   setCode: string | null;
+  constructedFormat: ConstructedFormat | null;
+  constructedFormatCustom: string | null;
   prepTimerEndsAt: string | null;
   prepTimerLabel: string | null;
   createdAt: string;

@@ -1,7 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useStandings } from "../features/pods/useStandings";
 import { useSetManualTiebreak } from "../features/pods/useEntrants";
-import { usePod, podFormatLabel } from "../features/pods/usePods";
+import { usePod, podFormatDisplay } from "../features/pods/usePods";
 import { entrantDisplayName } from "../lib/entrant";
 import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
@@ -50,7 +50,7 @@ export function PodStandingsPage() {
         <Link to={`/pods/${id}`} className="hover:text-accent-strong">
           {pod ? pod.name : "Pod"}
         </Link>
-        {pod && ` · ${podFormatLabel[pod.format]}`}
+        {pod && ` · ${podFormatDisplay(pod)}`}
       </Eyebrow>
       <ScreenTitle>Standings</ScreenTitle>
       <ScreenDek>

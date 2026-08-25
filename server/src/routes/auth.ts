@@ -45,6 +45,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     reply.send({ allowSignup: config.allowSignup });
   });
 
+  // Public app-wide config the frontend chrome needs before/without a
+  // session — currently just the optional footer legal link (PI-35).
+  app.get("/api/app-config", async (_request, reply) => {
+    reply.send({
+      legalLinkUrl: config.legalLinkUrl || null,
+      legalLinkLabel: config.legalLinkLabel || null,
+    });
+  });
+
   app.post(
     "/api/auth/signup",
     { config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } },

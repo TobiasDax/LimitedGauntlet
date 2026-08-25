@@ -176,6 +176,17 @@ enum PodFormat {
   CUSTOM
 }
 
+enum ConstructedFormat {
+  STANDARD
+  MODERN
+  LEGACY
+  VINTAGE
+  PIONEER
+  PRE_MODERN
+  PAUPER
+  CUSTOM
+}
+
 enum MatchFormat {
   BO1
   BO3
@@ -201,7 +212,13 @@ model Pod {
   // always overridable per pull (e.g. a bonus-sheet card from a linked
   // companion set).
   setCode            String?
-  sequenceOrder      Int
+  // Which constructed format was played — only meaningful when
+  // format === CONSTRUCTED. CUSTOM pairs with constructedFormatCustom
+  // for a free-text name (e.g. "Canadian Highlander"); application-layer
+  // enforced, same pattern as setCode above.
+  constructedFormat       ConstructedFormat?
+  constructedFormatCustom String?
+  sequenceOrder           Int
   isTeamEvent        Boolean     @default(false)
   teamSize           Int?
   roundCount         Int         @default(3)

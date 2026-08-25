@@ -2,6 +2,7 @@ import { Outlet, useParams } from "react-router-dom";
 import { usePublicOrganization, usePublicLockStatus } from "../features/public/usePublic";
 import { PublicUnlockPrompt } from "./PublicUnlockPrompt";
 import { TopBar, type NavItem } from "./TopBar";
+import { Footer } from "./Footer";
 
 // The shareable-link surface (replaces the old Outline doc links) — one
 // link per org, viewable by anyone with the URL, no login involved. Nav
@@ -35,6 +36,8 @@ export function PublicLayout() {
       <main className="mx-auto max-w-[1180px] px-4 pb-24 pt-8 sm:px-8 sm:pt-10">
         <Outlet />
       </main>
+
+      <Footer />
     </div>
   );
 }

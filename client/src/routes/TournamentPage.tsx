@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTournament, tournamentStatusLabel, type TournamentDetail } from "../features/tournaments/useTournament";
 import { useUpdateTournament, useDeleteTournament } from "../features/tournaments/useTournaments";
-import { useCreatePod, podFormatLabel } from "../features/pods/usePods";
+import { useCreatePod, podFormatLabel, podFormatDisplay } from "../features/pods/usePods";
 import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
 import { RichText } from "../components/RichText";
 import { SetPicker } from "../components/SetPicker";
-import type { PodFormat, TournamentStatus } from "../lib/types";
+import { ConstructedFormatPicker } from "../components/ConstructedFormatPicker";
+import type { ConstructedFormat, PodFormat, TournamentStatus } from "../lib/types";
 
 const tournamentStatuses: TournamentStatus[] = ["PLANNING", "ACTIVE", "COMPLETED"];
 
@@ -164,6 +165,8 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
   const [roundLengthMinutes, setRoundLengthMinutes] = useState(50);
   const [isMainEvent, setIsMainEvent] = useState(false);
   const [setCode, setSetCode] = useState("");
+  const [constructedFormat, setConstructedFormat] = useState<ConstructedFormat | "">("");
+  const [constructedFormatCustom, setConstructedFormatCustom] = useState("");
 
   return (
     <Card className="p-6">
@@ -186,6 +189,9 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
             roundLengthMinutes,
             isMainEvent,
             setCode: setCode || undefined,
+            constructedFormat: format === "CONSTRUCTED" && constructedFormat ? constructedFormat : undefined,
+            constructedFormatCustom:
+              format === "CONSTRUCTED" && constructedFormat === "CUSTOM" ? constructedFormatCustom || undefined : undefined,
           });
         }}
       >
@@ -213,6 +219,14 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
         </Field>
 
         {(format === "DRAFT" || format === "SEALED") && <SetPicker value={setCode} onChange={setSetCode} />}
+        {format === "CONSTRUCTED" && (
+          <ConstructedFormatPicker
+            value={constructedFormat}
+            customValue={constructedFormatCustom}
+            onChange={setConstructedFormat}
+            onCustomChange={setConstructedFormatCustom}
+          />
+        )}
 
         <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
           <input type="checkbox" checked={isTeamEvent} onChange={(e) => setIsTeamEvent(e.target.checked)} />
@@ -365,7 +379,7 @@ export function TournamentPage() {
                     {pod.name}
                   </div>
                   <div className="text-[12.5px] text-ink-muted">
-                    {podFormatLabel[pod.format]}
+                    {podFormatDisplay(pod)}
                     {pod.isTeamEvent && ` · teams of ${pod.teamSize}`} · {pod.roundCount} rounds
                   </div>
                 </div>

@@ -9,7 +9,7 @@ import { Card, Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 import { GesamtwertungList } from "../components/GesamtwertungList";
 import { CardGallery, formatEur } from "../components/CardGallery";
 import { RichText } from "../components/RichText";
-import { podFormatLabel } from "../features/pods/usePods";
+import { podFormatDisplay } from "../features/pods/usePods";
 import type { CardPull } from "../lib/types";
 
 export function PublicTournamentPage() {
@@ -59,7 +59,7 @@ export function PublicTournamentPage() {
                 <div>
                   <div className="font-display text-[16px] font-bold">{pod.name}</div>
                   <div className="text-[12.5px] text-ink-muted">
-                    {podFormatLabel[pod.format]}
+                    {podFormatDisplay(pod)}
                     {pod.isTeamEvent && ` · teams of ${pod.teamSize}`} · {pod.roundCount} rounds
                   </div>
                 </div>

@@ -46,6 +46,12 @@ export const config = {
     // STARTTLS (587) vs implicit TLS (465). Default false = STARTTLS.
     secure: process.env.SMTP_SECURE === "true",
   },
+  // Optional footer legal link (PI-35) — a deployer can point this at their
+  // own hosted Impressum/Privacy Policy/etc. Blank by default: this is
+  // self-hosted OSS, so there's no built-in legal content to ship, and the
+  // footer simply omits the link when unset.
+  legalLinkUrl: process.env.LEGAL_LINK_URL ?? "",
+  legalLinkLabel: process.env.LEGAL_LINK_LABEL ?? "",
 };
 
 export function isEmailConfigured(): boolean {

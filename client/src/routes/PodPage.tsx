@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { usePod, podFormatLabel, useUpdatePod, useDeletePod, type PodDetail } from "../features/pods/usePods";
+import { usePod, podFormatLabel, podFormatDisplay, useUpdatePod, useDeletePod, type PodDetail } from "../features/pods/usePods";
 import { useAddIndividualEntrant, useAddTeamEntrant, useRemoveEntrant, entrantErrorMessage } from "../features/pods/useEntrants";
 import { usePlayers } from "../features/players/usePlayers";
 import { useTournament } from "../features/tournaments/useTournament";
@@ -10,8 +10,9 @@ import { PodTabs } from "../components/PodTabs";
 import { PrepTimer } from "../components/PrepTimer";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { SetPicker } from "../components/SetPicker";
+import { ConstructedFormatPicker } from "../components/ConstructedFormatPicker";
 import { entrantDisplayName } from "../lib/entrant";
-import type { Entrant, MatchFormat, PodFormat } from "../lib/types";
+import type { ConstructedFormat, Entrant, MatchFormat, PodFormat } from "../lib/types";
 
 const podFormats: PodFormat[] = ["DRAFT", "SEALED", "CHAOS_DRAFT", "CONSTRUCTED", "CUSTOM"];
 
@@ -29,6 +30,8 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
   const [excludeFromStats, setExcludeFromStats] = useState(pod.excludeFromStats);
   const [isMainEvent, setIsMainEvent] = useState(pod.isMainEvent);
   const [setCode, setSetCode] = useState(pod.setCode ?? "");
+  const [constructedFormat, setConstructedFormat] = useState<ConstructedFormat | "">(pod.constructedFormat ?? "");
+  const [constructedFormatCustom, setConstructedFormatCustom] = useState(pod.constructedFormatCustom ?? "");
 
   return (
     <Card className="mb-6 p-6">
@@ -50,6 +53,9 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
               excludeFromStats,
               isMainEvent,
               setCode: setCode || null,
+              constructedFormat: format === "CONSTRUCTED" && constructedFormat ? constructedFormat : null,
+              constructedFormatCustom:
+                format === "CONSTRUCTED" && constructedFormat === "CUSTOM" ? constructedFormatCustom || null : null,
             },
             { onSuccess: onDone },
           );
@@ -79,6 +85,14 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
         </Field>
 
         {(format === "DRAFT" || format === "SEALED") && <SetPicker value={setCode} onChange={setSetCode} />}
+        {format === "CONSTRUCTED" && (
+          <ConstructedFormatPicker
+            value={constructedFormat}
+            customValue={constructedFormatCustom}
+            onChange={setConstructedFormat}
+            onCustomChange={setConstructedFormatCustom}
+          />
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Rounds">
@@ -233,7 +247,7 @@ function IndividualEntrants({ podId, entrants }: { podId: string; entrants: Entr
   );
 }
 
-function TeamEntrants({ podId, entrants }: { podId: string; entrants: Entrant[] }) {
+function TeamEntrants({ podId, entrants, teamSize }: { podId: string; entrants: Entrant[]; teamSize: number | null }) {
   const { data: playersData } = usePlayers();
   const addTeam = useAddTeamEntrant(podId);
   const removeEntrant = useRemoveEntrant(podId);
@@ -242,6 +256,7 @@ function TeamEntrants({ podId, entrants }: { podId: string; entrants: Entrant[] 
 
   const taken = alreadyEnteredPlayerIds(entrants);
   const available = (playersData?.players ?? []).filter((p) => !taken.has(p.id));
+  const wrongSize = teamSize != null && memberIds.length !== teamSize;
 
   return (
     <div>
@@ -266,7 +281,7 @@ function TeamEntrants({ podId, entrants }: { podId: string; entrants: Entrant[] 
             className="flex flex-col gap-3"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!teamName.trim() || memberIds.length === 0) return;
+              if (!teamName.trim() || memberIds.length === 0 || wrongSize) return;
               addTeam.mutate(
                 { teamName: teamName.trim(), playerIds: memberIds },
                 { onSuccess: () => { setTeamName(""); setMemberIds([]); } },
@@ -288,7 +303,16 @@ function TeamEntrants({ podId, entrants }: { podId: string; entrants: Entrant[] 
                 </label>
               ))}
             </div>
-            <Button type="submit" variant="primary" disabled={!teamName.trim() || memberIds.length === 0 || addTeam.isPending}>
+            {teamSize != null && (
+              <p className={`text-[12px] ${wrongSize ? "text-critical" : "text-ink-muted"}`}>
+                {memberIds.length} / {teamSize} selected
+              </p>
+            )}
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!teamName.trim() || memberIds.length === 0 || wrongSize || addTeam.isPending}
+            >
               + Add team
             </Button>
           </form>
@@ -327,7 +351,7 @@ export function PodPage() {
             ·{" "}
           </>
         )}
-        {podFormatLabel[pod.format]} · {pod.roundCount} rounds
+        {podFormatDisplay(pod)} · {pod.roundCount} rounds
       </Eyebrow>
       <ScreenTitle>
         {pod.isMainEvent && <span title="This tournament's main event">👑 </span>}
@@ -368,7 +392,7 @@ export function PodPage() {
       <PodTabs podId={pod.id} />
 
       {pod.isTeamEvent ? (
-        <TeamEntrants podId={pod.id} entrants={pod.entrants} />
+        <TeamEntrants podId={pod.id} entrants={pod.entrants} teamSize={pod.teamSize} />
       ) : (
         <IndividualEntrants podId={pod.id} entrants={pod.entrants} />
       )}

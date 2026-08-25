@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import type { Entrant, MatchFormat, Pod, PodFormat } from "../../lib/types";
+import type { ConstructedFormat, Entrant, MatchFormat, Pod, PodFormat } from "../../lib/types";
 
 export interface PodDetail extends Pod {
   entrants: Entrant[];
@@ -29,6 +29,8 @@ export interface CreatePodInput {
   roundLengthMinutes: number;
   isMainEvent?: boolean;
   setCode?: string;
+  constructedFormat?: ConstructedFormat;
+  constructedFormatCustom?: string;
 }
 
 export function useCreatePod(tournamentId: string) {
@@ -56,6 +58,8 @@ export interface UpdatePodInput {
   excludeFromStats?: boolean;
   isMainEvent?: boolean;
   setCode?: string | null;
+  constructedFormat?: ConstructedFormat | null;
+  constructedFormatCustom?: string | null;
 }
 
 export function useUpdatePod(podId: string, tournamentId?: string) {
@@ -107,3 +111,23 @@ export const podFormatLabel: Record<PodFormat, string> = {
   CONSTRUCTED: "Constructed",
   CUSTOM: "Custom",
 };
+
+export const constructedFormatLabel: Record<ConstructedFormat, string> = {
+  STANDARD: "Standard",
+  MODERN: "Modern",
+  LEGACY: "Legacy",
+  VINTAGE: "Vintage",
+  PIONEER: "Pioneer",
+  PRE_MODERN: "Pre-Modern",
+  PAUPER: "Pauper",
+  CUSTOM: "Custom",
+};
+
+// "Constructed — Modern" / "Constructed — <custom name>" for a CONSTRUCTED
+// pod with a format recorded, otherwise just the plain format label.
+export function podFormatDisplay(pod: Pick<Pod, "format" | "constructedFormat" | "constructedFormatCustom">): string {
+  if (pod.format !== "CONSTRUCTED" || !pod.constructedFormat) return podFormatLabel[pod.format];
+  const detail =
+    pod.constructedFormat === "CUSTOM" ? pod.constructedFormatCustom : constructedFormatLabel[pod.constructedFormat];
+  return detail ? `${podFormatLabel[pod.format]} — ${detail}` : podFormatLabel[pod.format];
+}

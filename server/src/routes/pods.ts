@@ -22,6 +22,7 @@ function syncTournamentAttendance(tx: Prisma.TransactionClient, tournamentId: st
 }
 
 const podFormats = ["DRAFT", "SEALED", "CHAOS_DRAFT", "CONSTRUCTED", "CUSTOM"] as const;
+const constructedFormats = ["STANDARD", "MODERN", "LEGACY", "VINTAGE", "PIONEER", "PRE_MODERN", "PAUPER", "CUSTOM"] as const;
 const matchFormats = ["BO1", "BO3"] as const;
 const podStatuses = ["SETUP", "PAIRING", "IN_PROGRESS", "COMPLETED"] as const;
 
@@ -43,6 +44,8 @@ const podCreateSchema = z.object({
   excludeFromStats: z.boolean().default(false),
   isMainEvent: z.boolean().default(false),
   setCode: z.string().trim().toLowerCase().min(2).max(10).optional(),
+  constructedFormat: z.enum(constructedFormats).optional(),
+  constructedFormatCustom: z.string().trim().min(1).max(60).optional(),
 });
 
 // Deliberately NOT `podCreateSchema.partial()` — the create schema uses
@@ -70,7 +73,23 @@ const podUpdateSchema = z.object({
   excludeFromStats: z.boolean().optional(),
   isMainEvent: z.boolean().optional(),
   setCode: z.string().trim().toLowerCase().min(2).max(10).nullable().optional(),
+  constructedFormat: z.enum(constructedFormats).nullable().optional(),
+  constructedFormatCustom: z.string().trim().min(1).max(60).nullable().optional(),
 });
+
+// A constructedFormat only makes sense on a CONSTRUCTED pod, and
+// constructedFormatCustom only pairs with the CUSTOM option — enforced
+// here (not via Zod .refine) to match the existing isTeamEvent/teamSize
+// check below, which needs the same "read body + 400" shape.
+function constructedFormatError(format: string | undefined, data: {
+  constructedFormat?: string | null;
+  constructedFormatCustom?: string | null;
+}): string | null {
+  if (data.constructedFormat && format !== "CONSTRUCTED") return "constructed_format_requires_constructed_pod";
+  if (data.constructedFormatCustom && data.constructedFormat !== "CUSTOM") return "constructed_format_custom_requires_custom";
+  if (data.constructedFormat === "CUSTOM" && !data.constructedFormatCustom) return "constructed_format_custom_name_required";
+  return null;
+}
 
 const individualEntrantSchema = z.object({ playerId: z.string().min(1) });
 const teamEntrantSchema = z.object({
@@ -141,6 +160,12 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
 
     if (body.data.isTeamEvent && !body.data.teamSize) {
       reply.code(400).send({ error: "team_size_required" });
+      return;
+    }
+
+    const constructedError = constructedFormatError(body.data.format, body.data);
+    if (constructedError) {
+      reply.code(400).send({ error: constructedError });
       return;
     }
 
@@ -225,6 +250,12 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
     const existing = await findOwnedPod(params.data.id, request.organizer!.orgId);
     if (!existing) {
       reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    const constructedError = constructedFormatError(body.data.format ?? existing.format, body.data);
+    if (constructedError) {
+      reply.code(400).send({ error: constructedError });
       return;
     }
 
@@ -322,6 +353,11 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       const body = teamEntrantSchema.safeParse(request.body);
       if (!body.success) {
         reply.code(400).send({ error: "invalid_input", issues: body.error.issues });
+        return;
+      }
+
+      if (pod.teamSize && body.data.playerIds.length !== pod.teamSize) {
+        reply.code(400).send({ error: "wrong_team_size", expected: pod.teamSize, got: body.data.playerIds.length });
         return;
       }
 

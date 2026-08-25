@@ -99,21 +99,27 @@ Split out from the PI-28 account-deletion decision (2026-08-25). The data model 
 - [x] **Explicit "delete organization"** action (`POST /api/settings/delete-organization`, hard-gated: password + type org name) — always deletes the whole org regardless of organizer count. Distinct from "delete my account". Only shown in Settings when `organizerCount > 1` (for a solo organizer, "Delete account" already does this — a second identical-looking danger button would just be clutter).
 - [x] Revisited PI-28's cascade: `POST /api/settings/delete-account` now checks `organizerCount` — if >1, it only removes the caller's own `OrganizerAccount` ("leave organization", confirmed by typing your own email) and leaves the org untouched; if it's the last organizer, unchanged full-org-delete behavior (confirmed by typing the org name). `organizerCount` added to `/auth/login` and `/auth/me` responses so the frontend knows which copy/behavior to show.
 
-### PI-35 — Footer bar with legal links and GitHub link
+### PI-35 — Footer bar with legal links and GitHub link ✅ (code-complete, browser-verify pending)
 Add a site-wide footer bar: legal links (e.g. Impressum/Privacy — decide what's actually needed for a self-hosted OSS app vs. what individual deployers should supply) and a link to the GitHub repo.
-- [ ] Decide scope: does this app need Impressum/Privacy Policy content out of the box (multi-tenant, public pages, EU self-hosters), or just placeholder links/slots a deployer fills in via config? Confirm with Tobias before building.
-- [ ] Decide footer placement: global (`Layout`/`PublicLayout` shared chrome) vs. per-surface (authed app vs. public `/o/:slug/...` pages) — likely both, sharing one `Footer` component.
-- [ ] GitHub link target: the actual public repo URL.
+- [x] **Scope decided:** GitHub + License links ship built-in (no legal content of our own). A third link is a deployer-configured slot: `LEGAL_LINK_URL` + `LEGAL_LINK_LABEL` env vars, surfaced via a new public `GET /api/app-config` (`server/src/routes/auth.ts`, config in `server/src/config.ts`), rendered only when both are set. Documented in `.env.example` + passed through `docker-compose.yml`.
+- [x] **Placement:** new shared `Footer.tsx` (`client/src/components/Footer.tsx`, backed by `useAppConfig` in `client/src/features/config/useAppConfig.ts`), rendered in both `Layout.tsx` (authed) and `PublicLayout.tsx` (public `/o/:slug/...`), after `<main>` inside the shared `min-h-screen` chrome — same "shared chrome" pattern `TopBar` already uses.
+- [x] GitHub link target: `https://github.com/TobiasDax/LimitedGauntlet` (License links to `/blob/main/LICENSE` on the same repo).
 
-### PI-36 — Constructed format dropdown (Standard, Modern, Legacy, etc.)
+### PI-36 — Constructed format dropdown (Standard, Modern, Legacy, etc.) ✅ (code-complete, browser-verify pending)
 Pods with `format: CONSTRUCTED` currently don't record *which* constructed format was played. Add a dropdown for that: Standard, Modern, Legacy, Vintage, Pioneer, Pre-Modern, Pauper, plus a **Custom** option that reveals a free-text field to record an arbitrary format name.
-- [ ] New field (e.g. `Pod.constructedFormat` enum + `Pod.constructedFormatCustom String?` for the Custom text, mirroring how other optional pod fields are modeled) — only relevant/shown when the pod's top-level `format` is `CONSTRUCTED`.
-- [ ] Decide whether this is required or optional for constructed pods, and how it displays on standings/pod pages (badge/label next to the pod name, presumably).
-- [ ] Update create/edit pod forms (`DashboardPage`/`PodPage` or wherever pod format is set) with the conditional dropdown + custom text field.
+- [x] New `ConstructedFormat` enum + `Pod.constructedFormat`/`Pod.constructedFormatCustom String?` fields (migration `20260825140000_add_pod_constructed_format`), mirroring the `setCode` optional-field pattern. Both optional; application-layer enforced (not a DB constraint) that `constructedFormat` only applies to `CONSTRUCTED` pods and `constructedFormatCustom` only pairs with the `CUSTOM` option — see `constructedFormatError()` in `server/src/routes/pods.ts`.
+- [x] **Optional, not required** — a constructed pod can leave it unset. Displayed via a new `podFormatDisplay()` helper (`client/src/features/pods/usePods.ts`) as "Constructed — Modern" etc., wherever the plain format label used to show (pod header, tournament pod list, public pod/tournament pages, standings, value page).
+- [x] New shared `ConstructedFormatPicker` component (`client/src/components/ConstructedFormatPicker.tsx`), wired into both `NewPodForm` (`TournamentPage.tsx`) and `EditPodForm` (`PodPage.tsx`) — shown only when `format === "CONSTRUCTED"`, same conditional pattern as the existing `SetPicker`.
+- [ ] Browser-verified.
 
-### PI-37 — Multiplayer support for Constructed: 2v2 and 4-player Commander
-Bigger structural feature — support multiplayer constructed pod types beyond 1v1: **2v2** and **4-player Commander**. Tobias flagged 4-player Commander in particular as possibly a v2-scale feature, not a quick add.
-- [ ] **2v2** may mostly reuse the existing team-pod machinery (`Entrant` already unifies individuals/teams for 2HG-style events per `PLAN.md`) — check how far that gets before building anything new.
+### PI-37a — 2v2 Constructed (multiplayer/4-player Commander split out, see PI-37b)
+Bigger structural feature — support multiplayer constructed pod types beyond 1v1: **2v2** and **4-player Commander**. Tobias flagged 4-player Commander in particular as possibly a v2-scale feature, not a quick add, so it's tracked separately as **PI-37b** below; this entry covers the 2v2 slice only.
+- [x] **2v2 needed zero pairing/standings changes** — confirmed the existing team-pod machinery (`Entrant` unifying individuals/teams) is already format-agnostic: no `format`-conditional branching anywhere in `pairing.ts`/`standings.ts`/`podStats.ts`/`weekendHistory.ts`. A `CONSTRUCTED` pod with `isTeamEvent: true, teamSize: 2` already pairs/scores correctly today.
+- [x] **Found and fixed the one real gap:** nothing previously validated that a team-entrant's `playerIds.length` matched `pod.teamSize` — an organizer could add a "2-player team" with 1, 3, or 5 members and nothing rejected it. Fixed server-side (`POST /api/pods/:id/entrants`, `pods.ts`) with a `wrong_team_size` 400, plus a matching client-side guard + "x / N selected" hint in `TeamEntrants` (`PodPage.tsx`) that disables submit until the count matches.
+- [ ] Browser-verified.
+
+### PI-37b — 4-player Commander (multiplayer pairing system, deferred)
+Split out from PI-37a — this is the larger, v2-scale piece: 4-player Commander needs a different pairing system entirely rather than reusing 1v1/team Swiss.
 - [ ] **4-player Commander needs a different pairing system entirely** — pod-based multiplayer pairing (4 players/table) rather than 1v1 Swiss pairing. Scope as given:
   - Swiss pairing for the field above 16 players.
   - Cut to Top 16 once Swiss rounds finish.
