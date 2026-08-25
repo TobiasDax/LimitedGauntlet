@@ -18,10 +18,10 @@ export function GesamtwertungPage() {
     <div>
       <Eyebrow>
         <Link to={`/tournaments/${id}`} className="hover:text-accent-strong">
-          {tournamentData?.tournament.name ?? "Weekend overview"}
+          {tournamentData?.tournament.name ?? "Tournament overview"}
         </Link>
       </Eyebrow>
-      <ScreenTitle>Gesamtwertung</ScreenTitle>
+      <ScreenTitle>Tournament Standings</ScreenTitle>
       <ScreenDek>Ranked by average points per pod played, not raw total — nobody's penalized for missing an event.</ScreenDek>
 
       <GesamtwertungList pods={data.pods} rows={data.gesamtwertung} />

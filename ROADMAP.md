@@ -65,9 +65,10 @@ Supports PI-28's email-change verification (and any future notifications). Bigge
 - [ ] **Security/anti-spam:** app only sends to its own organizers' addresses (no user-supplied arbitrary recipients), rate-limit sends, no open relay surface. Verification links are single-use + expiring. Fail gracefully / clearly if SMTP isn't configured (features that need it degrade, don't crash).
 - [ ] Optional for self-hosters: keep SMTP optional so the app still runs without it (email-change just unavailable until configured).
 
-### PI-30 — Rename "Gesamtwertung" → "Tournament Standings"
+### PI-30 — Rename "Gesamtwertung" → "Tournament Standings" ✅ (code-complete, browser-verify pending)
 The tournament-wide standings feature/page uses a German term; rename it to **"Tournament Standings"** for a broader audience (deliberately *not* "Weekend Standings" — not every tournament spans a weekend).
-- [ ] Rename across UI labels, routes if desired, component/hook names (`GesamtwertungList`, `useGesamtwertung`, `computeGesamtwertung`, endpoint paths) — decide how deep the rename goes (user-facing only vs. code too). Update PLAN.md/README wording.
+- [x] **Scope decision: user-facing text only.** Renamed the three rendered strings (`GesamtwertungPage` title + "Weekend overview"→"Tournament overview" fallback, `PublicTournamentPage` heading, `TournamentPage` "View standings" link) plus the README's user-facing mentions (feature list + screenshot alt).
+- [x] **Deliberately NOT renamed:** code identifiers (`GesamtwertungList`, `useGesamtwertung`, `computeGesamtwertung`, types), API endpoint paths, JSON response keys, query keys, the `/gesamtwertung` client route, and the historical German term in PLAN.md/BUILD-LOG.md (it's the real term the group used). The German word only hurts where a broad audience *reads* it (the UI); renaming endpoints/hooks is a cross-package (client/server/mcp/tests) API-contract ripple with zero user value and no runtime verification available here. A code-level rename is a separate mechanical pass if ever wanted.
 
 ### PI-31 — Richer Markdown for tournament descriptions
 The tournament description (built in the build log's PI-8 as a safe minimal renderer — plain text + auto-linked URLs + `[label](url)` only) should support fuller Markdown so detailed descriptions can be crafted. **No file uploads.**

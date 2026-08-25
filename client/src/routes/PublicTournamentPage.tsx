@@ -70,7 +70,7 @@ export function PublicTournamentPage() {
         </div>
       )}
 
-      <h2 className="font-display mb-1 text-[22px] font-bold">Gesamtwertung</h2>
+      <h2 className="font-display mb-1 text-[22px] font-bold">Tournament Standings</h2>
       <p className="mb-6 text-[13px] text-ink-secondary">
         Ranked by average points per pod played, not raw total.
       </p>

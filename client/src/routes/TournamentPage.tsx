@@ -330,7 +330,7 @@ export function TournamentPage() {
             to={`/tournaments/${tournament.id}/gesamtwertung`}
             className="inline-block text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-strong"
           >
-            View Gesamtwertung →
+            View standings →
           </Link>
           <Link
             to={`/tournaments/${tournament.id}/value`}
