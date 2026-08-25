@@ -70,11 +70,12 @@ The tournament-wide standings feature/page uses a German term; rename it to **"T
 - [x] **Scope decision: user-facing text only.** Renamed the three rendered strings (`GesamtwertungPage` title + "Weekend overview"→"Tournament overview" fallback, `PublicTournamentPage` heading, `TournamentPage` "View standings" link) plus the README's user-facing mentions (feature list + screenshot alt).
 - [x] **Deliberately NOT renamed:** code identifiers (`GesamtwertungList`, `useGesamtwertung`, `computeGesamtwertung`, types), API endpoint paths, JSON response keys, query keys, the `/gesamtwertung` client route, and the historical German term in PLAN.md/BUILD-LOG.md (it's the real term the group used). The German word only hurts where a broad audience *reads* it (the UI); renaming endpoints/hooks is a cross-package (client/server/mcp/tests) API-contract ripple with zero user value and no runtime verification available here. A code-level rename is a separate mechanical pass if ever wanted.
 
-### PI-31 — Richer Markdown for tournament descriptions
+### PI-31 — Richer Markdown for tournament descriptions ✅ (code-complete, browser-verify pending)
 The tournament description (built in the build log's PI-8 as a safe minimal renderer — plain text + auto-linked URLs + `[label](url)` only) should support fuller Markdown so detailed descriptions can be crafted. **No file uploads.**
-- [ ] Support headings, ordered/unordered lists, bold/italic/underline, tables, etc.
-- [ ] **Keep the XSS-safe posture** PI-8 established — no raw HTML / `dangerouslySetInnerHTML`. Use a Markdown lib with a safe React renderer (or a sanitizer); no image/file upload surface.
-- [ ] Editor UX: the `Textarea` stays plain Markdown source, or add light preview — decide during implementation. Renders on both `TournamentPage` (authed) and `PublicTournamentPage`.
+- [x] `RichText` now renders full Markdown via `react-markdown` + `remark-gfm`: headings, ordered/unordered lists, **bold**/*italic*/<u>underline</u>, tables, code, blockquotes, strikethrough, links. Element styling centralized in a `.markdown` CSS scope (`index.css`) since Tailwind preflight strips defaults.
+- [x] **XSS-safe:** react-markdown emits React nodes (no `dangerouslySetInnerHTML` for the Markdown). `rehype-raw` lets literal tags through only so `<u>` works, but `rehype-sanitize` runs after it with a strict allowlist that **drops `img`** (no image/file-embed surface) and adds only `u`. Links forced to `target=_blank rel=noopener noreferrer`.
+- [x] Editor stays plain Markdown source (no live preview) with a "Markdown supported" hint on both the create form (`DashboardPage`) and the inline edit-in-place (`TournamentPage`). Renders on `TournamentPage` (authed) + `PublicTournamentPage`. Server description cap raised 4000→10000 for detailed content.
+- [ ] Nice-to-have not built: a live side-by-side preview while editing.
 
 ### PI-32 — Secondary link color for Edit buttons (muted blue) ✅ (code-complete, browser-verify pending)
 Introduce a secondary link/action color, distinct from the accent — mainly for the "Edit" affordances (description, pod, tournament). A muted blue is the proposed direction.

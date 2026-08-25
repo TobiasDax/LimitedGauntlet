@@ -119,12 +119,12 @@ export function DashboardPage() {
             <Field label="Location" hint="Optional">
               <TextField value={location} onChange={(e) => setLocation(e.target.value)} />
             </Field>
-            <Field label="Description" hint="Optional · URLs and [label](https://…) become clickable links">
+            <Field label="Description" hint="Optional · Markdown supported (headings, lists, bold/italic, tables, links)">
               <Textarea
                 rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Links to the Outline pages, venue notes, format explainer…"
+                placeholder="Venue notes, format explainer, schedule… Markdown supported."
               />
             </Field>
             <div className="flex gap-2">

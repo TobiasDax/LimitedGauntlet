@@ -121,11 +121,14 @@ function DescriptionSection({ tournament }: { tournament: TournamentDetail }) {
   return (
     <div className="mb-6 flex flex-col gap-2">
       <Textarea
-        rows={4}
+        rows={6}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Links to the Outline pages, venue notes, format explainer… URLs and [label](https://…) become clickable."
+        placeholder={"Venue notes, format explainer, schedule…\n\nMarkdown supported: # headings, - lists, **bold**, *italic*, tables, [links](https://…)."}
       />
+      <p className="text-[12px] text-ink-muted">
+        Supports Markdown — headings, lists, <strong>bold</strong>/<em>italic</em>/<u>underline</u>, tables, and links.
+      </p>
       <div className="flex gap-2">
         <Button
           variant="primary"

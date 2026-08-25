@@ -1,39 +1,35 @@
-import type { ReactNode } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 
-// Renders a plain-text blurb with clickable links, safely. Everything is
-// emitted as React nodes — plain text becomes auto-escaped text nodes and
-// ONLY http/https URLs become <a> elements — so there's no raw-HTML / XSS
-// surface (no dangerouslySetInnerHTML). Supports bare URLs and Markdown-style
-// [label](url) links; newlines are preserved via `whitespace-pre-wrap`.
-const TOKEN = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s)]+)/g;
+// Renders a Markdown blurb (PI-31) — headings, ordered/unordered lists,
+// bold/italic/underline, tables, code, blockquotes, links — safely.
+//
+// XSS posture (unchanged from PI-8's intent): react-markdown emits React nodes,
+// never dangerouslySetInnerHTML for the Markdown itself. rehype-raw lets a
+// couple of literal HTML tags through (so `<u>` underline works, since Markdown
+// has no underline syntax), but rehype-sanitize runs AFTER it and strips
+// everything to a strict allowlist — the schema below drops `img` (no external
+// image / file-embed surface, per "no file uploads") and adds only `u`. Links
+// are additionally forced to open in a new tab with noopener/noreferrer.
+const schema: typeof defaultSchema = {
+  ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames ?? []).filter((t) => t !== "img"), "u"],
+};
 
 export function RichText({ text, className = "" }: { text: string; className?: string }) {
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
-  let key = 0;
-
-  for (const match of text.matchAll(TOKEN)) {
-    const start = match.index ?? 0;
-    if (start > lastIndex) nodes.push(text.slice(lastIndex, start));
-
-    const url = match[2] ?? match[3]; // guaranteed http(s) by the regex
-    const label = match[1] ?? match[3];
-    nodes.push(
-      <a
-        key={key++}
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-accent underline hover:text-accent-strong"
-      >
-        {label}
-      </a>,
-    );
-    lastIndex = start + match[0].length;
-  }
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
-
   return (
-    <div className={`text-[14px] leading-relaxed whitespace-pre-wrap text-ink-secondary ${className}`}>{nodes}</div>
+    <div className={`markdown text-[14px] leading-relaxed text-ink-secondary ${className}`}>
+      <Markdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, schema]]}
+        components={{
+          a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+        }}
+      >
+        {text}
+      </Markdown>
+    </div>
   );
 }

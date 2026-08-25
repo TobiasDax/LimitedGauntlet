@@ -11,7 +11,8 @@ const tournamentCreateSchema = z.object({
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   location: z.string().trim().max(200).optional(),
-  description: z.string().trim().max(4000).optional(),
+  // Roomy cap for detailed Markdown descriptions (PI-31): headings, lists, tables.
+  description: z.string().trim().max(10000).optional(),
 });
 
 const tournamentUpdateSchema = z.object({
@@ -20,7 +21,7 @@ const tournamentUpdateSchema = z.object({
   endDate: z.coerce.date().optional(),
   location: z.string().trim().max(200).optional(),
   // nullable so the description can be cleared back to empty
-  description: z.string().trim().max(4000).nullable().optional(),
+  description: z.string().trim().max(10000).nullable().optional(),
   status: z.enum(["PLANNING", "ACTIVE", "COMPLETED"]).optional(),
 });
 
