@@ -113,18 +113,53 @@ Pods with `format: CONSTRUCTED` currently don't record *which* constructed forma
 - [x] New shared `ConstructedFormatPicker` component (`client/src/components/ConstructedFormatPicker.tsx`), wired into both `NewPodForm` (`TournamentPage.tsx`) and `EditPodForm` (`PodPage.tsx`) — shown only when `format === "CONSTRUCTED"`, same conditional pattern as the existing `SetPicker`.
 - [ ] Browser-verified.
 
-### PI-37a — 2v2 Constructed (multiplayer/4-player Commander split out, see PI-37b)
-Bigger structural feature — support multiplayer constructed pod types beyond 1v1: **2v2** and **4-player Commander**. Tobias flagged 4-player Commander in particular as possibly a v2-scale feature, not a quick add, so it's tracked separately as **PI-37b** below; this entry covers the 2v2 slice only.
+### PI-37a — 2v2 Constructed
+Support the 2v2 multiplayer constructed pod type beyond 1v1. (4-player Commander was considered alongside this but dropped as out of scope for the app — 1v1/team Swiss is the model this app commits to.)
 - [x] **2v2 needed zero pairing/standings changes** — confirmed the existing team-pod machinery (`Entrant` unifying individuals/teams) is already format-agnostic: no `format`-conditional branching anywhere in `pairing.ts`/`standings.ts`/`podStats.ts`/`weekendHistory.ts`. A `CONSTRUCTED` pod with `isTeamEvent: true, teamSize: 2` already pairs/scores correctly today.
 - [x] **Found and fixed the one real gap:** nothing previously validated that a team-entrant's `playerIds.length` matched `pod.teamSize` — an organizer could add a "2-player team" with 1, 3, or 5 members and nothing rejected it. Fixed server-side (`POST /api/pods/:id/entrants`, `pods.ts`) with a `wrong_team_size` 400, plus a matching client-side guard + "x / N selected" hint in `TeamEntrants` (`PodPage.tsx`) that disables submit until the count matches.
 - [ ] Browser-verified.
 
-### PI-37b — 4-player Commander (multiplayer pairing system, deferred)
-Split out from PI-37a — this is the larger, v2-scale piece: 4-player Commander needs a different pairing system entirely rather than reusing 1v1/team Swiss.
-- [ ] **4-player Commander needs a different pairing system entirely** — pod-based multiplayer pairing (4 players/table) rather than 1v1 Swiss pairing. Scope as given:
-  - Swiss pairing for the field above 16 players.
-  - Cut to Top 16 once Swiss rounds finish.
-  - Top 4 (from the Top 16 stage) form the finals table.
-  - Edge case: pods that start with fewer than 16 players need a manual way to add non-winning players into the finals table (the cut math doesn't work cleanly below 16).
-- [ ] **Research first:** look at how other cEDH tournament tools (e.g. existing bracket/pairing software used at cEDH events) handle multiplayer pairing, sub-16-player cuts, and finals-table formation before designing this — don't build pairing logic from scratch without that survey.
-- [ ] Given the scope, consider treating 4-player Commander as a separate/v2 milestone rather than bundling with the 2v2 work.
+### PI-38 — Organizer data export
+Give an organizer a way to export all their org's data in a machine-readable form, so it can be moved/backed up or imported elsewhere (pairs with PI-39's import).
+- [ ] **Contents:** all tournaments, pods, matches — plus the Hall of Fame and the Treasure Vault (card-value data). Machine-readable (JSON), structured so PI-39 can round-trip it back in.
+- [ ] **UI:** a single "Export" button on the Settings page (organizer-scoped) that opens a popup with checkboxes for what to include (tournaments/pods/matches, Hall of Fame, Treasure Vault), then downloads the file.
+- [ ] Lives in an **Export / Import** section of the Settings page (shared with PI-39).
+
+### PI-39 — Organizer data import (UI)
+A UI path to import data into an organization, so imports don't require shell/`import-legacy` access.
+- [ ] **v1:** accept the PI-38 export file (round-trips our own format back into an org).
+- [ ] **Next step (later):** also accept the `legacy-data.json` history file that the `/import-history` skill produces — folding the existing `import-legacy.ts` flow into the UI. See PI-40 for the duplicate-org handling that needs sorting out first.
+- [ ] **UI:** part of the same **Export / Import** section on the Settings page as PI-38.
+
+### PI-40 — History import: default slug + duplicate-org handling
+Cleanups to the existing `import-legacy.ts` flow (`server/src/scripts/import-legacy.ts`).
+- [ ] **Default slug:** `upsertOrg()` currently defaults `IMPORT_ORG_SLUG` to `gp-eichstaett` (and name to `GP Eichstätt`) — too specific to be a useful default. Change the default slug to `gp` (reconsider the default name alongside it).
+- [ ] **Duplicate-org handling — investigated:** the tool checks for an existing org **by slug only** (`findUnique({ where: { slug } })`); if the slug matches it reuses the org, and tournament/pod idempotency (matched by name) prevents duplicated rows on re-run. But **org name is not unique** — running a second import with the same *name* under a *different* slug silently creates a second org. Decide the desired behavior (e.g. warn/refuse on a name collision, or make the match/dedupe intent explicit) and implement it, especially before PI-39 exposes this via the UI where a footgun is easier to hit.
+
+### PI-41 — Roadmap overview in the README
+Surface a short roadmap snapshot in `README.md` for quick visibility, so a visitor/self-hoster can see project status and what's planned without opening `ROADMAP.md`.
+- [ ] Add a brief "Roadmap" section to the README: current status (feature-complete, latest release) + a short bullet list of notable open/backlog items, linking to `ROADMAP.md` for the full detail.
+- [ ] Keep it **short and pointer-style** — the canonical list stays here in `ROADMAP.md`; the README is just a teaser so the two don't drift (don't duplicate every PI item).
+
+### PI-42 — Register / Login via OIDC
+Add OIDC as a login/registration option so the app can be used with an external identity provider (self-hosted Authelia/Keycloak/etc.), alongside the existing email+password organizer accounts.
+- [ ] Standard OIDC authorization-code flow; configured per-deployment via env (issuer, client id/secret, redirect URL), degrading cleanly to email+password-only when unconfigured (same optional-feature posture as SMTP in PI-29).
+- [ ] **Account linking by email:** an OIDC login whose verified email matches an existing `OrganizerAccount` links to that account rather than creating a duplicate; a new email provisions a new account. Keep the session model unchanged (still `@fastify/secure-session` encrypted cookies — OIDC only establishes identity, no external session store, per the "no auth dependency beyond the DB" convention).
+- [ ] Consider org/first-run semantics: how an OIDC-provisioned account maps to an organization (join-by-invite reuse of PI-34, or first login creating an org).
+
+### PI-43 — Optional social login via Google (lower priority)
+Google as a social-login provider on top of PI-42's OIDC groundwork. **Lower priority** — this is for public/general use, not needed for Tobias's own deployment right now.
+- [ ] Reuse PI-42's OIDC/account-linking machinery (Google is an OIDC provider); mainly the provider config + a "Sign in with Google" button. Optional/off unless configured.
+
+### PI-44 — Public demo instance (lower priority)
+A public demo deployment so prospective self-hosters can try the app without standing one up. **Lower priority.**
+- [ ] **Seed data:** reuse Tobias's real live data but **anonymize the player names** and **clean up the unfinished/untracked pods** so the demo shows a tidy, complete dataset.
+- [ ] **Known demo login:** a fixed, published organizer credential (`admin@demo.com` / `admin`) so anyone can log in and click around.
+- [ ] **Auto-reset:** the instance resets to a known previous state every X hours (scheduled job / re-seed), so demo visitors' edits don't accumulate.
+- [ ] Decide hosting/where it lives (likely DaxLite alongside the main deploy) and how the reset is wired (cron re-seed vs. volume snapshot restore).
+
+### PI-45 — Share popup with QR code for a pod's public link
+The pod page's "Public link ↗" (`PodPage.tsx`) is currently a plain anchor that just opens the public pod page in a new tab. Turn it into a proper share affordance: a popup showing the shareable link plus a generated QR code so players can scan it to open the pod's public page on their phone.
+- [ ] Clicking the share control opens a popup/modal displaying the full public URL (`/o/:slug/tournaments/:id/pods/:podId`) with a copy button, and a **QR code** encoding that same URL.
+- [ ] Generate the QR client-side (add a small QR lib) — no server round-trip, works offline once the page is loaded.
+- [ ] Consider reusing the same share popup for the other public surfaces (tournament page, Hall of Fame, Treasure Vault) if it generalizes cleanly, but the pod link is the primary target.
