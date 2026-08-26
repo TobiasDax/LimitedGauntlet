@@ -5,6 +5,7 @@ import { ApiTokensSection } from "../components/settings/ApiTokensSection";
 import { PublicLockSection } from "../components/settings/PublicLockSection";
 import { OrganizersSection } from "../components/settings/OrganizersSection";
 import { ExportImportSection } from "../components/settings/ExportImportSection";
+import { WebhookSection } from "../components/settings/WebhookSection";
 import { AccountSection } from "../components/settings/AccountSection";
 
 // Organizer settings hub (PI-26). Organizer-only (this route is inside the

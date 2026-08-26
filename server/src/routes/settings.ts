@@ -7,6 +7,7 @@ import { requireSessionAuth } from "../auth/middleware.js";
 import { isEmailConfigured, sendMail, resolveBaseUrl } from "../services/mailer.js";
 import { buildOrgExport, type ExportSections } from "../services/orgExport.js";
 import { ImportInProgressError, parseOrgExport, importOrgData } from "../services/orgImport.js";
+import { generateWebhookSecret, sendTestWebhookEvent } from "../services/webhooks.js";
 import { refreshRealtimeAuthorization } from "../realtime.js";
 
 const publicLockSchema = z.object({ password: z.string().min(4).max(200) });
@@ -30,6 +31,14 @@ const deleteOrganizationSchema = z.object({
   confirmName: z.string().min(1),
 });
 const inviteOrganizerSchema = z.object({ email: z.string().trim().toLowerCase().email() });
+const webhookUrlSchema = z.object({
+  url: z
+    .string()
+    .trim()
+    .url()
+    .refine((url) => url.startsWith("http://") || url.startsWith("https://"), "must be an http(s) URL")
+    .nullable(),
+});
 const idParams = z.object({ id: z.string().min(1) });
 
 const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — invites sit in inboxes longer than the 1hr email-change link
@@ -421,4 +430,69 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     }
     reply.code(204).send();
   });
+
+  // --- Outbound webhook (PI-50) ---
+  // Per-organization, off unless a URL is configured. Session-auth only,
+  // like everything else in this file — a leaked API token must not be able
+  // to read the signing secret or repoint the webhook.
+
+  app.get("/api/settings/webhook", async (request, reply) => {
+    const org = await prisma.organization.findUniqueOrThrow({
+      where: { id: request.organizer!.orgId },
+      select: { webhookUrl: true, webhookSecret: true },
+    });
+    reply.send({ url: org.webhookUrl, secret: org.webhookSecret });
+  });
+
+  // Sets (or clears, with url: null) the webhook URL. Generates a secret on
+  // first-ever configure; an existing secret is left alone so re-saving the
+  // URL doesn't silently break an already-wired-up receiver.
+  app.put("/api/settings/webhook", async (request, reply) => {
+    const body = webhookUrlSchema.safeParse(request.body);
+    if (!body.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const org = await prisma.organization.findUniqueOrThrow({
+      where: { id: request.organizer!.orgId },
+      select: { webhookSecret: true },
+    });
+    const updated = await prisma.organization.update({
+      where: { id: request.organizer!.orgId },
+      data: {
+        webhookUrl: body.data.url,
+        webhookSecret: body.data.url === null ? null : (org.webhookSecret ?? generateWebhookSecret()),
+      },
+      select: { webhookUrl: true, webhookSecret: true },
+    });
+    reply.send({ url: updated.webhookUrl, secret: updated.webhookSecret });
+  });
+
+  // Rotates the signing secret without touching the URL — for "I think this
+  // leaked" or just periodic hygiene.
+  app.post("/api/settings/webhook/regenerate-secret", async (request, reply) => {
+    const org = await prisma.organization.findUniqueOrThrow({
+      where: { id: request.organizer!.orgId },
+      select: { webhookUrl: true },
+    });
+    if (!org.webhookUrl) {
+      reply.code(400).send({ error: "not_configured" });
+      return;
+    }
+    const updated = await prisma.organization.update({
+      where: { id: request.organizer!.orgId },
+      data: { webhookSecret: generateWebhookSecret() },
+      select: { webhookUrl: true, webhookSecret: true },
+    });
+    reply.send({ url: updated.webhookUrl, secret: updated.webhookSecret });
+  });
+
+  app.post(
+    "/api/settings/webhook/test",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const result = await sendTestWebhookEvent(request.organizer!.orgId);
+      reply.send(result);
+    },
+  );
 }

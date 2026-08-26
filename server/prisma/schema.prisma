@@ -23,6 +23,18 @@ model Organization {
   // password once to view any /o/<slug>/... page — an opt-in, off-by-default
   // exception to "public pages stay open", set only by the organizer.
   publicPasswordHash String?
+  // Outbound webhook (PI-50): an HMAC-signed HTTP POST fired on round
+  // lifecycle events (round started/extended/completed, pairings posted) so
+  // an organizer's own automation (Home Assistant, etc.) can react — the
+  // receiver derives a live countdown from the endsAt each payload carries,
+  // so this never needs to stream continuously. Both null = inert for this
+  // org, same "degrades cleanly when unconfigured" posture as SMTP/OIDC.
+  // webhookSecret is intentionally NOT a one-way hash: unlike a password or
+  // API token (something a caller presents that we only ever need to
+  // verify), this app is the one PRESENTING it, as the HMAC key that signs
+  // every outgoing request, so it has to remain readable to the server.
+  webhookUrl    String?
+  webhookSecret String?
   createdAt DateTime @default(now())
 
   organizers  OrganizerAccount[]
@@ -258,6 +270,10 @@ model Pod {
   rarepicUrl         String?
   status             PodStatus   @default(SETUP)
   excludeFromStats   Boolean     @default(false)
+  // Per-pod opt-out for the org's webhook (PI-50) — default on, mirrors
+  // excludeFromStats's opt-out shape (an organizer turns individual noisy/
+  // test pods off, rather than needing to opt each real pod in).
+  webhookEnabled     Boolean     @default(true)
   // At most one pod per tournament may be the "main event" (Chaos Draft
   // for this group, but deliberately generic — any format works). Winning
   // one earns a crown on the Hall of Fame. Application-layer enforcement

@@ -136,6 +136,38 @@ docker compose exec app node server/dist/scripts/oidc-relink.js organizer@exampl
 
 It only runs after the organizer has actually attempted an SSO login and been refused (that attempt is what records the pending relink) — it previews the exact change (current vs. pending subject) and asks for an explicit `yes` before applying anything; pass `--yes` to skip the interactive prompt for scripted use. Like `import-legacy.js`, this requires direct host/operator access — there's no HTTP route for it.
 
+## 9. Optional: outbound webhooks (Home Assistant, etc.)
+
+An organizer can configure a webhook URL (Settings → Webhook) that gets an HMAC-signed HTTP POST whenever a round starts, is extended, or completes, and when a round's pairings are posted. Off unless a URL is set. This was built with Home Assistant in mind (e.g. driving a live round-timer display and chime on a smart display), but it's plain HTTP — any receiver that accepts a POST works (Node-RED, n8n, a Discord relay, etc.).
+
+Each request body looks like:
+
+```json
+{
+  "event": "round.started",
+  "timestamp": "2026-08-26T18:05:30.580Z",
+  "data": {
+    "podId": "…", "podName": "Draft 1",
+    "tournamentId": "…", "tournamentName": "Test GP",
+    "roundId": "…", "roundNumber": 1,
+    "startedAt": "2026-08-26T18:05:30.575Z", "endsAt": "2026-08-26T18:55:30.575Z",
+    "matches": [{ "tableNumber": 1, "entrantA": { "id": "…", "name": "Alice" }, "entrantB": { "id": "…", "name": "Bob" } }]
+  }
+}
+```
+
+`event` is one of `round.started`, `round.extended`, `round.completed` (whose `data.standings` carries the updated, ranked standings instead of `matches`), or `pairings.posted`. There's no continuous "remaining time" stream — a receiver derives the live countdown itself from `endsAt`, the same way the app's own frontend does, then re-renders every second or so and decides its own chime timing.
+
+Verify the request actually came from your deployment by checking the `X-LimitedGauntlet-Signature: sha256=<hex>` header — an HMAC-SHA256 of the raw request body using the signing secret shown in Settings:
+
+```js
+const crypto = require("node:crypto");
+const expected = "sha256=" + crypto.createHmac("sha256", WEBHOOK_SECRET).update(rawBody).digest("hex");
+// compare with the X-LimitedGauntlet-Signature header (use a timing-safe comparison)
+```
+
+The webhook URL only needs to be reachable from the container — a LAN address (e.g. your Home Assistant at `http://192.168.1.231:8123/api/webhook/…`) works fine. Loopback and link-local addresses (including cloud metadata endpoints) are refused as a target. Delivery is fire-and-forget with a 5-second timeout and no retries — a slow or unreachable receiver never blocks a round operation, and a failed delivery is just logged, not surfaced in the UI (use the Settings page's "Send test event" button to check your setup works).
+
 ## Updating
 
 **Published image (Option A):**

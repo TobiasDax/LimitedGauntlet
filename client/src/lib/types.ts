@@ -64,6 +64,7 @@ export interface Pod {
   rarepicUrl: string | null;
   status: PodStatus;
   excludeFromStats: boolean;
+  webhookEnabled: boolean;
   isMainEvent: boolean;
   setCode: string | null;
   constructedFormat: ConstructedFormat | null;

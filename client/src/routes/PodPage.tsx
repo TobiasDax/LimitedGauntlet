@@ -29,6 +29,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
   const [pointsLoss, setPointsLoss] = useState(pod.pointsLoss);
   const [roundLengthMinutes, setRoundLengthMinutes] = useState(pod.roundLengthMinutes);
   const [excludeFromStats, setExcludeFromStats] = useState(pod.excludeFromStats);
+  const [webhookEnabled, setWebhookEnabled] = useState(pod.webhookEnabled);
   const [isMainEvent, setIsMainEvent] = useState(pod.isMainEvent);
   const [setCode, setSetCode] = useState(pod.setCode ?? "");
   const [constructedFormat, setConstructedFormat] = useState<ConstructedFormat | "">(pod.constructedFormat ?? "");
@@ -52,6 +53,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
               pointsLoss,
               roundLengthMinutes,
               excludeFromStats,
+              webhookEnabled,
               isMainEvent,
               setCode: setCode || null,
               constructedFormat: format === "CONSTRUCTED" && constructedFormat ? constructedFormat : null,
@@ -141,6 +143,15 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
             onChange={(e) => setExcludeFromStats(e.target.checked)}
           />
           Exclude from org-wide stats (Hall of Fame, Treasure Chest) — for one-off, joke, or test pods
+        </label>
+
+        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+          <input
+            type="checkbox"
+            checked={webhookEnabled}
+            onChange={(e) => setWebhookEnabled(e.target.checked)}
+          />
+          Send events to the org's configured webhook for this pod (Settings → Webhook)
         </label>
 
         <label className="flex items-center gap-2 text-[13px] text-ink-secondary">

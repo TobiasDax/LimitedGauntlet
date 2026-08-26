@@ -238,6 +238,7 @@ registerReadWriteTool(
     pointsLoss: z.number().int().default(0),
     roundLengthMinutes: z.number().int().default(50),
     excludeFromStats: z.boolean().default(false),
+    webhookEnabled: z.boolean().default(true),
     constructedFormat: z
       .enum(["STANDARD", "MODERN", "LEGACY", "VINTAGE", "PIONEER", "PRE_MODERN", "PAUPER", "CUSTOM"])
       .optional(),
@@ -262,6 +263,7 @@ registerReadWriteTool(
     roundLengthMinutes: z.number().int().optional(),
     status: z.enum(["SETUP", "PAIRING", "IN_PROGRESS", "COMPLETED"]).optional(),
     excludeFromStats: z.boolean().optional(),
+    webhookEnabled: z.boolean().optional(),
     constructedFormat: z
       .enum(["STANDARD", "MODERN", "LEGACY", "VINTAGE", "PIONEER", "PRE_MODERN", "PAUPER", "CUSTOM"])
       .nullable()
