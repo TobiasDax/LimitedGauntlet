@@ -25,8 +25,12 @@ function importErrorText(err: unknown): string {
       return "This export was made by a newer version of LimitedGauntlet than this one can read.";
     case "no_data":
       return "This export has no tournament data to import (it was exported without the data section).";
+    case "import_too_large":
+      return "This export is too large to import safely. Split it into smaller exports and try again.";
+    case "import_in_progress":
+      return "Another import is already running. Wait for it to finish, then try again.";
     case "import_failed":
-      return "Import failed — the file references data that doesn't line up. Nothing partial is left behind on a re-run.";
+      return "Import failed — the file references data that doesn't line up. No changes were saved.";
     default:
       return "Import failed.";
   }

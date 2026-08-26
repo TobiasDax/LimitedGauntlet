@@ -6,7 +6,8 @@ import { hashPassword, verifyPassword } from "../auth/password.js";
 import { requireSessionAuth } from "../auth/middleware.js";
 import { isEmailConfigured, sendMail, resolveBaseUrl } from "../services/mailer.js";
 import { buildOrgExport, type ExportSections } from "../services/orgExport.js";
-import { parseOrgExport, importOrgData } from "../services/orgImport.js";
+import { ImportInProgressError, parseOrgExport, importOrgData } from "../services/orgImport.js";
+import { refreshRealtimeAuthorization } from "../realtime.js";
 
 const publicLockSchema = z.object({ password: z.string().min(4).max(200) });
 const passwordChangeSchema = z.object({
@@ -56,6 +57,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       where: { id: request.organizer!.orgId },
       data: { publicPasswordHash },
     });
+    refreshRealtimeAuthorization();
     reply.send({ publicLockEnabled: true });
   });
 
@@ -65,6 +67,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       where: { id: request.organizer!.orgId },
       data: { publicPasswordHash: null },
     });
+    refreshRealtimeAuthorization();
     reply.send({ publicLockEnabled: false });
   });
 
@@ -377,17 +380,21 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const parsed = parseOrgExport(request.body);
       if (!parsed.ok || !parsed.data) {
-        reply.code(400).send({ error: parsed.error ?? "invalid_shape" });
+        reply.code(parsed.error === "import_too_large" ? 413 : 400).send({ error: parsed.error ?? "invalid_shape" });
         return;
       }
       try {
         const summary = await importOrgData(request.organizer!.orgId, parsed.data);
         reply.send({ ok: true, summary });
       } catch (err) {
+        if (err instanceof ImportInProgressError) {
+          reply.code(409).send({ error: "import_in_progress" });
+          return;
+        }
         // A reference error (unknown player/team/entrant in the file) — surface
         // it rather than 500ing, since it's a problem with the uploaded data.
         request.log.warn({ err }, "org import failed");
-        reply.code(422).send({ error: "import_failed", detail: (err as Error).message });
+        reply.code(422).send({ error: "import_failed" });
       }
     },
   );

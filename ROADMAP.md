@@ -8,7 +8,10 @@ The app is **feature-complete and running in production**, with a first tagged r
 
 ## Open items
 
-_None currently — PI-22 (below) was the last one._
+- [ ] **PI-46:** authorize Socket.IO subscriptions for password-locked public data.
+- [ ] **PI-47:** bound and transactionalize organization imports.
+- [ ] **PI-48:** make proxy trust and rate-limit identity deployment-safe.
+- [ ] **PI-49:** reject conflicting OIDC subject bindings during email linking.
 
 ## New improvements (backlog)
 
@@ -165,3 +168,46 @@ The pod page's "Public link ↗" (`PodPage.tsx`) was a plain anchor that just op
 - [x] "Share public link ↗" opens a modal (`SharePopup.tsx`, on the shared `Modal` in `ui.tsx`) with the full public URL (read-only field + Copy button, with an execCommand fallback for non-HTTPS LAN where the clipboard API is unavailable) and a **QR code** encoding it.
 - [x] QR generated client-side via `qrcode.react` (`QRCodeSVG`) — pure-JS, no server round-trip, works offline once loaded. URL built from `window.location.origin` so it matches whatever host the organizer is on.
 - [x] **Generalized to every public surface** (it composed cleanly): pod (primary), tournament (`TournamentPage`), org home (`DashboardPage`), Hall of Fame (`HallOfFamePage`), Treasure Chest (`TreasureChestPage`) — each old "Public link ↗" anchor is now a Share button opening the popup.
+
+### PI-46 — Security: authorize Socket.IO subscriptions for locked public data
+Codex Security finding `csf_09568eb85fba75844b9037e5` (medium, high confidence; CWE-862) found that `server/src/realtime.ts` accepts any `pod:<id>` or `tournament:<id>` room name by prefix. A visitor who still knows a shared resource ID can therefore subscribe without satisfying PI-27's organization password lock and receive future full pairing/result payloads emitted by `server/src/routes/rounds.ts`.
+- [ ] **Choose and document the authorization mechanism:** either parse the existing secure-session cookie during the Socket.IO handshake, or mint a short-lived signed subscription capability from an authorized HTTP endpoint. Prefer reusing the existing session and `publicUnlocked` state unless Socket.IO/Fastify integration makes that materially brittle.
+- [ ] Resolve every requested pod/tournament room to its organization before joining. Permit access only when the socket represents an organizer in that organization, the organization has no public lock, or the session's `publicUnlocked` list contains that organization ID. Reject malformed, nonexistent, cross-org, and locked rooms without revealing extra resource details.
+- [ ] Replace full `round`/`match` broadcast payloads with minimal invalidation events where the clients only refetch through the authorized HTTP API. Keep event names and IDs only where the client genuinely needs them.
+- [ ] Add server-level Socket.IO tests covering unlocked public access, successful password unlock, same-org organizer access, locked-out visitors, stale known IDs, cross-org IDs, malformed rooms, and reconnect/session behavior.
+- [ ] **Acceptance:** a locked-out socket cannot receive pairing, score, timer, or standings events for the locked organization; authorized public and organizer clients still update live; the HTTP public-lock behavior remains unchanged.
+- [ ] Re-run finding verification against `server/src/realtime.ts:16-18`, `server/src/routes/rounds.ts:121,349`, and `server/src/routes/public.ts:41-49` before marking complete.
+
+### PI-47 — Security: bound and transactionalize organization imports
+Codex Security finding `csf_86d99714c3f7c9b0b2c21419` (medium, high confidence; CWE-400) found that PI-39's 25 MiB import accepts unbounded nested arrays and performs sequential per-record Prisma writes without rollback. One organizer session can amplify a compact upload into excessive shared database work and durable storage.
+- [ ] Define explicit, product-realistic maximum lengths and cardinalities for players, tournaments, pods, teams/members, entrants, rounds, matches, card pulls, descriptions, and other stored strings in `server/src/services/orgImport.ts`.
+- [ ] Add one aggregate preflight budget (total records and estimated database writes) and reject the whole document before the first write when any per-field or aggregate limit is exceeded. Return a stable typed error that the import UI can explain.
+- [ ] Wrap each accepted import in a Prisma transaction so validation/reference/constraint failures leave no partial rows. Decide and document whether the transaction covers the complete file or one independently rollback-safe tournament at a time.
+- [ ] Replace safe per-row writes with bounded batches/`createMany` where practical, and enforce an active-import concurrency limit. Add a documented per-organization quota or explicitly record why deployment-level storage monitoring is the chosen residual control.
+- [ ] Add tests at every boundary: exact limit accepted, limit + 1 rejected, aggregate budget exceeded, deeply nested high-cardinality input, concurrent attempts, late reference failure rollback, and ordinary PI-38 export round-trip compatibility.
+- [ ] **Acceptance:** over-budget imports fail before durable writes; a failed accepted import leaves no partial data; concurrent imports cannot monopolize the shared database; normal exports still round-trip successfully.
+- [ ] Re-run finding verification against `server/src/services/orgImport.ts:83-102,148-319` and `server/src/routes/settings.ts:372-384` before marking complete.
+
+### PI-48 — Security: make proxy trust and rate-limit identity deployment-safe
+Codex Security finding `csf_15c64d317da4d05b9e578f79` (medium, high confidence; CWE-307) found that global `trustProxy: true` lets a client reaching the app directly rotate `X-Forwarded-For` values and obtain fresh authentication rate-limit buckets. This conflicts with the Compose files publishing the listener directly and the documented LAN deployment option.
+- [ ] **Deployment intent (Tobias, 2026-08-26):** optimize the shipped/default Compose setup for Cloudflare Tunnel running as a container on the same device and shared private Docker network. The app should not publish its port to the host in that default mode; the tunnel is the only ingress and the app explicitly trusts that single proxy boundary.
+- [ ] Replace unconditional `trustProxy: true` with explicit deployment configuration for trusted proxy addresses, Docker-network CIDR, or a narrowly justified hop count. Fail clearly on invalid configuration; do not trust arbitrary direct peers merely because proxy mode is enabled.
+- [ ] Ensure the documented reverse-proxy/tunnel configuration overwrites attacker-supplied forwarding headers. Where a peer is not an explicitly trusted proxy, derive the rate-limit key from the socket peer address.
+- [ ] Preserve direct/LAN and other self-hoster deployments as explicit alternatives: they opt into host-port publishing and default to no proxy trust unless they separately configure a known proxy. Do not assume external users share Tobias's topology.
+- [ ] Document recommended examples for the default Cloudflare Tunnel container topology, direct LAN, and a conventional reverse proxy in `.env.example`, both Compose files, and `docs/deployment.md`, including Docker networking, port exposure, trusted peers/hops, and required header-overwrite behavior.
+- [ ] Add integration tests showing that rotated forwarding headers do not rotate buckets for direct clients, known proxies preserve the real client IP, unknown proxies cannot influence it, and login/signup/public-unlock limits still trigger as configured.
+- [ ] **Acceptance:** rate-limit identity is attacker-independent on every documented ingress mode, while proxied deployments retain correct per-client bucketing and direct LAN deployments continue to work.
+- [ ] Re-run finding verification against `server/src/index.ts:40-48,99-102`, `server/src/routes/auth.ts:200-219`, and the Compose port mappings before marking complete.
+
+### PI-49 — Security: reject conflicting OIDC subject bindings
+Codex Security finding `csf_75d7f7bccdd1a727f883f142` (medium, medium confidence; CWE-287) found that PI-42's verified-email fallback authenticates an existing organizer even when that account is already bound to a different `oidcSubject`. If the provider reassigns or duplicates a verified email, the new subject could receive the existing organizer session.
+- [ ] **Implementation checkpoint (2026-08-26):** the conflicting-subject callback no longer creates a session; the server now creates hashed, expiring relink requests, confirms them transactionally, rotates an account `authVersion`, revokes API tokens, and disconnects realtime sockets. Schema migration and server/client typechecks pass. Still required before this item is complete: recovery confirmation UI, operator CLI that consumes only verified pending requests, realtime `authVersion` enforcement, focused tests, and the post-patch adversarial review.
+- [ ] **Identity intent (Tobias, 2026-08-26):** Pocket ID is the intended provider. A Pocket ID account may be deleted and recreated with the same mailbox but a different subject. Existing subject bindings remain authoritative for normal login, but possession of the existing email mailbox is accepted as the recovery authority for an explicit relink.
+- [ ] In `linkOrProvisionFromOidc`, allow email-based first linking only when the matching account has no `oidcSubject`. If a non-null subject differs, do **not** create a session immediately: return a generic recovery-required result and log a safe security event without claims or secrets.
+- [ ] Keep the known-subject path authoritative and preserve the current state, nonce, PKCE, `email_verified`, and unique-subject controls.
+- [ ] Implement an explicit subject-relink recovery flow: create a single-use, short-lived hashed recovery token; send its link to the existing account email through the configured SMTP transport; only after confirmation replace `oidcSubject`. Bind the token to the organizer, pending new subject, email, purpose, and expiry so it cannot authorize a different identity or action.
+- [ ] On successful relink, invalidate all existing organizer sessions and API tokens, consume any outstanding relink tokens, and record a safe audit/security event. Show a generic completion/error result that does not disclose account existence to unauthenticated callers.
+- [ ] Add an operator CLI recovery command for solo, SSO-only deployments without SMTP. It must require direct host/operator access, identify the organizer and pending new subject explicitly, preview the exact account change, require confirmation, and invalidate sessions/API tokens just like the email flow. It must never accept a subject solely from an unverified browser request.
+- [ ] Add tests for known subject success, unbound verified-email first linking, conflicting subject recovery-required behavior, wrong/expired/replayed relink tokens, subject/purpose binding, successful mailbox relink, session/token invalidation, operator CLI recovery, unverified email rejection, provider email change for the already-bound subject, invite provisioning, and signup-open/closed behavior.
+- [ ] **Acceptance:** a different subject can never authenticate as an already-bound organizer through email equality alone; mailbox-confirmed or operator-confirmed recovery can deliberately replace the binding; legitimate existing bindings and the approved first-link flow continue to work.
+- [ ] Re-run finding verification against `server/src/routes/auth.ts:63-77,398-415` and `server/src/services/oidc.ts:84-96` before marking complete.

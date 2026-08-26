@@ -43,7 +43,8 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
   const organizerId = request.session.get("organizerId");
   if (organizerId) {
     const account = await prisma.organizerAccount.findUnique({ where: { id: organizerId } });
-    if (!account) {
+    const sessionVersion = request.session.get("authVersion");
+    if (!account || (sessionVersion ?? 0) !== account.authVersion) {
       request.session.delete();
       reply.code(401).send({ error: "unauthenticated" });
       return;
@@ -68,7 +69,8 @@ export async function requireSessionAuth(request: FastifyRequest, reply: Fastify
     return;
   }
   const account = await prisma.organizerAccount.findUnique({ where: { id: organizerId } });
-  if (!account) {
+  const sessionVersion = request.session.get("authVersion");
+  if (!account || (sessionVersion ?? 0) !== account.authVersion) {
     request.session.delete();
     reply.code(401).send({ error: "unauthenticated" });
     return;

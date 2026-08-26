@@ -35,10 +35,13 @@ export function usePodRealtime(podId: string | undefined, tournamentId?: string)
       }
     };
 
-    socket.emit("join", room);
+    const joinRoom = () => socket.emit("join", room);
+    if (socket.connected) joinRoom();
+    socket.on("connect", joinRoom);
     for (const event of POD_EVENTS) socket.on(event, onEvent);
 
     return () => {
+      socket.off("connect", joinRoom);
       for (const event of POD_EVENTS) socket.off(event, onEvent);
       socket.emit("leave", room);
     };

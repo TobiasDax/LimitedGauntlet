@@ -7,100 +7,170 @@ import {
   PodStatus,
   RoundStatus,
   TournamentStatus,
+  type Prisma,
 } from "@prisma/client";
 import { prisma } from "../prisma.js";
 import { EXPORT_FORMAT_VERSION, type ExportData } from "./orgExport.js";
 
 // Importer for LimitedGauntlet's own export format (PI-39), the counterpart to
 // buildOrgExport. Imports into an EXISTING org (the caller's) rather than
-// creating one. Like the history import (import-legacy.ts) it's non-
-// transactional and idempotent at the tournament level: a tournament whose
-// name already exists in the org is skipped whole, so re-running a partial
-// import is safe. Entrants/matches are re-linked by the same in-pod ref
+// creating one. The complete import runs in one transaction and remains
+// idempotent at the tournament level: a tournament whose name already exists
+// in the org is skipped whole. Entrants/matches are re-linked by the same in-pod ref
 // (player displayName / team name) the export wrote.
 
+export const IMPORT_LIMITS = {
+  players: 1_000,
+  tournaments: 100,
+  rosterPlayers: 1_000,
+  pods: 100,
+  teams: 500,
+  teamMembers: 8,
+  entrants: 1_000,
+  rounds: 20,
+  matches: 500,
+  cardPulls: 1_000,
+  totalRecords: 50_000,
+  totalStringCharacters: 2_000_000,
+} as const;
+
+const playerName = z.string().trim().min(1).max(100);
+const teamName = z.string().trim().min(1).max(100);
+const isoDate = z.string().datetime({ offset: true }).max(40);
+
 const matchSchema = z.object({
-  tableNumber: z.number().int(),
-  a: z.string().min(1),
-  b: z.string().min(1).nullable(),
+  tableNumber: z.number().int().min(1).max(10_000),
+  a: z.string().trim().min(1).max(100),
+  b: z.string().trim().min(1).max(100).nullable(),
   result: z.nativeEnum(MatchResult),
-  gamesWonA: z.number().int().min(0),
-  gamesWonB: z.number().int().min(0),
-  gamesDrawn: z.number().int().min(0),
-});
+  gamesWonA: z.number().int().min(0).max(1_000),
+  gamesWonB: z.number().int().min(0).max(1_000),
+  gamesDrawn: z.number().int().min(0).max(1_000),
+}).strict();
 
 const roundSchema = z.object({
-  roundNumber: z.number().int(),
+  roundNumber: z.number().int().min(1).max(IMPORT_LIMITS.rounds),
   status: z.nativeEnum(RoundStatus),
-  startedAt: z.string().nullable().optional(),
-  endsAt: z.string().nullable().optional(),
-  matches: z.array(matchSchema),
-});
+  startedAt: isoDate.nullable().optional(),
+  endsAt: isoDate.nullable().optional(),
+  matches: z.array(matchSchema).max(IMPORT_LIMITS.matches),
+}).strict();
 
 const entrantSchema = z.object({
-  player: z.string().min(1).nullable(),
-  team: z.string().min(1).nullable(),
-  droppedAfterRound: z.number().int().nullable().optional(),
-  finalPointsOverride: z.number().int().nullable().optional(),
-  manualTiebreak: z.number().int().nullable().optional(),
-});
+  player: playerName.nullable(),
+  team: teamName.nullable(),
+  droppedAfterRound: z.number().int().min(0).max(IMPORT_LIMITS.rounds).nullable().optional(),
+  finalPointsOverride: z.number().int().min(-10_000).max(10_000).nullable().optional(),
+  manualTiebreak: z.number().int().min(0).max(IMPORT_LIMITS.entrants).nullable().optional(),
+}).strict().refine((entrant) => (entrant.player === null) !== (entrant.team === null), "entrant must reference exactly one player or team");
 
 const teamSchema = z.object({
-  name: z.string().min(1),
-  members: z.array(z.string().min(1)),
-});
+  name: teamName,
+  members: z.array(playerName).min(1).max(IMPORT_LIMITS.teamMembers),
+}).strict();
 
 const cardPullSchema = z.object({
-  cardName: z.string().min(1),
-  player: z.string().min(1).nullable().optional(),
+  cardName: z.string().trim().min(1).max(200),
+  player: playerName.nullable().optional(),
   playerIdInferred: z.boolean().optional(),
-  scryfallId: z.string().nullable().optional(),
-  setCode: z.string().nullable().optional(),
+  scryfallId: z.string().max(64).nullable().optional(),
+  setCode: z.string().max(10).nullable().optional(),
   foil: z.boolean().optional(),
-  priceEur: z.number().nullable().optional(),
-  imageUri: z.string().nullable().optional(),
-});
+  priceEur: z.number().finite().min(0).max(1_000_000).nullable().optional(),
+  imageUri: z.string().max(2_048).nullable().optional(),
+}).strict();
 
 const podSchema = z.object({
-  name: z.string().min(1),
-  date: z.string().nullable().optional(),
+  name: z.string().trim().min(1).max(150),
+  date: isoDate.nullable().optional(),
   format: z.nativeEnum(PodFormat),
-  setCode: z.string().nullable().optional(),
+  setCode: z.string().max(10).nullable().optional(),
   constructedFormat: z.nativeEnum(ConstructedFormat).nullable().optional(),
-  constructedFormatCustom: z.string().nullable().optional(),
-  sequenceOrder: z.number().int(),
+  constructedFormatCustom: z.string().max(60).nullable().optional(),
+  sequenceOrder: z.number().int().min(0).max(10_000),
   isTeamEvent: z.boolean(),
-  teamSize: z.number().int().nullable().optional(),
-  roundCount: z.number().int(),
+  teamSize: z.number().int().min(2).max(8).nullable().optional(),
+  roundCount: z.number().int().min(1).max(IMPORT_LIMITS.rounds),
   matchFormat: z.nativeEnum(MatchFormat),
-  pointsWin: z.number().int(),
-  pointsDraw: z.number().int(),
-  pointsLoss: z.number().int(),
-  roundLengthMinutes: z.number().int(),
+  pointsWin: z.number().int().min(-1_000).max(1_000),
+  pointsDraw: z.number().int().min(-1_000).max(1_000),
+  pointsLoss: z.number().int().min(-1_000).max(1_000),
+  roundLengthMinutes: z.number().int().min(1).max(1_440),
   status: z.nativeEnum(PodStatus),
   excludeFromStats: z.boolean(),
   isMainEvent: z.boolean(),
-  teams: z.array(teamSchema),
-  entrants: z.array(entrantSchema),
-  rounds: z.array(roundSchema),
-  cardPulls: z.array(cardPullSchema),
-});
+  teams: z.array(teamSchema).max(IMPORT_LIMITS.teams),
+  entrants: z.array(entrantSchema).max(IMPORT_LIMITS.entrants),
+  rounds: z.array(roundSchema).max(IMPORT_LIMITS.rounds),
+  cardPulls: z.array(cardPullSchema).max(IMPORT_LIMITS.cardPulls),
+}).strict();
 
 const tournamentSchema = z.object({
-  name: z.string().min(1),
-  startDate: z.string(),
-  endDate: z.string(),
-  location: z.string().nullable().optional(),
-  description: z.string().nullable().optional(),
+  name: z.string().trim().min(1).max(150),
+  startDate: isoDate,
+  endDate: isoDate,
+  location: z.string().max(200).nullable().optional(),
+  description: z.string().max(10_000).nullable().optional(),
   status: z.nativeEnum(TournamentStatus),
-  players: z.array(z.string().min(1)),
-  pods: z.array(podSchema),
-});
+  players: z.array(playerName).max(IMPORT_LIMITS.rosterPlayers),
+  pods: z.array(podSchema).max(IMPORT_LIMITS.pods),
+}).strict();
 
 const dataSchema = z.object({
-  players: z.array(z.string().min(1)),
-  tournaments: z.array(tournamentSchema),
+  players: z.array(playerName).max(IMPORT_LIMITS.players),
+  tournaments: z.array(tournamentSchema).max(IMPORT_LIMITS.tournaments),
+}).strict().superRefine((data, ctx) => {
+  const tournamentNames = new Set<string>();
+  for (const [tournamentIndex, tournament] of data.tournaments.entries()) {
+    if (tournamentNames.has(tournament.name)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tournaments", tournamentIndex, "name"], message: "duplicate tournament name" });
+    }
+    tournamentNames.add(tournament.name);
+    for (const [podIndex, pod] of tournament.pods.entries()) {
+      const teamNames = new Set<string>();
+      for (const [teamIndex, team] of pod.teams.entries()) {
+        if (teamNames.has(team.name)) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tournaments", tournamentIndex, "pods", podIndex, "teams", teamIndex, "name"], message: "duplicate team name" });
+        }
+        teamNames.add(team.name);
+      }
+      const entrantRefs = new Set<string>();
+      for (const [entrantIndex, entrant] of pod.entrants.entries()) {
+        const ref = entrant.player ?? entrant.team!;
+        if (entrantRefs.has(ref)) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tournaments", tournamentIndex, "pods", podIndex, "entrants", entrantIndex], message: "duplicate entrant reference" });
+        }
+        entrantRefs.add(ref);
+      }
+      const roundNumbers = new Set<number>();
+      for (const [roundIndex, round] of pod.rounds.entries()) {
+        if (roundNumbers.has(round.roundNumber)) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tournaments", tournamentIndex, "pods", podIndex, "rounds", roundIndex, "roundNumber"], message: "duplicate round number" });
+        }
+        roundNumbers.add(round.roundNumber);
+      }
+    }
+  }
 });
+
+const snapshotString = z.string().max(200);
+const hallOfFameRowSchema = z.object({
+  player: playerName,
+  tournamentsPlayed: z.number().int().min(0),
+  podsPlayed: z.number().int().min(0),
+  totalPoints: z.number().finite(),
+  average: z.number().finite(),
+  mainEventWins: z.number().int().min(0),
+}).strict();
+const treasureVaultRowSchema = z.object({
+  cardName: snapshotString,
+  priceEur: z.number().finite().nullable(),
+  player: playerName.nullable(),
+  setCode: z.string().max(10).nullable(),
+  foil: z.boolean(),
+  podName: z.string().max(150),
+  tournamentName: z.string().max(150),
+}).strict();
 
 // The full uploaded envelope. Only `data` is consumed on import — hallOfFame /
 // treasureVault are derived snapshots that recompute from `data`, so they're
@@ -108,8 +178,12 @@ const dataSchema = z.object({
 export const orgExportEnvelopeSchema = z.object({
   application: z.literal("limited-gauntlet"),
   formatVersion: z.number().int(),
+  exportedAt: isoDate,
+  organization: z.object({ slug: z.string().max(100), name: z.string().max(150) }).strict(),
   data: dataSchema.optional(),
-});
+  hallOfFame: z.array(hallOfFameRowSchema).max(IMPORT_LIMITS.totalRecords).optional(),
+  treasureVault: z.array(treasureVaultRowSchema).max(IMPORT_LIMITS.totalRecords).optional(),
+}).strict();
 
 export type ParsedExportData = z.infer<typeof dataSchema>;
 
@@ -122,7 +196,7 @@ export interface ImportSummary {
 
 export interface ParseResult {
   ok: boolean;
-  error?: "not_our_format" | "unsupported_version" | "no_data" | "invalid_shape";
+  error?: "not_our_format" | "unsupported_version" | "no_data" | "invalid_shape" | "import_too_large";
   data?: ParsedExportData;
 }
 
@@ -142,10 +216,56 @@ export function parseOrgExport(raw: unknown): ParseResult {
   if (!envelope.data.data) {
     return { ok: false, error: "no_data" };
   }
+  const budget = measureImport(envelope.data.data);
+  if (budget.records > IMPORT_LIMITS.totalRecords || budget.stringCharacters > IMPORT_LIMITS.totalStringCharacters) {
+    return { ok: false, error: "import_too_large" };
+  }
   return { ok: true, data: envelope.data.data };
 }
 
+function measureImport(data: ParsedExportData): { records: number; stringCharacters: number } {
+  let records = data.players.length + data.tournaments.length;
+  let stringCharacters = 0;
+  const visit = (value: unknown): void => {
+    if (typeof value === "string") stringCharacters += value.length;
+    else if (Array.isArray(value)) for (const item of value) visit(item);
+    else if (value && typeof value === "object") for (const item of Object.values(value)) visit(item);
+  };
+  visit(data);
+  for (const tournament of data.tournaments) {
+    records += tournament.players.length + tournament.pods.length;
+    for (const pod of tournament.pods) {
+      records += pod.teams.length + pod.entrants.length + pod.rounds.length + pod.cardPulls.length;
+      for (const team of pod.teams) records += team.members.length;
+      for (const round of pod.rounds) records += round.matches.length;
+    }
+  }
+  return { records, stringCharacters };
+}
+
+export class ImportInProgressError extends Error {
+  constructor() {
+    super("An organization import is already running");
+    this.name = "ImportInProgressError";
+  }
+}
+
+let importInProgress = false;
+
 export async function importOrgData(orgId: string, data: ParsedExportData): Promise<ImportSummary> {
+  if (importInProgress) throw new ImportInProgressError();
+  importInProgress = true;
+  try {
+    return await prisma.$transaction((tx) => importOrgDataInTransaction(tx, orgId, data), {
+      maxWait: 5_000,
+      timeout: 120_000,
+    });
+  } finally {
+    importInProgress = false;
+  }
+}
+
+async function importOrgDataInTransaction(db: Prisma.TransactionClient, orgId: string, data: ParsedExportData): Promise<ImportSummary> {
   const summary: ImportSummary = { tournamentsCreated: 0, tournamentsSkipped: 0, podsCreated: 0, playersCreated: 0 };
 
   // Upsert every referenced player once, up front (org-scoped, keyed on
@@ -161,11 +281,11 @@ export async function importOrgData(orgId: string, data: ParsedExportData): Prom
     }
   }
   for (const name of allNames) {
-    const existing = await prisma.player.findFirst({ where: { orgId, displayName: name } });
+    const existing = await db.player.findFirst({ where: { orgId, displayName: name } });
     if (existing) {
       playerIdByName.set(name, existing.id);
     } else {
-      const created = await prisma.player.create({ data: { orgId, displayName: name } });
+      const created = await db.player.create({ data: { orgId, displayName: name } });
       playerIdByName.set(name, created.id);
       summary.playersCreated += 1;
     }
@@ -177,13 +297,13 @@ export async function importOrgData(orgId: string, data: ParsedExportData): Prom
   };
 
   for (const t of data.tournaments) {
-    const existing = await prisma.tournament.findFirst({ where: { orgId, name: t.name } });
+    const existing = await db.tournament.findFirst({ where: { orgId, name: t.name } });
     if (existing) {
       summary.tournamentsSkipped += 1;
       continue;
     }
 
-    const tournament = await prisma.tournament.create({
+    const tournament = await db.tournament.create({
       data: {
         orgId,
         name: t.name,
@@ -197,11 +317,11 @@ export async function importOrgData(orgId: string, data: ParsedExportData): Prom
     summary.tournamentsCreated += 1;
 
     for (const name of t.players) {
-      await prisma.tournamentPlayer.create({ data: { tournamentId: tournament.id, playerId: playerId(name) } });
+      await db.tournamentPlayer.create({ data: { tournamentId: tournament.id, playerId: playerId(name) } });
     }
 
     for (const pod of t.pods) {
-      await importPod(tournament.id, pod, playerId);
+      await importPod(db, tournament.id, pod, playerId);
       summary.podsCreated += 1;
     }
   }
@@ -210,11 +330,12 @@ export async function importOrgData(orgId: string, data: ParsedExportData): Prom
 }
 
 async function importPod(
+  db: Prisma.TransactionClient,
   tournamentId: string,
   pod: ParsedExportData["tournaments"][number]["pods"][number],
   playerId: (name: string) => string,
 ): Promise<void> {
-  const record = await prisma.pod.create({
+  const record = await db.pod.create({
     data: {
       tournamentId,
       name: pod.name,
@@ -241,7 +362,7 @@ async function importPod(
   // Teams first (entrants may reference them), tracking teamName -> teamId.
   const teamIdByName = new Map<string, string>();
   for (const team of pod.teams) {
-    const created = await prisma.team.create({
+    const created = await db.team.create({
       data: {
         podId: record.id,
         name: team.name,
@@ -258,7 +379,7 @@ async function importPod(
     if (e.team) {
       const teamId = teamIdByName.get(e.team);
       if (!teamId) throw new Error(`Pod "${pod.name}" entrant references unknown team "${e.team}"`);
-      const entrant = await prisma.entrant.create({
+      const entrant = await db.entrant.create({
         data: {
           podId: record.id,
           teamId,
@@ -269,7 +390,7 @@ async function importPod(
       });
       entrantIdByRef.set(e.team, entrant.id);
     } else if (e.player) {
-      const entrant = await prisma.entrant.create({
+      const entrant = await db.entrant.create({
         data: {
           podId: record.id,
           playerId: playerId(e.player),
@@ -289,7 +410,7 @@ async function importPod(
   };
 
   for (const round of pod.rounds) {
-    const created = await prisma.round.create({
+    const created = await db.round.create({
       data: {
         podId: record.id,
         roundNumber: round.roundNumber,
@@ -299,7 +420,7 @@ async function importPod(
       },
     });
     for (const m of round.matches) {
-      await prisma.match.create({
+      await db.match.create({
         data: {
           roundId: created.id,
           tableNumber: m.tableNumber,
@@ -316,7 +437,7 @@ async function importPod(
   }
 
   for (const c of pod.cardPulls) {
-    await prisma.cardPull.create({
+    await db.cardPull.create({
       data: {
         podId: record.id,
         playerId: c.player ? playerId(c.player) : null,

@@ -45,15 +45,33 @@ model OrganizerAccount {
   // changes. One IdP per deployment (issuer is env-configured), so the subject
   // alone is unique. Null for password-only accounts.
   oidcSubject  String?  @unique
+  authVersion  Int      @default(0)
   name         String
   createdAt    DateTime @default(now())
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   apiTokens    ApiToken[]
   emailChangeRequests EmailChangeRequest[]
+  oidcRelinkRequests OidcSubjectRelinkRequest[]
   sentInvites  OrganizerInvite[]
 
   @@index([orgId])
+}
+
+model OidcSubjectRelinkRequest {
+  id             String    @id @default(cuid())
+  organizerId    String
+  pendingSubject String
+  email          String
+  purpose        String    @default("SUBJECT_RELINK")
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  organizer OrganizerAccount @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+
+  @@index([organizerId])
 }
 
 // Pending co-organizer invites (PI-34). An invited address doesn't get an

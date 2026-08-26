@@ -7,6 +7,9 @@ import { hashPassword, verifyPassword } from "../auth/password.js";
 import { requireAuth } from "../auth/middleware.js";
 import { config, isOidcConfigured, isLocalLoginDisabled } from "../config.js";
 import { beginOidcLogin, completeOidcLogin, type OidcIdentity } from "../services/oidc.js";
+import { createOidcRelinkRequest, confirmOidcRelink } from "../services/oidcRelink.js";
+import { isEmailConfigured, resolveBaseUrl, sendMail } from "../services/mailer.js";
+import { refreshRealtimeAuthorization } from "../realtime.js";
 
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -38,6 +41,13 @@ const completeOidcRegistrationSchema = z.object({
   organizerName: z.string().trim().min(1).max(100),
 });
 
+const oidcRelinkSchema = z.object({ token: z.string().min(1).max(200) });
+
+function establishSession(request: { session: { set: (key: "organizerId" | "authVersion", value: string | number) => void } }, account: { id: string; authVersion?: number }) {
+  request.session.set("organizerId", account.id);
+  request.session.set("authVersion", account.authVersion ?? 0);
+}
+
 function requestOrigin(request: { protocol: string; headers: Record<string, unknown> }): string {
   const host = request.headers.host;
   return host ? `${request.protocol}://${String(host)}` : "";
@@ -55,13 +65,14 @@ function requestOrigin(request: { protocol: string; headers: Record<string, unkn
 //   5. Unknown identity + signups closed → refused; an organizer must invite
 //      this email first.
 type LinkResult =
-  | { status: "ok"; organizerId: string }
+  | { status: "ok"; organizerId: string; authVersion: number }
+  | { status: "recovery_required" }
   | { status: "needs_registration"; identity: OidcIdentity }
   | { status: "error"; error: string };
 
-async function linkOrProvisionFromOidc(identity: OidcIdentity): Promise<LinkResult> {
+async function linkOrProvisionFromOidc(identity: OidcIdentity, origin: string): Promise<LinkResult> {
   const bySubject = await prisma.organizerAccount.findUnique({ where: { oidcSubject: identity.subject } });
-  if (bySubject) return { status: "ok", organizerId: bySubject.id };
+  if (bySubject) return { status: "ok", organizerId: bySubject.id, authVersion: bySubject.authVersion };
 
   if (!identity.email || !identity.emailVerified) {
     return { status: "error", error: "oidc_email_unverified" };
@@ -72,9 +83,18 @@ async function linkOrProvisionFromOidc(identity: OidcIdentity): Promise<LinkResu
     // Link the subject to the existing account if it isn't already, so future
     // logins match on the stable subject even if the IdP email changes.
     if (!byEmail.oidcSubject) {
-      await prisma.organizerAccount.update({ where: { id: byEmail.id }, data: { oidcSubject: identity.subject } });
+      const linked = await prisma.organizerAccount.updateMany({ where: { id: byEmail.id, oidcSubject: null }, data: { oidcSubject: identity.subject } });
+      if (linked.count === 1) return { status: "ok", organizerId: byEmail.id, authVersion: byEmail.authVersion };
+    } else if (byEmail.oidcSubject === identity.subject) {
+      return { status: "ok", organizerId: byEmail.id, authVersion: byEmail.authVersion };
     }
-    return { status: "ok", organizerId: byEmail.id };
+    const { request: relink, token } = await createOidcRelinkRequest(byEmail.id, identity.subject, byEmail.email);
+    if (isEmailConfigured()) {
+      const url = `${resolveBaseUrl(origin)}/oidc-relink?token=${encodeURIComponent(token)}`;
+      await sendMail({ to: byEmail.email, subject: "Confirm your LimitedGauntlet SSO relink", text: `Confirm this SSO account relink within one hour: ${url}` });
+    }
+    console.warn("OIDC subject relink required", { organizerId: byEmail.id, requestId: relink.id });
+    return { status: "recovery_required" };
   }
 
   const invite = await prisma.organizerInvite.findFirst({
@@ -94,7 +114,7 @@ async function linkOrProvisionFromOidc(identity: OidcIdentity): Promise<LinkResu
       }),
       prisma.organizerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } }),
     ]);
-    return { status: "ok", organizerId: organizer.id };
+    return { status: "ok", organizerId: organizer.id, authVersion: organizer.authVersion };
   }
 
   // No existing account and no invite. When signups are open, let them bootstrap
@@ -176,7 +196,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           return { organization, organizer };
         });
 
-        request.session.set("organizerId", organizer.id);
+        establishSession(request, organizer);
         reply.code(201).send({
           organization: { id: organization.id, slug: organization.slug, name: organization.name },
           organizer: { id: organizer.id, name: organizer.name, email: organizer.email },
@@ -228,7 +248,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         prisma.organizerAccount.count({ where: { orgId: account.orgId } }),
       ]);
 
-      request.session.set("organizerId", account.id);
+      establishSession(request, account);
       reply.send({
         organizer: { id: account.id, orgId: account.orgId, name: account.name, email: account.email },
         organization: { id: organization.id, slug: organization.slug, name: organization.name },
@@ -274,6 +294,28 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         prisma.emailChangeRequest.update({ where: { id: change.id }, data: { usedAt: new Date() } }),
       ]);
       reply.send({ ok: true, email: change.newEmail });
+    },
+  );
+
+  // Confirm a conflicting OIDC-subject relink. Public and token-gated; all
+  // invalid, expired, replayed, or conflicting requests look identical.
+  app.post(
+    "/api/auth/oidc/relink",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const body = oidcRelinkSchema.safeParse(request.body);
+      if (!body.success) {
+        reply.code(400).send({ error: "invalid_or_expired" });
+        return;
+      }
+      try {
+        await confirmOidcRelink(body.data.token);
+        refreshRealtimeAuthorization();
+        request.log.info("OIDC subject relink confirmed");
+        reply.send({ ok: true });
+      } catch {
+        reply.code(400).send({ error: "invalid_or_expired" });
+      }
     },
   );
 
@@ -335,7 +377,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         prisma.organizerAccount.count({ where: { orgId: invite.orgId } }),
       ]);
 
-      request.session.set("organizerId", organizer.id);
+      establishSession(request, organizer);
       reply.code(201).send({
         organizer: { id: organizer.id, orgId: organizer.orgId, name: organizer.name, email: organizer.email },
         organization: { id: organization.id, slug: organization.slug, name: organization.name },
@@ -395,7 +437,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           nonce: checks.nonce,
           codeVerifier: checks.codeVerifier,
         });
-        const result = await linkOrProvisionFromOidc(identity);
+        const result = await linkOrProvisionFromOidc(identity, checks.origin);
         if (result.status === "error") {
           reply.redirect(`/login?error=${result.error}`);
           return;
@@ -411,7 +453,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           reply.redirect("/oidc-setup");
           return;
         }
-        request.session.set("organizerId", result.organizerId);
+        if (result.status === "recovery_required") {
+          reply.redirect("/login?error=oidc_recovery_required");
+          return;
+        }
+        establishSession(request, { id: result.organizerId, authVersion: result.authVersion });
         reply.redirect("/");
       } catch (err) {
         request.log.error({ err }, "oidc callback failed");
@@ -468,7 +514,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
 
         request.session.set("oidcPending", undefined);
-        request.session.set("organizerId", organizer.id);
+        establishSession(request, organizer);
         reply.code(201).send({
           organizer: { id: organizer.id, orgId: organizer.orgId, name: organizer.name, email: organizer.email },
           organization: { id: organization.id, slug: organization.slug, name: organization.name },

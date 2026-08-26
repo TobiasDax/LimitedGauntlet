@@ -19,7 +19,7 @@ import { hallOfFameRoutes } from "./routes/hallOfFame.js";
 import { apiTokenRoutes } from "./routes/apiTokens.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { publicRoutes } from "./routes/public.js";
-import { initRealtime } from "./realtime.js";
+import { createAppRealtimeRoomAuthorizer, initRealtime } from "./realtime.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientDistPath = path.resolve(__dirname, "../../client/dist");
@@ -37,22 +37,14 @@ const httpServer = createServer();
 
 const app = Fastify({
   logger: true,
-  // Cloudflare Tunnel (or any reverse proxy) is the only thing that can
-  // reach this app when deployed publicly — there's no open inbound port,
-  // so the proxy hop is trusted by construction. This makes request.ip
-  // (and therefore rate-limit's per-IP bucketing) reflect the real client
-  // IP from X-Forwarded-For/CF-Connecting-IP instead of the tunnel's own
-  // address. Note: this also means a same-LAN client could forge those
-  // headers on a direct, non-tunneled request — acceptable here since LAN
-  // access is already a trusted network in this app's threat model.
-  trustProxy: true,
+  // Only explicitly configured peers may supply forwarding headers. This is
+  // also the shared security boundary for @fastify/rate-limit's request.ip key.
+  trustProxy: config.trustedProxies,
   serverFactory: (handler) => {
     httpServer.on("request", handler);
     return httpServer;
   },
 });
-
-initRealtime(httpServer);
 
 // CSP tuned to what this app actually loads: same-origin scripts/styles
 // (Vite's build, no external CDN), Scryfall's card-image CDN, and
@@ -112,6 +104,12 @@ await app.register(fastifySecureSession, {
     maxAge: 60 * 60 * 24 * 30, // 30 days
   },
 });
+
+// Initialize Socket.IO after secure-session so its separate handshake can use
+// the same battle-tested cookie decoder for room authorization. Fastify's raw
+// request listener was already attached synchronously in serverFactory above,
+// preserving the required Fastify-before-Socket.IO listener order.
+initRealtime(httpServer, createAppRealtimeRoomAuthorizer(app));
 
 // Best-effort "please don't index this" signal on every response — robots.txt
 // below covers well-behaved crawlers at the crawl stage, this covers the

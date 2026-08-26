@@ -19,6 +19,9 @@ function parseSessionKey(hex: string): Buffer {
 export const config = {
   port: Number(process.env.PORT ?? 8080),
   host: process.env.HOST ?? "0.0.0.0",
+  // Exact proxy peers/CIDRs allowed to supply forwarding headers. Blank means
+  // direct-client mode: X-Forwarded-* is ignored for request identity.
+  trustedProxies: parseTrustedProxies(process.env.TRUSTED_PROXIES),
   sessionKey: parseSessionKey(requireEnv("SESSION_SECRET")),
   // Off by default so a fresh `docker compose up` over plain HTTP (LAN,
   // first local test, etc.) doesn't silently break login by dropping the
@@ -90,3 +93,4 @@ export function isOidcConfigured(): boolean {
 export function isLocalLoginDisabled(): boolean {
   return config.localLoginDisabled && isOidcConfigured();
 }
+import { parseTrustedProxies } from "./proxyTrust.js";

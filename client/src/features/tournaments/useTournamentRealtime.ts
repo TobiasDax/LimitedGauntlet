@@ -18,10 +18,13 @@ export function useTournamentRealtime(tournamentId: string | undefined): void {
       queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes(tournamentId) });
     };
 
-    socket.emit("join", room);
+    const joinRoom = () => socket.emit("join", room);
+    if (socket.connected) joinRoom();
+    socket.on("connect", joinRoom);
     socket.on("standings-changed", onEvent);
 
     return () => {
+      socket.off("connect", joinRoom);
       socket.off("standings-changed", onEvent);
       socket.emit("leave", room);
     };
