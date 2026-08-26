@@ -342,18 +342,36 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
 
     const updated = await prisma.round.update({ where: { id: round.id }, data: { status: "COMPLETED" } });
     emitPodEvent(round.podId, "round-completed", { roundId: round.id });
+    const completedPod = await prisma.pod.findUniqueOrThrow({
+      where: { id: round.podId },
+      select: { tournamentId: true, roundCount: true },
+    });
     {
       const orgId = request.organizer!.orgId;
+      const isFinalRound = round.roundNumber >= completedPod.roundCount;
       fireAndForget(async () => {
         const standings = await buildStandingsPayload(round.podId);
         await sendWebhookEvent(orgId, round.podId, "round.completed", {
           roundId: round.id,
           roundNumber: round.roundNumber,
+          isLastRound: isFinalRound,
           standings,
         });
+        // The pod's last round just completed — this is the natural "pod is
+        // fully decided" moment (there's no separate organizer action for
+        // it; the app doesn't manage pod.status automatically). Reuses the
+        // same standings, no extra query. Also carried as `isLastRound` on
+        // round.completed above, so a receiver only listening to that one
+        // event doesn't need to also handle pod.completed.
+        if (isFinalRound) {
+          await sendWebhookEvent(orgId, round.podId, "pod.completed", {
+            roundNumber: round.roundNumber,
+            winner: standings[0] ?? null,
+            standings,
+          });
+        }
       });
     }
-    const completedPod = await prisma.pod.findUniqueOrThrow({ where: { id: round.podId }, select: { tournamentId: true } });
     emitTournamentEvent(completedPod.tournamentId, "standings-changed", { podId: round.podId });
     // The pod may have just become fully decided — see if any of its
     // card pulls can now be attributed.

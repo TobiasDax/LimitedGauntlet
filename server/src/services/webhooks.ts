@@ -10,7 +10,13 @@ import { computePodStandings } from "./standings.js";
 // beyond "did it accept the POST", and a slow/dead receiver must never block
 // the round operation that triggered it.
 
-export type WebhookEventType = "round.started" | "round.extended" | "round.completed" | "pairings.posted" | "test";
+export type WebhookEventType =
+  | "round.started"
+  | "round.extended"
+  | "round.completed"
+  | "pairings.posted"
+  | "pod.completed"
+  | "test";
 
 export interface WebhookPayload {
   event: WebhookEventType;

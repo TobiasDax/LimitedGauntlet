@@ -156,7 +156,9 @@ Each request body looks like:
 }
 ```
 
-`event` is one of `round.started`, `round.extended`, `round.completed` (whose `data.standings` carries the updated, ranked standings instead of `matches`), or `pairings.posted`. There's no continuous "remaining time" stream — a receiver derives the live countdown itself from `endsAt`, the same way the app's own frontend does, then re-renders every second or so and decides its own chime timing.
+`event` is one of `round.started`, `round.extended`, `round.completed` (whose `data.standings` carries the updated, ranked standings instead of `matches`), `pairings.posted`, or `pod.completed`. There's no continuous "remaining time" stream — a receiver derives the live countdown itself from `endsAt`, the same way the app's own frontend does, then re-renders every second or so and decides its own chime timing.
+
+`round.completed` also carries `isLastRound` (`true` when that round was the pod's last configured round) alongside `roundNumber` and `standings` — so a receiver that only listens for `round.completed` can still detect "the pod just finished" without also handling a second event type. `pod.completed` fires as a second, dedicated event at that same moment (there's no separate "mark pod complete" action in the app — this is the natural moment a pod is fully decided) for receivers that would rather filter on event type than a boolean field; its payload carries the same ranked `standings` plus a `winner` field (the rank-1 entry, or `null` for an empty pod).
 
 Verify the request actually came from your deployment by checking the `X-LimitedGauntlet-Signature: sha256=<hex>` header — an HMAC-SHA256 of the raw request body using that specific webhook's own signing secret (each webhook you configure gets its own, shown in Settings):
 
