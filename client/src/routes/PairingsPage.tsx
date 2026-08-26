@@ -262,6 +262,9 @@ function MatchCard({
 }
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
+// countdown-bell.mp3 has ~8s of lead-in before the actual bell hit, so start
+// playback that far early — the audible ding then lands right at zero.
+const EXPIRY_CHIME_LEAD_MS = 8 * 1000;
 
 function RoundTimer({ round, displayMode }: { round: Round; displayMode: boolean }) {
   const countdown = useCountdown(round.endsAt);
@@ -282,11 +285,11 @@ function RoundTimer({ round, displayMode }: { round: Round; displayMode: boolean
       warnedForRef.current = round.endsAt;
       playChime();
     }
-    if (countdown.expired && chimedForRef.current !== round.endsAt) {
+    if (countdown.remainingMs <= EXPIRY_CHIME_LEAD_MS && chimedForRef.current !== round.endsAt) {
       chimedForRef.current = round.endsAt;
       playEndChime();
     }
-  }, [countdown.expired, countdown.remainingMs, displayMode, round.endsAt]);
+  }, [countdown.remainingMs, displayMode, round.endsAt]);
 
   return (
     <div
