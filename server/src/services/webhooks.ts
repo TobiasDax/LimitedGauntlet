@@ -110,6 +110,9 @@ export async function deliverWebhook(url: string, secret: string, payload: Webho
 // `data` is merged under the standard podId/podName/tournamentId/
 // tournamentName context every event carries, so callers only need to
 // supply what's specific to that event (round number, matches, standings).
+// An org can have any number of configured webhooks; each is delivered to
+// independently (in parallel) with its own secret, so one slow/broken
+// receiver never delays or blocks delivery to the others.
 export async function sendWebhookEvent(
   orgId: string,
   podId: string,
@@ -117,22 +120,17 @@ export async function sendWebhookEvent(
   data: Record<string, unknown>,
 ): Promise<void> {
   try {
-    const [org, pod] = await Promise.all([
-      prisma.organization.findUnique({ where: { id: orgId }, select: { webhookUrl: true, webhookSecret: true } }),
+    const [webhooks, pod] = await Promise.all([
+      prisma.organizationWebhook.findMany({ where: { orgId }, select: { id: true, url: true, secret: true } }),
       prisma.pod.findUnique({
         where: { id: podId },
         select: { name: true, webhookEnabled: true, tournamentId: true, tournament: { select: { name: true } } },
       }),
     ]);
-    if (!org?.webhookUrl || !org.webhookSecret) return;
+    if (webhooks.length === 0) return;
     if (pod && !pod.webhookEnabled) return;
 
-    if (!(await isSafeWebhookTarget(org.webhookUrl))) {
-      console.warn("Webhook delivery skipped: target resolves to a loopback/link-local address", { orgId, podId, event });
-      return;
-    }
-
-    const result = await deliverWebhook(org.webhookUrl, org.webhookSecret, {
+    const payload: WebhookPayload = {
       event,
       timestamp: new Date().toISOString(),
       data: {
@@ -142,10 +140,25 @@ export async function sendWebhookEvent(
         tournamentName: pod?.tournament.name ?? null,
         ...data,
       },
-    });
-    if (!result.ok) {
-      console.warn("Webhook delivery failed", { orgId, podId, event, ...result });
-    }
+    };
+
+    await Promise.all(
+      webhooks.map(async (webhook) => {
+        if (!(await isSafeWebhookTarget(webhook.url))) {
+          console.warn("Webhook delivery skipped: target resolves to a loopback/link-local address", {
+            orgId,
+            podId,
+            webhookId: webhook.id,
+            event,
+          });
+          return;
+        }
+        const result = await deliverWebhook(webhook.url, webhook.secret, payload);
+        if (!result.ok) {
+          console.warn("Webhook delivery failed", { orgId, podId, webhookId: webhook.id, event, ...result });
+        }
+      }),
+    );
   } catch (err) {
     console.error("Webhook dispatch failed", { orgId, podId, event, err });
   }
@@ -217,12 +230,18 @@ export async function buildStandingsPayload(podId: string): Promise<WebhookStand
 // Settings UI "send test event" — unlike sendWebhookEvent, this reports the
 // outcome back to the caller so the organizer can tell whether their
 // receiver is actually reachable and configured correctly.
-export async function sendTestWebhookEvent(orgId: string): Promise<DeliveryResult & { error?: "not_configured" | "unsafe_target" | string }> {
-  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { webhookUrl: true, webhookSecret: true } });
-  if (!org?.webhookUrl || !org.webhookSecret) return { ok: false, error: "not_configured" };
-  if (!(await isSafeWebhookTarget(org.webhookUrl))) return { ok: false, error: "unsafe_target" };
+export async function sendTestWebhookEvent(
+  orgId: string,
+  webhookId: string,
+): Promise<DeliveryResult & { error?: "not_found" | "unsafe_target" | string }> {
+  const webhook = await prisma.organizationWebhook.findFirst({
+    where: { id: webhookId, orgId },
+    select: { url: true, secret: true },
+  });
+  if (!webhook) return { ok: false, error: "not_found" };
+  if (!(await isSafeWebhookTarget(webhook.url))) return { ok: false, error: "unsafe_target" };
 
-  return deliverWebhook(org.webhookUrl, org.webhookSecret, {
+  return deliverWebhook(webhook.url, webhook.secret, {
     event: "test",
     timestamp: new Date().toISOString(),
     data: { message: "This is a test event from LimitedGauntlet." },

@@ -61,8 +61,8 @@ export function SettingsPage() {
       </SettingsSection>
 
       <SettingsSection
-        title="Webhook"
-        description="Get an HMAC-signed HTTP POST when a round starts, is extended, or completes, and when pairings are posted — for Home Assistant or anything else that accepts a webhook. Off unless a URL is set; individual pods can opt out from their own edit form."
+        title="Webhooks"
+        description="Get an HMAC-signed HTTP POST when a round starts, is extended, or completes, and when pairings are posted — for Home Assistant or anything else that accepts a webhook. Configure as many as you like, each delivered to independently; individual pods can opt out from their own edit form."
       >
         <WebhookSection />
       </SettingsSection>

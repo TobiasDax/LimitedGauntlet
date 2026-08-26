@@ -10,6 +10,7 @@ import {
   deliverWebhook,
   isLoopbackOrLinkLocalAddress,
   isSafeWebhookTarget,
+  sendTestWebhookEvent,
   sendWebhookEvent,
 } from "./webhooks.js";
 
@@ -142,10 +143,14 @@ describe("deliverWebhook", () => {
 });
 
 describe("sendWebhookEvent", () => {
-  async function makeOrgTournamentPod(webhook?: { url: string; secret: string }, webhookEnabled = true) {
+  async function makeOrgTournamentPod(webhooks: { url: string; secret: string; label?: string }[] = [], webhookEnabled = true) {
     const unique = `${Date.now()}-${Math.random()}`;
     const org = await prisma.organization.create({
-      data: { slug: `webhook-${unique}`, name: "Webhook Test Org", webhookUrl: webhook?.url, webhookSecret: webhook?.secret },
+      data: {
+        slug: `webhook-${unique}`,
+        name: "Webhook Test Org",
+        webhooks: { create: webhooks.map((w) => ({ url: w.url, secret: w.secret, label: w.label ?? null })) },
+      },
     });
     const tournament = await prisma.tournament.create({
       data: { orgId: org.id, name: "Webhook Test Tournament", startDate: new Date(), endDate: new Date() },
@@ -157,14 +162,14 @@ describe("sendWebhookEvent", () => {
   }
 
   it("does nothing when the org has no webhook configured", async () => {
-    const { org, pod } = await makeOrgTournamentPod(undefined);
+    const { org, pod } = await makeOrgTournamentPod();
     await expect(sendWebhookEvent(org.id, pod.id, "round.started", {})).resolves.toBeUndefined();
   });
 
   it("does nothing when the pod has opted out", async () => {
     const server = await withTestServer(() => ({ status: 200 }));
     try {
-      const { org, pod } = await makeOrgTournamentPod({ url: server.url, secret: "s" }, false);
+      const { org, pod } = await makeOrgTournamentPod([{ url: server.url, secret: "s" }], false);
       await sendWebhookEvent(org.id, pod.id, "round.started", {});
       expect(server.requests).toHaveLength(0);
     } finally {
@@ -173,14 +178,14 @@ describe("sendWebhookEvent", () => {
   });
 
   it("skips delivery when the configured URL is loopback/link-local", async () => {
-    const { org, pod } = await makeOrgTournamentPod({ url: "http://127.0.0.1:9999/hook", secret: "s" });
+    const { org, pod } = await makeOrgTournamentPod([{ url: "http://127.0.0.1:9999/hook", secret: "s" }]);
     await expect(sendWebhookEvent(org.id, pod.id, "round.started", {})).resolves.toBeUndefined();
   });
 
   it("delivers with the standard context merged under the event-specific data", async () => {
     const server = await withTestServer(() => ({ status: 200 }));
     try {
-      const { org, tournament, pod } = await makeOrgTournamentPod({ url: server.url, secret: "s" });
+      const { org, tournament, pod } = await makeOrgTournamentPod([{ url: server.url, secret: "s" }]);
       await sendWebhookEvent(org.id, pod.id, "round.started", { roundId: "r1", roundNumber: 2 });
 
       expect(server.requests).toHaveLength(1);
@@ -197,6 +202,43 @@ describe("sendWebhookEvent", () => {
         },
       });
       expect(typeof body.timestamp).toBe("string");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("delivers the same event to multiple configured webhooks, each with its own signature", async () => {
+    const serverA = await withTestServer(() => ({ status: 200 }));
+    const serverB = await withTestServer(() => ({ status: 200 }));
+    try {
+      const { org, pod } = await makeOrgTournamentPod([
+        { url: serverA.url, secret: "secret-a" },
+        { url: serverB.url, secret: "secret-b" },
+      ]);
+      await sendWebhookEvent(org.id, pod.id, "round.completed", { roundId: "r1" });
+
+      expect(serverA.requests).toHaveLength(1);
+      expect(serverB.requests).toHaveLength(1);
+      // Same body, but signed with each webhook's own secret — not interchangeable.
+      expect(serverA.requests[0]!.body).toBe(serverB.requests[0]!.body);
+      expect(serverA.requests[0]!.headers["x-limitedgauntlet-signature"]).not.toBe(
+        serverB.requests[0]!.headers["x-limitedgauntlet-signature"],
+      );
+    } finally {
+      await serverA.close();
+      await serverB.close();
+    }
+  });
+
+  it("still delivers to the other webhooks when one is unreachable", async () => {
+    const server = await withTestServer(() => ({ status: 200 }));
+    try {
+      const { org, pod } = await makeOrgTournamentPod([
+        { url: `http://${ownNonLoopbackAddress()}:1/dead`, secret: "s1" }, // nothing listens here
+        { url: server.url, secret: "s2" },
+      ]);
+      await expect(sendWebhookEvent(org.id, pod.id, "round.started", {})).resolves.toBeUndefined();
+      expect(server.requests).toHaveLength(1);
     } finally {
       await server.close();
     }
@@ -243,5 +285,44 @@ describe("buildMatchesPayload / buildStandingsPayload", () => {
     const standings = await buildStandingsPayload(pod.id);
     expect(standings[0]).toMatchObject({ rank: 1, entrant: { id: entrantA!.id, name: "Alice" }, points: 3 });
     expect(standings[1]).toMatchObject({ rank: 2, entrant: { id: entrantB!.id, name: "Bob" }, points: 0 });
+  });
+});
+
+describe("sendTestWebhookEvent", () => {
+  it("targets one specific webhook by id, not all of an org's webhooks", async () => {
+    const serverA = await withTestServer(() => ({ status: 200 }));
+    const serverB = await withTestServer(() => ({ status: 200 }));
+    try {
+      const org = await prisma.organization.create({
+        data: {
+          slug: `webhook-test-send-${Date.now()}-${Math.random()}`,
+          name: "Test Org",
+          webhooks: {
+            create: [
+              { url: serverA.url, secret: "secret-a" },
+              { url: serverB.url, secret: "secret-b" },
+            ],
+          },
+        },
+        include: { webhooks: true },
+      });
+      const [webhookA] = org.webhooks;
+
+      const result = await sendTestWebhookEvent(org.id, webhookA!.id);
+      expect(result).toEqual({ ok: true, status: 200 });
+      expect(serverA.requests).toHaveLength(1);
+      expect(serverB.requests).toHaveLength(0);
+      expect(JSON.parse(serverA.requests[0]!.body).event).toBe("test");
+    } finally {
+      await serverA.close();
+      await serverB.close();
+    }
+  });
+
+  it("returns not_found for an unknown or cross-org webhook id", async () => {
+    const org = await prisma.organization.create({
+      data: { slug: `webhook-test-send-2-${Date.now()}-${Math.random()}`, name: "Test Org" },
+    });
+    await expect(sendTestWebhookEvent(org.id, "does-not-exist")).resolves.toEqual({ ok: false, error: "not_found" });
   });
 });

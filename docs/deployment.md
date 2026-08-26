@@ -138,7 +138,7 @@ It only runs after the organizer has actually attempted an SSO login and been re
 
 ## 9. Optional: outbound webhooks (Home Assistant, etc.)
 
-An organizer can configure a webhook URL (Settings → Webhook) that gets an HMAC-signed HTTP POST whenever a round starts, is extended, or completes, and when a round's pairings are posted. Off unless a URL is set. This was built with Home Assistant in mind (e.g. driving a live round-timer display and chime on a smart display), but it's plain HTTP — any receiver that accepts a POST works (Node-RED, n8n, a Discord relay, etc.).
+An organizer can configure any number of webhooks (Settings → Webhooks) — each gets its own HMAC-signed HTTP POST whenever a round starts, is extended, or completes, and when a round's pairings are posted. Off unless at least one is configured, and each is delivered to independently, so you can push the same events to several places at once (e.g. Home Assistant *and* a Discord relay) without one affecting the other. This was built with Home Assistant in mind (e.g. driving a live round-timer display and chime on a smart display), but it's plain HTTP — any receiver that accepts a POST works (Node-RED, n8n, a Discord relay, etc.).
 
 Each request body looks like:
 
@@ -158,7 +158,7 @@ Each request body looks like:
 
 `event` is one of `round.started`, `round.extended`, `round.completed` (whose `data.standings` carries the updated, ranked standings instead of `matches`), or `pairings.posted`. There's no continuous "remaining time" stream — a receiver derives the live countdown itself from `endsAt`, the same way the app's own frontend does, then re-renders every second or so and decides its own chime timing.
 
-Verify the request actually came from your deployment by checking the `X-LimitedGauntlet-Signature: sha256=<hex>` header — an HMAC-SHA256 of the raw request body using the signing secret shown in Settings:
+Verify the request actually came from your deployment by checking the `X-LimitedGauntlet-Signature: sha256=<hex>` header — an HMAC-SHA256 of the raw request body using that specific webhook's own signing secret (each webhook you configure gets its own, shown in Settings):
 
 ```js
 const crypto = require("node:crypto");

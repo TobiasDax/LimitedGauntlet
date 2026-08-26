@@ -23,24 +23,41 @@ model Organization {
   // password once to view any /o/<slug>/... page — an opt-in, off-by-default
   // exception to "public pages stay open", set only by the organizer.
   publicPasswordHash String?
-  // Outbound webhook (PI-50): an HMAC-signed HTTP POST fired on round
-  // lifecycle events (round started/extended/completed, pairings posted) so
-  // an organizer's own automation (Home Assistant, etc.) can react — the
-  // receiver derives a live countdown from the endsAt each payload carries,
-  // so this never needs to stream continuously. Both null = inert for this
-  // org, same "degrades cleanly when unconfigured" posture as SMTP/OIDC.
-  // webhookSecret is intentionally NOT a one-way hash: unlike a password or
-  // API token (something a caller presents that we only ever need to
-  // verify), this app is the one PRESENTING it, as the HMAC key that signs
-  // every outgoing request, so it has to remain readable to the server.
-  webhookUrl    String?
-  webhookSecret String?
   createdAt DateTime @default(now())
 
   organizers  OrganizerAccount[]
   players     Player[]
   tournaments Tournament[]
   organizerInvites OrganizerInvite[]
+  webhooks    OrganizationWebhook[]
+}
+
+// Outbound webhooks (PI-50): an HMAC-signed HTTP POST fired on round
+// lifecycle events (round started/extended/completed, pairings posted) so an
+// organizer's own automation (Home Assistant, etc.) can react — the receiver
+// derives a live countdown from the endsAt each payload carries, so this
+// never needs to stream continuously. An org can configure any number of
+// these, each delivered independently with its own secret (revised 2026-08-26
+// from a single url/secret pair on Organization, per Tobias — push the same
+// events to multiple places at once). No rows = inert for this org, same
+// "degrades cleanly when unconfigured" posture as SMTP/OIDC.
+model OrganizationWebhook {
+  id    String  @id @default(cuid())
+  orgId String
+  url   String
+  // Intentionally NOT a one-way hash: unlike a password or API token
+  // (something a caller presents that we only ever need to verify), this app
+  // is the one PRESENTING this, as the HMAC key that signs every outgoing
+  // request, so it has to remain readable to the server.
+  secret String
+  // Optional organizer-facing name ("Home Assistant", "Discord relay") to
+  // tell multiple webhooks apart in Settings — purely cosmetic.
+  label     String?
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
 }
 
 model OrganizerAccount {
