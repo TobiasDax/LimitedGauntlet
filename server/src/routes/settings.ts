@@ -5,10 +5,15 @@ import { prisma } from "../prisma.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { requireSessionAuth } from "../auth/middleware.js";
 import { isEmailConfigured, sendMail, resolveBaseUrl } from "../services/mailer.js";
+import { buildOrgExport, type ExportSections } from "../services/orgExport.js";
+import { parseOrgExport, importOrgData } from "../services/orgImport.js";
 
 const publicLockSchema = z.object({ password: z.string().min(4).max(200) });
 const passwordChangeSchema = z.object({
-  currentPassword: z.string().min(1),
+  // Optional so an OIDC-only account (no local password, PI-42) can set its
+  // first password. When the account already has a password, it's required and
+  // verified below.
+  currentPassword: z.string().optional(),
   newPassword: z.string().min(8).max(200),
 });
 const emailChangeSchema = z.object({
@@ -76,9 +81,14 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       const account = await prisma.organizerAccount.findUniqueOrThrow({ where: { id: request.organizer!.id } });
-      if (!(await verifyPassword(account.passwordHash, body.data.currentPassword))) {
-        reply.code(401).send({ error: "invalid_password" });
-        return;
+      // If the account already has a password, the current one is required and
+      // must verify. An OIDC-only account (passwordHash null) is setting its
+      // first password, so there's nothing to verify.
+      if (account.passwordHash) {
+        if (!body.data.currentPassword || !(await verifyPassword(account.passwordHash, body.data.currentPassword))) {
+          reply.code(401).send({ error: "invalid_password" });
+          return;
+        }
       }
       await prisma.organizerAccount.update({
         where: { id: account.id },
@@ -105,6 +115,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       const account = await prisma.organizerAccount.findUniqueOrThrow({ where: { id: request.organizer!.id } });
+      // An OIDC-only account (PI-42) has no password to re-verify — it must set
+      // one first (Settings → Account) before these password-gated actions.
+      if (!account.passwordHash) {
+        reply.code(400).send({ error: "password_required" });
+        return;
+      }
       if (!(await verifyPassword(account.passwordHash, body.data.currentPassword))) {
         reply.code(401).send({ error: "invalid_password" });
         return;
@@ -158,6 +174,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       const account = await prisma.organizerAccount.findUniqueOrThrow({ where: { id: request.organizer!.id } });
+      // An OIDC-only account (PI-42) has no password to re-verify — it must set
+      // one first (Settings → Account) before these password-gated actions.
+      if (!account.passwordHash) {
+        reply.code(400).send({ error: "password_required" });
+        return;
+      }
       if (!(await verifyPassword(account.passwordHash, body.data.currentPassword))) {
         reply.code(401).send({ error: "invalid_password" });
         return;
@@ -199,6 +221,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       const account = await prisma.organizerAccount.findUniqueOrThrow({ where: { id: request.organizer!.id } });
+      // An OIDC-only account (PI-42) has no password to re-verify — it must set
+      // one first (Settings → Account) before these password-gated actions.
+      if (!account.passwordHash) {
+        reply.code(400).send({ error: "password_required" });
+        return;
+      }
       if (!(await verifyPassword(account.passwordHash, body.data.currentPassword))) {
         reply.code(401).send({ error: "invalid_password" });
         return;
@@ -314,6 +342,55 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     }
     reply.code(204).send();
   });
+
+  // --- Data export (PI-38) ---
+  // Machine-readable dump of the org's data. Which sections are included is
+  // driven by query flags (the Settings popup's checkboxes); default is
+  // everything. Session-auth only, like the rest of this file — an org's full
+  // data export shouldn't be reachable with a bearer API token.
+  app.get("/api/settings/export", async (request, reply) => {
+    const q = (request.query ?? {}) as Record<string, unknown>;
+    const has = (key: string) => q[key] === "1" || q[key] === "true";
+    const anySelected = has("data") || has("hallOfFame") || has("treasureVault");
+    // No explicit selection ⇒ export everything (a bare /export is "give me all of it").
+    const sections: ExportSections = anySelected
+      ? { data: has("data"), hallOfFame: has("hallOfFame"), treasureVault: has("treasureVault") }
+      : { data: true, hallOfFame: true, treasureVault: true };
+
+    const payload = await buildOrgExport(request.organizer!.orgId, sections);
+    reply
+      .header("Content-Disposition", `attachment; filename="${payload.organization.slug}-export.json"`)
+      .type("application/json")
+      .send(payload);
+  });
+
+  // --- Data import (PI-39) ---
+  // Accepts a file produced by the export above and rebuilds its `data` section
+  // into THIS org. Idempotent at the tournament level (a same-named tournament
+  // is skipped), so re-uploading is safe. Rate-limited — this is a heavy,
+  // write-many operation.
+  app.post(
+    "/api/settings/import",
+    // Bump the body limit well past Fastify's 1MB default — an export with card
+    // images/history for several tournaments can run large.
+    { bodyLimit: 25 * 1024 * 1024, config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const parsed = parseOrgExport(request.body);
+      if (!parsed.ok || !parsed.data) {
+        reply.code(400).send({ error: parsed.error ?? "invalid_shape" });
+        return;
+      }
+      try {
+        const summary = await importOrgData(request.organizer!.orgId, parsed.data);
+        reply.send({ ok: true, summary });
+      } catch (err) {
+        // A reference error (unknown player/team/entrant in the file) — surface
+        // it rather than 500ing, since it's a problem with the uploaded data.
+        request.log.warn({ err }, "org import failed");
+        reply.code(422).send({ error: "import_failed", detail: (err as Error).message });
+      }
+    },
+  );
 
   // Remove a co-organizer's access. Self-removal is deliberately rejected here
   // — leaving the org goes through /settings/delete-account instead, which

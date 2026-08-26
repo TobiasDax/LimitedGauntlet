@@ -1,0 +1,307 @@
+import { prisma } from "../prisma.js";
+import { computeHallOfFame } from "./hallOfFame.js";
+import type {
+  ConstructedFormat,
+  MatchFormat,
+  MatchResult,
+  PodFormat,
+  PodStatus,
+  RoundStatus,
+  TournamentStatus,
+} from "@prisma/client";
+
+// LimitedGauntlet's own portable export format (PI-38), the round-trip
+// counterpart to the history-import path. Unlike the one-time legacy import
+// (`import-legacy.ts`, keyed loosely on names and lossy by design), this is a
+// faithful dump of an org's persistent data so PI-39's importer can rebuild it
+// elsewhere. Entrants/matches are keyed within a pod by a stable *ref* — the
+// player's displayName for individuals, the team name for team entrants —
+// which is exactly what the importer re-resolves, so export and import stay
+// symmetric. Derived views (hallOfFame, treasureVault) are informational
+// snapshots, not consumed on import (they recompute from `data`).
+
+export const EXPORT_FORMAT_VERSION = 1;
+
+export interface ExportSections {
+  data: boolean; // tournaments / pods / matches (the round-trippable structural dump)
+  hallOfFame: boolean;
+  treasureVault: boolean;
+}
+
+export interface ExportMatch {
+  tableNumber: number;
+  a: string; // entrant ref (player displayName or team name)
+  b: string | null; // null = bye
+  result: MatchResult;
+  gamesWonA: number;
+  gamesWonB: number;
+  gamesDrawn: number;
+}
+
+export interface ExportRound {
+  roundNumber: number;
+  status: RoundStatus;
+  startedAt: string | null;
+  endsAt: string | null;
+  matches: ExportMatch[];
+}
+
+export interface ExportEntrant {
+  player: string | null; // displayName, xor team
+  team: string | null; // team name, xor player
+  droppedAfterRound: number | null;
+  finalPointsOverride: number | null;
+  manualTiebreak: number | null;
+}
+
+export interface ExportTeam {
+  name: string;
+  members: string[]; // player displayNames
+}
+
+export interface ExportCardPull {
+  cardName: string;
+  player: string | null; // displayName
+  playerIdInferred: boolean;
+  scryfallId: string | null;
+  setCode: string | null;
+  foil: boolean;
+  priceEur: number | null;
+  imageUri: string | null;
+}
+
+export interface ExportPod {
+  name: string;
+  date: string | null;
+  format: PodFormat;
+  setCode: string | null;
+  constructedFormat: ConstructedFormat | null;
+  constructedFormatCustom: string | null;
+  sequenceOrder: number;
+  isTeamEvent: boolean;
+  teamSize: number | null;
+  roundCount: number;
+  matchFormat: MatchFormat;
+  pointsWin: number;
+  pointsDraw: number;
+  pointsLoss: number;
+  roundLengthMinutes: number;
+  status: PodStatus;
+  excludeFromStats: boolean;
+  isMainEvent: boolean;
+  teams: ExportTeam[];
+  entrants: ExportEntrant[];
+  rounds: ExportRound[];
+  cardPulls: ExportCardPull[];
+}
+
+export interface ExportTournament {
+  name: string;
+  startDate: string;
+  endDate: string;
+  location: string | null;
+  description: string | null;
+  status: TournamentStatus;
+  players: string[]; // displayNames on this tournament's roster
+  pods: ExportPod[];
+}
+
+export interface ExportData {
+  players: string[]; // every player displayName in the org
+  tournaments: ExportTournament[];
+}
+
+export interface HallOfFameSnapshotRow {
+  player: string;
+  tournamentsPlayed: number;
+  podsPlayed: number;
+  totalPoints: number;
+  average: number;
+  mainEventWins: number;
+}
+
+export interface TreasureVaultSnapshotRow {
+  cardName: string;
+  priceEur: number | null;
+  player: string | null;
+  setCode: string | null;
+  foil: boolean;
+  podName: string;
+  tournamentName: string;
+}
+
+export interface OrgExport {
+  formatVersion: number;
+  exportedAt: string;
+  application: "limited-gauntlet";
+  organization: { slug: string; name: string };
+  data?: ExportData;
+  hallOfFame?: HallOfFameSnapshotRow[];
+  treasureVault?: TreasureVaultSnapshotRow[];
+}
+
+const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
+
+export async function buildOrgExport(orgId: string, sections: ExportSections): Promise<OrgExport> {
+  const org = await prisma.organization.findUniqueOrThrow({
+    where: { id: orgId },
+    select: { slug: true, name: true },
+  });
+
+  const out: OrgExport = {
+    formatVersion: EXPORT_FORMAT_VERSION,
+    exportedAt: new Date().toISOString(),
+    application: "limited-gauntlet",
+    organization: { slug: org.slug, name: org.name },
+  };
+
+  if (sections.data) out.data = await buildStructuralData(orgId);
+  if (sections.hallOfFame) out.hallOfFame = await buildHallOfFameSnapshot(orgId);
+  if (sections.treasureVault) out.treasureVault = await buildTreasureVaultSnapshot(orgId);
+
+  return out;
+}
+
+async function buildStructuralData(orgId: string): Promise<ExportData> {
+  const players = await prisma.player.findMany({
+    where: { orgId },
+    orderBy: { displayName: "asc" },
+    select: { displayName: true },
+  });
+
+  const tournaments = await prisma.tournament.findMany({
+    where: { orgId },
+    orderBy: { startDate: "asc" },
+    include: {
+      players: { include: { player: { select: { displayName: true } } } },
+      pods: {
+        orderBy: { sequenceOrder: "asc" },
+        include: {
+          teams: { include: { members: { include: { player: { select: { displayName: true } } } } } },
+          entrants: {
+            include: {
+              player: { select: { displayName: true } },
+              team: { select: { name: true } },
+            },
+          },
+          rounds: { orderBy: { roundNumber: "asc" }, include: { matches: { orderBy: { tableNumber: "asc" } } } },
+          cardPulls: { include: { player: { select: { displayName: true } } } },
+        },
+      },
+    },
+  });
+
+  return {
+    players: players.map((p) => p.displayName),
+    tournaments: tournaments.map((t) => ({
+      name: t.name,
+      startDate: t.startDate.toISOString(),
+      endDate: t.endDate.toISOString(),
+      location: t.location,
+      description: t.description,
+      status: t.status,
+      players: t.players.map((tp) => tp.player.displayName),
+      pods: t.pods.map((pod) => {
+        // entrantId -> ref (player displayName or team name), for resolving matches.
+        const refByEntrantId = new Map<string, string>();
+        for (const e of pod.entrants) {
+          const ref = e.player?.displayName ?? e.team?.name;
+          if (ref) refByEntrantId.set(e.id, ref);
+        }
+        return {
+          name: pod.name,
+          date: iso(pod.date),
+          format: pod.format,
+          setCode: pod.setCode,
+          constructedFormat: pod.constructedFormat,
+          constructedFormatCustom: pod.constructedFormatCustom,
+          sequenceOrder: pod.sequenceOrder,
+          isTeamEvent: pod.isTeamEvent,
+          teamSize: pod.teamSize,
+          roundCount: pod.roundCount,
+          matchFormat: pod.matchFormat,
+          pointsWin: pod.pointsWin,
+          pointsDraw: pod.pointsDraw,
+          pointsLoss: pod.pointsLoss,
+          roundLengthMinutes: pod.roundLengthMinutes,
+          status: pod.status,
+          excludeFromStats: pod.excludeFromStats,
+          isMainEvent: pod.isMainEvent,
+          teams: pod.teams.map((team) => ({
+            name: team.name,
+            members: team.members.map((m) => m.player.displayName),
+          })),
+          entrants: pod.entrants.map((e) => ({
+            player: e.player?.displayName ?? null,
+            team: e.team?.name ?? null,
+            droppedAfterRound: e.droppedAfterRound,
+            finalPointsOverride: e.finalPointsOverride,
+            manualTiebreak: e.manualTiebreak,
+          })),
+          rounds: pod.rounds.map((round) => ({
+            roundNumber: round.roundNumber,
+            status: round.status,
+            startedAt: iso(round.startedAt),
+            endsAt: iso(round.endsAt),
+            matches: round.matches.map((m) => ({
+              tableNumber: m.tableNumber,
+              a: refByEntrantId.get(m.entrantAId) ?? "",
+              b: m.entrantBId ? (refByEntrantId.get(m.entrantBId) ?? null) : null,
+              result: m.result,
+              gamesWonA: m.gamesWonA,
+              gamesWonB: m.gamesWonB,
+              gamesDrawn: m.gamesDrawn,
+            })),
+          })),
+          cardPulls: pod.cardPulls.map((c) => ({
+            cardName: c.cardName,
+            player: c.player?.displayName ?? null,
+            playerIdInferred: c.playerIdInferred,
+            scryfallId: c.scryfallId,
+            setCode: c.setCode,
+            foil: c.foil,
+            priceEur: c.priceEur === null ? null : Number(c.priceEur),
+            imageUri: c.imageUri,
+          })),
+        };
+      }),
+    })),
+  };
+}
+
+async function buildHallOfFameSnapshot(orgId: string): Promise<HallOfFameSnapshotRow[]> {
+  const rows = await computeHallOfFame(orgId);
+  const players = await prisma.player.findMany({
+    where: { id: { in: rows.map((r) => r.playerId) } },
+    select: { id: true, displayName: true },
+  });
+  const nameById = new Map(players.map((p) => [p.id, p.displayName]));
+  return rows.map((r) => ({
+    player: nameById.get(r.playerId) ?? "(unknown)",
+    tournamentsPlayed: r.tournamentsPlayed,
+    podsPlayed: r.podsPlayed,
+    totalPoints: r.totalPoints,
+    average: r.average,
+    mainEventWins: r.mainEventWins.length,
+  }));
+}
+
+async function buildTreasureVaultSnapshot(orgId: string): Promise<TreasureVaultSnapshotRow[]> {
+  const pulls = await prisma.cardPull.findMany({
+    where: { pod: { excludeFromStats: false, tournament: { orgId } } },
+    include: {
+      player: { select: { displayName: true } },
+      pod: { select: { name: true, tournament: { select: { name: true } } } },
+    },
+    orderBy: { priceEur: "desc" },
+  });
+  return pulls.map((p) => ({
+    cardName: p.cardName,
+    priceEur: p.priceEur === null ? null : Number(p.priceEur),
+    player: p.player?.displayName ?? null,
+    setCode: p.setCode,
+    foil: p.foil,
+    podName: p.pod.name,
+    tournamentName: p.pod.tournament.name,
+  }));
+}

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { requireAuth } from "../auth/middleware.js";
-import { config } from "../config.js";
+import { config, isOidcConfigured } from "../config.js";
+import { beginOidcLogin, completeOidcLogin, type OidcIdentity } from "../services/oidc.js";
 
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -27,6 +28,64 @@ const acceptInviteSchema = z.object({
   name: z.string().trim().min(1).max(100),
   password: z.string().min(8).max(200),
 });
+
+function requestOrigin(request: { protocol: string; headers: Record<string, unknown> }): string {
+  const host = request.headers.host;
+  return host ? `${request.protocol}://${String(host)}` : "";
+}
+
+// OIDC login resolution (PI-42): map a verified external identity to an
+// organizer account. Deliberately does NOT create new organizations — that
+// keeps the closed-signup / invite-based posture (new orgs come from signup or
+// the history import). The paths, in order:
+//   1. Known subject → the account we linked before.
+//   2. Verified email matching an existing account → link (record the subject).
+//   3. Verified email matching a pending co-organizer invite → provision a
+//      passwordless account into that org and consume the invite (SSO as an
+//      alternative to the password-set accept-invite flow).
+//   4. Otherwise → refused; an organizer must invite this email first.
+type LinkResult = { ok: true; organizerId: string } | { ok: false; error: string };
+
+async function linkOrProvisionFromOidc(identity: OidcIdentity): Promise<LinkResult> {
+  const bySubject = await prisma.organizerAccount.findUnique({ where: { oidcSubject: identity.subject } });
+  if (bySubject) return { ok: true, organizerId: bySubject.id };
+
+  if (!identity.email || !identity.emailVerified) {
+    return { ok: false, error: "oidc_email_unverified" };
+  }
+
+  const byEmail = await prisma.organizerAccount.findUnique({ where: { email: identity.email } });
+  if (byEmail) {
+    // Link the subject to the existing account if it isn't already, so future
+    // logins match on the stable subject even if the IdP email changes.
+    if (!byEmail.oidcSubject) {
+      await prisma.organizerAccount.update({ where: { id: byEmail.id }, data: { oidcSubject: identity.subject } });
+    }
+    return { ok: true, organizerId: byEmail.id };
+  }
+
+  const invite = await prisma.organizerInvite.findFirst({
+    where: { email: identity.email, usedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (invite) {
+    const [organizer] = await prisma.$transaction([
+      prisma.organizerAccount.create({
+        data: {
+          orgId: invite.orgId,
+          email: identity.email,
+          name: identity.name || identity.email,
+          passwordHash: null,
+          oidcSubject: identity.subject,
+        },
+      }),
+      prisma.organizerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } }),
+    ]);
+    return { ok: true, organizerId: organizer.id };
+  }
+
+  return { ok: false, error: "oidc_no_account" };
+}
 
 function isUniqueConstraintError(err: unknown, target: string): boolean {
   return (
@@ -51,6 +110,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     reply.send({
       legalLinkUrl: config.legalLinkUrl || null,
       legalLinkLabel: config.legalLinkLabel || null,
+      // Whether SSO login is available + the button label (PI-42).
+      oidcEnabled: isOidcConfigured(),
+      oidcProviderName: config.oidc.providerName,
     });
   });
 
@@ -121,7 +183,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const { email, password } = parsed.data;
 
       const account = await prisma.organizerAccount.findUnique({ where: { email } });
-      const valid = account ? await verifyPassword(account.passwordHash, password) : false;
+      // An OIDC-only account (PI-42) has no local password — password login
+      // can't succeed for it. Kept generic (not a distinct error) to avoid
+      // revealing which emails have accounts.
+      const valid = account?.passwordHash ? await verifyPassword(account.passwordHash, password) : false;
 
       if (!account || !valid) {
         reply.code(401).send({ error: "invalid_credentials" });
@@ -247,6 +312,70 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         publicLockEnabled: !!organization.publicPasswordHash,
         organizerCount,
       });
+    },
+  );
+
+  // --- OIDC / SSO login (PI-42) ---
+  // A full-page redirect flow (not fetch/JSON): the browser is sent to the IdP
+  // and comes back to the callback below, which sets the session and redirects
+  // into the SPA. Both routes 404/redirect cleanly when OIDC isn't configured.
+
+  app.get(
+    "/api/auth/oidc/login",
+    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      if (!isOidcConfigured()) {
+        reply.code(404).send({ error: "oidc_not_configured" });
+        return;
+      }
+      const origin = requestOrigin(request);
+      try {
+        const start = await beginOidcLogin(origin);
+        request.session.set("oidc", {
+          state: start.state,
+          nonce: start.nonce,
+          codeVerifier: start.codeVerifier,
+          origin,
+        });
+        reply.redirect(start.url);
+      } catch (err) {
+        request.log.error({ err }, "oidc login start failed");
+        reply.redirect("/login?error=oidc_unavailable");
+      }
+    },
+  );
+
+  app.get(
+    "/api/auth/oidc/callback",
+    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      if (!isOidcConfigured()) {
+        reply.code(404).send({ error: "oidc_not_configured" });
+        return;
+      }
+      const checks = request.session.get("oidc");
+      request.session.set("oidc", undefined); // single-use, whatever happens next
+      if (!checks) {
+        reply.redirect("/login?error=oidc_expired");
+        return;
+      }
+      try {
+        const identity = await completeOidcLogin(checks.origin, request.query as Record<string, string>, {
+          state: checks.state,
+          nonce: checks.nonce,
+          codeVerifier: checks.codeVerifier,
+        });
+        const result = await linkOrProvisionFromOidc(identity);
+        if (!result.ok) {
+          reply.redirect(`/login?error=${result.error}`);
+          return;
+        }
+        request.session.set("organizerId", result.organizerId);
+        reply.redirect("/");
+      } catch (err) {
+        request.log.error({ err }, "oidc callback failed");
+        reply.redirect("/login?error=oidc_failed");
+      }
     },
   );
 

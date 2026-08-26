@@ -76,6 +76,17 @@ npm run --workspace server test   # server unit/integration tests, needs a live 
 npm run --workspace server build && npm run --workspace client build   # typecheck + build both
 ```
 
+## Roadmap
+
+The app is **feature-complete and running in production** ([latest release](https://github.com/TobiasDax/LimitedGauntlet/releases/latest)). The full, always-current backlog lives in [`ROADMAP.md`](ROADMAP.md) — a quick snapshot of what's planned:
+
+- **Data export / import** — download all of an org's data (tournaments, pods, matches, Hall of Fame, Treasure Chest) as JSON, and a UI to import it back (PI-38 / PI-39).
+- **OIDC login** — sign in via an external identity provider, linking to an existing account by email (PI-42).
+- **Share popup + QR code** — a pod's public link as a scannable QR so players can open the standings on their phone (PI-45).
+- **Richer public sharing & polish** — footer/legal links, constructed-format details, multi-organizer orgs (recently shipped, verification in flight).
+
+See [`ROADMAP.md`](ROADMAP.md) for the full list, status, and design notes.
+
 ## History import
 
 `server/src/scripts/import-legacy.ts` reads a JSON file of past tournament history — names, pods, points, card pulls — and inserts it via Prisma. It's idempotent (safe to re-run, existing rows are left alone rather than duplicated) and never goes through the HTTP API.
@@ -89,7 +100,7 @@ docker compose exec app node server/dist/scripts/import-legacy.js /path/to/your-
 # or: LEGACY_DATA_PATH=/path/to/your-data.json docker compose exec app node server/dist/scripts/import-legacy.js
 ```
 
-Creates an organization and one organizer login — this is the one path into the app that works regardless of `ALLOW_SIGNUP`. Defaults to an org slugged `gp-eichstaett` (the original author's own group — harmless as a default, but you'll want your own group's details); set these first:
+Creates an organization and one organizer login — this is the one path into the app that works regardless of `ALLOW_SIGNUP`. Defaults to a generic org slugged `gp` (named `GP`) — harmless as a default, but you'll want your own group's details; set these first:
 
 ```sh
 IMPORT_ORG_SLUG=your-group
@@ -98,6 +109,8 @@ IMPORT_ORGANIZER_EMAIL=organizer@example.com
 IMPORT_ORGANIZER_PASSWORD=              # generated + printed once if left unset — log in and change it
 IMPORT_ORGANIZER_NAME=Organizer
 ```
+
+The import is idempotent **per org**, keyed on the slug: re-running with the same `IMPORT_ORG_SLUG` reuses that org and skips tournaments/pods/players it already has. As a guard, if an org with the same **name** already exists under a *different* slug, the script refuses (that would silently create a second, separate org sharing the name) — either re-run pointing `IMPORT_ORG_SLUG` at the existing org's slug, or set `IMPORT_ALLOW_DUPLICATE_NAME=1` to deliberately create a separate one.
 
 If you've logged historical card pulls without per-player attribution (or from before that existed), a one-time backfill script guesses attribution for already-completed pods from finish + card value, marking every guess as inferred and reviewable/reassignable — see `docs/deployment.md`'s optional steps.
 

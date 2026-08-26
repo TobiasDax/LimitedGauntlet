@@ -98,6 +98,23 @@ docker compose exec app node server/dist/scripts/infer-existing-card-pulls.js
 
 Safe to re-run — it's idempotent and never overwrites an attribution a human has already set or confirmed.
 
+## 8. Optional: SSO login via OIDC
+
+Organizers can sign in through an external identity provider (Authelia, Keycloak, Authentik, Google, etc.) instead of (or alongside) an email + password. It's off unless configured — the app runs password-only until you set the OIDC env vars, and the "Sign in with…" button simply isn't shown.
+
+Set these in `.env` (one provider per deployment):
+
+```sh
+OIDC_ISSUER=https://auth.example.com          # provider base URL; discovery at <issuer>/.well-known/openid-configuration
+OIDC_CLIENT_ID=limited-gauntlet
+OIDC_CLIENT_SECRET=…
+OIDC_REDIRECT_URI=                             # optional; defaults to <APP_BASE_URL>/api/auth/oidc/callback
+OIDC_PROVIDER_NAME=Authelia                    # button label: "Sign in with Authelia"
+OIDC_SCOPE=openid email profile               # must include openid + email
+```
+
+Register the redirect URI (`<APP_BASE_URL>/api/auth/oidc/callback`) at your provider, and make sure `APP_BASE_URL` is set so links resolve. An SSO login **links to an existing organizer account by verified email**, or provisions one if that email has a pending co-organizer invite (Settings → Organizers) — it never creates a new organization, so this doesn't reopen signup. An SSO-only account has no local password; it can set one from **Settings → Account** if it also wants password login.
+
 ## Updating
 
 **Published image (Option A):**

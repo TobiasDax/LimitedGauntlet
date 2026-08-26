@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useCreateTournament, useTournaments } from "../features/tournaments/useTournaments";
 import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
+import { SharePopup } from "../components/SharePopup";
 import type { TournamentStatus } from "../lib/types";
 
 const statusLabel: Record<TournamentStatus, string> = {
@@ -26,6 +27,7 @@ export function DashboardPage() {
   const [endDate, setEndDate] = useState("");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
+  const [sharing, setSharing] = useState(false);
 
   return (
     <div>
@@ -34,14 +36,15 @@ export function DashboardPage() {
       <ScreenDek>Every weekend your group has run, and the one you're planning next.</ScreenDek>
 
       {me && (
-        <a
-          href={`/o/${me.organization.slug}`}
-          target="_blank"
-          rel="noreferrer"
+        <button
+          onClick={() => setSharing(true)}
           className="mb-6 inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
         >
-          Public link (share this with your group) ↗
-        </a>
+          Share public link (with your group) ↗
+        </button>
+      )}
+      {me && sharing && (
+        <SharePopup title="Share your organization" path={`/o/${me.organization.slug}`} onClose={() => setSharing(false)} />
       )}
 
       {isLoading && <p className="text-ink-muted">Loading…</p>}

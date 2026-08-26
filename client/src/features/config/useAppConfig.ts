@@ -4,6 +4,9 @@ import { api } from "../../lib/api";
 export interface AppConfig {
   legalLinkUrl: string | null;
   legalLinkLabel: string | null;
+  // Optional SSO login (PI-42): whether it's configured, and the button label.
+  oidcEnabled?: boolean;
+  oidcProviderName?: string;
 }
 
 // Public, no-auth config the frontend chrome needs on every page (incl.

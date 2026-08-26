@@ -34,6 +34,12 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       LEGAL_LINK_URL: ${LEGAL_LINK_URL:-}
       LEGAL_LINK_LABEL: ${LEGAL_LINK_LABEL:-}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-SSO}
+      OIDC_SCOPE: ${OIDC_SCOPE:-openid email profile}
     depends_on:
       db:
         condition: service_healthy

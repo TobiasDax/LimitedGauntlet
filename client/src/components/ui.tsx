@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 
 type ButtonVariant = "default" | "primary" | "ghost";
@@ -72,6 +73,46 @@ export function ScreenTitle({ children }: { children: ReactNode }) {
 
 export function ScreenDek({ children }: { children: ReactNode }) {
   return <p className="mb-8 max-w-[62ch] text-[14.5px] text-ink-secondary">{children}</p>;
+}
+
+// Lightweight modal dialog. Closes on Escape, backdrop click, or the ✕.
+// Sits above the sticky top bar (which is z-30). Shared by the export popup
+// (PI-38) and the pod share popup (PI-45).
+export function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-lg border border-border-strong bg-surface shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+          <h2 className="font-display text-[16px] font-bold">{title}</h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded px-1.5 text-[16px] text-ink-muted hover:text-ink focus-visible:ring-1 focus-visible:ring-accent focus-visible:outline-none"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>
+  );
 }
 
 export function StatusPill({ tone, children }: { tone: "good" | "warning" | "critical"; children: ReactNode }) {

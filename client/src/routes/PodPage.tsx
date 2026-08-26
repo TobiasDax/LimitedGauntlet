@@ -11,6 +11,7 @@ import { PrepTimer } from "../components/PrepTimer";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { SetPicker } from "../components/SetPicker";
 import { ConstructedFormatPicker } from "../components/ConstructedFormatPicker";
+import { SharePopup } from "../components/SharePopup";
 import { entrantDisplayName } from "../lib/entrant";
 import type { ConstructedFormat, Entrant, MatchFormat, PodFormat } from "../lib/types";
 
@@ -333,6 +334,7 @@ export function PodPage() {
   const { data: tournamentData } = useTournament(data?.pod.tournamentId);
   const { data: me } = useMe();
   const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
   usePodRealtime(id, data?.pod.tournamentId);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
@@ -365,14 +367,19 @@ export function PodPage() {
 
       <div className="mb-6 flex flex-wrap items-center gap-5">
         {me && (
-          <a
-            href={`/o/${me.organization.slug}/tournaments/${pod.tournamentId}/pods/${pod.id}`}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={() => setSharing(true)}
             className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
           >
-            Public link ↗
-          </a>
+            Share public link ↗
+          </button>
+        )}
+        {me && sharing && (
+          <SharePopup
+            title="Share this pod"
+            path={`/o/${me.organization.slug}/tournaments/${pod.tournamentId}/pods/${pod.id}`}
+            onClose={() => setSharing(false)}
+          />
         )}
         {!editing && (
           <button

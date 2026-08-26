@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useHallOfFame } from "../features/hallOfFame/useHallOfFame";
 import { useMe } from "../features/auth/useAuth";
 import { HeadlineStats, HallOfFameList, MostPlayedPairings, BiggestPulls } from "../components/HallOfFameOverview";
 import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
+import { SharePopup } from "../components/SharePopup";
 
 export function HallOfFamePage() {
   const { data, isLoading } = useHallOfFame();
   const { data: me } = useMe();
+  const [sharing, setSharing] = useState(false);
 
   return (
     <div>
@@ -17,14 +20,19 @@ export function HallOfFamePage() {
       </ScreenDek>
 
       {me && (
-        <a
-          href={`/o/${me.organization.slug}/hall-of-fame`}
-          target="_blank"
-          rel="noreferrer"
+        <button
+          onClick={() => setSharing(true)}
           className="mb-6 inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
         >
-          Public link ↗
-        </a>
+          Share public link ↗
+        </button>
+      )}
+      {me && sharing && (
+        <SharePopup
+          title="Share the Hall of Fame"
+          path={`/o/${me.organization.slug}/hall-of-fame`}
+          onClose={() => setSharing(false)}
+        />
       )}
 
       {isLoading ? (

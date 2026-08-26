@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useTreasureChest } from "../features/pods/useCardPulls";
 import { useMe } from "../features/auth/useAuth";
 import { CardGallery } from "../components/CardGallery";
 import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
+import { SharePopup } from "../components/SharePopup";
 
 export function TreasureChestPage() {
   const { data, isLoading } = useTreasureChest();
   const { data: me } = useMe();
+  const [sharing, setSharing] = useState(false);
 
   return (
     <div>
@@ -14,14 +17,19 @@ export function TreasureChestPage() {
       <ScreenDek>The biggest pulls across every tournament this group has ever run.</ScreenDek>
 
       {me && (
-        <a
-          href={`/o/${me.organization.slug}/treasure-chest`}
-          target="_blank"
-          rel="noreferrer"
+        <button
+          onClick={() => setSharing(true)}
           className="mb-6 inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
         >
-          Public link ↗
-        </a>
+          Share public link ↗
+        </button>
+      )}
+      {me && sharing && (
+        <SharePopup
+          title="Share the Treasure Chest"
+          path={`/o/${me.organization.slug}/treasure-chest`}
+          onClose={() => setSharing(false)}
+        />
       )}
 
       {isLoading ? (

@@ -8,6 +8,7 @@ import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextFi
 import { RichText } from "../components/RichText";
 import { SetPicker } from "../components/SetPicker";
 import { ConstructedFormatPicker } from "../components/ConstructedFormatPicker";
+import { SharePopup } from "../components/SharePopup";
 import type { ConstructedFormat, PodFormat, TournamentStatus } from "../lib/types";
 
 const tournamentStatuses: TournamentStatus[] = ["PLANNING", "ACTIVE", "COMPLETED"];
@@ -308,6 +309,7 @@ export function TournamentPage() {
   const { data: me } = useMe();
   const [showPodForm, setShowPodForm] = useState(false);
   const [editingTournament, setEditingTournament] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
   if (!data) return <p className="text-ink-muted">Tournament not found.</p>;
@@ -356,14 +358,19 @@ export function TournamentPage() {
             Best pulls of the weekend →
           </Link>
           {me && (
-            <a
-              href={`/o/${me.organization.slug}/tournaments/${tournament.id}`}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              onClick={() => setSharing(true)}
               className="inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
             >
-              Public link ↗
-            </a>
+              Share public link ↗
+            </button>
+          )}
+          {me && sharing && (
+            <SharePopup
+              title="Share this tournament"
+              path={`/o/${me.organization.slug}/tournaments/${tournament.id}`}
+              onClose={() => setSharing(false)}
+            />
           )}
         </div>
       )}

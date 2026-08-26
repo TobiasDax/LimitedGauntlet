@@ -79,15 +79,34 @@ async function loadLegacyData(): Promise<LegacyData> {
 }
 
 async function upsertOrg() {
-  const slug = process.env.IMPORT_ORG_SLUG ?? "gp-eichstaett";
+  const slug = process.env.IMPORT_ORG_SLUG ?? "gp";
+  const name = process.env.IMPORT_ORG_NAME ?? "GP";
   const existing = await prisma.organization.findUnique({ where: { slug } });
   if (existing) {
     console.log(`Org "${slug}" already exists, reusing it.`);
     return existing;
   }
 
+  // Dedup guard: the slug is the only unique key, but the org NAME is not —
+  // so importing again under a *different* slug would silently spawn a second
+  // org with the same name. That's almost always an accident (a re-run with a
+  // changed IMPORT_ORG_SLUG, or a forgotten previous import). Refuse it by
+  // default; set IMPORT_ALLOW_DUPLICATE_NAME=1 to intentionally create a
+  // separate org that happens to share a name.
+  const nameCollision = await prisma.organization.findFirst({ where: { name } });
+  if (nameCollision && process.env.IMPORT_ALLOW_DUPLICATE_NAME !== "1") {
+    throw new Error(
+      `An organization named "${name}" already exists under slug "${nameCollision.slug}", ` +
+        `but you're importing under a different slug "${slug}". This would create a second, ` +
+        `separate org with the same name.\n` +
+        `  - To ADD to the existing org, re-run with IMPORT_ORG_SLUG="${nameCollision.slug}" ` +
+        `(imports are idempotent — existing tournaments/pods/players are skipped).\n` +
+        `  - To intentionally create a separate org sharing this name, set IMPORT_ALLOW_DUPLICATE_NAME=1.`,
+    );
+  }
+
   const org = await prisma.organization.create({
-    data: { slug, name: process.env.IMPORT_ORG_NAME ?? "GP Eichstätt" },
+    data: { slug, name },
   });
 
   const email = process.env.IMPORT_ORGANIZER_EMAIL ?? "organizer@example.com";

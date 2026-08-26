@@ -52,8 +52,29 @@ export const config = {
   // footer simply omits the link when unset.
   legalLinkUrl: process.env.LEGAL_LINK_URL ?? "",
   legalLinkLabel: process.env.LEGAL_LINK_LABEL ?? "",
+  // Optional OIDC / SSO login (PI-42). One identity provider per deployment.
+  // Entirely optional: if issuer/clientId/clientSecret aren't all set,
+  // isOidcConfigured() is false and the app runs password-only (the "Sign in
+  // with…" button just isn't shown). redirectUri falls back to
+  // APP_BASE_URL + the callback path when not given explicitly.
+  oidc: {
+    issuer: process.env.OIDC_ISSUER ?? "",
+    clientId: process.env.OIDC_CLIENT_ID ?? "",
+    clientSecret: process.env.OIDC_CLIENT_SECRET ?? "",
+    redirectUri: process.env.OIDC_REDIRECT_URI ?? "",
+    // Label for the login button ("Sign in with <name>").
+    providerName: process.env.OIDC_PROVIDER_NAME ?? "SSO",
+    // Space-separated scopes; must include openid + email for account linking.
+    scope: process.env.OIDC_SCOPE ?? "openid email profile",
+  },
 };
 
 export function isEmailConfigured(): boolean {
   return config.smtp.host.length > 0 && config.smtp.from.length > 0;
+}
+
+export function isOidcConfigured(): boolean {
+  return (
+    config.oidc.issuer.length > 0 && config.oidc.clientId.length > 0 && config.oidc.clientSecret.length > 0
+  );
 }

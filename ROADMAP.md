@@ -119,33 +119,34 @@ Support the 2v2 multiplayer constructed pod type beyond 1v1. (4-player Commander
 - [x] **Found and fixed the one real gap:** nothing previously validated that a team-entrant's `playerIds.length` matched `pod.teamSize` — an organizer could add a "2-player team" with 1, 3, or 5 members and nothing rejected it. Fixed server-side (`POST /api/pods/:id/entrants`, `pods.ts`) with a `wrong_team_size` 400, plus a matching client-side guard + "x / N selected" hint in `TeamEntrants` (`PodPage.tsx`) that disables submit until the count matches.
 - [ ] Browser-verified.
 
-### PI-38 — Organizer data export
+### PI-38 — Organizer data export ✅ (code-complete, browser-verify pending)
 Give an organizer a way to export all their org's data in a machine-readable form, so it can be moved/backed up or imported elsewhere (pairs with PI-39's import).
-- [ ] **Contents:** all tournaments, pods, matches — plus the Hall of Fame and the Treasure Vault (card-value data). Machine-readable (JSON), structured so PI-39 can round-trip it back in.
-- [ ] **UI:** a single "Export" button on the Settings page (organizer-scoped) that opens a popup with checkboxes for what to include (tournaments/pods/matches, Hall of Fame, Treasure Vault), then downloads the file.
-- [ ] Lives in an **Export / Import** section of the Settings page (shared with PI-39).
+- [x] **Contents:** structural `data` (players, tournaments, pods, teams, entrants, rounds, matches, card pulls) — a faithful, round-trippable dump keyed by in-pod refs (player displayName / team name), the same identity PI-39 re-resolves — plus optional **Hall of Fame** and **Treasure Vault** snapshots (derived, informational). New `server/src/services/orgExport.ts` + `GET /api/settings/export?data=&hallOfFame=&treasureVault=` (session-auth only, never bearer).
+- [x] **UI:** "Export data…" button in a new **Export / Import** Settings section opens a popup (`ExportImportSection.tsx` + shared `Modal` in `ui.tsx`) with a checkbox per section; downloads `<slug>-export-<date>.json` via `useExportOrg` (direct fetch → Blob, not the JSON `api` client).
+- [x] Lives in the shared **Export / Import** Settings section (with PI-39).
 
-### PI-39 — Organizer data import (UI)
+### PI-39 — Organizer data import (UI) ✅ (v1 code-complete, browser-verify pending)
 A UI path to import data into an organization, so imports don't require shell/`import-legacy` access.
-- [ ] **v1:** accept the PI-38 export file (round-trips our own format back into an org).
-- [ ] **Next step (later):** also accept the `legacy-data.json` history file that the `/import-history` skill produces — folding the existing `import-legacy.ts` flow into the UI. See PI-40 for the duplicate-org handling that needs sorting out first.
-- [ ] **UI:** part of the same **Export / Import** section on the Settings page as PI-38.
+- [x] **v1:** accepts the PI-38 export file and rebuilds its `data` into the current org. New `server/src/services/orgImport.ts` (zod-validated envelope + `importOrgData`) + `POST /api/settings/import` (25MB body limit, rate-limited). Non-transactional and **idempotent at the tournament level** (same-named tournament skipped), matching `import-legacy`'s posture — re-importing is safe. Typed errors (`not_our_format`/`invalid_shape`/`unsupported_version`/`no_data`/`import_failed`) surfaced with clear UI copy.
+- [x] **UI:** file picker in the same Settings section; `useImportOrg` parses/posts the file and invalidates the whole query cache on success, then shows a created/skipped summary.
+- [ ] **Next step (later, not built):** also accept the `legacy-data.json` history file that the `/import-history` skill produces — folding the existing `import-legacy.ts` flow into the UI. PI-40's duplicate-org guard is now in place, clearing the way for this.
 
-### PI-40 — History import: default slug + duplicate-org handling
+### PI-40 — History import: default slug + duplicate-org handling ✅ (code-complete, browser-verify pending)
 Cleanups to the existing `import-legacy.ts` flow (`server/src/scripts/import-legacy.ts`).
-- [ ] **Default slug:** `upsertOrg()` currently defaults `IMPORT_ORG_SLUG` to `gp-eichstaett` (and name to `GP Eichstätt`) — too specific to be a useful default. Change the default slug to `gp` (reconsider the default name alongside it).
-- [ ] **Duplicate-org handling — investigated:** the tool checks for an existing org **by slug only** (`findUnique({ where: { slug } })`); if the slug matches it reuses the org, and tournament/pod idempotency (matched by name) prevents duplicated rows on re-run. But **org name is not unique** — running a second import with the same *name* under a *different* slug silently creates a second org. Decide the desired behavior (e.g. warn/refuse on a name collision, or make the match/dedupe intent explicit) and implement it, especially before PI-39 exposes this via the UI where a footgun is easier to hit.
+- [x] **Default slug:** `upsertOrg()` now defaults `IMPORT_ORG_SLUG` to `gp` and `IMPORT_ORG_NAME` to `GP` (was `gp-eichstaett` / `GP Eichstätt` — too author-specific). README + `import-history` SKILL.md updated.
+- [x] **Duplicate-org handling:** the tool checks for an existing org **by slug** (`findUnique({ where: { slug } })`) and reuses it (tournament/pod idempotency by name prevents dupes on re-run). Added a **name-collision guard**: since org name isn't unique, importing under a *different* slug when an org with the same *name* already exists now throws with a clear message (re-run with the existing slug, or set `IMPORT_ALLOW_DUPLICATE_NAME=1` to deliberately create a separate org). Closes the silent-duplicate footgun before PI-39 exposes import via the UI.
 
-### PI-41 — Roadmap overview in the README
+### PI-41 — Roadmap overview in the README ✅
 Surface a short roadmap snapshot in `README.md` for quick visibility, so a visitor/self-hoster can see project status and what's planned without opening `ROADMAP.md`.
-- [ ] Add a brief "Roadmap" section to the README: current status (feature-complete, latest release) + a short bullet list of notable open/backlog items, linking to `ROADMAP.md` for the full detail.
-- [ ] Keep it **short and pointer-style** — the canonical list stays here in `ROADMAP.md`; the README is just a teaser so the two don't drift (don't duplicate every PI item).
+- [x] Added a brief "Roadmap" section to the README (between Development and History import): status + latest-release link + a short bullet list of notable backlog items (export/import, OIDC, share/QR, recent polish), linking to `ROADMAP.md` for full detail.
+- [x] Kept it **short and pointer-style** — the canonical list stays here in `ROADMAP.md`; the README is a teaser (doesn't duplicate every PI item), so the two don't drift.
 
-### PI-42 — Register / Login via OIDC
+### PI-42 — Register / Login via OIDC ✅ (code-complete, browser-verify pending)
 Add OIDC as a login/registration option so the app can be used with an external identity provider (self-hosted Authelia/Keycloak/etc.), alongside the existing email+password organizer accounts.
-- [ ] Standard OIDC authorization-code flow; configured per-deployment via env (issuer, client id/secret, redirect URL), degrading cleanly to email+password-only when unconfigured (same optional-feature posture as SMTP in PI-29).
-- [ ] **Account linking by email:** an OIDC login whose verified email matches an existing `OrganizerAccount` links to that account rather than creating a duplicate; a new email provisions a new account. Keep the session model unchanged (still `@fastify/secure-session` encrypted cookies — OIDC only establishes identity, no external session store, per the "no auth dependency beyond the DB" convention).
-- [ ] Consider org/first-run semantics: how an OIDC-provisioned account maps to an organization (join-by-invite reuse of PI-34, or first login creating an org).
+- [x] Standard OIDC **authorization-code + PKCE** flow via `openid-client` v5 (`server/src/services/oidc.ts`, memoized discovery). Configured per-deployment via env (`OIDC_ISSUER`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET`, optional `OIDC_REDIRECT_URI`/`OIDC_PROVIDER_NAME`/`OIDC_SCOPE`), `isOidcConfigured()`; degrades cleanly to password-only when unset (same posture as SMTP in PI-29 — button hidden). Routes: `GET /api/auth/oidc/login` (redirect, stashes state/nonce/verifier in the session) + `GET /api/auth/oidc/callback`. Env wired into `.env.example` + both compose files; documented in `docs/deployment.md` §8.
+- [x] **Account linking by verified email:** callback resolves identity in order — known `oidcSubject` → existing account by verified email (records the subject) → pending co-organizer invite for that email (provisions a passwordless account into that org, PI-34 reuse) → else refused (`oidc_no_account`). **Never creates a new org**, preserving the closed-signup posture. Session model unchanged (`@fastify/secure-session` cookie — OIDC only establishes identity, no external store). Schema: `OrganizerAccount.passwordHash` now nullable + `oidcSubject String? @unique` (migration `20260826120000_add_organizer_oidc`); password login rejects passwordless accounts; SSO-only accounts can set a first password in Settings.
+- [x] **Org/first-run semantics decided:** join-by-invite reuse (PI-34), *not* first-login-creates-org — SSO is an alternative way into an existing org, new orgs still come only from signup/import. Frontend: "Sign in with <provider>" button on `LoginPage` (via `useAppConfig` `oidcEnabled`/`oidcProviderName`) + `?error=` message mapping for callback failures.
+- [ ] **Follow-up (not built):** UI affordance for an SSO-only account to set its first password is backend-ready (`POST /api/settings/password` accepts no current password when none is set) but the Account form still always asks for a current password — a small UI tweak gated on exposing "has password" to the client.
 
 ### PI-43 — Optional social login via Google (lower priority)
 Google as a social-login provider on top of PI-42's OIDC groundwork. **Lower priority** — this is for public/general use, not needed for Tobias's own deployment right now.
@@ -158,8 +159,8 @@ A public demo deployment so prospective self-hosters can try the app without sta
 - [ ] **Auto-reset:** the instance resets to a known previous state every X hours (scheduled job / re-seed), so demo visitors' edits don't accumulate.
 - [ ] Decide hosting/where it lives (likely DaxLite alongside the main deploy) and how the reset is wired (cron re-seed vs. volume snapshot restore).
 
-### PI-45 — Share popup with QR code for a pod's public link
-The pod page's "Public link ↗" (`PodPage.tsx`) is currently a plain anchor that just opens the public pod page in a new tab. Turn it into a proper share affordance: a popup showing the shareable link plus a generated QR code so players can scan it to open the pod's public page on their phone.
-- [ ] Clicking the share control opens a popup/modal displaying the full public URL (`/o/:slug/tournaments/:id/pods/:podId`) with a copy button, and a **QR code** encoding that same URL.
-- [ ] Generate the QR client-side (add a small QR lib) — no server round-trip, works offline once the page is loaded.
-- [ ] Consider reusing the same share popup for the other public surfaces (tournament page, Hall of Fame, Treasure Vault) if it generalizes cleanly, but the pod link is the primary target.
+### PI-45 — Share popup with QR code for a pod's public link ✅ (code-complete, browser-verify pending)
+The pod page's "Public link ↗" (`PodPage.tsx`) was a plain anchor that just opened the public pod page in a new tab. Turned it into a proper share affordance: a popup showing the shareable link plus a generated QR code so players can scan it to open the public page on their phone.
+- [x] "Share public link ↗" opens a modal (`SharePopup.tsx`, on the shared `Modal` in `ui.tsx`) with the full public URL (read-only field + Copy button, with an execCommand fallback for non-HTTPS LAN where the clipboard API is unavailable) and a **QR code** encoding it.
+- [x] QR generated client-side via `qrcode.react` (`QRCodeSVG`) — pure-JS, no server round-trip, works offline once loaded. URL built from `window.location.origin` so it matches whatever host the organizer is on.
+- [x] **Generalized to every public surface** (it composed cleanly): pod (primary), tournament (`TournamentPage`), org home (`DashboardPage`), Hall of Fame (`HallOfFamePage`), Treasure Chest (`TreasureChestPage`) — each old "Public link ↗" anchor is now a Share button opening the popup.

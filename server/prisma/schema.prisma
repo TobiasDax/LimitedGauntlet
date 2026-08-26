@@ -35,7 +35,16 @@ model OrganizerAccount {
   id           String   @id @default(cuid())
   orgId        String
   email        String   @unique
-  passwordHash String
+  // Nullable since PI-42: an account provisioned purely via OIDC (SSO) has no
+  // local password. Password login is rejected for such accounts; they can set
+  // a password later from Settings to gain a second way in.
+  passwordHash String?
+  // OIDC subject (`sub` claim) of the linked identity-provider account (PI-42).
+  // Set the first time an OIDC login links to (or provisions) this account, so
+  // subsequent logins match on the stable subject even if the IdP email later
+  // changes. One IdP per deployment (issuer is env-configured), so the subject
+  // alone is unique. Null for password-only accounts.
+  oidcSubject  String?  @unique
   name         String
   createdAt    DateTime @default(now())
 
