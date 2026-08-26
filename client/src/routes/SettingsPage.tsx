@@ -60,6 +60,13 @@ export function SettingsPage() {
         <ExportImportSection />
       </SettingsSection>
 
+      <SettingsSection
+        title="Webhook"
+        description="Get an HMAC-signed HTTP POST when a round starts, is extended, or completes, and when pairings are posted — for Home Assistant or anything else that accepts a webhook. Off unless a URL is set; individual pods can opt out from their own edit form."
+      >
+        <WebhookSection />
+      </SettingsSection>
+
       <SettingsSection title="Account" description="Change your password or email, or delete your account.">
         <AccountSection />
       </SettingsSection>
