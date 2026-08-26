@@ -13,6 +13,10 @@ const oidcErrorMessages: Record<string, string> = {
   oidc_expired: "That SSO login expired before it finished. Please try again.",
   oidc_failed: "SSO login failed. Please try again.",
   oidc_unavailable: "SSO is temporarily unavailable. Try again, or log in with your password.",
+  oidc_recovery_required:
+    "Your identity provider's account for this email looks different than what we have on file. We've emailed a confirmation link to relink it — open that link to finish signing in.",
+  oidc_recovery_required_no_email:
+    "Your identity provider's account for this email looks different than what we have on file, but this deployment has no email configured to send a confirmation link. Ask whoever runs this deployment to relink it from the server.",
 };
 
 export function LoginPage() {

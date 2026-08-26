@@ -124,6 +124,18 @@ An SSO-provisioned account has no local password; it can set one from **Settings
 
 To make OIDC the *only* way in, set `LOCAL_LOGIN_DISABLED=true`. This hides the password form + local signup and rejects `POST /api/auth/login` / local signup — everyone logs in via SSO (existing accounts link by email; new ones self-register through the org-setup screen when signups are open). As a fail-safe it's **ignored unless OIDC is configured**, so a typo can't lock you out of the app entirely.
 
+### If your identity provider reassigns an organizer's subject
+
+An organizer account is bound to their provider's stable subject identifier, not just their email — deliberately, so a provider that later reuses or changes email addresses can't silently take over an account. If that identity provider account is ever deleted and recreated with the same mailbox (documented Pocket ID behavior, for example), the new subject won't match, and SSO login refuses to sign them in rather than trusting email equality alone.
+
+When that happens, the app emails the organizer's **existing** address a one-time confirmation link (`/oidc-relink?token=…`) — opening it relinks the account to the new subject and revokes every existing session and API token for it, so re-confirm intentionally. If SMTP isn't configured on your deployment, there's no other way to deliver that link, so use the operator recovery CLI instead:
+
+```sh
+docker compose exec app node server/dist/scripts/oidc-relink.js organizer@example.com
+```
+
+It only runs after the organizer has actually attempted an SSO login and been refused (that attempt is what records the pending relink) — it previews the exact change (current vs. pending subject) and asks for an explicit `yes` before applying anything; pass `--yes` to skip the interactive prompt for scripted use. Like `import-legacy.js`, this requires direct host/operator access — there's no HTTP route for it.
+
 ## Updating
 
 **Published image (Option A):**

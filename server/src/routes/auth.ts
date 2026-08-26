@@ -66,7 +66,7 @@ function requestOrigin(request: { protocol: string; headers: Record<string, unkn
 //      this email first.
 type LinkResult =
   | { status: "ok"; organizerId: string; authVersion: number }
-  | { status: "recovery_required" }
+  | { status: "recovery_required"; emailSent: boolean }
   | { status: "needs_registration"; identity: OidcIdentity }
   | { status: "error"; error: string };
 
@@ -89,12 +89,15 @@ async function linkOrProvisionFromOidc(identity: OidcIdentity, origin: string): 
       return { status: "ok", organizerId: byEmail.id, authVersion: byEmail.authVersion };
     }
     const { request: relink, token } = await createOidcRelinkRequest(byEmail.id, identity.subject, byEmail.email);
-    if (isEmailConfigured()) {
+    const emailSent = isEmailConfigured();
+    if (emailSent) {
       const url = `${resolveBaseUrl(origin)}/oidc-relink?token=${encodeURIComponent(token)}`;
       await sendMail({ to: byEmail.email, subject: "Confirm your LimitedGauntlet SSO relink", text: `Confirm this SSO account relink within one hour: ${url}` });
     }
-    console.warn("OIDC subject relink required", { organizerId: byEmail.id, requestId: relink.id });
-    return { status: "recovery_required" };
+    // No claims or secrets in the log — just enough for an operator to find the
+    // right pending request via the recovery CLI when SMTP isn't configured.
+    console.warn("OIDC subject relink required", { organizerId: byEmail.id, requestId: relink.id, emailSent });
+    return { status: "recovery_required", emailSent };
   }
 
   const invite = await prisma.organizerInvite.findFirst({
@@ -454,7 +457,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           return;
         }
         if (result.status === "recovery_required") {
-          reply.redirect("/login?error=oidc_recovery_required");
+          reply.redirect(`/login?error=${result.emailSent ? "oidc_recovery_required" : "oidc_recovery_required_no_email"}`);
           return;
         }
         establishSession(request, { id: result.organizerId, authVersion: result.authVersion });

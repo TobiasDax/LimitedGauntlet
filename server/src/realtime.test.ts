@@ -23,12 +23,12 @@ function fixture(options?: {
       ? null
       : { id: "org-1", publicPasswordHash: options?.locked === false ? null : "hash" },
   );
-  const organizerBelongsToOrganization = vi.fn(async () => options?.organizerMatches ?? false);
+  const organizerSessionValid = vi.fn(async () => options?.organizerMatches ?? false);
   const authorize = createRealtimeRoomAuthorizer(
     { parseCookie, decodeSecureSession },
-    { findRoomOrganization, organizerBelongsToOrganization },
+    { findRoomOrganization, organizerSessionValid },
   );
-  return { authorize, parseCookie, decodeSecureSession, findRoomOrganization, organizerBelongsToOrganization };
+  return { authorize, parseCookie, decodeSecureSession, findRoomOrganization, organizerSessionValid };
 }
 
 describe("realtime room authorization", () => {
@@ -76,12 +76,25 @@ describe("realtime room authorization", () => {
   });
 
   it("allows a current organizer only for their own locked organization", async () => {
-    const own = fixture({ sessionValues: { organizerId: "organizer-1" }, organizerMatches: true });
+    const own = fixture({ sessionValues: { organizerId: "organizer-1", authVersion: 2 }, organizerMatches: true });
     await expect(own.authorize("tournament:t-1", "session=good")).resolves.toBe(true);
-    expect(own.organizerBelongsToOrganization).toHaveBeenCalledWith("organizer-1", "org-1");
+    expect(own.organizerSessionValid).toHaveBeenCalledWith("organizer-1", "org-1", 2);
 
     const other = fixture({ sessionValues: { organizerId: "organizer-2" }, organizerMatches: false });
     await expect(other.authorize("tournament:t-1", "session=good")).resolves.toBe(false);
+  });
+
+  it("denies a session whose authVersion no longer matches the account (e.g. after an OIDC relink)", async () => {
+    const store = { id: "org-1", publicPasswordHash: "hash" };
+    const findRoomOrganization = vi.fn(async () => store);
+    // Simulates the DB check in the default store: only authVersion 3 is current.
+    const organizerSessionValid = vi.fn(async (_organizerId: string, _orgId: string, authVersion: number) => authVersion === 3);
+    const authorize = createRealtimeRoomAuthorizer(
+      { parseCookie: () => ({ session: "encoded" }), decodeSecureSession: () => session({ organizerId: "organizer-1", authVersion: 1 }) },
+      { findRoomOrganization, organizerSessionValid },
+    );
+    await expect(authorize("pod:pod-1", "session=stale")).resolves.toBe(false);
+    expect(organizerSessionValid).toHaveBeenCalledWith("organizer-1", "org-1", 1);
   });
 
   it("denies malformed and nonexistent rooms without decoding a session", async () => {
@@ -103,7 +116,7 @@ describe("realtime room authorization", () => {
       { parseCookie: () => ({}), decodeSecureSession: () => null },
       {
         findRoomOrganization: async () => ({ id: "org-1", publicPasswordHash: locked ? "hash" : null }),
-        organizerBelongsToOrganization: async () => false,
+        organizerSessionValid: async () => false,
       },
     );
 

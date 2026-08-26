@@ -82,7 +82,6 @@ npm run --workspace server build && npm run --workspace client build   # typeche
 
 The app is **feature-complete and running in production** ([latest release](https://github.com/TobiasDax/LimitedGauntlet/releases/latest)). The full, always-current backlog lives in [`ROADMAP.md`](ROADMAP.md) — a quick snapshot of what's still planned:
 
-- **OIDC subject-relink hardening** — the rare case where an identity provider reassigns an already-linked email to a new subject has its core protection shipped (no session is granted on a conflict), but the user-facing relink-confirmation page and an operator recovery CLI for SMTP-less deployments are still in progress (PI-49).
 - **Social login via Google** — layer a "Sign in with Google" button on top of the OIDC groundwork; lower priority, not needed for the primary deployment (PI-43).
 - **Public demo instance** — a reset-on-schedule deployment with anonymized seed data so prospective self-hosters can try it without standing one up; lower priority (PI-44).
 

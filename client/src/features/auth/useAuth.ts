@@ -138,6 +138,18 @@ export function useVerifyEmailChange() {
   });
 }
 
+// Confirm a conflicting OIDC-subject relink (PI-49). Public, token-gated —
+// confirming rotates the account's authVersion and revokes existing sessions
+// (including whatever session confirmed it), so refresh "me" rather than
+// assume this browser is still logged in.
+export function useConfirmOidcRelink() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (token: string) => api.post<{ ok: true }>("/auth/oidc/relink", { token }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+  });
+}
+
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
   return useMutation({

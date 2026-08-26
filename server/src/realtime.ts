@@ -19,7 +19,12 @@ interface RealtimeSessionCodec {
 
 interface RealtimeAuthorizationStore {
   findRoomOrganization(kind: RoomKind, resourceId: string): Promise<{ id: string; publicPasswordHash: string | null } | null>;
-  organizerBelongsToOrganization(organizerId: string, orgId: string): Promise<boolean>;
+  // Also checks the session's authVersion against the account's current one —
+  // the same invalidation `requireAuth`/`requireSessionAuth` (auth/middleware.ts)
+  // apply to HTTP requests, so an OIDC subject relink (PI-49) or any other
+  // session-revoking action also cuts off an already-open realtime subscription
+  // rather than leaving it authorized on stale state.
+  organizerSessionValid(organizerId: string, orgId: string, authVersion: number): Promise<boolean>;
 }
 
 export type RealtimeRoomAuthorizer = (room: unknown, cookieHeader: string | undefined) => Promise<boolean>;
@@ -39,12 +44,12 @@ const defaultAuthorizationStore: RealtimeAuthorizationStore = {
     });
     return tournament?.organization ?? null;
   },
-  async organizerBelongsToOrganization(organizerId, orgId) {
+  async organizerSessionValid(organizerId, orgId, authVersion) {
     const organizer = await prisma.organizerAccount.findFirst({
       where: { id: organizerId, orgId },
-      select: { id: true },
+      select: { authVersion: true },
     });
-    return organizer !== null;
+    return organizer !== null && organizer.authVersion === authVersion;
   },
 };
 
@@ -77,9 +82,9 @@ export function createRealtimeRoomAuthorizer(
     if (Array.isArray(unlockedOrgIds) && unlockedOrgIds.includes(organization.id)) return true;
 
     const organizerId = session.get<unknown>("organizerId");
-    return typeof organizerId === "string"
-      ? store.organizerBelongsToOrganization(organizerId, organization.id)
-      : false;
+    if (typeof organizerId !== "string") return false;
+    const authVersion = session.get<unknown>("authVersion");
+    return store.organizerSessionValid(organizerId, organization.id, typeof authVersion === "number" ? authVersion : 0);
   };
 }
 
