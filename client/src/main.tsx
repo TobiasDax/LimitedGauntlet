@@ -22,6 +22,7 @@ import { PlayerStatsPage } from "./routes/PlayerStatsPage.tsx";
 import { SettingsPage } from "./routes/SettingsPage.tsx";
 import { VerifyEmailPage } from "./routes/VerifyEmailPage.tsx";
 import { AcceptInvitePage } from "./routes/AcceptInvitePage.tsx";
+import { OidcSetupPage } from "./routes/OidcSetupPage.tsx";
 import { PublicDashboardPage } from "./routes/PublicDashboardPage.tsx";
 import { PublicRosterPage } from "./routes/PublicRosterPage.tsx";
 import { PublicTournamentPage } from "./routes/PublicTournamentPage.tsx";
@@ -52,6 +53,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/accept-invite" element={<AcceptInvitePage />} />
+            <Route path="/oidc-setup" element={<OidcSetupPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/roster" element={<RosterPage />} />

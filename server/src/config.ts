@@ -67,6 +67,11 @@ export const config = {
     // Space-separated scopes; must include openid + email for account linking.
     scope: process.env.OIDC_SCOPE ?? "openid email profile",
   },
+  // Switch the whole deployment to SSO-only (PI-42): disable local password
+  // login + local signup so OIDC is the only way in. Only honoured when OIDC is
+  // actually configured (see isLocalLoginDisabled) — a fail-safe so setting
+  // this without a working IdP can't lock everyone out of the app.
+  localLoginDisabled: process.env.LOCAL_LOGIN_DISABLED === "true",
 };
 
 export function isEmailConfigured(): boolean {
@@ -77,4 +82,11 @@ export function isOidcConfigured(): boolean {
   return (
     config.oidc.issuer.length > 0 && config.oidc.clientId.length > 0 && config.oidc.clientSecret.length > 0
   );
+}
+
+// SSO-only mode is only in effect when OIDC is actually usable — otherwise the
+// flag is ignored so a misconfiguration can't leave the app with no way to log
+// in at all.
+export function isLocalLoginDisabled(): boolean {
+  return config.localLoginDisabled && isOidcConfigured();
 }

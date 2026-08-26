@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSignup, useSignupStatus } from "../features/auth/useAuth";
+import { useAppConfig } from "../features/config/useAppConfig";
 import { Button, Card, Field, FormError, TextField } from "../components/ui";
 import { ApiError } from "../lib/api";
 
@@ -22,6 +23,7 @@ export function SignupPage() {
   const signup = useSignup();
   const navigate = useNavigate();
   const { data: signupStatus, isLoading: statusLoading } = useSignupStatus();
+  const { data: appConfig } = useAppConfig();
 
   return (
     <div className="mx-auto max-w-[420px] py-16">
@@ -30,7 +32,21 @@ export function SignupPage() {
         One organization per playgroup — your roster and tournaments live under it.
       </p>
 
-      {statusLoading ? null : !signupStatus?.allowSignup ? (
+      {appConfig?.localLoginDisabled ? (
+        // SSO-only mode: no local accounts. Registration happens by signing in
+        // with SSO, which drops the first-time user into the org-setup screen.
+        <Card className="p-6 text-center">
+          <p className="mb-4 text-[14px] text-ink-secondary">
+            This instance uses single sign-on. Sign in with {appConfig.oidcProviderName || "SSO"} — if you don't have an
+            organization yet, you'll be prompted to create one.
+          </p>
+          <a href="/api/auth/oidc/login" className="block">
+            <Button type="button" variant="primary" className="w-full">
+              Sign in with {appConfig.oidcProviderName || "SSO"}
+            </Button>
+          </a>
+        </Card>
+      ) : statusLoading ? null : !signupStatus?.allowSignup ? (
         <Card className="p-6 text-center">
           <p className="text-[14px] text-ink-secondary">
             Signups are closed right now. Ask whoever's running this instance for an invite, or to open signups

@@ -44,61 +44,68 @@ export function LoginPage() {
               Sign in with {appConfig.oidcProviderName || "SSO"}
             </Button>
           </a>
-          <div className="my-5 flex items-center gap-3 text-[11.5px] tracking-wide text-ink-muted uppercase">
-            <span className="h-px flex-1 bg-border" />
-            or
-            <span className="h-px flex-1 bg-border" />
-          </div>
+          {/* The local form is hidden entirely in SSO-only mode, so no divider then. */}
+          {!appConfig.localLoginDisabled && (
+            <div className="my-5 flex items-center gap-3 text-[11.5px] tracking-wide text-ink-muted uppercase">
+              <span className="h-px flex-1 bg-border" />
+              or
+              <span className="h-px flex-1 bg-border" />
+            </div>
+          )}
         </div>
       )}
 
-      <Card className="p-6">
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            login.mutate({ email, password }, { onSuccess: () => navigate("/") });
-          }}
-        >
-          <Field label="Email">
-            <TextField
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </Field>
-          <Field label="Password">
-            <TextField
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </Field>
+      {!appConfig?.localLoginDisabled && (
+        <>
+          <Card className="p-6">
+            <form
+              className="flex flex-col gap-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                login.mutate({ email, password }, { onSuccess: () => navigate("/") });
+              }}
+            >
+              <Field label="Email">
+                <TextField
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </Field>
+              <Field label="Password">
+                <TextField
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </Field>
 
-          {login.isError && (
-            <FormError>
-              {login.error instanceof ApiError && login.error.status === 401
-                ? "Wrong email or password."
-                : "Something went wrong. Try again."}
-            </FormError>
-          )}
+              {login.isError && (
+                <FormError>
+                  {login.error instanceof ApiError && login.error.status === 401
+                    ? "Wrong email or password."
+                    : "Something went wrong. Try again."}
+                </FormError>
+              )}
 
-          <Button type="submit" variant="primary" disabled={login.isPending}>
-            {login.isPending ? "Logging in…" : "Log in"}
-          </Button>
-        </form>
-      </Card>
+              <Button type="submit" variant="primary" disabled={login.isPending}>
+                {login.isPending ? "Logging in…" : "Log in"}
+              </Button>
+            </form>
+          </Card>
 
-      <p className="mt-5 text-center text-[13px] text-ink-secondary">
-        New group?{" "}
-        <Link to="/signup" className="text-accent hover:text-accent-strong">
-          Create an organization
-        </Link>
-      </p>
+          <p className="mt-5 text-center text-[13px] text-ink-secondary">
+            New group?{" "}
+            <Link to="/signup" className="text-accent hover:text-accent-strong">
+              Create an organization
+            </Link>
+          </p>
+        </>
+      )}
     </div>
   );
 }

@@ -113,7 +113,17 @@ OIDC_PROVIDER_NAME=Authelia                    # button label: "Sign in with Aut
 OIDC_SCOPE=openid email profile               # must include openid + email
 ```
 
-Register the redirect URI (`<APP_BASE_URL>/api/auth/oidc/callback`) at your provider, and make sure `APP_BASE_URL` is set so links resolve. An SSO login **links to an existing organizer account by verified email**, or provisions one if that email has a pending co-organizer invite (Settings → Organizers) — it never creates a new organization, so this doesn't reopen signup. An SSO-only account has no local password; it can set one from **Settings → Account** if it also wants password login.
+Register the redirect URI (`<APP_BASE_URL>/api/auth/oidc/callback`) at your provider, and make sure `APP_BASE_URL` is set so links resolve. An SSO login resolves in this order:
+
+1. **Existing organizer account with a matching verified email** → linked and logged in.
+2. **A pending co-organizer invite** (Settings → Organizers) for that email → a passwordless account is provisioned into that org.
+3. **A brand-new identity, when `ALLOW_SIGNUP=true`** → the user is dropped on a one-time **org-setup screen** to name their new organization, then logged in. (With `ALLOW_SIGNUP=false`, an unknown SSO identity is refused — invite them first.)
+
+An SSO-provisioned account has no local password; it can set one from **Settings → Account** if it also wants password login.
+
+### SSO-only mode
+
+To make OIDC the *only* way in, set `LOCAL_LOGIN_DISABLED=true`. This hides the password form + local signup and rejects `POST /api/auth/login` / local signup — everyone logs in via SSO (existing accounts link by email; new ones self-register through the org-setup screen when signups are open). As a fail-safe it's **ignored unless OIDC is configured**, so a typo can't lock you out of the app entirely.
 
 ## Updating
 

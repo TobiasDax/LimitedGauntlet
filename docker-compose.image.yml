@@ -40,6 +40,7 @@ services:
       OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
       OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-SSO}
       OIDC_SCOPE: ${OIDC_SCOPE:-openid email profile}
+      LOCAL_LOGIN_DISABLED: ${LOCAL_LOGIN_DISABLED:-false}
     depends_on:
       db:
         condition: service_healthy

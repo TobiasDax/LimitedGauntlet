@@ -7,6 +7,8 @@ export interface AppConfig {
   // Optional SSO login (PI-42): whether it's configured, and the button label.
   oidcEnabled?: boolean;
   oidcProviderName?: string;
+  // SSO-only mode: hide the local password form + signup link entirely.
+  localLoginDisabled?: boolean;
 }
 
 // Public, no-auth config the frontend chrome needs on every page (incl.

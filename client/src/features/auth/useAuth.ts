@@ -173,3 +173,31 @@ export function useAcceptInvite() {
     },
   });
 }
+
+// OIDC self-registration (PI-42). After a first SSO login with no existing
+// account, the org-setup screen reads the pending identity and completes it.
+export function useOidcPending() {
+  return useQuery({
+    queryKey: ["oidc-pending"],
+    queryFn: async () => {
+      try {
+        return await api.get<{ email: string; suggestedName: string }>("/auth/oidc/pending");
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) return null;
+        throw err;
+      }
+    },
+    retry: false,
+  });
+}
+
+export function useCompleteOidcRegistration() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { orgName: string; orgSlug: string; organizerName: string }) =>
+      api.post<MeResponse>("/auth/oidc/complete-registration", input),
+    onSuccess: (data) => {
+      queryClient.setQueryData<MeResponse>(["me"], data);
+    },
+  });
+}

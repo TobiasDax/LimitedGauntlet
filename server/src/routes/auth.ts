@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { requireAuth } from "../auth/middleware.js";
-import { config, isOidcConfigured } from "../config.js";
+import { config, isOidcConfigured, isLocalLoginDisabled } from "../config.js";
 import { beginOidcLogin, completeOidcLogin, type OidcIdentity } from "../services/oidc.js";
 
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -29,29 +29,42 @@ const acceptInviteSchema = z.object({
   password: z.string().min(8).max(200),
 });
 
+// Finishing an OIDC-bootstrapped registration (PI-42): the email/subject come
+// from the verified session, so the client only supplies the org details + the
+// organizer's display name.
+const completeOidcRegistrationSchema = z.object({
+  orgName: z.string().trim().min(1).max(100),
+  orgSlug: z.string().trim().min(3).max(40).regex(slugPattern, "lowercase letters, numbers, and hyphens only"),
+  organizerName: z.string().trim().min(1).max(100),
+});
+
 function requestOrigin(request: { protocol: string; headers: Record<string, unknown> }): string {
   const host = request.headers.host;
   return host ? `${request.protocol}://${String(host)}` : "";
 }
 
 // OIDC login resolution (PI-42): map a verified external identity to an
-// organizer account. Deliberately does NOT create new organizations — that
-// keeps the closed-signup / invite-based posture (new orgs come from signup or
-// the history import). The paths, in order:
+// organizer account. The paths, in order:
 //   1. Known subject → the account we linked before.
 //   2. Verified email matching an existing account → link (record the subject).
 //   3. Verified email matching a pending co-organizer invite → provision a
 //      passwordless account into that org and consume the invite (SSO as an
 //      alternative to the password-set accept-invite flow).
-//   4. Otherwise → refused; an organizer must invite this email first.
-type LinkResult = { ok: true; organizerId: string } | { ok: false; error: string };
+//   4. Unknown identity + signups open → "needs_registration": the caller sends
+//      them to the org-setup screen to create a brand-new org via SSO.
+//   5. Unknown identity + signups closed → refused; an organizer must invite
+//      this email first.
+type LinkResult =
+  | { status: "ok"; organizerId: string }
+  | { status: "needs_registration"; identity: OidcIdentity }
+  | { status: "error"; error: string };
 
 async function linkOrProvisionFromOidc(identity: OidcIdentity): Promise<LinkResult> {
   const bySubject = await prisma.organizerAccount.findUnique({ where: { oidcSubject: identity.subject } });
-  if (bySubject) return { ok: true, organizerId: bySubject.id };
+  if (bySubject) return { status: "ok", organizerId: bySubject.id };
 
   if (!identity.email || !identity.emailVerified) {
-    return { ok: false, error: "oidc_email_unverified" };
+    return { status: "error", error: "oidc_email_unverified" };
   }
 
   const byEmail = await prisma.organizerAccount.findUnique({ where: { email: identity.email } });
@@ -61,7 +74,7 @@ async function linkOrProvisionFromOidc(identity: OidcIdentity): Promise<LinkResu
     if (!byEmail.oidcSubject) {
       await prisma.organizerAccount.update({ where: { id: byEmail.id }, data: { oidcSubject: identity.subject } });
     }
-    return { ok: true, organizerId: byEmail.id };
+    return { status: "ok", organizerId: byEmail.id };
   }
 
   const invite = await prisma.organizerInvite.findFirst({
@@ -81,10 +94,15 @@ async function linkOrProvisionFromOidc(identity: OidcIdentity): Promise<LinkResu
       }),
       prisma.organizerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } }),
     ]);
-    return { ok: true, organizerId: organizer.id };
+    return { status: "ok", organizerId: organizer.id };
   }
 
-  return { ok: false, error: "oidc_no_account" };
+  // No existing account and no invite. When signups are open, let them bootstrap
+  // a new org via the setup screen; otherwise hold the line on closed signup.
+  if (config.allowSignup) {
+    return { status: "needs_registration", identity };
+  }
+  return { status: "error", error: "oidc_no_account" };
 }
 
 function isUniqueConstraintError(err: unknown, target: string): boolean {
@@ -113,6 +131,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // Whether SSO login is available + the button label (PI-42).
       oidcEnabled: isOidcConfigured(),
       oidcProviderName: config.oidc.providerName,
+      // SSO-only mode: the frontend hides the local password form + signup link.
+      localLoginDisabled: isLocalLoginDisabled(),
     });
   });
 
@@ -120,6 +140,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     "/api/auth/signup",
     { config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } },
     async (request, reply) => {
+      // In SSO-only mode there are no local password accounts to create —
+      // registration goes through the OIDC org-setup flow instead.
+      if (isLocalLoginDisabled()) {
+        reply.code(403).send({ error: "local_login_disabled" });
+        return;
+      }
       if (!config.allowSignup) {
         reply.code(403).send({ error: "signup_disabled" });
         return;
@@ -175,6 +201,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     "/api/auth/login",
     { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (request, reply) => {
+      if (isLocalLoginDisabled()) {
+        reply.code(403).send({ error: "local_login_disabled" });
+        return;
+      }
       const parsed = loginSchema.safeParse(request.body);
       if (!parsed.success) {
         reply.code(400).send({ error: "invalid_input", issues: parsed.error.issues });
@@ -366,8 +396,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           codeVerifier: checks.codeVerifier,
         });
         const result = await linkOrProvisionFromOidc(identity);
-        if (!result.ok) {
+        if (result.status === "error") {
           reply.redirect(`/login?error=${result.error}`);
+          return;
+        }
+        if (result.status === "needs_registration") {
+          // Verified identity, no account yet, signups open — stash it and send
+          // them to the org-setup screen to finish creating their org.
+          request.session.set("oidcPending", {
+            subject: result.identity.subject,
+            email: result.identity.email!,
+            name: result.identity.name ?? "",
+          });
+          reply.redirect("/oidc-setup");
           return;
         }
         request.session.set("organizerId", result.organizerId);
@@ -375,6 +416,77 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       } catch (err) {
         request.log.error({ err }, "oidc callback failed");
         reply.redirect("/login?error=oidc_failed");
+      }
+    },
+  );
+
+  // The pending OIDC registration for the current session, so the org-setup
+  // screen can prefill/gate itself. 404 when there's nothing pending (the page
+  // then bounces to /login).
+  app.get("/api/auth/oidc/pending", async (request, reply) => {
+    const pending = request.session.get("oidcPending");
+    if (!pending) {
+      reply.code(404).send({ error: "no_pending_registration" });
+      return;
+    }
+    reply.send({ email: pending.email, suggestedName: pending.name });
+  });
+
+  // Finish an OIDC-bootstrapped registration: create the org + a passwordless
+  // organizer from the verified pending identity, then log them in. The email
+  // and OIDC subject are taken from the session (verified in the callback), not
+  // from the request body.
+  app.post(
+    "/api/auth/oidc/complete-registration",
+    { config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } },
+    async (request, reply) => {
+      const pending = request.session.get("oidcPending");
+      if (!pending) {
+        reply.code(400).send({ error: "no_pending_registration" });
+        return;
+      }
+      const parsed = completeOidcRegistrationSchema.safeParse(request.body);
+      if (!parsed.success) {
+        reply.code(400).send({ error: "invalid_input", issues: parsed.error.issues });
+        return;
+      }
+      const { orgName, orgSlug, organizerName } = parsed.data;
+
+      try {
+        const { organization, organizer } = await prisma.$transaction(async (tx) => {
+          const organization = await tx.organization.create({ data: { name: orgName, slug: orgSlug } });
+          const organizer = await tx.organizerAccount.create({
+            data: {
+              orgId: organization.id,
+              name: organizerName,
+              email: pending.email,
+              passwordHash: null,
+              oidcSubject: pending.subject,
+            },
+          });
+          return { organization, organizer };
+        });
+
+        request.session.set("oidcPending", undefined);
+        request.session.set("organizerId", organizer.id);
+        reply.code(201).send({
+          organizer: { id: organizer.id, orgId: organizer.orgId, name: organizer.name, email: organizer.email },
+          organization: { id: organization.id, slug: organization.slug, name: organization.name },
+          publicLockEnabled: false,
+          organizerCount: 1,
+        });
+      } catch (err) {
+        if (isUniqueConstraintError(err, "slug")) {
+          reply.code(409).send({ error: "slug_taken" });
+          return;
+        }
+        // The email/subject were free when the callback checked, but a race (or
+        // a second concurrent setup) could collide — surface it rather than 500.
+        if (isUniqueConstraintError(err, "email") || isUniqueConstraintError(err, "oidcSubject")) {
+          reply.code(409).send({ error: "account_exists" });
+          return;
+        }
+        throw err;
       }
     },
   );
