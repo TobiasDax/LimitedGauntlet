@@ -8,7 +8,9 @@ The app is **feature-complete and running in production**, with tagged releases 
 
 ## Open items
 
-_None currently — PI-43 and PI-44 below are backlog ideas, not committed work._
+- [ ] **PI-50:** Home Assistant integration via MQTT — scope decided, design/implementation not started.
+
+PI-43 and PI-44 below are lower-priority backlog ideas, not committed work.
 
 ## New improvements (backlog)
 
@@ -208,3 +210,17 @@ Codex Security finding `csf_75d7f7bccdd1a727f883f142` (medium, medium confidence
 - [x] Tests: `server/src/services/oidcRelink.test.ts` (6 tests — mailbox-token confirm incl. side effects, unknown/expired/replayed token rejection, email-changed-since-request rejection, `findPendingOidcRelink` for known/unknown/no-pending, operator-CLI confirm-by-id and its rejection of an unknown/reused id) and `server/src/realtime.test.ts`'s added authVersion-mismatch case. Full suite (43 tests across 8 files) run against a real Postgres container, all green; server + client `tsc -b` clean.
 - [x] **Acceptance verified:** a different subject can never authenticate as an already-bound organizer through email equality alone (returns `recovery_required`, no session); mailbox-confirmed and operator-confirmed recovery both deliberately replace the binding (tested both paths); the known-subject login and first-link-when-unbound flows are untouched and still work.
 - [x] Re-verified against `server/src/routes/auth.ts` and `server/src/services/oidc.ts` as part of implementing this item.
+
+### PI-50 — Home Assistant integration via MQTT (not started)
+Publish tournament events and live state to an organizer's own MQTT broker so Home Assistant (or anything else that speaks MQTT) can react — announce round events over TTS/speakers, flash a light when a round ends, put the current round timer on a dashboard. One-way only for v1 (LimitedGauntlet → MQTT); no inbound control.
+- [x] **Scope intent (Tobias, 2026-08-26):** one-way publish, covering both (a) discrete events — round started, pairings posted, round timer expired — and (b) live state as HA entities — round timer remaining, current round number, pod status. No bidirectional control (an HA automation triggering an action back in the app) in v1; that's a materially bigger auth/security surface and a separate future item if wanted.
+- [x] **Config scope intent (Tobias, 2026-08-26):** per-organization, configured in Settings (broker host/port/credentials, TLS) — not a deployment-wide env var. Consistent with this being personal home-automation config an individual self-hoster controls, unlike SMTP/OIDC which are deployment-level.
+- [x] **Publish scope intent (Tobias, 2026-08-26):** default **on** for every pod; an organizer can opt a specific pod **out** (mirrors the existing `excludeFromStats` per-pod toggle pattern) rather than needing to opt each pod in.
+- [ ] **Still to design before implementation:**
+  - Topic naming scheme and payload shapes for both the discrete events and the live-state sensors.
+  - Whether to use [Home Assistant MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery) (`homeassistant/.../config` retained topics) so entities appear automatically without the organizer hand-writing HA YAML — likely yes, given Tobias's own HA setup already leans on Zigbee2MQTT-style auto-discovery, but confirm.
+  - Which Node MQTT client library (e.g. `mqtt` npm package), and whether the connection is long-lived in the main server process or a separate worker.
+  - Credential storage: broker password needs the same at-rest handling as other secrets in this app (currently there are none stored encrypted at rest beyond hashed passwords/tokens — decide hash vs. reversible encryption, since this one has to be sent back out to actually connect).
+  - Exact event/sensor list: confirm "round started / pairings posted / round timer expired" is complete, and which pod/tournament fields become sensors (round timer remaining, current round number, pod status — anything else, e.g. standings-changed?).
+  - Reconnection/backoff behavior when the broker is unreachable, and whether a broken MQTT connection should ever surface to the organizer UI (vs. silent best-effort, matching the "email/OIDC degrade cleanly when unconfigured" posture elsewhere in this app).
+- [ ] Not yet built: schema (per-org MQTT config + per-pod opt-out flag), the publisher service, Settings UI section, and tests.
