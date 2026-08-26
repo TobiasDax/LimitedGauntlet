@@ -14,13 +14,18 @@
 # upgrade — migrations still apply automatically on start either way.
 
 services:
+  # No ingress is defined by default: the app publishes no host port and no
+  # reverse proxy/tunnel is bundled. Add a docker-compose.override.yml to
+  # expose it (a published port for LAN/direct use, or your own reverse
+  # proxy/tunnel service on a shared network) — see docs/deployment.md
+  # section 4 for both patterns, including setting TRUSTED_PROXIES.
   app:
     image: ghcr.io/tobiasdax/limitedgauntlet:latest
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-limitedgauntlet}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-limitedgauntlet}
       PORT: 8080
       HOST: 0.0.0.0
-      TRUSTED_PROXIES: 172.30.0.2
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       SESSION_SECRET: ${SESSION_SECRET}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
@@ -46,21 +51,6 @@ services:
     restart: unless-stopped
     networks:
       backend:
-      ingress:
-        ipv4_address: 172.30.0.3
-      egress:
-
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      - app
-    restart: unless-stopped
-    networks:
-      ingress:
-        ipv4_address: 172.30.0.2
       egress:
 
   db:
@@ -89,9 +79,4 @@ volumes:
 networks:
   backend:
     internal: true
-  ingress:
-    internal: true
-    ipam:
-      config:
-        - subnet: 172.30.0.0/24
   egress:

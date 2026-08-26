@@ -41,10 +41,8 @@ Set at minimum:
 
 - `POSTGRES_PASSWORD` — a real secret, not the placeholder
 - `SESSION_SECRET` — a 32-byte hex string: `openssl rand -hex 32`. The app fails to start without this, deliberately — no silent insecure default.
-- `CLOUDFLARE_TUNNEL_TOKEN` — the token for a remotely managed Cloudflare Tunnel. Configure its public hostname service as `http://172.30.0.3:8080`.
-- `SESSION_COOKIE_SECURE=true` — the default tunnel terminates public TLS. Leave this false only for a deliberate plain-HTTP LAN override.
 
-Everything else in `.env.example` has a working default.
+Everything else in `.env.example` has a working default, including `TRUSTED_PROXIES` (blank — direct/LAN mode). See section 4 below before you decide how the app will actually be reached: the default Compose files ship with no host port published and no bundled reverse proxy or tunnel, so you need to add one via an override before the app is reachable at all.
 
 ## 3. First boot
 
@@ -62,16 +60,16 @@ docker compose up -d --build
 
 Migrations run automatically on container start (`docker/entrypoint.sh` runs `prisma migrate deploy` before the server boots) — there's no manual database setup step, ever, including after an update that brings in new migrations.
 
-The app is reachable only through the Cloudflare Tunnel hostname. The app has no host-published port in the default topology. `cloudflared` has the fixed ingress address `172.30.0.2`, the app is `172.30.0.3`, and only that exact proxy peer is trusted to supply `X-Forwarded-*` client identity. Choose a different non-overlapping subnet in both Compose and the tunnel origin if `172.30.0.0/24` conflicts with your host.
+The app has no host-published port and no bundled reverse proxy or tunnel in this default topology — it isn't reachable from outside the Compose project until you add one (see section 4).
 
 **Postgres has no published port by default** — the app container reaches `db` over the internal Compose network regardless, and nothing about a normal deployment needs `5432` reachable from outside Docker. If you're doing local (non-Docker) development with `npm run dev:server`, which does need to reach it directly, see the **Updating** section below for how to add that back via a `docker-compose.override.yml` without editing the tracked file.
 
 ## 4. Exposure and alternatives
 
-The shipped default uses the bundled Cloudflare Tunnel container and does not expose the app listener on the host. This prevents a direct path around the trusted proxy boundary.
+The shipped Compose files deliberately define no ingress at all — no published host port, no bundled reverse proxy or tunnel — so pick one of these and add it via a local `docker-compose.override.yml` (keeps the tracked file untouched):
 
-- **LAN only, no proxy**: add a local `docker-compose.override.yml` with `services: { app: { ports: ["8080:8080"], environment: { TRUSTED_PROXIES: "" } }, cloudflared: { profiles: ["tunnel"] } }`. Leave `SESSION_COOKIE_SECURE=false`. Forwarding headers are ignored, so clients cannot rotate authentication rate-limit buckets by spoofing them.
-- **A reverse proxy you already run** (Nginx, Caddy, Traefik, NPM, etc.): disable the bundled `cloudflared` service, connect the proxy over a private Docker network, and set `TRUSTED_PROXIES` to its exact container IP (or the narrowest dedicated CIDR). Do not use `true`, `*`, a hop count, or an entire shared RFC1918 range. The proxy must replace client-supplied `X-Forwarded-For`, `X-Forwarded-Host`, and `X-Forwarded-Proto` values rather than blindly preserving them. Set `SESSION_COOKIE_SECURE=true` behind HTTPS.
+- **LAN only, no proxy**: add `services: { app: { ports: ["8080:8080"] } }`. Leave `TRUSTED_PROXIES` blank and `SESSION_COOKIE_SECURE=false`. Forwarding headers are ignored, so clients cannot rotate authentication rate-limit buckets by spoofing them.
+- **A reverse proxy or tunnel you already run** (Cloudflare Tunnel, Nginx, Caddy, Traefik, NPM, etc.) — including one that lives in its own separate Compose project rather than this one: connect it to the app container over a private Docker network (an `external: true` network both Compose projects join, or by attaching the proxy's container to this project's `egress` network) and set `TRUSTED_PROXIES` to its exact container IP (or the narrowest dedicated CIDR). Do not use `true`, `*`, a hop count, or an entire shared RFC1918 range. The proxy must replace client-supplied `X-Forwarded-For`, `X-Forwarded-Host`, and `X-Forwarded-Proto` values rather than blindly preserving them. Set `SESSION_COOKIE_SECURE=true` behind HTTPS.
 - **A mesh VPN** (Tailscale, WireGuard, etc.): expose the container's port through whatever mechanism your mesh provides (Tailscale Serve, a sidecar proxy, etc.) rather than opening it to the public internet at all.
 
 Socket.IO (used for live pairings/standings/timer updates) shares the same port and path prefix as the rest of the API — no separate WebSocket configuration is needed beyond whatever your proxy needs to pass `Upgrade`/`Connection` headers through for WebSocket traffic (most reverse proxies do this by default for HTTP/1.1 upstreams; check your proxy's docs if realtime updates aren't arriving).
