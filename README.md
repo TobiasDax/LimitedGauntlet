@@ -6,7 +6,7 @@ Designed from day one as a real multi-group tool: one deployment can host severa
 
 ![Tournament Standings — the tournament-wide standings page, average-ranked with per-pod pips](docs/screenshots/gesamtwertung.png)
 
-**Status: solid beta, running in production.** Built over a few days with an AI pair-programmer (Claude Code — see [`PLAN.md`](PLAN.md) for the design rationale and [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) for the full build log, every entry verified live against a running instance, not just typechecked), then hardened through real weekend-tournament use. Auth/multi-tenancy, Swiss pairing (auto *and* manual, with weekend-wide repeat avoidance and pre-lock swaps), standings, tournament-wide standings, an all-time Hall of Fame, Scryfall-backed card value tracking (the "Treasure Chest"), realtime broadcasts (Socket.IO), a round timer with a Display Mode chime, one-link public read-only sharing per org, and a security-hardened public-exposure posture (rate limiting, closed signup by default, CSP headers, anti-scraping) are all built and browser-tested. Dark mode only for now — light mode is a deliberate v2, not an oversight.
+**Status: solid beta, running in production.** Built over a few days with an AI pair-programmer (Claude Code — see [`PLAN.md`](PLAN.md) for the design rationale and [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) for the full build log, every entry verified live against a running instance, not just typechecked), then hardened through real weekend-tournament use. Auth/multi-tenancy (email+password or OIDC/SSO), Swiss pairing (auto *and* manual, with weekend-wide repeat avoidance and pre-lock swaps), standings, tournament-wide standings, an all-time Hall of Fame, Scryfall-backed card value tracking (the "Treasure Chest"), realtime broadcasts (Socket.IO), a round timer with a Display Mode chime, one-link public read-only sharing per org with share/QR popups, data export/import, and a security-hardened public-exposure posture (rate limiting, closed signup by default, CSP headers, anti-scraping, deployment-safe proxy trust, authorized realtime subscriptions) are all built and browser-tested. Dark mode only for now — light mode is a deliberate v2, not an oversight.
 
 ## Features
 
@@ -15,9 +15,11 @@ Designed from day one as a real multi-group tool: one deployment can host severa
 - **Live everything**: pairings, standings, and the round timer update over Socket.IO on every connected device — no manual refresh.
 - **Standings that actually add up**: per-pod Swiss standings (OMW%/GW%/OGW% tiebreakers, with a manual override for intentional-draw endgames), plus tournament-wide standings ranked by average points per pod (so missing an event doesn't tank your rank).
 - **Hall of Fame & Treasure Chest**: an all-time cross-tournament leaderboard (with a longest-win-streak spotlight and main-event crowns), and a Scryfall-backed card-pull value tracker with set/foil-accurate pricing and lightweight auto-attribution for who pulled what.
-- **One public link per org**: `/o/<slug>` gives your group a read-only mirror of everything the organizer sees — tournaments, roster, standings, Hall of Fame, Treasure Chest — no login required, and nothing editable.
+- **One public link per org**: `/o/<slug>` gives your group a read-only mirror of everything the organizer sees — tournaments, roster, standings, Hall of Fame, Treasure Chest — no login required, and nothing editable. Every public link opens a share popup with a copyable URL and a scannable QR code.
+- **SSO login**: sign in via an external OIDC identity provider (Authelia, Keycloak, Pocket ID, etc.) alongside the built-in email+password accounts, including an SSO-only mode. Off unless configured — see [`docs/deployment.md`](docs/deployment.md#8-optional-sso-login-via-oidc).
+- **Export / import your data**: download an org's full tournament history (players, pods, matches, card pulls, Hall of Fame, Treasure Chest) as JSON from Settings, and re-import it into another deployment — no shell access needed.
 - **MCP server**: an AI agent can run pairing/results/standings/card-pulls through the same authenticated API the web app uses — see [API tokens & MCP server](#api-tokens--mcp-server) below.
-- **Built for public exposure**: rate limiting, a closed-by-default signup form, security headers (CSP/HSTS), anti-scraping headers, and trusted-proxy support out of the box — see [`docs/deployment.md`](docs/deployment.md) for the full exposure guide.
+- **Built for public exposure**: rate limiting, a closed-by-default signup form, security headers (CSP/HSTS), anti-scraping headers, and deployment-safe proxy trust out of the box — see [`docs/deployment.md`](docs/deployment.md) for the full exposure guide.
 
 ## Stack
 
@@ -78,12 +80,11 @@ npm run --workspace server build && npm run --workspace client build   # typeche
 
 ## Roadmap
 
-The app is **feature-complete and running in production** ([latest release](https://github.com/TobiasDax/LimitedGauntlet/releases/latest)). The full, always-current backlog lives in [`ROADMAP.md`](ROADMAP.md) — a quick snapshot of what's planned:
+The app is **feature-complete and running in production** ([latest release](https://github.com/TobiasDax/LimitedGauntlet/releases/latest)). The full, always-current backlog lives in [`ROADMAP.md`](ROADMAP.md) — a quick snapshot of what's still planned:
 
-- **Data export / import** — download all of an org's data (tournaments, pods, matches, Hall of Fame, Treasure Chest) as JSON, and a UI to import it back (PI-38 / PI-39).
-- **OIDC login** — sign in via an external identity provider, linking to an existing account by email (PI-42).
-- **Share popup + QR code** — a pod's public link as a scannable QR so players can open the standings on their phone (PI-45).
-- **Richer public sharing & polish** — footer/legal links, constructed-format details, multi-organizer orgs (recently shipped, verification in flight).
+- **OIDC subject-relink hardening** — the rare case where an identity provider reassigns an already-linked email to a new subject has its core protection shipped (no session is granted on a conflict), but the user-facing relink-confirmation page and an operator recovery CLI for SMTP-less deployments are still in progress (PI-49).
+- **Social login via Google** — layer a "Sign in with Google" button on top of the OIDC groundwork; lower priority, not needed for the primary deployment (PI-43).
+- **Public demo instance** — a reset-on-schedule deployment with anonymized seed data so prospective self-hosters can try it without standing one up; lower priority (PI-44).
 
 See [`ROADMAP.md`](ROADMAP.md) for the full list, status, and design notes.
 
