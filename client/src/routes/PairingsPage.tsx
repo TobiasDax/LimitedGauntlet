@@ -13,6 +13,8 @@ import {
   roundErrorMessage,
 } from "../features/pods/useRounds";
 import { entrantDisplayName } from "../lib/entrant";
+import { computeSeatings } from "../lib/seatings";
+import { SeatingChart } from "../components/SeatingChart";
 import { Button, Eyebrow, FormError, ScreenDek, ScreenTitle } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
 import { PrepTimerDisplay } from "../components/PrepTimer";
@@ -417,6 +419,15 @@ export function PairingsPage() {
   const activeEntrants = pod.entrants.filter(
     (e) => e.droppedAfterRound === null || e.droppedAfterRound >= nextRoundNumber,
   );
+  // Draft seating chart (PI-51): derived from round 1's pairings, not
+  // stored — a manual edit to round 1 corrects it automatically. Only
+  // meaningful for formats where packs actually get passed around a table.
+  // Shown only while round 1 is still PENDING — once the round starts, the
+  // physical draft has already happened and the page's focus shifts to
+  // gameplay, so the chart gets out of the way.
+  const showSeatingChart =
+    (pod.format === "DRAFT" || pod.format === "CHAOS_DRAFT") && rounds[0]?.status === "PENDING";
+  const seatByEntrantId = showSeatingChart ? computeSeatings(rounds[0]?.matches ?? [], pod.entrants.length) : null;
 
   return (
     <div>
@@ -441,6 +452,10 @@ export function PairingsPage() {
           This device will chime when the round timer hits zero. Leave other devices out of display mode so the room
           doesn't fill with simultaneous beeps.
         </p>
+      )}
+
+      {seatByEntrantId && seatByEntrantId.size > 0 && (
+        <SeatingChart seatByEntrantId={seatByEntrantId} entrantById={entrantById} entrantCount={pod.entrants.length} />
       )}
 
       <PodTabs podId={pod.id} />
