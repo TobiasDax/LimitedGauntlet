@@ -20,6 +20,12 @@ interface EntrantInfo {
 // found rather than the algorithm giving up — this is a nudge, not a
 // second hard rule. Within-pod repeats stay a true hard rule (Infinity),
 // handled separately below.
+//
+// Only applied to round 1: that's the "everyone plays everyone" nudge for
+// a pod's opening draw. From round 2 on, standings-based Swiss pairing
+// must win outright — otherwise two players tied at the top can get kept
+// apart in the pod's final round just because they crossed paths in an
+// unrelated pod earlier in the weekend.
 const REPEAT_ELSEWHERE_WEIGHT = 1000;
 
 // An entrant is active for a given round unless it dropped before that
@@ -41,7 +47,8 @@ export async function generatePairings(podId: string, roundNumber: number): Prom
   const entrants = await getActiveEntrants(podId, roundNumber);
 
   const { points, opponents, hasHadBye } = await computePodStats(podId, roundNumber);
-  const weekendHistory = await computePlayerPairHistory(pod.tournamentId, podId);
+  const weekendHistory =
+    roundNumber === 1 ? await computePlayerPairHistory(pod.tournamentId, podId) : new Map<string, number>();
 
   const infos: EntrantInfo[] = entrants.map((e) => ({
     id: e.id,
