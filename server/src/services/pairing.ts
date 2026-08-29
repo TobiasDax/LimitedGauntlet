@@ -92,8 +92,19 @@ export async function generatePairings(podId: string, roundNumber: number): Prom
     return repeatElsewhere * REPEAT_ELSEWHERE_WEIGHT + scoreDiff;
   }
 
-  function backtrack(remaining: string[]): Array<[string, string]> | null {
-    if (remaining.length === 0) return [];
+  // Exact minimum-total-cost perfect matching via branch-and-bound, not a
+  // greedy "pair the first entrant with their own cheapest partner and
+  // never look back." A pure greedy pass can lock in a locally-cheap
+  // pairing that blocks a globally better (or fully repeat-free) result
+  // for everyone else — e.g. two players who've only faced each other
+  // getting paired first, forcing a third pair elsewhere to eat an
+  // avoidable repeat that a different first choice would have sidestepped
+  // entirely. Costs are never negative, so once a candidate's own edge
+  // cost already matches or exceeds the best full-matching cost found so
+  // far, no matching built on it (or anything sorted after it) can beat
+  // that best — safe to prune the rest of this branch.
+  function bestMatching(remaining: string[]): { pairs: Array<[string, string]>; cost: number } | null {
+    if (remaining.length === 0) return { pairs: [], cost: 0 };
     const [first, ...rest] = remaining as [string, ...string[]];
     const a = byId.get(first)!;
 
@@ -102,22 +113,28 @@ export async function generatePairings(podId: string, roundNumber: number): Prom
       .filter((c) => Number.isFinite(c.cost))
       .sort((x, y) => x.cost - y.cost);
 
+    let best: { pairs: Array<[string, string]>; cost: number } | null = null;
     for (const candidate of candidates) {
+      if (best && candidate.cost >= best.cost) break;
       const nextRemaining = rest.filter((id) => id !== candidate.id);
-      const solvedRest = backtrack(nextRemaining);
-      if (solvedRest) return [[first, candidate.id], ...solvedRest];
+      const solvedRest = bestMatching(nextRemaining);
+      if (!solvedRest) continue;
+      const totalCost = candidate.cost + solvedRest.cost;
+      if (!best || totalCost < best.cost) {
+        best = { pairs: [[first, candidate.id], ...solvedRest.pairs], cost: totalCost };
+      }
     }
-    return null;
+    return best;
   }
 
-  const solved = backtrack(pool.map((e) => e.id));
+  const solved = bestMatching(pool.map((e) => e.id));
   if (!solved) {
     throw new PairingError(
       "No valid pairing avoids all within-pod repeat opponents. Use manual pairing to resolve this round.",
     );
   }
 
-  const pairs: PairingSuggestion["pairs"] = solved.map(([a, b]) => ({ entrantAId: a, entrantBId: b }));
+  const pairs: PairingSuggestion["pairs"] = solved.pairs.map(([a, b]) => ({ entrantAId: a, entrantBId: b }));
   if (byeEntrantId) pairs.push({ entrantAId: byeEntrantId, entrantBId: null });
 
   return { pairs };
