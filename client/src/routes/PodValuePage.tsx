@@ -59,15 +59,34 @@ function AddPullForm({
     return () => clearTimeout(t);
   }, [query]);
 
-  const { data: suggestions } = useAutocompleteCard(debouncedQuery);
-  const showSuggestions = query === debouncedQuery && (suggestions?.names.length ?? 0) > 0;
+  // A leading "#" switches the name field into collector-number mode —
+  // the only way to pin one exact printing when a special version
+  // (showcase/borderless/promo) shares both name and set with the normal
+  // printing, which fuzzy name search can't tell apart.
+  const isCollectorLookup = query.trim().startsWith("#");
+  const collectorNumber = isCollectorLookup ? query.trim().slice(1).trim() : "";
+
+  const { data: suggestions } = useAutocompleteCard(isCollectorLookup ? "" : debouncedQuery);
+  const showSuggestions = !isCollectorLookup && query === debouncedQuery && (suggestions?.names.length ?? 0) > 0;
   const players = pullablePlayers(entrants);
 
-  const submit = (name: string) => {
+  const resolvedSetCode = useMemo(() => {
     const trimmed = setInput.trim();
-    const resolvedSetCode = trimmed ? (codeByName.get(trimmed.toLowerCase()) ?? trimmed) : undefined;
+    return trimmed ? (codeByName.get(trimmed.toLowerCase()) ?? trimmed) : undefined;
+  }, [setInput, codeByName]);
+
+  const canSubmit = isCollectorLookup ? collectorNumber.length > 0 && !!resolvedSetCode : query.trim().length > 0;
+
+  const submit = (name: string) => {
     addPull.mutate(
       { cardName: name, playerId: playerId || undefined, setCode: resolvedSetCode, foil },
+      { onSuccess: () => setQuery("") },
+    );
+  };
+
+  const submitCollectorNumber = () => {
+    addPull.mutate(
+      { collectorNumber, playerId: playerId || undefined, setCode: resolvedSetCode, foil },
       { onSuccess: () => setQuery("") },
     );
   };
@@ -78,12 +97,15 @@ function AddPullForm({
         className="flex flex-wrap items-center gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (query.trim()) submit(query.trim());
+          if (!canSubmit) return;
+          if (isCollectorLookup) submitCollectorNumber();
+          else submit(query.trim());
         }}
       >
         <TextField
           className="min-w-[180px] flex-1"
-          placeholder="Card name…"
+          placeholder="Card name, or #collector number…"
+          title="Type a name, or #<number> (e.g. #243) to pin an exact printing by collector number when a special version shares its name with the normal card — requires a Set below."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -91,7 +113,11 @@ function AddPullForm({
           className="w-48"
           list="set-options"
           placeholder="Set…"
-          title="Pick a set by name, or type a code directly (e.g. eos for a bonus sheet) — pins the printing instead of guessing. Optional."
+          title={
+            isCollectorLookup
+              ? "Required for a #collector number lookup — pick a set by name, or type a code directly (e.g. eos for a bonus sheet)."
+              : "Pick a set by name, or type a code directly (e.g. eos for a bonus sheet) — pins the printing instead of guessing. Optional."
+          }
           value={setInput}
           onChange={(e) => setSetInput(e.target.value)}
         />
@@ -119,7 +145,12 @@ function AddPullForm({
             ))}
           </select>
         )}
-        <Button type="submit" variant="primary" disabled={!query.trim() || addPull.isPending}>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={!canSubmit || addPull.isPending}
+          title={isCollectorLookup && !resolvedSetCode ? "Pick a set to look up a collector number" : undefined}
+        >
           {addPull.isPending ? "Looking up…" : "+ Add pull"}
         </Button>
       </form>

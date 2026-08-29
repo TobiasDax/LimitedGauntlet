@@ -45,8 +45,13 @@ export function useScryfallSets() {
 export function useAddCardPull(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { cardName: string; playerId?: string; setCode?: string; foil?: boolean }) =>
-      api.post<{ cardPull: CardPull }>(`/pods/${podId}/card-pulls`, input),
+    mutationFn: (input: {
+      cardName?: string;
+      collectorNumber?: string;
+      playerId?: string;
+      setCode?: string;
+      foil?: boolean;
+    }) => api.post<{ cardPull: CardPull }>(`/pods/${podId}/card-pulls`, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId, "card-pulls"] }),
   });
 }
@@ -73,7 +78,10 @@ export function useDeleteCardPull(podId: string) {
 
 export function cardPullErrorMessage(err: unknown): string {
   if (err instanceof ApiError && err.message === "card_not_found") {
-    return "Couldn't find that card on Scryfall — check the spelling.";
+    return "Couldn't find that card on Scryfall — check the spelling, set, or collector number.";
+  }
+  if (err instanceof ApiError && err.message === "invalid_input") {
+    return "A collector number needs a set too — fill in the Set field.";
   }
   return "Something went wrong.";
 }

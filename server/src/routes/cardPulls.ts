@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedPod, findOwnedTournament, findOwnedCardPull } from "../services/ownership.js";
-import { autocompleteCardNames, lookupCardByName, listMainSets } from "../services/scryfall.js";
+import { autocompleteCardNames, lookupCardByName, lookupCardByCollectorNumber, listMainSets } from "../services/scryfall.js";
 import { inferCardPullAttribution } from "../services/cardPullInference.js";
 
 const idParams = z.object({ id: z.string().min(1) });
@@ -13,13 +13,25 @@ const autocompleteQuerySchema = z.object({ q: z.string().trim().min(1).max(100) 
 const cardQuerySchema = z.object({ name: z.string().trim().min(1).max(200) });
 
 const setCodeSchema = z.string().trim().toLowerCase().min(2).max(10);
+const collectorNumberSchema = z.string().trim().min(1).max(20);
 
-const addPullSchema = z.object({
-  cardName: z.string().trim().min(1).max(200),
-  playerId: z.string().min(1).optional(),
-  setCode: setCodeSchema.optional(),
-  foil: z.boolean().default(false),
-});
+// Either a card name (fuzzy-matched, optionally pinned to a set) or a
+// collector number (pinned to an exact set+number printing) — the latter
+// is the only way to pick between two printings that share both name and
+// set, e.g. a showcase/borderless variant Scryfall's fuzzy name search
+// can't otherwise disambiguate. Collector number requires setCode since a
+// number alone means nothing without knowing which set it's from.
+const addPullSchema = z
+  .object({
+    cardName: z.string().trim().max(200).optional(),
+    collectorNumber: collectorNumberSchema.optional(),
+    playerId: z.string().min(1).optional(),
+    setCode: setCodeSchema.optional(),
+    foil: z.boolean().default(false),
+  })
+  .refine((v) => (v.collectorNumber ? !!v.setCode : !!v.cardName?.trim()), {
+    message: "cardName is required unless collectorNumber+setCode are given",
+  });
 
 function toPlainPull(pull: { priceEur: unknown; [k: string]: unknown }) {
   return { ...pull, priceEur: pull.priceEur === null ? null : Number(pull.priceEur) };
@@ -84,7 +96,9 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const card = await lookupCardByName(body.data.cardName, { setCode: body.data.setCode, foil: body.data.foil });
+    const card = body.data.collectorNumber
+      ? await lookupCardByCollectorNumber(body.data.setCode!, body.data.collectorNumber, { foil: body.data.foil })
+      : await lookupCardByName(body.data.cardName!, { setCode: body.data.setCode, foil: body.data.foil });
     if (!card) {
       reply.code(404).send({ error: "card_not_found" });
       return;
@@ -142,17 +156,22 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
   // - playerId: confirms an inferred guess as-is (pass the same id back)
   //   or reassigns to someone else — either way always marks it
   //   human-confirmed so inference never overwrites it again.
-  // - setCode/foil: re-resolves the pull against Scryfall for a specific
-  //   printing, overwriting scryfallId/setCode/priceEur/foil/imageUri in
-  //   place — fixes a wrong-set pull (e.g. a card silently resolved to an
-  //   unrelated reprint) without losing playerId/playerIdInferred/addedAt
-  //   the way a delete-and-recreate would.
+  // - setCode/foil/collectorNumber: re-resolves the pull against Scryfall
+  //   for a specific printing, overwriting scryfallId/setCode/priceEur/
+  //   foil/imageUri in place — fixes a wrong-set pull (e.g. a card
+  //   silently resolved to an unrelated reprint) without losing
+  //   playerId/playerIdInferred/addedAt the way a delete-and-recreate
+  //   would. collectorNumber pins an exact printing by set+number (falls
+  //   back to the pull's existing setCode if a new one isn't given in the
+  //   same call) — the only way to fix a pull that resolved to the wrong
+  //   one of two printings sharing both name and set.
   app.patch("/api/card-pulls/:id", async (request, reply) => {
     const params = idParams.safeParse(request.params);
     const body = z
       .object({
         playerId: z.string().min(1).nullable().optional(),
         setCode: setCodeSchema.optional(),
+        collectorNumber: collectorNumberSchema.optional(),
         foil: z.boolean().optional(),
       })
       .safeParse(request.body);
@@ -183,11 +202,15 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
       data.playerIdInferred = false;
     }
 
-    if (body.data.setCode !== undefined || body.data.foil !== undefined) {
-      const card = await lookupCardByName(pull.cardName, {
-        setCode: body.data.setCode,
-        foil: body.data.foil ?? pull.foil,
-      });
+    if (body.data.setCode !== undefined || body.data.foil !== undefined || body.data.collectorNumber !== undefined) {
+      const card = body.data.collectorNumber
+        ? await lookupCardByCollectorNumber(body.data.setCode ?? pull.setCode ?? "", body.data.collectorNumber, {
+            foil: body.data.foil ?? pull.foil,
+          })
+        : await lookupCardByName(pull.cardName, {
+            setCode: body.data.setCode,
+            foil: body.data.foil ?? pull.foil,
+          });
       if (!card) {
         // Don't clobber a working pull with a failed re-resolution —
         // the name/setCode combination genuinely doesn't exist on

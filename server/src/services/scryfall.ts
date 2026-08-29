@@ -161,6 +161,48 @@ export async function lookupCardByName(name: string, options: LookupOptions = {}
   return summary;
 }
 
+// Pins one exact printing by set + collector number (Scryfall's
+// `/cards/:set/:number` endpoint) — the only way to disambiguate a card
+// whose name and set both collide with another printing (e.g. a
+// showcase/borderless/promo variant sharing its base name within the same
+// set), which the fuzzy name-based lookup above has no way to select
+// between. Same "don't guess" contract as lookupCardByName: a 404 means
+// that set+number genuinely doesn't exist, not "try something close."
+export async function lookupCardByCollectorNumber(
+  setCode: string,
+  collectorNumber: string,
+  options: { foil?: boolean } = {},
+): Promise<ScryfallCardSummary | null> {
+  const { foil = false } = options;
+  const set = setCode.trim().toLowerCase();
+  const number = collectorNumber.trim().toLowerCase();
+  const key = `number:${set}:${number}:${foil ? "foil" : "nonfoil"}`;
+  const cached = getCached<ScryfallCardSummary | null>(key);
+  if (cached !== undefined) return cached;
+
+  const res = await scryfallFetch(`/cards/${encodeURIComponent(set)}/${encodeURIComponent(number)}`);
+  if (!res.ok) {
+    // Same transient-vs-permanent distinction as lookupCardByName: only a
+    // real 404 (this set+number doesn't exist) is safe to cache.
+    if (res.status === 404) setCached(key, null, NAMED_TTL_MS);
+    return null;
+  }
+
+  const card = (await res.json()) as ScryfallCardResponse;
+  const { priceEur, foil: resolvedFoil } = resolvePrice(card, foil);
+  const summary: ScryfallCardSummary = {
+    scryfallId: card.id,
+    name: card.name,
+    setCode: card.set,
+    priceEur,
+    foil: resolvedFoil,
+    imageUri: card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal ?? null,
+  };
+
+  setCached(key, summary, NAMED_TTL_MS);
+  return summary;
+}
+
 export interface ScryfallSetSummary {
   code: string;
   name: string;

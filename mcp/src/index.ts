@@ -350,10 +350,14 @@ registerReadWriteTool(
 
 registerReadWriteTool(
   "add_card_pull",
-  "Add a card pull to a pod — resolves the card live via Scryfall for image/price. Pass setCode to pin a specific printing (e.g. a card reprinted across many sets would otherwise resolve to Scryfall's arbitrary 'default' printing, which is often wrong for the actual pod).",
+  "Add a card pull to a pod — resolves the card live via Scryfall for image/price. Pass setCode to pin a specific printing (e.g. a card reprinted across many sets would otherwise resolve to Scryfall's arbitrary 'default' printing, which is often wrong for the actual pod). For a special version that shares its name with the normal printing in the same set (showcase/borderless/promo), pass collectorNumber+setCode instead of cardName — fuzzy name search can't tell those apart.",
   {
     podId: z.string(),
-    cardName: z.string(),
+    cardName: z.string().optional(),
+    collectorNumber: z
+      .string()
+      .describe("Scryfall collector number, e.g. '243' — requires setCode, pins the exact printing instead of matching by name")
+      .optional(),
     playerId: z.string().optional(),
     setCode: z.string().describe("Scryfall set code, e.g. 'eoe' — pins the printing instead of guessing").optional(),
     foil: z.boolean().optional(),
@@ -363,11 +367,15 @@ registerReadWriteTool(
 
 registerReadWriteTool(
   "update_card_pull",
-  "Correct an existing card pull's attribution and/or printing (setCode/foil) without losing its playerId/addedAt history — use this instead of delete + re-add when a pull resolved to the wrong printing.",
+  "Correct an existing card pull's attribution and/or printing (setCode/foil/collectorNumber) without losing its playerId/addedAt history — use this instead of delete + re-add when a pull resolved to the wrong printing.",
   {
     cardPullId: z.string(),
     playerId: z.string().nullable().optional(),
     setCode: z.string().describe("Scryfall set code, e.g. 'eoe' — re-resolves the same card name in this set").optional(),
+    collectorNumber: z
+      .string()
+      .describe("Scryfall collector number, e.g. '243' — pins an exact printing when the pull matched the wrong one of two cards sharing a name+set")
+      .optional(),
     foil: z.boolean().optional(),
   },
   ({ cardPullId, ...body }) => api.patch(`/card-pulls/${cardPullId}`, body),
