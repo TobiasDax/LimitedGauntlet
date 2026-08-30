@@ -28,31 +28,33 @@ export function GesamtwertungList({ pods, rows }: { pods: GesamtwertungPod[]; ro
           return (
             <div
               key={row.playerId}
-              className={`grid grid-cols-[44px_1fr_auto_auto] items-center gap-5 rounded-md border px-4 py-3.5 ${
+              className={`flex flex-col gap-2.5 rounded-md border px-4 py-3.5 ${
                 rank === 1 ? "border-accent/35 bg-gradient-to-r from-accent-wash to-surface" : "border-border bg-surface"
               }`}
             >
-              <div
-                className={`grid h-[34px] w-[34px] place-items-center rounded border font-display text-[15px] font-bold ${rankBadgeClasses(rank)}`}
-              >
-                {rank}
-              </div>
-
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="font-display text-[17px] font-bold">{row.player.displayName}</span>
-                <span className="text-[12px] text-ink-muted">
-                  {row.eventsPlayed} of {pods.length} pod{pods.length === 1 ? "" : "s"} played
-                </span>
-              </div>
-
-              <div className="text-right">
+              <div className="grid grid-cols-[44px_1fr_auto] items-center gap-5">
                 <div
-                  className={`font-display tabular-nums text-[26px] leading-none font-bold ${rank === 1 ? "text-accent-strong" : ""}`}
+                  className={`grid h-[34px] w-[34px] place-items-center rounded border font-display text-[15px] font-bold ${rankBadgeClasses(rank)}`}
                 >
-                  {row.average.toFixed(1)}
+                  {rank}
                 </div>
-                <div className="mt-0.5 text-[10.5px] tracking-wide text-ink-muted uppercase">
-                  avg · {row.totalPoints} total
+
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="font-display text-[17px] font-bold">{row.player.displayName}</span>
+                  <span className="text-[12px] text-ink-muted">
+                    {row.eventsPlayed} of {pods.length} pod{pods.length === 1 ? "" : "s"} played
+                  </span>
+                </div>
+
+                <div className="text-right">
+                  <div
+                    className={`font-display tabular-nums text-[26px] leading-none font-bold ${rank === 1 ? "text-accent-strong" : ""}`}
+                  >
+                    {row.average.toFixed(1)}
+                  </div>
+                  <div className="mt-0.5 text-[10.5px] tracking-wide text-ink-muted uppercase">
+                    avg · {row.totalPoints} total
+                  </div>
                 </div>
               </div>
 
