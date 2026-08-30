@@ -99,6 +99,10 @@ interface Ledger {
 // A minimum number of head-to-head games before crowning a "nemesis" or
 // "victim" — otherwise a single lucky/unlucky match would swing it.
 const MIN_HEAD_TO_HEAD_GAMES = 2;
+// A candidate nemesis/victim must themselves have played at least this many
+// tournaments — someone who only ever showed up once shouldn't get branded
+// the group's punching bag (or conqueror) off a single-event sample (PI-61).
+const MIN_TOURNAMENTS_FOR_H2H_AWARD = 2;
 // Same idea for "best format" — one match in a format that's barely been
 // tried isn't a meaningful signal.
 const MIN_FORMAT_MATCHES = 3;
@@ -381,10 +385,18 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
     if (rows[0]?.playerId === playerId) weekendWins++;
   }
 
+  const tournamentsPlayedById = new Map(hallOfFame.map((r) => [r.playerId, r.tournamentsPlayed]));
   const h2h = headToHeadEntries(ledger, playerId);
   const qualifying = h2h.filter((e) => e.matches >= MIN_HEAD_TO_HEAD_GAMES);
-  const nemesis = qualifying.length > 0 ? qualifying.reduce((a, b) => (b.winPct < a.winPct ? b : a)) : null;
-  const victim = qualifying.length > 0 ? qualifying.reduce((a, b) => (b.winPct > a.winPct ? b : a)) : null;
+  // Nemesis/victim only ever come from candidates who've played enough
+  // tournaments themselves — a candidate who fails that bar is skipped
+  // entirely (not just deprioritized), so the award naturally falls to the
+  // next-best qualifying candidate instead of going straight to null.
+  const eligibleForAward = qualifying.filter(
+    (e) => (tournamentsPlayedById.get(e.playerId) ?? 0) >= MIN_TOURNAMENTS_FOR_H2H_AWARD,
+  );
+  const nemesis = eligibleForAward.length > 0 ? eligibleForAward.reduce((a, b) => (b.winPct < a.winPct ? b : a)) : null;
+  const victim = eligibleForAward.length > 0 ? eligibleForAward.reduce((a, b) => (b.winPct > a.winPct ? b : a)) : null;
   const mostPlayedOpponent = h2h[0] ?? null;
 
   const hofRow = hallOfFame.find((r) => r.playerId === playerId);

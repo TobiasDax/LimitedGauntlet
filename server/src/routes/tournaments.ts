@@ -4,7 +4,7 @@ import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedTournament } from "../services/ownership.js";
 import { computePlayerPairHistory } from "../services/weekendHistory.js";
-import { computeGesamtwertung } from "../services/gesamtwertung.js";
+import { computeGesamtwertung, countTournamentParticipants } from "../services/gesamtwertung.js";
 
 const tournamentCreateSchema = z.object({
   name: z.string().trim().min(1).max(150),
@@ -62,7 +62,10 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       include: {
         pods: {
           orderBy: { sequenceOrder: "asc" },
-          include: { rounds: { select: { roundNumber: true, status: true }, orderBy: { roundNumber: "asc" } } },
+          include: {
+            rounds: { select: { roundNumber: true, status: true }, orderBy: { roundNumber: "asc" } },
+            entrants: { select: { playerId: true, team: { select: { members: { select: { playerId: true } } } } } },
+          },
         },
         players: { include: { player: true } },
       },
@@ -71,7 +74,9 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       reply.code(404).send({ error: "not_found" });
       return;
     }
-    reply.send({ tournament });
+    const playersPlayed = countTournamentParticipants(tournament.pods);
+    const pods = tournament.pods.map(({ entrants: _entrants, ...pod }) => pod);
+    reply.send({ tournament: { ...tournament, pods, playersPlayed } });
   });
 
   app.patch("/api/tournaments/:id", async (request, reply) => {

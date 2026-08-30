@@ -9,7 +9,7 @@ export function rankBadgeClasses(rank: number): string {
 
 export function GesamtwertungList({ pods, rows }: { pods: GesamtwertungPod[]; rows: GesamtwertungRow[] }) {
   if (rows.length === 0) {
-    return <p className="text-ink-muted">No players attending yet.</p>;
+    return <p className="text-ink-muted">No one has played a pod yet.</p>;
   }
 
   let rank = 0;

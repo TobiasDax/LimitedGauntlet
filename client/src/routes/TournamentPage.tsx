@@ -323,7 +323,7 @@ export function TournamentPage() {
       <ScreenDek>
         {tournament.pods.length === 0
           ? "No pods yet — add one to start pairing."
-          : `${tournament.pods.length} pod${tournament.pods.length === 1 ? "" : "s"} · ${tournament.players.length} player${tournament.players.length === 1 ? "" : "s"} attending`}
+          : `${tournament.pods.length} pod${tournament.pods.length === 1 ? "" : "s"} · ${tournament.playersPlayed} player${tournament.playersPlayed === 1 ? "" : "s"} played`}
       </ScreenDek>
 
       <div className="mb-6 flex flex-wrap items-center gap-5">
@@ -343,7 +343,7 @@ export function TournamentPage() {
 
       <DescriptionSection tournament={tournament} />
 
-      {tournament.players.length > 0 && (
+      {tournament.playersPlayed > 0 && (
         <div className="mb-6 flex gap-5">
           <Link
             to={`/tournaments/${tournament.id}/gesamtwertung`}

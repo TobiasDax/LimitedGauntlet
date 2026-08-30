@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { findPublicTournament, findPublicPod, findPublicOrganization } from "../services/ownership.js";
 import { verifyPassword } from "../auth/password.js";
-import { computeGesamtwertung } from "../services/gesamtwertung.js";
+import { computeGesamtwertung, countTournamentParticipants } from "../services/gesamtwertung.js";
 import { computePodStandings } from "../services/standings.js";
 import { computeHallOfFameOverview, computePlayerStats } from "../services/playerStats.js";
 
@@ -159,19 +159,25 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const [pods, players, organization] = await Promise.all([
+    const [podsWithEntrants, players, organization] = await Promise.all([
       prisma.pod.findMany({
         where: { tournamentId: tournament.id },
         orderBy: { sequenceOrder: "asc" },
-        include: { rounds: { select: { roundNumber: true, status: true }, orderBy: { roundNumber: "asc" } } },
+        include: {
+          rounds: { select: { roundNumber: true, status: true }, orderBy: { roundNumber: "asc" } },
+          entrants: { select: { playerId: true, team: { select: { members: { select: { playerId: true } } } } } },
+        },
       }),
       prisma.tournamentPlayer.findMany({ where: { tournamentId: tournament.id }, include: { player: true } }),
       prisma.organization.findUniqueOrThrow({ where: { id: tournament.orgId } }),
     ]);
 
+    const playersPlayed = countTournamentParticipants(podsWithEntrants);
+    const pods = podsWithEntrants.map(({ entrants: _entrants, ...pod }) => pod);
+
     reply.send({
       organization: { id: organization.id, slug: organization.slug, name: organization.name },
-      tournament: { ...tournament, pods, players },
+      tournament: { ...tournament, pods, players, playersPlayed },
     });
   });
 

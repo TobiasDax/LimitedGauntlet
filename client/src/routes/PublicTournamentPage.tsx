@@ -45,8 +45,8 @@ export function PublicTournamentPage() {
       <Eyebrow>{organization.name}</Eyebrow>
       <ScreenTitle>{tournament.name}</ScreenTitle>
       <ScreenDek>
-        {tournament.pods.length} pod{tournament.pods.length === 1 ? "" : "s"} · {tournament.players.length} player
-        {tournament.players.length === 1 ? "" : "s"} attending
+        {tournament.pods.length} pod{tournament.pods.length === 1 ? "" : "s"} · {tournament.playersPlayed} player
+        {tournament.playersPlayed === 1 ? "" : "s"} played
       </ScreenDek>
 
       {tournament.description && <RichText text={tournament.description} className="mb-8" />}

@@ -23,6 +23,26 @@ export interface GesamtwertungResult {
   rows: GesamtwertungRow[];
 }
 
+interface EntrantForParticipation {
+  playerId: string | null;
+  team: { members: { playerId: string }[] } | null;
+}
+
+// Distinct players who actually appear as an entrant in at least one of
+// these pods — the same "did they actually play" concept computeGesamtwertung
+// filters on below (PI-60), reused wherever a tournament needs a real
+// participation count instead of its raw TournamentPlayer registration count.
+export function countTournamentParticipants(pods: { entrants: EntrantForParticipation[] }[]): number {
+  const ids = new Set<string>();
+  for (const pod of pods) {
+    for (const entrant of pod.entrants) {
+      if (entrant.playerId) ids.add(entrant.playerId);
+      else for (const m of entrant.team?.members ?? []) ids.add(m.playerId);
+    }
+  }
+  return ids.size;
+}
+
 // The weekend "overall" table: for each player attending the tournament,
 // sum their match points across every pod they played (team pods credit
 // the FULL team score to each member, not divided — confirmed against
@@ -65,7 +85,10 @@ export async function computeGesamtwertung(tournamentId: string): Promise<Gesamt
     }
   }
 
-  const playerIds = [...totals.keys()];
+  // Only players who actually played at least one pod — a registered
+  // attendee who never took a seat anywhere shouldn't clutter a table
+  // that's meant to rank performance (PI-60).
+  const playerIds = [...totals.keys()].filter((id) => (eventsPlayed.get(id) ?? 0) > 0);
   const players = await prisma.player.findMany({ where: { id: { in: playerIds } } });
   const nameById = new Map(players.map((p) => [p.id, p.displayName]));
 

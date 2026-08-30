@@ -63,6 +63,7 @@ export function usePublicRoster(slug: string | undefined) {
 export interface PublicTournamentDetail extends Tournament {
   pods: Pod[];
   players: Array<{ tournamentId: string; playerId: string; player: { id: string; displayName: string } }>;
+  playersPlayed: number;
 }
 
 export function usePublicTournament(slug: string | undefined, tournamentId: string | undefined) {
