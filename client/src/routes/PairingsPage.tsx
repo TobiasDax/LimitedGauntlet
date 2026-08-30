@@ -120,7 +120,7 @@ function ResultEntry({ match, podId, matchFormat }: { match: Match; podId: strin
 
   return (
     <form
-      className="flex flex-wrap items-center gap-1.5"
+      className="flex flex-col gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         const result = a > b ? "A_WINS" : b > a ? "B_WINS" : "DRAW";
@@ -130,21 +130,25 @@ function ResultEntry({ match, podId, matchFormat }: { match: Match; podId: strin
         );
       }}
     >
-      <Stepper value={a} onChange={setA} max={maxGames} ariaLabel="Seat A games won" />
-      <span className="text-ink-muted">–</span>
-      <Stepper value={b} onChange={setB} max={maxGames} ariaLabel="Seat B games won" />
-      <Button type="submit" variant="primary" disabled={submitResult.isPending} className="ml-1">
-        Submit
-      </Button>
-      {editing && (
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          className="ml-1 text-[11px] text-ink-muted underline hover:text-accent-strong"
-        >
-          Cancel
-        </button>
-      )}
+      <div className="flex items-center gap-1.5">
+        <Stepper value={a} onChange={setA} max={maxGames} ariaLabel="Seat A games won" />
+        <span className="text-ink-muted">–</span>
+        <Stepper value={b} onChange={setB} max={maxGames} ariaLabel="Seat B games won" />
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Button type="submit" variant="primary" disabled={submitResult.isPending}>
+          Submit
+        </Button>
+        {editing && (
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="text-[11px] text-ink-muted underline hover:text-accent-strong"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
     </form>
   );
 }
