@@ -36,6 +36,7 @@ function Stepper({
   ariaLabel,
   title,
   dashed,
+  className,
 }: {
   value: number;
   onChange: (next: number) => void;
@@ -44,11 +45,12 @@ function Stepper({
   ariaLabel: string;
   title?: string;
   dashed?: boolean;
+  className?: string;
 }) {
   const clamp = (n: number) => Math.min(max ?? Number.POSITIVE_INFINITY, Math.max(min, n));
   return (
     <div
-      className={`flex items-center rounded border ${dashed ? "border-dashed" : ""} border-border-strong bg-surface`}
+      className={`flex items-center rounded border ${dashed ? "border-dashed" : ""} border-border-strong bg-surface ${className ?? ""}`}
       title={title}
     >
       <button
@@ -56,7 +58,7 @@ function Stepper({
         onClick={() => onChange(clamp(value - 1))}
         disabled={value <= min}
         aria-label={`Decrease ${ariaLabel}`}
-        className="px-1.5 py-1 text-ink-muted hover:text-accent-strong disabled:opacity-30 disabled:hover:text-ink-muted"
+        className="px-3.5 py-2.5 text-base text-ink-muted hover:text-accent-strong disabled:opacity-30 disabled:hover:text-ink-muted"
       >
         −
       </button>
@@ -67,14 +69,14 @@ function Stepper({
         value={value}
         onChange={(e) => onChange(clamp(Number(e.target.value)))}
         aria-label={ariaLabel}
-        className="w-8 border-none bg-transparent text-center text-[13px] tabular-nums text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="w-0 min-w-0 flex-1 border-none bg-transparent text-center text-base tabular-nums text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
       <button
         type="button"
         onClick={() => onChange(clamp(value + 1))}
         disabled={max !== undefined && value >= max}
         aria-label={`Increase ${ariaLabel}`}
-        className="px-1.5 py-1 text-ink-muted hover:text-accent-strong disabled:opacity-30 disabled:hover:text-ink-muted"
+        className="px-3.5 py-2.5 text-base text-ink-muted hover:text-accent-strong disabled:opacity-30 disabled:hover:text-ink-muted"
       >
         +
       </button>
@@ -131,19 +133,19 @@ function ResultEntry({ match, podId, matchFormat }: { match: Match; podId: strin
       }}
     >
       <div className="flex items-center gap-1.5">
-        <Stepper value={a} onChange={setA} max={maxGames} ariaLabel="Seat A games won" />
+        <Stepper value={a} onChange={setA} max={maxGames} ariaLabel="Seat A games won" className="flex-1" />
         <span className="text-ink-muted">–</span>
-        <Stepper value={b} onChange={setB} max={maxGames} ariaLabel="Seat B games won" />
+        <Stepper value={b} onChange={setB} max={maxGames} ariaLabel="Seat B games won" className="flex-1" />
       </div>
-      <div className="flex items-center gap-1.5">
-        <Button type="submit" variant="primary" disabled={submitResult.isPending}>
+      <div className="flex items-center gap-3">
+        <Button type="submit" variant="primary" disabled={submitResult.isPending} className="flex-1">
           Submit
         </Button>
         {editing && (
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="text-[11px] text-ink-muted underline hover:text-accent-strong"
+            className="shrink-0 text-[11px] text-ink-muted underline hover:text-accent-strong"
           >
             Cancel
           </button>
