@@ -69,7 +69,7 @@ function Stepper({
         value={value}
         onChange={(e) => onChange(clamp(Number(e.target.value)))}
         aria-label={ariaLabel}
-        className="w-0 min-w-0 flex-1 border-none bg-transparent text-center text-base tabular-nums text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="min-w-10 flex-1 border-none bg-transparent text-center text-base tabular-nums text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
       <button
         type="button"
@@ -290,7 +290,7 @@ function MatchCard({
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-y-2 rounded-md border border-border bg-surface px-4 py-3">
+    <div className="flex flex-col gap-3 rounded-md border border-border bg-surface px-4 py-3">
       <div className="min-w-0">
         <div className="mb-1 text-[11px] tracking-wide text-ink-muted uppercase">Table {match.tableNumber}</div>
         <div className="font-display text-[15px] font-bold">
