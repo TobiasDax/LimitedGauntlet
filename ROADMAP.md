@@ -229,3 +229,34 @@ Tobias flagged a gap: draft pods (the only format where seating around a physica
 - [x] **Scope (Tobias, 2026-08-26):** DRAFT and CHAOS_DRAFT pods only — Swiss/other formats don't have a physical seating concept. Shown inline at the top of the Pairings page (`client/src/routes/PairingsPage.tsx`), and only while round 1 is still `PENDING` — once round 1 starts, the physical draft has already happened and the page's focus shifts to gameplay, so the chart gets out of the way automatically (`showSeatingChart` gate).
 - [x] **Visual design (Tobias, referencing the group's existing Outline layout):** a styled two-row grid (`client/src/components/SeatingChart.tsx`, not a plain table) — row 1 holds seats 1..M left-to-right, row 2 holds seats N..M+1 right-to-left, so reading row 1 then row 2 traces the seating order clockwise around the table. A bye's seat renders as a dashed/muted "Round 1 bye" cell. For an odd N, the one unused chair in this two-row layout is always rendered under seat 1 (a blank leading grid cell in row 2), not wherever the bye's table happens to fall — so every seat number keeps a fixed, predictable position on the imaginary table regardless of pod size or who drew the bye.
 - [x] Verified via an ad-hoc Node script (no client test framework exists in this repo) covering 8-seat clean, 8-seat with out-of-order `tableNumber`s, 7-seat and 5-seat with a bye at a non-final raw table number, and the empty/no-round-1 case. Visually confirmed end-to-end via a full Docker build + Postgres + seeded 7-entrant DRAFT pod + Playwright screenshot, including the fixed-empty-slot-under-seat-1 layout.
+
+### PI-52 — Player accounts for self-service check-in (v2 idea)
+Idea from Tobias: let non-organizer users (players) have accounts so they can check themselves in / report their own game results, instead of everything going through an organizer. A bigger access-control question than the current model (`OrganizerAccount` + session cookies, public pages open-by-default per `CLAUDE.md`) — `Player` records today are just org-scoped names with no login of their own. Needs a design pass before implementation: what a player account can/can't do, how results get confirmed (self-report both sides? one side reports, other confirms?), how it interacts with the public-pages-stay-open default.
+- [ ] Not scoped yet — design discussion needed before implementation.
+
+### PI-53 — Better match-result entry UI (+/- steppers instead of two text boxes)
+Idea from Tobias: entering a match result today is two free-text number inputs (games won per side). Replace with a +/- stepper per player for faster, less error-prone entry on a 0–2 range.
+- [ ] Not started.
+
+### PI-54 — Auto-stop the prep timer when round 1 starts
+Idea from Tobias: PI-33's pod prep timer (draft/deckbuilding countdown) has to be stopped manually by the organizer. When round 1 is actually started, the prep timer should clear itself automatically instead of continuing to count down alongside the round timer.
+- [ ] Not started.
+
+### PI-55 — Move round-control buttons above the rounds list
+Idea from Tobias: the "Generate pairings"/"Start round" buttons currently render below the rounds list, but newest rounds render at the top of that list — so as a pod progresses, the primary action buttons end up further down the page instead of staying next to the round they act on. Move the buttons above the list.
+- [ ] Not started.
+
+### PI-56 — Allow reverting a round back to "not yet paired"
+Idea from Tobias: once a round is paired there's no way back to the unpaired state, only forward (swap individual pairings). This especially hurts round 1: the draft seating chart (PI-51) only renders once round 1 is paired, but by then the pairing is already locked in behind the swap-only UI. Add an explicit "undo pairing" action for a round that hasn't started yet — deletes its `Match` rows and returns the pod to its pre-pairing state.
+- [ ] Not started.
+
+### PI-57 — Rename remaining "Weekend overview" copy to "Tournament overview" ✅ (code-complete, browser-verify pending)
+PI-30 renamed the Gesamtwertung page and the public tournament page, but missed two spots: `TournamentPage.tsx`'s `Eyebrow` label (still hardcoded "Weekend overview") and `TournamentValuePage.tsx`'s fallback title. Same rationale as PI-30 — not every tournament spans a weekend.
+- [x] Both strings changed to "Tournament overview"; confirmed via repo-wide grep that no "Weekend overview" text remains anywhere in `client/src` or `server/src`.
+
+### PI-58 — Pod status label should reflect actual progress ✅ (code-complete, browser-verify pending)
+Idea from Tobias: the tournament overview shows every pod's status as "SETUP" regardless of how far it's actually progressed. Root cause: `Pod.status` is a manually-set field the app never transitions automatically (per `rounds.ts`'s own comment: "the app doesn't manage pod.status automatically") — only the one-time `import-legacy.ts` script sets it.
+- [x] **Derived, not stored** (same posture as PI-51's seating chart) — left the stored `Pod.status` field and its enum untouched (still round-trips through export/import unchanged) and instead compute a display-only label from real round data. `podProgressStatus()` (`client/src/features/pods/usePods.ts`): no rounds yet → "Setup"; the pod's last configured round (`roundNumber === roundCount`) is `COMPLETED` → "Finished"; anything paired in between → "In progress".
+- [x] Both tournament-detail queries (`GET /api/tournaments/:id` in `tournaments.ts`, `GET /api/public/o/:slug/tournaments/:id` in `public.ts`) now include each pod's `rounds: { roundNumber, status }` — just enough to derive the label, not the full Round/Match payload the pairings page needs. New optional `Pod.rounds` field on the shared client type.
+- [x] Wired into the two places that rendered raw `pod.status`: `TournamentPage.tsx` (authed) and `PublicTournamentPage.tsx` (public).
+- [ ] Browser-verified.

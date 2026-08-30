@@ -13,7 +13,7 @@ export function TournamentValuePage() {
     <div>
       <Eyebrow>
         <Link to={`/tournaments/${id}`} className="hover:text-accent-strong">
-          {tournamentData?.tournament.name ?? "Weekend overview"}
+          {tournamentData?.tournament.name ?? "Tournament overview"}
         </Link>
       </Eyebrow>
       <ScreenTitle>Best pulls of the weekend</ScreenTitle>

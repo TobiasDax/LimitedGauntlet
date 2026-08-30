@@ -72,6 +72,10 @@ export interface Pod {
   prepTimerEndsAt: string | null;
   prepTimerLabel: string | null;
   createdAt: string;
+  // Present only on pods nested in a tournament-detail response (PI-58) —
+  // just enough to derive a progress label client-side, not the full
+  // Round/Match payload the pairings page needs.
+  rounds?: { roundNumber: number; status: RoundStatus }[];
 }
 
 export interface TeamMember {

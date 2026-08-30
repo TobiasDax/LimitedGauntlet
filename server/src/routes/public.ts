@@ -160,7 +160,11 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const [pods, players, organization] = await Promise.all([
-      prisma.pod.findMany({ where: { tournamentId: tournament.id }, orderBy: { sequenceOrder: "asc" } }),
+      prisma.pod.findMany({
+        where: { tournamentId: tournament.id },
+        orderBy: { sequenceOrder: "asc" },
+        include: { rounds: { select: { roundNumber: true, status: true }, orderBy: { roundNumber: "asc" } } },
+      }),
       prisma.tournamentPlayer.findMany({ where: { tournamentId: tournament.id }, include: { player: true } }),
       prisma.organization.findUniqueOrThrow({ where: { id: tournament.orgId } }),
     ]);

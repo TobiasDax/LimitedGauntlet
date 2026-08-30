@@ -132,3 +132,17 @@ export function podFormatDisplay(pod: Pick<Pod, "format" | "constructedFormat" |
     pod.constructedFormat === "CUSTOM" ? pod.constructedFormatCustom : constructedFormatLabel[pod.constructedFormat];
   return detail ? `${podFormatLabel[pod.format]} — ${detail}` : podFormatLabel[pod.format];
 }
+
+// PI-58: Pod.status is a manually-set field the app never transitions on
+// its own, so it just sits at "SETUP" forever in practice. Derive what to
+// actually show from real round state instead — same "derived, not
+// stored" approach as PI-51's seating chart: no rounds yet → still setup;
+// the pod's last configured round has completed → finished; anything
+// paired in between → in progress.
+export function podProgressStatus(pod: Pick<Pod, "roundCount" | "rounds">): "Setup" | "In progress" | "Finished" {
+  const rounds = pod.rounds ?? [];
+  if (rounds.length === 0) return "Setup";
+  const lastRound = rounds.find((r) => r.roundNumber === pod.roundCount);
+  if (lastRound?.status === "COMPLETED") return "Finished";
+  return "In progress";
+}

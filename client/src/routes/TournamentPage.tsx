@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTournament, tournamentStatusLabel, type TournamentDetail } from "../features/tournaments/useTournament";
 import { useUpdateTournament, useDeleteTournament } from "../features/tournaments/useTournaments";
-import { useCreatePod, podFormatLabel, podFormatDisplay } from "../features/pods/usePods";
+import { useCreatePod, podFormatLabel, podFormatDisplay, podProgressStatus } from "../features/pods/usePods";
 import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
 import { RichText } from "../components/RichText";
@@ -318,7 +318,7 @@ export function TournamentPage() {
 
   return (
     <div>
-      <Eyebrow>Weekend overview</Eyebrow>
+      <Eyebrow>Tournament overview</Eyebrow>
       <ScreenTitle>{tournament.name}</ScreenTitle>
       <ScreenDek>
         {tournament.pods.length === 0
@@ -390,7 +390,7 @@ export function TournamentPage() {
                     {pod.isTeamEvent && ` · teams of ${pod.teamSize}`} · {pod.roundCount} rounds
                   </div>
                 </div>
-                <span className="text-[11.5px] tracking-wide text-ink-secondary uppercase">{pod.status}</span>
+                <span className="text-[11.5px] tracking-wide text-ink-secondary uppercase">{podProgressStatus(pod)}</span>
               </Card>
             </Link>
           ))}

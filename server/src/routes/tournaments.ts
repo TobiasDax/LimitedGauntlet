@@ -60,7 +60,10 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
     const tournament = await prisma.tournament.findFirst({
       where: { id: params.data.id, orgId: request.organizer!.orgId },
       include: {
-        pods: { orderBy: { sequenceOrder: "asc" } },
+        pods: {
+          orderBy: { sequenceOrder: "asc" },
+          include: { rounds: { select: { roundNumber: true, status: true }, orderBy: { roundNumber: "asc" } } },
+        },
         players: { include: { player: true } },
       },
     });
