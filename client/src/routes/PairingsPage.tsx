@@ -22,10 +22,69 @@ import { PrepTimerDisplay } from "../components/PrepTimer";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { useCountdown } from "../lib/useCountdown";
 import { playChime, playEndChime } from "../lib/chime";
-import type { Entrant, Match, Round } from "../lib/types";
+import type { Entrant, Match, MatchFormat, Round } from "../lib/types";
 
-function ResultEntry({ match, podId }: { match: Match; podId: string }) {
+// Compact [-] value [+] control (PI-53) for a bounded 0..N game count — the
+// number stays a real, still-typable input between the buttons rather than
+// a locked display, so a quick tap-tap works at the table but typing a
+// value directly (or pasting a correction) still works too.
+function Stepper({
+  value,
+  onChange,
+  min = 0,
+  max,
+  ariaLabel,
+  title,
+  dashed,
+}: {
+  value: number;
+  onChange: (next: number) => void;
+  min?: number;
+  max?: number;
+  ariaLabel: string;
+  title?: string;
+  dashed?: boolean;
+}) {
+  const clamp = (n: number) => Math.min(max ?? Number.POSITIVE_INFINITY, Math.max(min, n));
+  return (
+    <div
+      className={`flex items-center rounded border ${dashed ? "border-dashed" : ""} border-border-strong bg-surface`}
+      title={title}
+    >
+      <button
+        type="button"
+        onClick={() => onChange(clamp(value - 1))}
+        disabled={value <= min}
+        aria-label={`Decrease ${ariaLabel}`}
+        className="px-1.5 py-1 text-ink-muted hover:text-accent-strong disabled:opacity-30 disabled:hover:text-ink-muted"
+      >
+        −
+      </button>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(clamp(Number(e.target.value)))}
+        aria-label={ariaLabel}
+        className="w-8 border-none bg-transparent text-center text-[13px] tabular-nums text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+      <button
+        type="button"
+        onClick={() => onChange(clamp(value + 1))}
+        disabled={max !== undefined && value >= max}
+        aria-label={`Increase ${ariaLabel}`}
+        className="px-1.5 py-1 text-ink-muted hover:text-accent-strong disabled:opacity-30 disabled:hover:text-ink-muted"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+function ResultEntry({ match, podId, matchFormat }: { match: Match; podId: string; matchFormat: MatchFormat }) {
   const submitResult = useSubmitResult(podId);
+  const maxGames = matchFormat === "BO1" ? 1 : 2;
   const [editing, setEditing] = useState(false);
   const [a, setA] = useState(match.gamesWonA);
   const [b, setB] = useState(match.gamesWonB);
@@ -71,29 +130,15 @@ function ResultEntry({ match, podId }: { match: Match; podId: string }) {
         );
       }}
     >
-      <input
-        type="number"
-        min={0}
-        value={a}
-        onChange={(e) => setA(Number(e.target.value))}
-        className="w-12 rounded border border-border-strong bg-surface px-2 py-1 text-center text-[13px] tabular-nums outline-none focus:border-accent"
-      />
+      <Stepper value={a} onChange={setA} max={maxGames} ariaLabel="Seat A games won" />
       <span className="text-ink-muted">–</span>
-      <input
-        type="number"
-        min={0}
-        value={b}
-        onChange={(e) => setB(Number(e.target.value))}
-        className="w-12 rounded border border-border-strong bg-surface px-2 py-1 text-center text-[13px] tabular-nums outline-none focus:border-accent"
-      />
-      <input
-        type="number"
-        min={0}
+      <Stepper value={b} onChange={setB} max={maxGames} ariaLabel="Seat B games won" />
+      <Stepper
         value={d}
-        onChange={(e) => setD(Number(e.target.value))}
+        onChange={setD}
+        ariaLabel="Drawn games"
         title="Drawn games (counted as played, credited to neither)"
-        aria-label="Drawn games"
-        className="w-12 rounded border border-dashed border-border-strong bg-surface px-2 py-1 text-center text-[13px] tabular-nums text-ink-muted outline-none focus:border-accent"
+        dashed
       />
       <Button type="submit" variant="primary" disabled={submitResult.isPending} className="ml-1">
         Submit
@@ -213,6 +258,7 @@ function MatchCard({
   match,
   entrantById,
   podId,
+  matchFormat,
   swappable,
   selectedSlot,
   onSelectSlot,
@@ -220,6 +266,7 @@ function MatchCard({
   match: Match;
   entrantById: Map<string, Entrant>;
   podId: string;
+  matchFormat: MatchFormat;
   swappable: boolean;
   selectedSlot: SwapSlot | null;
   onSelectSlot: (slot: SwapSlot) => void;
@@ -259,7 +306,7 @@ function MatchCard({
           )}
         </div>
       </div>
-      {b && <ResultEntry match={match} podId={podId} />}
+      {b && <ResultEntry match={match} podId={podId} matchFormat={matchFormat} />}
     </div>
   );
 }
@@ -309,11 +356,13 @@ function RoundCard({
   round,
   entrantById,
   podId,
+  matchFormat,
   displayMode,
 }: {
   round: Round;
   entrantById: Map<string, Entrant>;
   podId: string;
+  matchFormat: MatchFormat;
   displayMode: boolean;
 }) {
   const startRound = useStartRound(podId);
@@ -398,6 +447,7 @@ function RoundCard({
             match={m}
             entrantById={entrantById}
             podId={podId}
+            matchFormat={matchFormat}
             swappable={swappable}
             selectedSlot={selectedSlot}
             onSelectSlot={handleSelectSlot}
@@ -512,7 +562,14 @@ export function PairingsPage() {
 
       <div className="flex flex-col gap-5">
         {[...rounds].reverse().map((round) => (
-          <RoundCard key={round.id} round={round} entrantById={entrantById} podId={pod.id} displayMode={displayMode} />
+          <RoundCard
+            key={round.id}
+            round={round}
+            entrantById={entrantById}
+            podId={pod.id}
+            matchFormat={pod.matchFormat}
+            displayMode={displayMode}
+          />
         ))}
       </div>
     </div>

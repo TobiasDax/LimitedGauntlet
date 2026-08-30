@@ -234,9 +234,12 @@ Tobias flagged a gap: draft pods (the only format where seating around a physica
 Idea from Tobias: let non-organizer users (players) have accounts so they can check themselves in / report their own game results, instead of everything going through an organizer. A bigger access-control question than the current model (`OrganizerAccount` + session cookies, public pages open-by-default per `CLAUDE.md`) — `Player` records today are just org-scoped names with no login of their own. Needs a design pass before implementation: what a player account can/can't do, how results get confirmed (self-report both sides? one side reports, other confirms?), how it interacts with the public-pages-stay-open default.
 - [ ] Not scoped yet — design discussion needed before implementation.
 
-### PI-53 — Better match-result entry UI (+/- steppers instead of two text boxes)
+### PI-53 — Better match-result entry UI (+/- steppers instead of two text boxes) ✅ (code-complete, browser-verify pending)
 Idea from Tobias: entering a match result today is two free-text number inputs (games won per side). Replace with a +/- stepper per player for faster, less error-prone entry on a 0–2 range.
-- [ ] Not started.
+- [x] New `Stepper` component (`PairingsPage.tsx`) — `[−] value [+]`, the number itself stays a real, still-typable `<input type="number">` between the buttons rather than a locked display, so tap-only entry works at the table but direct typing/correction still works too.
+- [x] **Clamped to the pod's actual match format:** `gamesWonA`/`gamesWonB` cap at 1 for BO1, 2 for BO3 (`matchFormat` threaded down through `RoundCard` → `MatchCard` → `ResultEntry` from `pod.matchFormat`) — the +/- buttons disable at the bound instead of allowing an impossible score. `gamesDrawn` stays uncapped (min 0 only), same as before.
+- [x] Replaces all three number inputs (A wins, B wins, draws) in both the initial-entry and "Edit" re-entry forms.
+- [ ] Browser-verified.
 
 ### PI-54 — Auto-stop the prep timer when round 1 starts ✅ (code-complete, browser-verify pending)
 Idea from Tobias: PI-33's pod prep timer (draft/deckbuilding countdown) has to be stopped manually by the organizer. When round 1 is actually started, the prep timer should clear itself automatically instead of continuing to count down alongside the round timer.
