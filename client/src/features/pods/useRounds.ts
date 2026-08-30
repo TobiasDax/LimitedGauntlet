@@ -51,6 +51,17 @@ export function useSwapPairing(podId: string) {
   });
 }
 
+// Undo a round's pairing entirely (PI-56) — only works while it's still
+// PENDING. Deletes the round and returns the pod to its pre-pairing
+// state so it can be re-paired from scratch.
+export function useUnpairRound(podId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (roundId: string) => api.delete<void>(`/rounds/${roundId}`),
+    onSuccess: () => invalidatePod(queryClient, podId),
+  });
+}
+
 export function useStartRound(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -102,6 +113,7 @@ export function roundErrorMessage(err: unknown): string {
     if (err.message === "round_locked") return "This round has already started — swaps only work before it starts.";
     if (err.message === "cannot_swap_bye") return "Can't swap into or out of a bye slot.";
     if (err.message === "no_op") return "Pick two different seats to swap.";
+    if (err.message === "round_already_started") return "This round has already started — it can't be un-paired anymore.";
   }
   return "Something went wrong.";
 }

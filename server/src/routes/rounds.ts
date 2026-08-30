@@ -242,6 +242,37 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     reply.send({ ok: true });
   });
 
+  // Undo a round's pairing entirely (PI-56) — only while it's still
+  // PENDING (not started). Deletes its Match rows and the Round itself,
+  // returning the pod to its pre-pairing state so it can be re-paired
+  // (generated or manual) from scratch. Mainly useful for round 1: the
+  // draft seating chart only renders once round 1 is paired, but the
+  // existing swap-only UI can't fully re-shuffle it — this gives a real
+  // way back to the unpaired state instead of swapping seat by seat.
+  app.delete("/api/rounds/:id", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    const round = await findOwnedRound(params.data.id, request.organizer!.orgId);
+    if (!round) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    if (round.status !== "PENDING") {
+      reply.code(400).send({ error: "round_already_started" });
+      return;
+    }
+
+    await prisma.match.deleteMany({ where: { roundId: round.id } });
+    await prisma.round.delete({ where: { id: round.id } });
+
+    emitPodEvent(round.podId, "round-unpaired", { roundId: round.id });
+    reply.code(204).send();
+  });
+
   app.post("/api/rounds/:id/start", async (request, reply) => {
     const params = idParams.safeParse(request.params);
     if (!params.success) {
@@ -267,6 +298,16 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       where: { id: round.id },
       data: { status: "ACTIVE", startedAt, endsAt },
     });
+
+    // PI-54: the prep timer (draft/deckbuilding countdown, PI-33) only makes
+    // sense before the pod's first round — once round 1 actually starts,
+    // stop it automatically instead of leaving it counting down alongside
+    // the round timer.
+    if (round.roundNumber === 1 && pod.prepTimerEndsAt !== null) {
+      await prisma.pod.update({ where: { id: pod.id }, data: { prepTimerEndsAt: null, prepTimerLabel: null } });
+      emitPodEvent(round.podId, "prep-timer-updated", { podId: round.podId, prepTimerEndsAt: null, prepTimerLabel: null });
+    }
+
     emitPodEvent(round.podId, "round-started", { roundId: round.id, startedAt, endsAt });
     {
       const orgId = request.organizer!.orgId;

@@ -238,17 +238,20 @@ Idea from Tobias: let non-organizer users (players) have accounts so they can ch
 Idea from Tobias: entering a match result today is two free-text number inputs (games won per side). Replace with a +/- stepper per player for faster, less error-prone entry on a 0–2 range.
 - [ ] Not started.
 
-### PI-54 — Auto-stop the prep timer when round 1 starts
+### PI-54 — Auto-stop the prep timer when round 1 starts ✅ (code-complete, browser-verify pending)
 Idea from Tobias: PI-33's pod prep timer (draft/deckbuilding countdown) has to be stopped manually by the organizer. When round 1 is actually started, the prep timer should clear itself automatically instead of continuing to count down alongside the round timer.
-- [ ] Not started.
+- [x] `POST /api/rounds/:id/start` (`rounds.ts`) now clears `Pod.prepTimerEndsAt`/`prepTimerLabel` when the round being started is round 1 and a prep timer is still set, reusing the same `prep-timer-updated` broadcast PI-33's manual stop button uses — every connected client (organizer, public, Display Mode) picks it up live without any client-side change needed.
 
-### PI-55 — Move round-control buttons above the rounds list
+### PI-55 — Move round-control buttons above the rounds list ✅
 Idea from Tobias: the "Generate pairings"/"Start round" buttons currently render below the rounds list, but newest rounds render at the top of that list — so as a pod progresses, the primary action buttons end up further down the page instead of staying next to the round they act on. Move the buttons above the list.
-- [ ] Not started.
+- [x] `PairingsPage.tsx`: the "Pair round N" / manual-pairing form / "all rounds complete" block now renders above the reversed rounds list instead of below it — purely a JSX reorder, no logic changes.
 
-### PI-56 — Allow reverting a round back to "not yet paired"
+### PI-56 — Allow reverting a round back to "not yet paired" ✅ (code-complete, browser-verify pending)
 Idea from Tobias: once a round is paired there's no way back to the unpaired state, only forward (swap individual pairings). This especially hurts round 1: the draft seating chart (PI-51) only renders once round 1 is paired, but by then the pairing is already locked in behind the swap-only UI. Add an explicit "undo pairing" action for a round that hasn't started yet — deletes its `Match` rows and returns the pod to its pre-pairing state.
-- [ ] Not started.
+- [x] New `DELETE /api/rounds/:id` (`rounds.ts`), org-scoped via `findOwnedRound` — 400s `round_already_started` unless the round is still `PENDING`, otherwise deletes its `Match` rows then the `Round` row and broadcasts a new `round-unpaired` pod event (added to the client's `POD_EVENTS` realtime whitelist).
+- [x] Frontend: "Undo pairing" ghost button next to "Start round" on a `PENDING` round (`PairingsPage.tsx`), confirmed via the same native `confirm()` pattern used for other destructive actions (delete tournament/pod/webhook) in this codebase. `useUnpairRound` hook + `round_already_started` error mapping in `useRounds.ts`.
+- [x] Not pod-1-specific — works for any not-yet-started round, since the same "back out and re-pair" need can come up on a later round too, not just round 1.
+- [ ] Browser-verified.
 
 ### PI-57 — Rename remaining "Weekend overview" copy to "Tournament overview" ✅ (code-complete, browser-verify pending)
 PI-30 renamed the Gesamtwertung page and the public tournament page, but missed two spots: `TournamentPage.tsx`'s `Eyebrow` label (still hardcoded "Weekend overview") and `TournamentValuePage.tsx`'s fallback title. Same rationale as PI-30 — not every tournament spans a weekend.

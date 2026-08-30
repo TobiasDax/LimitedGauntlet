@@ -10,6 +10,7 @@ import {
   useStartRound,
   useSubmitResult,
   useSwapPairing,
+  useUnpairRound,
   roundErrorMessage,
 } from "../features/pods/useRounds";
 import { entrantDisplayName } from "../lib/entrant";
@@ -319,6 +320,7 @@ function RoundCard({
   const completeRound = useCompleteRound(podId);
   const extendRound = useExtendRound(podId);
   const swapPairing = useSwapPairing(podId);
+  const unpairRound = useUnpairRound(podId);
   const [selectedSlot, setSelectedSlot] = useState<SwapSlot | null>(null);
 
   const allReported = round.matches.every((m) => !m.entrantBId || m.result !== "PENDING");
@@ -349,9 +351,22 @@ function RoundCard({
         {round.status === "ACTIVE" && <RoundTimer round={round} displayMode={displayMode} />}
         <div className="flex items-center gap-2">
           {round.status === "PENDING" && (
-            <Button variant="primary" onClick={() => startRound.mutate(round.id)} disabled={startRound.isPending}>
-              Start round
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  if (confirm(`Undo the pairing for round ${round.roundNumber} and go back to unpaired?`)) {
+                    unpairRound.mutate(round.id);
+                  }
+                }}
+                disabled={unpairRound.isPending}
+              >
+                Undo pairing
+              </Button>
+              <Button variant="primary" onClick={() => startRound.mutate(round.id)} disabled={startRound.isPending}>
+                Start round
+              </Button>
+            </>
           )}
           {round.status === "ACTIVE" && (
             <>
@@ -392,6 +407,7 @@ function RoundCard({
 
       {completeRound.isError && <FormError>{roundErrorMessage(completeRound.error)}</FormError>}
       {swapPairing.isError && <FormError>{roundErrorMessage(swapPairing.error)}</FormError>}
+      {unpairRound.isError && <FormError>{roundErrorMessage(unpairRound.error)}</FormError>}
     </div>
   );
 }
@@ -464,14 +480,8 @@ export function PairingsPage() {
 
       {pod.entrants.length < 2 && <p className="text-ink-muted">Add at least 2 entrants before pairing round 1.</p>}
 
-      <div className="flex flex-col gap-5">
-        {[...rounds].reverse().map((round) => (
-          <RoundCard key={round.id} round={round} entrantById={entrantById} podId={pod.id} displayMode={displayMode} />
-        ))}
-      </div>
-
       {canGenerateNext && !showManual && (
-        <div className="mt-5 flex items-center gap-3">
+        <div className="mb-5 flex items-center gap-3">
           <Button variant="primary" onClick={() => generateRound.mutate()} disabled={generateRound.isPending}>
             {generateRound.isPending ? "Pairing…" : `Pair round ${nextRoundNumber}`}
           </Button>
@@ -497,8 +507,14 @@ export function PairingsPage() {
       )}
 
       {rounds.length >= pod.roundCount && rounds.length > 0 && lastRound?.status === "COMPLETED" && (
-        <p className="mt-5 text-[13px] text-ink-muted">All {pod.roundCount} rounds complete.</p>
+        <p className="mb-5 text-[13px] text-ink-muted">All {pod.roundCount} rounds complete.</p>
       )}
+
+      <div className="flex flex-col gap-5">
+        {[...rounds].reverse().map((round) => (
+          <RoundCard key={round.id} round={round} entrantById={entrantById} podId={pod.id} displayMode={displayMode} />
+        ))}
+      </div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ const POD_EVENTS = [
   "round-started",
   "round-extended",
   "round-completed",
+  "round-unpaired",
   "result-submitted",
   "prep-timer-updated",
 ] as const;
