@@ -266,3 +266,9 @@ Idea from Tobias: the tournament overview shows every pod's status as "SETUP" re
 - [x] Both tournament-detail queries (`GET /api/tournaments/:id` in `tournaments.ts`, `GET /api/public/o/:slug/tournaments/:id` in `public.ts`) now include each pod's `rounds: { roundNumber, status }` — just enough to derive the label, not the full Round/Match payload the pairings page needs. New optional `Pod.rounds` field on the shared client type.
 - [x] Wired into the two places that rendered raw `pod.status`: `TournamentPage.tsx` (authed) and `PublicTournamentPage.tsx` (public).
 - [ ] Browser-verified.
+
+### PI-59 — Bug: match-result row overflows on mobile, hiding the seat-A name ✅ (code-complete, browser-verify pending)
+Tobias flagged via a phone screenshot right after PI-53 shipped: the `MatchCard` row (`entrant names` + `ResultEntry`'s steppers/Submit) was a single non-wrapping flex row. On a narrow viewport the steppers/Submit — fixed-width, non-shrinking — squeezed the name column down so hard that seat A's name effectively vanished from the layout (only "Table 1" and "vs Kaiser" remained visible).
+- [x] `MatchCard`'s outer row and `ResultEntry`'s form both gained `flex-wrap` (`PairingsPage.tsx`) — the result-entry controls now drop to their own row below the names instead of squeezing them, on any viewport too narrow to fit both.
+- [x] **Also dropped the separate "drawn games" stepper** (Tobias, same pass) — a match's `DRAW` result was already inferred purely from `gamesWonA === gamesWonB`, so a manual drawn-games count was redundant UI clutter, not something the result computation ever depended on. Removed the input; the underlying `gamesDrawn` value/state is still preserved and still submitted unchanged (so a match imported with historical drawn-game data isn't silently zeroed out), it's just no longer manually editable through this form. Still shown in the read-only completed-match summary when `> 0`.
+- [ ] Browser-verified.

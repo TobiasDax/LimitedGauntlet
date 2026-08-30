@@ -120,7 +120,7 @@ function ResultEntry({ match, podId, matchFormat }: { match: Match; podId: strin
 
   return (
     <form
-      className="flex items-center gap-1.5"
+      className="flex flex-wrap items-center gap-1.5"
       onSubmit={(e) => {
         e.preventDefault();
         const result = a > b ? "A_WINS" : b > a ? "B_WINS" : "DRAW";
@@ -133,13 +133,6 @@ function ResultEntry({ match, podId, matchFormat }: { match: Match; podId: strin
       <Stepper value={a} onChange={setA} max={maxGames} ariaLabel="Seat A games won" />
       <span className="text-ink-muted">–</span>
       <Stepper value={b} onChange={setB} max={maxGames} ariaLabel="Seat B games won" />
-      <Stepper
-        value={d}
-        onChange={setD}
-        ariaLabel="Drawn games"
-        title="Drawn games (counted as played, credited to neither)"
-        dashed
-      />
       <Button type="submit" variant="primary" disabled={submitResult.isPending} className="ml-1">
         Submit
       </Button>
@@ -291,7 +284,7 @@ function MatchCard({
   };
 
   return (
-    <div className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-y-2 rounded-md border border-border bg-surface px-4 py-3">
       <div className="min-w-0">
         <div className="mb-1 text-[11px] tracking-wide text-ink-muted uppercase">Table {match.tableNumber}</div>
         <div className="font-display text-[15px] font-bold">
