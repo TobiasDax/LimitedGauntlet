@@ -84,7 +84,17 @@ function Stepper({
   );
 }
 
-function ResultEntry({ match, podId, matchFormat }: { match: Match; podId: string; matchFormat: MatchFormat }) {
+function ResultEntry({
+  match,
+  podId,
+  matchFormat,
+  resultsOpen,
+}: {
+  match: Match;
+  podId: string;
+  matchFormat: MatchFormat;
+  resultsOpen: boolean;
+}) {
   const submitResult = useSubmitResult(podId);
   const maxGames = matchFormat === "BO1" ? 1 : 2;
   const [editing, setEditing] = useState(false);
@@ -138,7 +148,12 @@ function ResultEntry({ match, podId, matchFormat }: { match: Match; podId: strin
         <Stepper value={b} onChange={setB} max={maxGames} ariaLabel="Seat B games won" className="flex-1" />
       </div>
       <div className="flex items-center gap-3">
-        <Button type="submit" variant="primary" disabled={submitResult.isPending} className="flex-1">
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={!resultsOpen || submitResult.isPending}
+          className="flex-1"
+        >
           Submit
         </Button>
         {editing && (
@@ -151,6 +166,7 @@ function ResultEntry({ match, podId, matchFormat }: { match: Match; podId: strin
           </button>
         )}
       </div>
+      {!resultsOpen && <p className="text-[11px] text-ink-muted">Start the round to enter results.</p>}
     </form>
   );
 }
@@ -259,6 +275,7 @@ function MatchCard({
   podId,
   matchFormat,
   swappable,
+  resultsOpen,
   selectedSlot,
   onSelectSlot,
 }: {
@@ -267,6 +284,7 @@ function MatchCard({
   podId: string;
   matchFormat: MatchFormat;
   swappable: boolean;
+  resultsOpen: boolean;
   selectedSlot: SwapSlot | null;
   onSelectSlot: (slot: SwapSlot) => void;
 }) {
@@ -305,7 +323,7 @@ function MatchCard({
           )}
         </div>
       </div>
-      {b && <ResultEntry match={match} podId={podId} matchFormat={matchFormat} />}
+      {b && <ResultEntry match={match} podId={podId} matchFormat={matchFormat} resultsOpen={resultsOpen} />}
     </div>
   );
 }
@@ -373,6 +391,10 @@ function RoundCard({
 
   const allReported = round.matches.every((m) => !m.entrantBId || m.result !== "PENDING");
   const swappable = round.status === "PENDING";
+  // Backend only accepts result submissions once the round is ACTIVE (and still
+  // allows edits after it's COMPLETED) — mirror that here so the Submit button
+  // isn't a dead click while the round is still PENDING.
+  const resultsOpen = round.status === "ACTIVE" || round.status === "COMPLETED";
 
   const handleSelectSlot = (slot: SwapSlot) => {
     if (!selectedSlot) {
@@ -448,6 +470,7 @@ function RoundCard({
             podId={podId}
             matchFormat={matchFormat}
             swappable={swappable}
+            resultsOpen={resultsOpen}
             selectedSlot={selectedSlot}
             onSelectSlot={handleSelectSlot}
           />
