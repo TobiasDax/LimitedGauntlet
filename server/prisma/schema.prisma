@@ -348,6 +348,11 @@ model Entrant {
   podId               String
   playerId            String?
   teamId              String? @unique
+  // N = played through round N, excluded from pairing in round N+1 onward
+  // (see getActiveEntrants in pairing.ts); null = never dropped. Set via
+  // POST /api/entrants/:id/drop, cleared via .../undrop (PI-63) — both only
+  // allowed between rounds, never while one is ACTIVE/PENDING, so there's
+  // never an in-flight match to rewrite when a drop is recorded.
   droppedAfterRound   Int?
   // Set only by the history-import script, for pods whose source data is a
   // final standings table with no round-by-round detail (most pre-2026

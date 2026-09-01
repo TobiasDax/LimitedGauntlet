@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
-import { generatePairings } from "./pairing.js";
+import { generatePairings, getActiveEntrants } from "./pairing.js";
 
 const prisma = new PrismaClient();
 
@@ -167,5 +167,43 @@ describe("generatePairings", () => {
       const b = playerIdByEntrant.get(pair.entrantBId)!;
       expect(metElsewhere(a, b)).toBe(false);
     }
+  });
+
+  // PI-63: dropping just sets Entrant.droppedAfterRound (the drop route's
+  // job, not exercised here since this suite is service-level) — this
+  // confirms the pairing engine already does the rest correctly once that
+  // field is set: the dropped entrant is excluded, and the resulting odd
+  // pool gets a bye via the existing rule, no special-case logic needed.
+  it("excludes a dropped entrant from pairing in every round after the drop", async () => {
+    const { org, tournament } = await createOrgAndTournament();
+    const players = await createPlayers(org.id, ["P1", "P2", "P3", "P4"]);
+    const pod = await createPod(tournament.id, { name: "Drop Pod", roundCount: 2 });
+    const entrants = await Promise.all(
+      players.map((p) => prisma.entrant.create({ data: { podId: pod.id, playerId: p.id } })),
+    );
+
+    await playAndCompleteRound(pod.id, 1); // 4 entrants, no bye
+
+    const dropped = entrants[0]!;
+    await prisma.entrant.update({ where: { id: dropped.id }, data: { droppedAfterRound: 1 } });
+
+    const active = await getActiveEntrants(pod.id, 2);
+    expect(active.map((e) => e.id).sort()).toEqual(
+      entrants
+        .slice(1)
+        .map((e) => e.id)
+        .sort(),
+    );
+
+    const round2 = await generatePairings(pod.id, 2);
+    const round2EntrantIds = round2.pairs.flatMap((p) => [p.entrantAId, p.entrantBId].filter(Boolean));
+    expect(round2EntrantIds).not.toContain(dropped.id);
+
+    // 3 remaining entrants -> one pair plus a bye, and the bye recipient is
+    // whoever the existing lowest-score/no-prior-bye rule picks from the
+    // remaining pool, same as any other odd-count round.
+    const bye = round2.pairs.find((p) => p.entrantBId === null);
+    expect(bye).toBeDefined();
+    expect(round2.pairs).toHaveLength(2);
   });
 });

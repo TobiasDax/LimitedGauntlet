@@ -41,6 +41,13 @@ export function getActiveEntrants(podId: string, roundNumber: number) {
   });
 }
 
+// The pod's most recently created round, if any — used to decide whether
+// pairing/roster changes are allowed right now (only between rounds, never
+// while one is ACTIVE/PENDING).
+export function getLatestRound(podId: string) {
+  return prisma.round.findFirst({ where: { podId }, orderBy: { roundNumber: "desc" } });
+}
+
 export async function generatePairings(podId: string, roundNumber: number): Promise<PairingSuggestion> {
   const pod = await prisma.pod.findUniqueOrThrow({ where: { id: podId } });
 

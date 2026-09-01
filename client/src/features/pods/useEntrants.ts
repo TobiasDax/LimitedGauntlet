@@ -27,6 +27,24 @@ export function useRemoveEntrant(podId: string) {
   });
 }
 
+// Drop/undrop (PI-63) — only allowed between rounds; see the server route
+// comment on POST /api/entrants/:id/drop for why.
+export function useDropEntrant(podId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entrantId: string) => api.post<{ entrant: Entrant }>(`/entrants/${entrantId}/drop`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
+  });
+}
+
+export function useUndropEntrant(podId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entrantId: string) => api.post<{ entrant: Entrant }>(`/entrants/${entrantId}/undrop`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
+  });
+}
+
 // Sets or clears an entrant's manual tiebreak order — only ever compared
 // against entrants tied on points (see the Entrant.manualTiebreak schema
 // comment for why this exists). Invalidates standings specifically since
@@ -42,6 +60,8 @@ export function useSetManualTiebreak(podId: string) {
 
 export function entrantErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
+    if (err.message === "round_in_progress") return "Finish the current round before changing who's dropped.";
+    if (err.message === "already_dropped" || err.message === "not_dropped") return "That entrant's drop status just changed — reload and try again.";
     if (err.status === 409) return "Already entered in this pod.";
     if (err.message === "player_not_found") return "Unknown player.";
   }

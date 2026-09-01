@@ -288,6 +288,20 @@ registerReadWriteTool(
 );
 
 registerReadWriteTool(
+  "drop_entrant",
+  "Drop an entrant from a pod, effective after the last completed round — pairing excludes them from every round after that. Reversible via undrop_entrant. Only works when no round is currently ACTIVE or PENDING.",
+  { entrantId: z.string() },
+  ({ entrantId }) => api.post(`/entrants/${entrantId}/drop`),
+);
+
+registerReadWriteTool(
+  "undrop_entrant",
+  "Undo a drop, putting the entrant back in the active pairing pool. Only works when no round is currently ACTIVE or PENDING.",
+  { entrantId: z.string() },
+  ({ entrantId }) => api.post(`/entrants/${entrantId}/undrop`),
+);
+
+registerReadWriteTool(
   "generate_round",
   "Auto-pair the next round of a pod (Swiss pairing, avoiding repeats).",
   { podId: z.string() },

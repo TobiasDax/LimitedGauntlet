@@ -1,8 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { usePod, podFormatLabel, podFormatDisplay, useUpdatePod, useDeletePod, type PodDetail } from "../features/pods/usePods";
-import { useAddIndividualEntrant, useAddTeamEntrant, useRemoveEntrant, entrantErrorMessage } from "../features/pods/useEntrants";
+import {
+  useAddIndividualEntrant,
+  useAddTeamEntrant,
+  useRemoveEntrant,
+  useDropEntrant,
+  useUndropEntrant,
+  entrantErrorMessage,
+} from "../features/pods/useEntrants";
 import { usePlayers } from "../features/players/usePlayers";
+import { useRounds } from "../features/pods/useRounds";
 import { useTournament } from "../features/tournaments/useTournament";
 import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
@@ -201,7 +209,50 @@ function alreadyEnteredPlayerIds(entrants: Entrant[]): Set<string> {
   return ids;
 }
 
-function IndividualEntrants({ podId, entrants }: { podId: string; entrants: Entrant[] }) {
+// Drop/undrop toggle + "Dropped" badge shared by the individual and team
+// entrant lists. Disabled between an active/pending round (PI-63) — the
+// title attribute explains why rather than hiding the control outright.
+function EntrantDropControl({
+  podId,
+  entrant,
+  canModifyRoster,
+}: {
+  podId: string;
+  entrant: Entrant;
+  canModifyRoster: boolean;
+}) {
+  const dropEntrant = useDropEntrant(podId);
+  const undropEntrant = useUndropEntrant(podId);
+  const dropped = entrant.droppedAfterRound !== null;
+  const pending = dropped ? undropEntrant.isPending : dropEntrant.isPending;
+
+  return (
+    <div className="flex items-center gap-3">
+      {dropped && <span className="text-[12px] tracking-wide text-ink-muted uppercase">Dropped</span>}
+      <Button
+        variant="ghost"
+        disabled={!canModifyRoster || pending}
+        title={canModifyRoster ? undefined : "Finish the current round before changing who's dropped."}
+        onClick={() => (dropped ? undropEntrant.mutate(entrant.id) : dropEntrant.mutate(entrant.id))}
+      >
+        {dropped ? "Un-drop" : "Drop"}
+      </Button>
+      {(dropEntrant.isError || undropEntrant.isError) && (
+        <FormError>{entrantErrorMessage(dropEntrant.error ?? undropEntrant.error)}</FormError>
+      )}
+    </div>
+  );
+}
+
+function IndividualEntrants({
+  podId,
+  entrants,
+  canModifyRoster,
+}: {
+  podId: string;
+  entrants: Entrant[];
+  canModifyRoster: boolean;
+}) {
   const { data: playersData } = usePlayers();
   const addEntrant = useAddIndividualEntrant(podId);
   const removeEntrant = useRemoveEntrant(podId);
@@ -217,9 +268,12 @@ function IndividualEntrants({ podId, entrants }: { podId: string; entrants: Entr
         {entrants.map((e) => (
           <div key={e.id} className="flex items-center justify-between px-5 py-3">
             <span className="font-display text-[15px] font-bold">{entrantDisplayName(e)}</span>
-            <Button variant="ghost" onClick={() => removeEntrant.mutate(e.id)}>
-              Remove
-            </Button>
+            <div className="flex items-center gap-2">
+              <EntrantDropControl podId={podId} entrant={e} canModifyRoster={canModifyRoster} />
+              <Button variant="ghost" onClick={() => removeEntrant.mutate(e.id)}>
+                Remove
+              </Button>
+            </div>
           </div>
         ))}
       </Card>
@@ -259,7 +313,17 @@ function IndividualEntrants({ podId, entrants }: { podId: string; entrants: Entr
   );
 }
 
-function TeamEntrants({ podId, entrants, teamSize }: { podId: string; entrants: Entrant[]; teamSize: number | null }) {
+function TeamEntrants({
+  podId,
+  entrants,
+  teamSize,
+  canModifyRoster,
+}: {
+  podId: string;
+  entrants: Entrant[];
+  teamSize: number | null;
+  canModifyRoster: boolean;
+}) {
   const { data: playersData } = usePlayers();
   const addTeam = useAddTeamEntrant(podId);
   const removeEntrant = useRemoveEntrant(podId);
@@ -280,9 +344,12 @@ function TeamEntrants({ podId, entrants, teamSize }: { podId: string; entrants: 
               <div className="font-display text-[15px] font-bold">{entrantDisplayName(e)}</div>
               <div className="text-[12px] text-ink-muted">{e.team?.members.map((m) => m.player.displayName).join(", ")}</div>
             </div>
-            <Button variant="ghost" onClick={() => removeEntrant.mutate(e.id)}>
-              Remove
-            </Button>
+            <div className="flex items-center gap-2">
+              <EntrantDropControl podId={podId} entrant={e} canModifyRoster={canModifyRoster} />
+              <Button variant="ghost" onClick={() => removeEntrant.mutate(e.id)}>
+                Remove
+              </Button>
+            </div>
           </div>
         ))}
       </Card>
@@ -343,6 +410,7 @@ export function PodPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading } = usePod(id);
   const { data: tournamentData } = useTournament(data?.pod.tournamentId);
+  const { data: roundsData } = useRounds(id);
   const { data: me } = useMe();
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -352,6 +420,12 @@ export function PodPage() {
   if (!data) return <p className="text-ink-muted">Pod not found.</p>;
 
   const { pod } = data;
+  const rounds = roundsData?.rounds ?? [];
+  const lastRound = rounds[rounds.length - 1];
+  // Roster changes (drop/undrop) are only safe between rounds — never while
+  // one is ACTIVE/PENDING — same gate PairingsPage uses before pairing the
+  // next round.
+  const canModifyRoster = rounds.length === 0 || lastRound?.status === "COMPLETED";
 
   return (
     <div>
@@ -410,9 +484,9 @@ export function PodPage() {
       <PodTabs podId={pod.id} />
 
       {pod.isTeamEvent ? (
-        <TeamEntrants podId={pod.id} entrants={pod.entrants} teamSize={pod.teamSize} />
+        <TeamEntrants podId={pod.id} entrants={pod.entrants} teamSize={pod.teamSize} canModifyRoster={canModifyRoster} />
       ) : (
-        <IndividualEntrants podId={pod.id} entrants={pod.entrants} />
+        <IndividualEntrants podId={pod.id} entrants={pod.entrants} canModifyRoster={canModifyRoster} />
       )}
     </div>
   );

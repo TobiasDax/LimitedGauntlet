@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedPod, findOwnedRound, findOwnedMatch } from "../services/ownership.js";
-import { generatePairings, getActiveEntrants, PairingError } from "../services/pairing.js";
+import { generatePairings, getActiveEntrants, getLatestRound, PairingError } from "../services/pairing.js";
 import { inferCardPullAttribution } from "../services/cardPullInference.js";
 import { emitPodEvent, emitTournamentEvent } from "../realtime.js";
 import { sendWebhookEvent, buildMatchesPayload, buildStandingsPayload, fireAndForget } from "../services/webhooks.js";
@@ -42,11 +42,7 @@ const resultSchema = z.object({
 async function checkNextRoundAllowed(
   pod: { id: string; roundCount: number },
 ): Promise<{ nextRoundNumber: number } | { error: string }> {
-  const [last] = await prisma.round.findMany({
-    where: { podId: pod.id },
-    orderBy: { roundNumber: "desc" },
-    take: 1,
-  });
+  const last = await getLatestRound(pod.id);
   const nextRoundNumber = (last?.roundNumber ?? 0) + 1;
   if (nextRoundNumber > pod.roundCount) return { error: "round_count_exceeded" };
   if (last && last.status !== "COMPLETED") return { error: "previous_round_not_completed" };

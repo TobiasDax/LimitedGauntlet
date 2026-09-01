@@ -5,6 +5,7 @@ import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedTournament, findOwnedPod, findOwnedEntrant } from "../services/ownership.js";
 import { computePodStandings } from "../services/standings.js";
+import { getLatestRound } from "../services/pairing.js";
 import { emitPodEvent } from "../realtime.js";
 
 // Playing in any pod implies attending that pod's tournament — upsert
@@ -445,6 +446,71 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
     const updated = await prisma.entrant.update({
       where: { id: entrant.id },
       data: { manualTiebreak: body.data.manualTiebreak },
+    });
+    reply.send({ entrant: updated });
+  });
+
+  // Drop/undrop (PI-63) — only allowed between rounds, never while a round
+  // is ACTIVE/PENDING. A player who leaves mid-round has that round's
+  // match reported as a normal walkover result instead; the drop itself
+  // only ever affects rounds not yet paired. See the Entrant.droppedAfterRound
+  // schema comment for the field's exact semantics.
+  app.post("/api/entrants/:id/drop", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    const entrant = await findOwnedEntrant(params.data.id, request.organizer!.orgId);
+    if (!entrant) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    if (entrant.droppedAfterRound !== null) {
+      reply.code(409).send({ error: "already_dropped" });
+      return;
+    }
+
+    const latest = await getLatestRound(entrant.podId);
+    if (latest && latest.status !== "COMPLETED") {
+      reply.code(400).send({ error: "round_in_progress" });
+      return;
+    }
+
+    const updated = await prisma.entrant.update({
+      where: { id: entrant.id },
+      data: { droppedAfterRound: latest?.roundNumber ?? 0 },
+    });
+    reply.send({ entrant: updated });
+  });
+
+  app.post("/api/entrants/:id/undrop", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    const entrant = await findOwnedEntrant(params.data.id, request.organizer!.orgId);
+    if (!entrant) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    if (entrant.droppedAfterRound === null) {
+      reply.code(409).send({ error: "not_dropped" });
+      return;
+    }
+
+    const latest = await getLatestRound(entrant.podId);
+    if (latest && latest.status !== "COMPLETED") {
+      reply.code(400).send({ error: "round_in_progress" });
+      return;
+    }
+
+    const updated = await prisma.entrant.update({
+      where: { id: entrant.id },
+      data: { droppedAfterRound: null },
     });
     reply.send({ entrant: updated });
   });
