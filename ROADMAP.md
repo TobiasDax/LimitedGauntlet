@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.4.0](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.4.0)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login), PI-52 (player accounts) and PI-64–68 (bulk pod-entrant modal + inline new-player, per-pod rare-picks toggle, standings place column, .xlsx export) shipped in v0.4.0 — browser-verify on the live deploy pending. PI-70/71 (hide the prep timer once a pod is under way; close the new-pod form on create) are code-complete, browser-verify pending. Open ideas: PI-62 (deck photos), PI-69 (drop dead pod columns); plus a few small follow-ups noted inline below.
+The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.4.0](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.4.0)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login), PI-52 (player accounts) and PI-64–68 (bulk pod-entrant modal + inline new-player, per-pod rare-picks toggle, standings place column, .xlsx export) shipped in v0.4.0 — browser-verify on the live deploy pending. PI-70/71 (hide the prep timer once a pod is under way; close the new-pod form on create) are code-complete, browser-verify pending. Open ideas: PI-62 (deck photos), PI-69 (drop dead pod columns), PI-72 (prize-points currency — scoping); plus a few small follow-ups noted inline below.
 
 ## Open items
 
@@ -373,3 +373,24 @@ Follow-up to PI-33/PI-54: PI-54 auto-*clears* a running prep timer when round 1 
 Idea from Tobias: creating a pod left the (long) new-pod form open with no clear signal it worked — easy to miss the new pod if it landed below the fold.
 - [x] `NewPodForm` (`TournamentPage.tsx`) takes an `onCreated` callback, fired from `createPod.mutate(..., { onSuccess })`; the parent closes the form. The new pod renders directly above where the form was, so no scroll-into-view needed.
 - [ ] Browser-verified.
+
+### PI-72 — Prize points: an org-wide player currency earned from play, spent on a (external) prize wall (v2 idea)
+Idea from Tobias: players accumulate points across every event, redeemable for prizes (the prize wall itself is **out of scope** — this app just tracks the balance). It's a **new concept, separate from match/standings points** — needs its own name.
+
+**Spec (Tobias):**
+- Players earn points for: (a) **playing in a pod** (participation), (b) a **standing bonus** based on where they finished.
+- Points accumulate **org-wide, all-time** — one balance per player across all tournaments.
+- Organizers can **set** a player's balance (to import history from external events), **add**, and **deduct** (prize-wall spend).
+- Every transaction is tracked on a **new tab on the player stats page**: point delta, date, and reason — either "manual, by <organizer>" or "automatic, from <pod/event>".
+- **Default point values** (per-participation + the standing bonus) are set in **tournament settings**, and can be **overridden per pod**.
+
+**Open design questions (settle before building):**
+- **Name.** "Prize points" / "store credit" / "tokens" / … — collides with match points, so it needs to be visually and terminologically distinct everywhere.
+- **Standing-bonus shape.** A fixed top-3 (1st/2nd/3rd bonus)? A configurable place→bonus list? A formula? And per-pod override granularity.
+- **Data model.** A `PointTransaction` ledger (`playerId`, `orgId`, signed `delta`, `reason` enum, nullable `createdByOrganizerId` / `podId` / `tournamentId`, optional note, `createdAt`); balance = sum of deltas. "Set to X" recorded as the adjusting delta (or a dedicated entry type).
+- **Team pods.** Each member gets the full participation + standing points (mirrors the "team pods credit each member the team's full match points" rule).
+- **When auto-points fire, and recomputation.** Award once when the pod's last round completes, from the standings at that moment? Do they recompute if a result is corrected afterwards, or does the organizer adjust manually? (Lean: award once, manual fix-ups — recompute is a rabbit hole.)
+- **Retroactivity.** Existing completed pods — backfill, or "automatic starts now" and pre-existing history goes in via the manual "set balance"?
+- **Public visibility.** Balance and/or the ledger on the public player page, or organizer-only?
+- **MCP.** add/deduct/set-points tools (bulk organizer op)?
+- [ ] Not started — scoping/interview only.
