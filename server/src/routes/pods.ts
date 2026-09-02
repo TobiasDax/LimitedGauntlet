@@ -95,6 +95,14 @@ function constructedFormatError(format: string | undefined, data: {
 }
 
 const individualEntrantSchema = z.object({ playerId: z.string().min(1) });
+
+// Bulk add for individual pods (PI-64/65): any mix of existing roster player
+// ids and brand-new player names to create-and-add. Names go through the same
+// case-insensitive roster-uniqueness rule as routes/players.ts.
+const bulkEntrantSchema = z.object({
+  playerIds: z.array(z.string().min(1)).max(200).optional(),
+  newPlayerNames: z.array(z.string().trim().min(1).max(100)).max(200).optional(),
+});
 const teamEntrantSchema = z.object({
   teamName: z.string().trim().min(1).max(100),
   playerIds: z
@@ -394,6 +402,61 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
         return tx.entrant.create({ data: { podId: pod.id, teamId: team.id } });
       });
       reply.code(201).send({ entrant });
+      return;
+    }
+
+    // Bulk form (PI-64/65) — checklist of existing players plus any new names
+    // to create. Falls through to the legacy single-player form below when
+    // neither list is present.
+    const bulk = bulkEntrantSchema.safeParse(request.body);
+    if (bulk.success && ((bulk.data.playerIds?.length ?? 0) > 0 || (bulk.data.newPlayerNames?.length ?? 0) > 0)) {
+      const orgId = request.organizer!.orgId;
+      const requestedIds = [...new Set(bulk.data.playerIds ?? [])];
+      const newNames = (bulk.data.newPlayerNames ?? []).map((n) => n.trim());
+
+      if (requestedIds.length > 0) {
+        const found = await prisma.player.findMany({ where: { id: { in: requestedIds }, orgId }, select: { id: true } });
+        if (found.length !== requestedIds.length) {
+          reply.code(400).send({ error: "unknown_player" });
+          return;
+        }
+      }
+
+      // New names: unique within the request and against the existing roster,
+      // case-insensitively (same rule as routes/players.ts).
+      const seen = new Set<string>();
+      for (const name of newNames) {
+        const key = name.toLowerCase();
+        if (seen.has(key)) {
+          reply.code(409).send({ error: "name_taken", name });
+          return;
+        }
+        seen.add(key);
+      }
+      if (newNames.length > 0) {
+        const clash = await prisma.player.findFirst({
+          where: { orgId, OR: newNames.map((name) => ({ displayName: { equals: name, mode: "insensitive" as const } })) },
+          select: { displayName: true },
+        });
+        if (clash) {
+          reply.code(409).send({ error: "name_taken", name: clash.displayName });
+          return;
+        }
+      }
+
+      const alreadyInPod = await getPlayerIdsAlreadyInPod(pod.id);
+      const existingToAdd = requestedIds.filter((id) => !alreadyInPod.has(id));
+
+      const entrants = await prisma.$transaction(async (tx) => {
+        const createdPlayers = await Promise.all(
+          newNames.map((displayName) => tx.player.create({ data: { orgId, displayName } })),
+        );
+        const playerIds = [...existingToAdd, ...createdPlayers.map((p) => p.id)];
+        await syncTournamentAttendance(tx, pod.tournamentId, playerIds);
+        return Promise.all(playerIds.map((playerId) => tx.entrant.create({ data: { podId: pod.id, playerId } })));
+      });
+
+      reply.code(201).send({ entrants });
       return;
     }
 

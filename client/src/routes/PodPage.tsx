@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { usePod, podFormatLabel, podFormatDisplay, useUpdatePod, useDeletePod, type PodDetail } from "../features/pods/usePods";
 import {
-  useAddIndividualEntrant,
   useAddTeamEntrant,
   useRemoveEntrant,
   useDropEntrant,
@@ -10,6 +9,7 @@ import {
   entrantErrorMessage,
 } from "../features/pods/useEntrants";
 import { usePlayers } from "../features/players/usePlayers";
+import { EntrantPickerModal } from "../components/EntrantPickerModal";
 import { useRounds } from "../features/pods/useRounds";
 import { useTournament } from "../features/tournaments/useTournament";
 import { useMe } from "../features/auth/useAuth";
@@ -246,20 +246,17 @@ function EntrantDropControl({
 
 function IndividualEntrants({
   podId,
+  podName,
   entrants,
   canModifyRoster,
 }: {
   podId: string;
+  podName: string;
   entrants: Entrant[];
   canModifyRoster: boolean;
 }) {
-  const { data: playersData } = usePlayers();
-  const addEntrant = useAddIndividualEntrant(podId);
   const removeEntrant = useRemoveEntrant(podId);
-  const [selected, setSelected] = useState("");
-
-  const taken = alreadyEnteredPlayerIds(entrants);
-  const available = (playersData?.players ?? []).filter((p) => !taken.has(p.id));
+  const [showPicker, setShowPicker] = useState(false);
 
   return (
     <div>
@@ -278,37 +275,19 @@ function IndividualEntrants({
         ))}
       </Card>
 
-      {available.length > 0 ? (
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!selected) return;
-            addEntrant.mutate(selected, { onSuccess: () => setSelected("") });
-          }}
-        >
-          <select
-            className="flex-1 rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-          >
-            <option value="">Select a player…</option>
-            {available.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.displayName}
-              </option>
-            ))}
-          </select>
-          <Button type="submit" variant="primary" disabled={!selected || addEntrant.isPending}>
-            + Add entrant
-          </Button>
-        </form>
-      ) : (
-        <p className="text-[13px] text-ink-muted">
-          Every roster player is already entered. Add more players on the Roster page.
-        </p>
+      <Button variant="primary" onClick={() => setShowPicker(true)}>
+        + Add players
+      </Button>
+      {removeEntrant.isError && <FormError>{entrantErrorMessage(removeEntrant.error)}</FormError>}
+
+      {showPicker && (
+        <EntrantPickerModal
+          podId={podId}
+          podName={podName}
+          enteredPlayerIds={alreadyEnteredPlayerIds(entrants)}
+          onClose={() => setShowPicker(false)}
+        />
       )}
-      {addEntrant.isError && <FormError>{entrantErrorMessage(addEntrant.error)}</FormError>}
     </div>
   );
 }
@@ -486,7 +465,7 @@ export function PodPage() {
       {pod.isTeamEvent ? (
         <TeamEntrants podId={pod.id} entrants={pod.entrants} teamSize={pod.teamSize} canModifyRoster={canModifyRoster} />
       ) : (
-        <IndividualEntrants podId={pod.id} entrants={pod.entrants} canModifyRoster={canModifyRoster} />
+        <IndividualEntrants podId={pod.id} podName={pod.name} entrants={pod.entrants} canModifyRoster={canModifyRoster} />
       )}
     </div>
   );

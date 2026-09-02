@@ -330,15 +330,15 @@ Idea from Tobias: a player might drop from a running pod partway through the wee
 - [x] **Test:** `pairing.test.ts` — completes round 1 of a 4-entrant pod, drops one entrant, asserts `getActiveEntrants` excludes them and `generatePairings` never pairs them in round 2.
 - [x] Browser-verified by Tobias; released as v0.3.1 (2026-09-01).
 
-### PI-64 — Add pod entrants via a roster checklist modal (not a one-at-a-time dropdown)
-Idea from Tobias: adding players to a pod today is a dropdown where each player is picked and added individually (`IndividualEntrants` / the add-entrant form in `client/src/routes/PodPage.tsx`, backed by `POST /api/pods/:id/entrants` one call per player). Replace with an **"Add players" modal** (reuse the shared `Modal` from `components/ui.tsx`, as PI-45's share popup does) showing the whole org roster as a checklist — already-added players shown checked/disabled — plus a **check-all / uncheck-all** toggle, so a whole pod's worth of entrants goes in with one confirm.
-- Needs a bulk endpoint (`POST /api/pods/:id/entrants` accepting `playerIds: string[]`, or a new `.../entrants/bulk`) that adds each in one transaction and is idempotent on already-present players. Team pods keep the existing per-team form — this is the individual-pod path only.
-- Pairs with PI-65 (same modal).
-- [ ] Not started.
+### PI-64 — Add pod entrants via a roster checklist modal ✅ (code-complete, browser-verify pending)
+Idea from Tobias: adding players to an individual pod was a one-at-a-time dropdown.
+- [x] `POST /api/pods/:id/entrants` (individual pods) now also accepts a bulk form — `{ playerIds?: string[], newPlayerNames?: string[] }` — adding everyone in one transaction (existing already-in-pod ids are silently skipped, not a 409). The legacy `{ playerId }` single form is untouched (MCP `add_individual_entrant`, back-compat). New `bulkEntrantSchema` + a branch at the top of the handler; team pods unchanged.
+- [x] Frontend: `EntrantPickerModal.tsx` (on the shared `Modal`) — full-roster checklist with already-entered players ticked + disabled, a **Select all / Clear all** toggle, and error surfacing. Replaces the `<select>` + form in `IndividualEntrants` (`PodPage.tsx`) with a **+ Add players** button. New `useAddEntrantsBulk` hook invalidates both `["pods", id]` and `["players"]`.
+- [ ] Browser-verified. No dedicated test (pods.ts has no route-test harness) — covered by build + browser check.
 
-### PI-65 — "Add a new player" from inside the pod entrant modal
-Idea from Tobias: the PI-64 add-players modal should also have an inline "new player" field — typing a name and confirming creates the `Player` on the org roster **and** adds them to the pod in one step, so an organizer doesn't have to bounce to the Roster page mid-setup. Reuses `POST /api/players` (which now enforces case-insensitive roster-name uniqueness) then the bulk-add from PI-64, surfacing the same "name already on the roster" guard.
-- [ ] Not started — depends on PI-64.
+### PI-65 — "Add a new player" from inside the pod entrant modal ✅ (code-complete, browser-verify pending)
+- [x] The `EntrantPickerModal` has a **New player** field: type a name → "Add" appends it as a removable chip. On confirm, `newPlayerNames` goes to the bulk endpoint, which creates each `Player` on the roster **and** adds them to the pod in the same transaction. Case-insensitive collision (against the roster or another new name in the same request) is rejected with `409 name_taken` + the offending name, surfaced as "tick them in the list instead". Client also pre-checks against the loaded roster.
+- [ ] Browser-verified.
 
 ### PI-66 — Per-pod "rare picks" toggle (disable value tracking for a pod)
 Idea from Tobias: pod edit (`EditPodForm` in `client/src/routes/PodPage.tsx`) should have a switch to **enable/disable "rare picks"** for that pod. When disabled: the pod's **Value tab is hidden** (`PodTabs.tsx` drops the `/value` entry; `PodValuePage` redirects/404s), and **no card pulls can be added** to that pod by any route — `POST /api/pods/:id/card-pulls` (`cardPulls.ts`) rejects, and the pod is excluded from the tournament "Best Pulls" rollup and the org Treasure Chest / Hall of Fame value stats.
