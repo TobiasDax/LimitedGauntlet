@@ -413,6 +413,10 @@ export function PodPage() {
   const { pod } = data;
   const rounds = roundsData?.rounds ?? [];
   const lastRound = rounds[rounds.length - 1];
+  // The pre-round timer only makes sense before the pod is under way — hide it
+  // once any round has started (PI-54 already auto-clears a running one then);
+  // it stays hidden for a finished pod.
+  const podUnderway = rounds.some((r) => r.status === "ACTIVE" || r.status === "COMPLETED");
   // Roster changes (drop/undrop) are only safe between rounds — never while
   // one is ACTIVE/PENDING — same gate PairingsPage uses before pairing the
   // next round.
@@ -470,7 +474,7 @@ export function PodPage() {
 
       {editing && <EditPodForm pod={pod} onDone={() => setEditing(false)} />}
 
-      <PrepTimer pod={pod} />
+      {!podUnderway && <PrepTimer pod={pod} />}
 
       <PodTabs podId={pod.id} />
 

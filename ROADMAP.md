@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.4.0](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.4.0)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login), PI-52 (player accounts) and PI-64–68 (bulk pod-entrant modal + inline new-player, per-pod rare-picks toggle, standings place column, .xlsx export) shipped in v0.4.0 — browser-verify on the live deploy pending. Open ideas: PI-62 (deck photos); plus a few small follow-ups noted inline below.
+The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.4.0](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.4.0)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login), PI-52 (player accounts) and PI-64–68 (bulk pod-entrant modal + inline new-player, per-pod rare-picks toggle, standings place column, .xlsx export) shipped in v0.4.0 — browser-verify on the live deploy pending. PI-70/71 (hide the prep timer once a pod is under way; close the new-pod form on create) are code-complete, browser-verify pending. Open ideas: PI-62 (deck photos), PI-69 (drop dead pod columns); plus a few small follow-ups noted inline below.
 
 ## Open items
 
@@ -359,3 +359,17 @@ Idea from Tobias: a human-readable spreadsheet export of a tournament, distinct 
 - [x] `server/src/services/tournamentSpreadsheet.ts` — `buildTournamentWorkbook(id)` reuses `computePodStandings` + `computeGesamtwertung`, derives W/L/D from Match rows (a bye counts as a win), tie-aware rank on the Gesamtwertung sheet, sanitises sheet names to Excel's 31-char / no-`[]:*?/\` rule. Route `GET /api/tournaments/:id/export.xlsx` (`tournaments.ts`, org-scoped). Frontend `useExportTournamentXlsx` hook (direct fetch → Blob download, same as the org export) + an "Export spreadsheet ↓" button on `TournamentPage`.
 - [x] Smoke-tested end to end against a real Postgres — valid xlsx, correct sheets, bye/pending/draw and dirty pod names all handled.
 - [ ] Browser-verified (download + open in Excel/LibreOffice).
+
+### PI-69 — Drop the dead `Pod.packConfig` / `Pod.rarepicUrl` columns
+Both fields are in `schema.prisma`, `client/src/lib/types.ts`, and both API schemas (`podCreateSchema` / `podUpdateSchema` in `pods.ts`), but nothing reads or sets them — no UI anywhere, early-design leftovers. Remove: the two columns (a `DROP COLUMN` migration), the Zod fields, and the client type fields. Check `orgExport.ts` / `orgImport.ts` don't reference them (they don't currently). Low-risk cleanup, no user-facing effect.
+- [ ] Not started.
+
+### PI-70 — Hide the pre-round timer once a pod is under way ✅ (code-complete, browser-verify pending)
+Follow-up to PI-33/PI-54: PI-54 auto-*clears* a running prep timer when round 1 starts, but the `PrepTimer` control on `PodPage` then fell back to showing the "start a pre-round timer" setup form for the rest of the tournament, which makes no sense mid-event or on a finished pod.
+- [x] `PodPage.tsx` — `<PrepTimer>` now renders only while `!podUnderway` (no round is `ACTIVE`/`COMPLETED`). The read-only `PrepTimerDisplay` on the Pairings tab / public page is unchanged (it already returns null when no timer is set).
+- [ ] Browser-verified.
+
+### PI-71 — Close the new-pod form when the pod is created ✅ (code-complete, browser-verify pending)
+Idea from Tobias: creating a pod left the (long) new-pod form open with no clear signal it worked — easy to miss the new pod if it landed below the fold.
+- [x] `NewPodForm` (`TournamentPage.tsx`) takes an `onCreated` callback, fired from `createPod.mutate(..., { onSuccess })`; the parent closes the form. The new pod renders directly above where the form was, so no scroll-into-view needed.
+- [ ] Browser-verified.

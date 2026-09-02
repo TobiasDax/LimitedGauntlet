@@ -157,7 +157,15 @@ function DescriptionSection({ tournament }: { tournament: TournamentDetail }) {
 
 const podFormats: PodFormat[] = ["DRAFT", "SEALED", "CHAOS_DRAFT", "CONSTRUCTED", "CUSTOM"];
 
-function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string; nextSequenceOrder: number }) {
+function NewPodForm({
+  tournamentId,
+  nextSequenceOrder,
+  onCreated,
+}: {
+  tournamentId: string;
+  nextSequenceOrder: number;
+  onCreated: () => void;
+}) {
   const createPod = useCreatePod(tournamentId);
   const [name, setName] = useState("");
   const [format, setFormat] = useState<PodFormat>("DRAFT");
@@ -205,7 +213,7 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
             constructedFormat: format === "CONSTRUCTED" && constructedFormat ? constructedFormat : undefined,
             constructedFormatCustom:
               format === "CONSTRUCTED" && constructedFormat === "CUSTOM" ? constructedFormatCustom || undefined : undefined,
-          });
+          }, { onSuccess: onCreated });
         }}
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -452,7 +460,11 @@ export function TournamentPage() {
       {!showPodForm && <Button onClick={() => setShowPodForm(true)}>+ New pod</Button>}
       {showPodForm && (
         <div className="flex flex-col gap-3">
-          <NewPodForm tournamentId={tournament.id} nextSequenceOrder={tournament.pods.length} />
+          <NewPodForm
+            tournamentId={tournament.id}
+            nextSequenceOrder={tournament.pods.length}
+            onCreated={() => setShowPodForm(false)}
+          />
           <Button variant="ghost" onClick={() => setShowPodForm(false)} className="self-start">
             Cancel
           </Button>
