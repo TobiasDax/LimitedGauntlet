@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production**, with tagged releases out ([v0.1.0](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.1.0), [v0.2.0](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.2.0)). The whole numbered build (Steps 0–12) and post-1.0 backlog PI-1 through PI-51 are done — see `docs/BUILD-LOG.md` for the blow-by-blow. What's left is whatever new improvements land below.
+The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.3.1](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.3.1)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. Still open: PI-43 (Google login), PI-52 (player accounts) and PI-62 (deck photos) are unscoped/lower-priority ideas; plus a few small follow-ups noted inline below.
 
 ## Open items
 
@@ -16,7 +16,7 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 Rough groupings (interlocking work worth doing together): **nav overhaul** = PI-24 + PI-25 (do alongside PI-23); **settings page** = PI-26 is the shell that PI-27, PI-28 live in, and PI-29 (SMTP) supports PI-28's email change.
 
-> **Verification note:** this sandbox can't run the app (no Docker) or even a full `vite build` (Windows Application Control blocks rollup/esbuild native binaries), so items below are built and typechecked (`tsc -b`) here, then browser-verified separately by Tobias on a real running instance. PI-23…33 were verified live 2026-08-25. Items marked ✅ (browser-verify pending) are still waiting on that step.
+> **Verification note:** this sandbox can't run the app (no Docker) or even a full `vite build` (Windows Application Control blocks rollup/esbuild native binaries), so items below are built and typechecked (`tsc -b`) here, then browser-verified separately by Tobias on a real running instance. PI-23…33 were verified live 2026-08-25; PI-34…61 were verified live 2026-09-02. A bare ✅ means shipped and browser-verified; any remaining caveat is called out in the heading.
 
 ### PI-22 — Publish a real GitHub release (not just the rolling `main`) ✅
 The repo is public on GitHub but had no tagged release: no `version` in any `package.json`, `git tag -l` empty, no GitHub Release with notes.
@@ -94,44 +94,44 @@ The round timer today only exists once a round is paired (it counts down from `R
 - [x] Frontend: reuses `useCountdown` (ticks client-side off `prepTimerEndsAt`). `PrepTimer` control (start length + optional label + Stop) on `PodPage`; read-only `PrepTimerDisplay` on `PublicPodPage` (large) and `PairingsPage` (enlarges in Display Mode). Live across devices via the existing socket.
 - [x] Browser-verified. No chime wired (round-timer-only, per scope); MCP tools not added (organizer UI action, not a bulk op).
 
-### PI-34 — Multiple organizers per org + explicit "delete organization" ✅ (code-complete, browser-verify pending)
+### PI-34 — Multiple organizers per org + explicit "delete organization" ✅
 Split out from the PI-28 account-deletion decision (2026-08-25). The data model already allows multiple `OrganizerAccount`s per org, but there's no way to add one, and no standalone org-delete.
 - [x] **Invite/add co-organizers** to an organization. New `OrganizerInvite` model (migration `20260825130000_add_organizer_invite`) — single-use hashed token, 7-day expiry, same pattern as PI-28's `EmailChangeRequest`. `GET/POST /api/settings/organizers[/invite]`, `DELETE .../invites/:id`, `DELETE .../organizers/:id` (session-auth only); public `GET /api/auth/invite/:token` + `POST /api/auth/accept-invite` (invitee sets their own name/password, logged in immediately). Requires SMTP (PI-29) — no other way to deliver the link. Roles equal for v1: an accepted invite is a full `OrganizerAccount`, same access as anyone else. Frontend: new "Organizers" section in Settings (invite form, organizer list, pending-invite list) + `AcceptInvitePage` at `/accept-invite`.
 - [x] **Explicit "delete organization"** action (`POST /api/settings/delete-organization`, hard-gated: password + type org name) — always deletes the whole org regardless of organizer count. Distinct from "delete my account". Only shown in Settings when `organizerCount > 1` (for a solo organizer, "Delete account" already does this — a second identical-looking danger button would just be clutter).
 - [x] Revisited PI-28's cascade: `POST /api/settings/delete-account` now checks `organizerCount` — if >1, it only removes the caller's own `OrganizerAccount` ("leave organization", confirmed by typing your own email) and leaves the org untouched; if it's the last organizer, unchanged full-org-delete behavior (confirmed by typing the org name). `organizerCount` added to `/auth/login` and `/auth/me` responses so the frontend knows which copy/behavior to show.
 
-### PI-35 — Footer bar with legal links and GitHub link ✅ (code-complete, browser-verify pending)
+### PI-35 — Footer bar with legal links and GitHub link ✅
 Add a site-wide footer bar: legal links (e.g. Impressum/Privacy — decide what's actually needed for a self-hosted OSS app vs. what individual deployers should supply) and a link to the GitHub repo.
 - [x] **Scope decided:** GitHub + License links ship built-in (no legal content of our own). A third link is a deployer-configured slot: `LEGAL_LINK_URL` + `LEGAL_LINK_LABEL` env vars, surfaced via a new public `GET /api/app-config` (`server/src/routes/auth.ts`, config in `server/src/config.ts`), rendered only when both are set. Documented in `.env.example` + passed through `docker-compose.yml`.
 - [x] **Placement:** new shared `Footer.tsx` (`client/src/components/Footer.tsx`, backed by `useAppConfig` in `client/src/features/config/useAppConfig.ts`), rendered in both `Layout.tsx` (authed) and `PublicLayout.tsx` (public `/o/:slug/...`), after `<main>` inside the shared `min-h-screen` chrome — same "shared chrome" pattern `TopBar` already uses.
 - [x] GitHub link target: `https://github.com/TobiasDax/LimitedGauntlet` (License links to `/blob/main/LICENSE` on the same repo).
 
-### PI-36 — Constructed format dropdown (Standard, Modern, Legacy, etc.) ✅ (code-complete, browser-verify pending)
+### PI-36 — Constructed format dropdown (Standard, Modern, Legacy, etc.) ✅
 Pods with `format: CONSTRUCTED` currently don't record *which* constructed format was played. Add a dropdown for that: Standard, Modern, Legacy, Vintage, Pioneer, Pre-Modern, Pauper, plus a **Custom** option that reveals a free-text field to record an arbitrary format name.
 - [x] New `ConstructedFormat` enum + `Pod.constructedFormat`/`Pod.constructedFormatCustom String?` fields (migration `20260825140000_add_pod_constructed_format`), mirroring the `setCode` optional-field pattern. Both optional; application-layer enforced (not a DB constraint) that `constructedFormat` only applies to `CONSTRUCTED` pods and `constructedFormatCustom` only pairs with the `CUSTOM` option — see `constructedFormatError()` in `server/src/routes/pods.ts`.
 - [x] **Optional, not required** — a constructed pod can leave it unset. Displayed via a new `podFormatDisplay()` helper (`client/src/features/pods/usePods.ts`) as "Constructed — Modern" etc., wherever the plain format label used to show (pod header, tournament pod list, public pod/tournament pages, standings, value page).
 - [x] New shared `ConstructedFormatPicker` component (`client/src/components/ConstructedFormatPicker.tsx`), wired into both `NewPodForm` (`TournamentPage.tsx`) and `EditPodForm` (`PodPage.tsx`) — shown only when `format === "CONSTRUCTED"`, same conditional pattern as the existing `SetPicker`.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-02).
 
-### PI-37a — 2v2 Constructed
+### PI-37a — 2v2 Constructed ✅
 Support the 2v2 multiplayer constructed pod type beyond 1v1. (4-player Commander was considered alongside this but dropped as out of scope for the app — 1v1/team Swiss is the model this app commits to.)
 - [x] **2v2 needed zero pairing/standings changes** — confirmed the existing team-pod machinery (`Entrant` unifying individuals/teams) is already format-agnostic: no `format`-conditional branching anywhere in `pairing.ts`/`standings.ts`/`podStats.ts`/`weekendHistory.ts`. A `CONSTRUCTED` pod with `isTeamEvent: true, teamSize: 2` already pairs/scores correctly today.
 - [x] **Found and fixed the one real gap:** nothing previously validated that a team-entrant's `playerIds.length` matched `pod.teamSize` — an organizer could add a "2-player team" with 1, 3, or 5 members and nothing rejected it. Fixed server-side (`POST /api/pods/:id/entrants`, `pods.ts`) with a `wrong_team_size` 400, plus a matching client-side guard + "x / N selected" hint in `TeamEntrants` (`PodPage.tsx`) that disables submit until the count matches.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-02).
 
-### PI-38 — Organizer data export ✅ (code-complete, browser-verify pending)
+### PI-38 — Organizer data export ✅
 Give an organizer a way to export all their org's data in a machine-readable form, so it can be moved/backed up or imported elsewhere (pairs with PI-39's import).
 - [x] **Contents:** structural `data` (players, tournaments, pods, teams, entrants, rounds, matches, card pulls) — a faithful, round-trippable dump keyed by in-pod refs (player displayName / team name), the same identity PI-39 re-resolves — plus optional **Hall of Fame** and **Treasure Vault** snapshots (derived, informational). New `server/src/services/orgExport.ts` + `GET /api/settings/export?data=&hallOfFame=&treasureVault=` (session-auth only, never bearer).
 - [x] **UI:** "Export data…" button in a new **Export / Import** Settings section opens a popup (`ExportImportSection.tsx` + shared `Modal` in `ui.tsx`) with a checkbox per section; downloads `<slug>-export-<date>.json` via `useExportOrg` (direct fetch → Blob, not the JSON `api` client).
 - [x] Lives in the shared **Export / Import** Settings section (with PI-39).
 
-### PI-39 — Organizer data import (UI) ✅ (v1 code-complete, browser-verify pending)
+### PI-39 — Organizer data import (UI) ✅ (v1 shipped; legacy-format step still open)
 A UI path to import data into an organization, so imports don't require shell/`import-legacy` access.
 - [x] **v1:** accepts the PI-38 export file and rebuilds its `data` into the current org. New `server/src/services/orgImport.ts` (zod-validated envelope + `importOrgData`) + `POST /api/settings/import` (25MB body limit, rate-limited). Non-transactional and **idempotent at the tournament level** (same-named tournament skipped), matching `import-legacy`'s posture — re-importing is safe. Typed errors (`not_our_format`/`invalid_shape`/`unsupported_version`/`no_data`/`import_failed`) surfaced with clear UI copy.
 - [x] **UI:** file picker in the same Settings section; `useImportOrg` parses/posts the file and invalidates the whole query cache on success, then shows a created/skipped summary.
 - [ ] **Next step (later, not built):** also accept the `legacy-data.json` history file that the `/import-history` skill produces — folding the existing `import-legacy.ts` flow into the UI. PI-40's duplicate-org guard is now in place, clearing the way for this.
 
-### PI-40 — History import: default slug + duplicate-org handling ✅ (code-complete, browser-verify pending)
+### PI-40 — History import: default slug + duplicate-org handling ✅
 Cleanups to the existing `import-legacy.ts` flow (`server/src/scripts/import-legacy.ts`).
 - [x] **Default slug:** `upsertOrg()` now defaults `IMPORT_ORG_SLUG` to `gp` and `IMPORT_ORG_NAME` to `GP` (was `gp-eichstaett` / `GP Eichstätt` — too author-specific). README + `import-history` SKILL.md updated.
 - [x] **Duplicate-org handling:** the tool checks for an existing org **by slug** (`findUnique({ where: { slug } })`) and reuses it (tournament/pod idempotency by name prevents dupes on re-run). Added a **name-collision guard**: since org name isn't unique, importing under a *different* slug when an org with the same *name* already exists now throws with a clear message (re-run with the existing slug, or set `IMPORT_ALLOW_DUPLICATE_NAME=1` to deliberately create a separate org). Closes the silent-duplicate footgun before PI-39 exposes import via the UI.
@@ -141,7 +141,7 @@ Surface a short roadmap snapshot in `README.md` for quick visibility, so a visit
 - [x] Added a brief "Roadmap" section to the README (between Development and History import): status + latest-release link + a short bullet list of notable backlog items (export/import, OIDC, share/QR, recent polish), linking to `ROADMAP.md` for full detail.
 - [x] Kept it **short and pointer-style** — the canonical list stays here in `ROADMAP.md`; the README is a teaser (doesn't duplicate every PI item), so the two don't drift.
 
-### PI-42 — Register / Login via OIDC ✅ (login verified live 2026-08-26 on DaxLite/Pocket ID; self-registration + SSO-only mode not yet separately verified)
+### PI-42 — Register / Login via OIDC ✅ (verified live; first-password UI tweak still open)
 Add OIDC as a login/registration option so the app can be used with an external identity provider (self-hosted Authelia/Keycloak/etc.), alongside the existing email+password organizer accounts.
 - [x] Standard OIDC **authorization-code + PKCE** flow via `openid-client` v5 (`server/src/services/oidc.ts`, memoized discovery). Configured per-deployment via env (`OIDC_ISSUER`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET`, optional `OIDC_REDIRECT_URI`/`OIDC_PROVIDER_NAME`/`OIDC_SCOPE`), `isOidcConfigured()`; degrades cleanly to password-only when unset (same posture as SMTP in PI-29 — button hidden). Routes: `GET /api/auth/oidc/login` (redirect, stashes state/nonce/verifier in the session) + `GET /api/auth/oidc/callback`. Env wired into `.env.example` + both compose files; documented in `docs/deployment.md` §8.
 - [x] **Account linking by verified email:** callback resolves identity in order — known `oidcSubject` → existing account by verified email (records the subject) → pending co-organizer invite for that email (provisions a passwordless account into that org, PI-34 reuse) → else refused (`oidc_no_account`). **Never creates a new org**, preserving the closed-signup posture. Session model unchanged (`@fastify/secure-session` cookie — OIDC only establishes identity, no external store). Schema: `OrganizerAccount.passwordHash` now nullable + `oidcSubject String? @unique` (migration `20260826120000_add_organizer_oidc`); password login rejects passwordless accounts; SSO-only accounts can set a first password in Settings. **Live-verified 2026-08-26** against Pocket ID on the DaxLite deployment (tsdproxy hostname, `APP_BASE_URL`/redirect URI configured per `docs/deployment.md` §8) — login via existing organizer account confirmed working end-to-end.
@@ -161,7 +161,7 @@ A public demo deployment so prospective self-hosters can try the app without sta
 - [x] **Known demo login:** a fixed, published organizer credential, same idea as originally scoped.
 - [x] **Deployed and live 2026-09-02** at [limited-gauntlet.com](https://limited-gauntlet.com); linked from the README. Full detail (compose file, reset script, anonymizer, setup steps) lives in `~/Projects/limitedgauntlet-demo/README.md` and the `claude-memory` infra docs, not here.
 
-### PI-45 — Share popup with QR code for a pod's public link ✅ (code-complete, browser-verify pending)
+### PI-45 — Share popup with QR code for a pod's public link ✅
 The pod page's "Public link ↗" (`PodPage.tsx`) was a plain anchor that just opened the public pod page in a new tab. Turned it into a proper share affordance: a popup showing the shareable link plus a generated QR code so players can scan it to open the public page on their phone.
 - [x] "Share public link ↗" opens a modal (`SharePopup.tsx`, on the shared `Modal` in `ui.tsx`) with the full public URL (read-only field + Copy button, with an execCommand fallback for non-HTTPS LAN where the clipboard API is unavailable) and a **QR code** encoding it.
 - [x] QR generated client-side via `qrcode.react` (`QRCodeSVG`) — pure-JS, no server round-trip, works offline once loaded. URL built from `window.location.origin` so it matches whatever host the organizer is on.
@@ -235,14 +235,14 @@ Tobias flagged a gap: draft pods (the only format where seating around a physica
 Idea from Tobias: let non-organizer users (players) have accounts so they can check themselves in / report their own game results, instead of everything going through an organizer. A bigger access-control question than the current model (`OrganizerAccount` + session cookies, public pages open-by-default per `CLAUDE.md`) — `Player` records today are just org-scoped names with no login of their own. Needs a design pass before implementation: what a player account can/can't do, how results get confirmed (self-report both sides? one side reports, other confirms?), how it interacts with the public-pages-stay-open default.
 - [ ] Not scoped yet — design discussion needed before implementation.
 
-### PI-53 — Better match-result entry UI (+/- steppers instead of two text boxes) ✅ (code-complete, browser-verify pending)
+### PI-53 — Better match-result entry UI (+/- steppers instead of two text boxes) ✅
 Idea from Tobias: entering a match result today is two free-text number inputs (games won per side). Replace with a +/- stepper per player for faster, less error-prone entry on a 0–2 range.
 - [x] New `Stepper` component (`PairingsPage.tsx`) — `[−] value [+]`, the number itself stays a real, still-typable `<input type="number">` between the buttons rather than a locked display, so tap-only entry works at the table but direct typing/correction still works too.
 - [x] **Clamped to the pod's actual match format:** `gamesWonA`/`gamesWonB` cap at 1 for BO1, 2 for BO3 (`matchFormat` threaded down through `RoundCard` → `MatchCard` → `ResultEntry` from `pod.matchFormat`) — the +/- buttons disable at the bound instead of allowing an impossible score. `gamesDrawn` stays uncapped (min 0 only), same as before.
 - [x] Replaces all three number inputs (A wins, B wins, draws) in both the initial-entry and "Edit" re-entry forms.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-02).
 
-### PI-54 — Auto-stop the prep timer when round 1 starts ✅ (code-complete, browser-verify pending)
+### PI-54 — Auto-stop the prep timer when round 1 starts ✅
 Idea from Tobias: PI-33's pod prep timer (draft/deckbuilding countdown) has to be stopped manually by the organizer. When round 1 is actually started, the prep timer should clear itself automatically instead of continuing to count down alongside the round timer.
 - [x] `POST /api/rounds/:id/start` (`rounds.ts`) now clears `Pod.prepTimerEndsAt`/`prepTimerLabel` when the round being started is round 1 and a prep timer is still set, reusing the same `prep-timer-updated` broadcast PI-33's manual stop button uses — every connected client (organizer, public, Display Mode) picks it up live without any client-side change needed.
 
@@ -250,46 +250,46 @@ Idea from Tobias: PI-33's pod prep timer (draft/deckbuilding countdown) has to b
 Idea from Tobias: the "Generate pairings"/"Start round" buttons currently render below the rounds list, but newest rounds render at the top of that list — so as a pod progresses, the primary action buttons end up further down the page instead of staying next to the round they act on. Move the buttons above the list.
 - [x] `PairingsPage.tsx`: the "Pair round N" / manual-pairing form / "all rounds complete" block now renders above the reversed rounds list instead of below it — purely a JSX reorder, no logic changes.
 
-### PI-56 — Allow reverting a round back to "not yet paired" ✅ (code-complete, browser-verify pending)
+### PI-56 — Allow reverting a round back to "not yet paired" ✅
 Idea from Tobias: once a round is paired there's no way back to the unpaired state, only forward (swap individual pairings). This especially hurts round 1: the draft seating chart (PI-51) only renders once round 1 is paired, but by then the pairing is already locked in behind the swap-only UI. Add an explicit "undo pairing" action for a round that hasn't started yet — deletes its `Match` rows and returns the pod to its pre-pairing state.
 - [x] New `DELETE /api/rounds/:id` (`rounds.ts`), org-scoped via `findOwnedRound` — 400s `round_already_started` unless the round is still `PENDING`, otherwise deletes its `Match` rows then the `Round` row and broadcasts a new `round-unpaired` pod event (added to the client's `POD_EVENTS` realtime whitelist).
 - [x] Frontend: "Undo pairing" ghost button next to "Start round" on a `PENDING` round (`PairingsPage.tsx`), confirmed via the same native `confirm()` pattern used for other destructive actions (delete tournament/pod/webhook) in this codebase. `useUnpairRound` hook + `round_already_started` error mapping in `useRounds.ts`.
 - [x] Not pod-1-specific — works for any not-yet-started round, since the same "back out and re-pair" need can come up on a later round too, not just round 1.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-02).
 
-### PI-57 — Rename remaining "Weekend overview" copy to "Tournament overview" ✅ (code-complete, browser-verify pending)
+### PI-57 — Rename remaining "Weekend overview" copy to "Tournament overview" ✅
 PI-30 renamed the Gesamtwertung page and the public tournament page, but missed two spots: `TournamentPage.tsx`'s `Eyebrow` label (still hardcoded "Weekend overview") and `TournamentValuePage.tsx`'s fallback title. Same rationale as PI-30 — not every tournament spans a weekend.
 - [x] Both strings changed to "Tournament overview"; confirmed via repo-wide grep that no "Weekend overview" text remains anywhere in `client/src` or `server/src`.
 
-### PI-58 — Pod status label should reflect actual progress ✅ (code-complete, browser-verify pending)
+### PI-58 — Pod status label should reflect actual progress ✅
 Idea from Tobias: the tournament overview shows every pod's status as "SETUP" regardless of how far it's actually progressed. Root cause: `Pod.status` is a manually-set field the app never transitions automatically (per `rounds.ts`'s own comment: "the app doesn't manage pod.status automatically") — only the one-time `import-legacy.ts` script sets it.
 - [x] **Derived, not stored** (same posture as PI-51's seating chart) — left the stored `Pod.status` field and its enum untouched (still round-trips through export/import unchanged) and instead compute a display-only label from real round data. `podProgressStatus()` (`client/src/features/pods/usePods.ts`): no rounds yet → "Setup"; the pod's last configured round (`roundNumber === roundCount`) is `COMPLETED` → "Finished"; anything paired in between → "In progress".
 - [x] Both tournament-detail queries (`GET /api/tournaments/:id` in `tournaments.ts`, `GET /api/public/o/:slug/tournaments/:id` in `public.ts`) now include each pod's `rounds: { roundNumber, status }` — just enough to derive the label, not the full Round/Match payload the pairings page needs. New optional `Pod.rounds` field on the shared client type.
 - [x] Wired into the two places that rendered raw `pod.status`: `TournamentPage.tsx` (authed) and `PublicTournamentPage.tsx` (public).
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-02).
 
-### PI-59 — Bug: match-result row overflows on mobile, hiding the seat-A name ✅ (code-complete, browser-verify pending)
+### PI-59 — Bug: match-result row overflows on mobile, hiding the seat-A name ✅
 Tobias flagged via a phone screenshot right after PI-53 shipped: the `MatchCard` row (`entrant names` + `ResultEntry`'s steppers/Submit) was a single non-wrapping flex row. On a narrow viewport the steppers/Submit — fixed-width, non-shrinking — squeezed the name column down so hard that seat A's name effectively vanished from the layout (only "Table 1" and "vs Kaiser" remained visible).
 - [x] `MatchCard`'s outer row and `ResultEntry`'s form both gained `flex-wrap` (`PairingsPage.tsx`) — the result-entry controls now drop to their own row below the names instead of squeezing them, on any viewport too narrow to fit both.
 - [x] **Also dropped the separate "drawn games" stepper** (Tobias, same pass) — a match's `DRAW` result was already inferred purely from `gamesWonA === gamesWonB`, so a manual drawn-games count was redundant UI clutter, not something the result computation ever depended on. Removed the input; the underlying `gamesDrawn` value/state is still preserved and still submitted unchanged (so a match imported with historical drawn-game data isn't silently zeroed out), it's just no longer manually editable through this form. Still shown in the read-only completed-match summary when `> 0`.
 - [x] **Follow-up (Tobias, next screenshot):** even wrapped, Submit sat cramped right next to the two steppers on phone width. `ResultEntry`'s form is now a fixed two-row stack — steppers+dash on row one, Submit (+ Cancel when editing) on row two — always, not just as a too-narrow-to-fit fallback, so the steppers get consistent breathing room on every screen size.
 - [x] **Second follow-up (Tobias):** bigger tap targets and full-width fill. `Stepper` gained a `className` passthrough so its two instances take `flex-1` and stretch to fill the steppers row evenly; the +/- buttons' padding grew (`px-1.5 py-1` → `px-3.5 py-2.5`, text bumped to `text-base`) and the number input is now `flex-1` (was a fixed `w-8`) so it grows with the stepper. Submit is `flex-1` in its own row so it fills the full row width when not editing (shares it with the still-`shrink-0` Cancel link when editing).
 - [x] **Third follow-up (Tobias, next screenshot) — root-caused the real problem:** the number had gone fully invisible in the steppers, and one card (short entrant names) rendered with the result-entry controls confusingly interleaved with the name line. Root cause: `MatchCard`'s outer row was still `flex-wrap`, so it only stacked name-vs-ResultEntry when the combined content didn't fit on one line — a short name let both sit side-by-side, and `items-center` then vertically centered the single-line name against the now two-row-tall `ResultEntry`, making it look interleaved. Fixed by making `MatchCard` always stack (`flex flex-col`, no more conditional wrap) so `ResultEntry` unconditionally gets the card's full width — same layout on every card regardless of name length. The stepper's number input also gained a real `min-w-10` floor (replacing `w-0 min-w-0`, which let it get squeezed to zero) so it can never shrink below legible again.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-02).
 
-### PI-60 — Tournament standings table should exclude players who played zero pods ✅ (code-complete, browser-verify pending)
+### PI-60 — Tournament standings table should exclude players who played zero pods ✅
 Idea from Tobias: the per-tournament ratings/standings table ("Tournament Standings", formerly Gesamtwertung) should only list players who took part in at least one pod.
 - **Current behavior (confirmed):** `computeGesamtwertung` (`server/src/services/gesamtwertung.ts`, lines 33–68) seeds its row map from **every `TournamentPlayer` row** (everyone registered/attending), not just those who played — `eventsPlayed` starts at 0 for all of them and the pod loop only increments counters for actual entrants, never removes anyone. `playerIds` (line 68) is built from that full map with no `eventsPlayed > 0` filter, so a registered-but-never-played attendee shows up as a "0 of N pods played" row (`client/src/components/GesamtwertungList.tsx` line 44 renders exactly that string).
 - **For contrast:** the org-wide Hall of Fame (`server/src/services/hallOfFame.ts`) already gets this right *by construction* — it seeds its player map only from pod entrants (lines 40–55), so a zero-pod attendee never appears there at all. PI-60 is about bringing the per-tournament table in line with that.
 - [x] `playerIds` in `computeGesamtwertung` now filters to `eventsPlayed.get(id) > 0` before building rows. `GesamtwertungList.tsx`'s empty-state copy updated from "No players attending yet." to "No one has played a pod yet." to match (a registered-but-not-yet-played tournament now correctly shows the empty state instead of a wall of "0 of N" rows).
 - [x] **Follow-up (Tobias, same root cause, different spot):** the tournament overview page's "N pods · M players attending" summary had the exact same bug — `M` came from `tournament.players.length` (raw `TournamentPlayer` registrations), so a fully-registered-but-not-yet-played tournament could read "13 players attending" with zero pods played. New shared `countTournamentParticipants()` (`gesamtwertung.ts`) counts distinct players who actually appear as a pod entrant; both tournament-detail routes (`tournaments.ts` authed, `public.ts` public) now fetch each pod's entrants alongside its rounds, compute `playersPlayed` from them, and strip the raw entrant list back out of the response before sending (keeps the wire payload the same shape as before, just adds one number). Wired into both `TournamentPage.tsx` and `PublicTournamentPage.tsx` — copy changed from "N players attending" to "N players played", and the "View standings"/"Best pulls" links now gate on `playersPlayed > 0` instead of the raw registration count.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-02).
 
-### PI-61 — Hall of Fame "Victim"/"Nemesis" should ignore opponents with only 1 tournament played ✅ (code-complete, browser-verify pending)
+### PI-61 — Hall of Fame "Victim"/"Nemesis" should ignore opponents with only 1 tournament played ✅
 Idea from Tobias: a player's "Victim" field on their Hall of Fame / player-detail page (their most-beaten opponent) shouldn't be someone who's only played in a single tournament — too small a sample to fairly brand them the group's punching bag. Decided: apply the same fix to "Nemesis", falling back to the next qualifying candidate rather than going to `null`.
 - **Root cause (confirmed):** `computePlayerStats` (`server/src/services/playerStats.ts`) picked `victim`/`nemesis` as the single best/worst head-to-head win% among opponents with `matches >= MIN_HEAD_TO_HEAD_GAMES` (2) — a raw match-count gate only, with no check on how many separate tournaments the candidate has played overall.
 - [x] New `MIN_TOURNAMENTS_FOR_H2H_AWARD = 2` constant. Built `tournamentsPlayedById` from the `hallOfFame` data already fetched in this function (no extra query) and added an `eligibleForAward` filter on top of the existing match-count `qualifying` filter — a candidate below the tournament-count bar is excluded from consideration entirely, so `nemesis`/`victim` are picked from whoever's left. Because ineligible candidates are dropped rather than deprioritized, this **naturally falls back to the next-best qualifying candidate** (Tobias's decided behavior) without any extra fallback logic — `null` only when nobody clears both bars.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-02).
 
 ### PI-62 — Upload a photo of each entrant's drafted deck (v2 idea, scoped via interview 2026-08-31)
 Idea from Tobias: on a pod's standings page, let each entrant have a photo of their drafted deck attached — flagged from the start as "more involved," scoped via an interview before any code. **This would be the app's first-ever user-uploaded file** — every prior "image" in the app (Scryfall card art) is a hotlinked external URL, never something stored by this app itself. `PLAN.md`/`CLAUDE.md` explicitly rule out file uploads for tournament descriptions (PI-31) as a deliberate scope boundary; this is the first place that boundary would be deliberately crossed.
