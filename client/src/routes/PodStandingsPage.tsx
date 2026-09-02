@@ -64,9 +64,12 @@ export function PodStandingsPage() {
         <p className="text-ink-muted">No entrants yet.</p>
       ) : (
         <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full min-w-[620px] border-collapse">
+          <table className="w-full min-w-[680px] border-collapse">
             <thead>
               <tr>
+                <th className="w-[1%] bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  #
+                </th>
                 <th className="bg-surface-sunken px-4 py-3 text-left text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                   {pod?.isTeamEvent ? "Team" : "Player"}
                 </th>
@@ -93,6 +96,9 @@ export function PodStandingsPage() {
                 const tiedBelow = isTiedWith(row, rows[i + 1]);
                 return (
                   <tr key={row.entrantId} className={i === 0 ? "bg-accent-wash shadow-[inset_3px_0_0_var(--color-accent)]" : ""}>
+                    <td className="border-t border-border px-4 py-3.5 text-right text-[13px] font-semibold tabular-nums text-ink-muted">
+                      {i + 1}
+                    </td>
                     <td className="border-t border-border px-4 py-3.5 font-semibold">
                       {entrantDisplayName(row.entrant)}
                       {row.manualTiebreak !== null && (

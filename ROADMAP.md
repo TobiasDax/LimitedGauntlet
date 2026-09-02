@@ -346,9 +346,10 @@ Idea from Tobias: pod edit (`EditPodForm` in `client/src/routes/PodPage.tsx`) sh
 - Decide: block silently (tab just gone) vs. a note on the pod page; and whether an *existing* pull on a pod that's later switched off is hidden or just frozen (lean: hidden from the Value views but not deleted).
 - [ ] Not started.
 
-### PI-67 — Show finishing place as a column in the standings table
-Idea from Tobias: the per-pod standings table (`client/src/components/` standings list, rendered on `PodStandingsPage` + `PublicPodStandingsPage`) doesn't show the rank number — add a **"Place" column** (1, 2, 3, … — or "1st / 2nd / 3rd") as the leftmost column. Purely frontend: the rows already arrive pre-sorted from `computePodStandings`, so place is the array index + 1 (ties share the sorted order the tiebreakers already produced; no special tie-display needed for v1). Check whether the tournament-wide standings (`GesamtwertungList`) wants the same treatment.
-- [ ] Not started.
+### PI-67 — Show finishing place as a column in the standings table ✅ (code-complete, browser-verify pending)
+Idea from Tobias: the per-pod standings table didn't show the rank number.
+- [x] Added a leftmost `#` column (sequential `i + 1`, muted, right-aligned tabular) to the per-pod standings table on both `PodStandingsPage.tsx` (authed) and `PublicPodPage.tsx` (public). No backend change — rows already arrive pre-sorted from `computePodStandings`. The tournament-wide standings (`GesamtwertungList.tsx`) already had a tie-aware rank badge, so it needed nothing. Sequential (not tie-aware) per the v1 scope — the manual-reorder arrows already handle the intentional-tie case.
+- [ ] Browser-verified.
 
 ### PI-68 — Export a tournament as a spreadsheet (CSV / Excel)
 Idea from Tobias: a human-readable spreadsheet export of a tournament — distinct from PI-38's JSON dump, which is a machine round-trip format. Likely one download producing per-pod standings (place, player, points, record, tiebreakers) and the weekend Gesamtwertung, plus maybe a card-pull value sheet. CSV is trivial (no dep); `.xlsx` with multiple named sheets needs a library (e.g. `exceljs` / `xlsx`) — decide whether the multi-sheet nicety is worth the dependency or a zip-of-CSVs is enough. Organizer-only (session auth), sits next to the existing Settings → Export/Import section or as a button on the tournament page.
