@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import type { ConstructedFormat, Entrant, MatchFormat, Pod, PodFormat } from "../../lib/types";
+import type { ConstructedFormat, Entrant, MatchFormat, Pod, PodFormat, StandingBonusRow } from "../../lib/types";
 
 export interface PodDetail extends Pod {
   entrants: Entrant[];
@@ -34,6 +34,8 @@ export interface CreatePodInput {
   setCode?: string;
   constructedFormat?: ConstructedFormat;
   constructedFormatCustom?: string;
+  tokenParticipation?: number | null;
+  tokenStandingBonuses?: StandingBonusRow[] | null;
 }
 
 export function useCreatePod(tournamentId: string) {
@@ -65,6 +67,8 @@ export interface UpdatePodInput {
   setCode?: string | null;
   constructedFormat?: ConstructedFormat | null;
   constructedFormatCustom?: string | null;
+  tokenParticipation?: number | null;
+  tokenStandingBonuses?: StandingBonusRow[] | null;
 }
 
 export function useUpdatePod(podId: string, tournamentId?: string) {

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import type { Tournament, TournamentStatus } from "../../lib/types";
+import type { StandingBonusRow, Tournament, TournamentStatus } from "../../lib/types";
 
 export function useTournaments() {
   return useQuery({
@@ -34,6 +34,8 @@ export interface UpdateTournamentInput {
   location?: string | null;
   description?: string | null;
   status?: TournamentStatus;
+  tokenParticipation?: number;
+  tokenStandingBonuses?: StandingBonusRow[];
 }
 
 export function useUpdateTournament(id: string) {

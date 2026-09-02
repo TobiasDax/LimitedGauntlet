@@ -6,6 +6,7 @@ import { findOwnedTournament } from "../services/ownership.js";
 import { computePlayerPairHistory } from "../services/weekendHistory.js";
 import { computeGesamtwertung, countTournamentParticipants } from "../services/gesamtwertung.js";
 import { buildTournamentWorkbook } from "../services/tournamentSpreadsheet.js";
+import { zStandingBonuses, syncPodTokenAwards } from "../services/tokens.js";
 
 const tournamentCreateSchema = z.object({
   name: z.string().trim().min(1).max(150),
@@ -24,6 +25,9 @@ const tournamentUpdateSchema = z.object({
   // nullable so the description can be cleared back to empty
   description: z.string().trim().max(10000).nullable().optional(),
   status: z.enum(["PLANNING", "ACTIVE", "COMPLETED"]).optional(),
+  // Default token rewards (PI-72) — stored regardless of Organization.tokensEnabled.
+  tokenParticipation: z.number().int().min(0).optional(),
+  tokenStandingBonuses: zStandingBonuses.optional(),
 });
 
 const idParams = z.object({ id: z.string().min(1) });
@@ -95,6 +99,13 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
     if (count === 0) {
       reply.code(404).send({ error: "not_found" });
       return;
+    }
+
+    // A change to the default token rewards (PI-72) ripples to every pod that
+    // inherits them — recompute each pod's auto awards.
+    if (body.data.tokenParticipation !== undefined || body.data.tokenStandingBonuses !== undefined) {
+      const pods = await prisma.pod.findMany({ where: { tournamentId: params.data.id }, select: { id: true } });
+      for (const pod of pods) await syncPodTokenAwards(pod.id);
     }
 
     const tournament = await prisma.tournament.findUnique({ where: { id: params.data.id } });

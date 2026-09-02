@@ -2,6 +2,12 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
+import {
+  getPlayerTokenLedger,
+  isTokensEnabled,
+  recordManualTokenTxn,
+  TokensDisabledError,
+} from "../services/tokens.js";
 
 const playerSchema = z.object({
   displayName: z.string().trim().min(1).max(100),
@@ -117,5 +123,62 @@ export async function playerRoutes(app: FastifyInstance): Promise<void> {
     }
 
     reply.code(204).send();
+  });
+
+  // --- Tokens (PI-72) — organizer view + manual adjustments -----------------
+
+  app.get("/api/players/:id/token-ledger", async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const orgId = request.organizer!.orgId;
+    const player = await prisma.player.findFirst({ where: { id: params.data.id, orgId }, select: { id: true } });
+    if (!player) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    if (!(await isTokensEnabled(orgId))) {
+      reply.code(404).send({ error: "tokens_disabled" });
+      return;
+    }
+    reply.send(await getPlayerTokenLedger(orgId, player.id));
+  });
+
+  app.post("/api/players/:id/token-adjust", async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    const body = z
+      .object({
+        delta: z.number().int().optional(),
+        setTo: z.number().int().optional(),
+        note: z.string().trim().max(300).optional(),
+        initial: z.boolean().optional(),
+      })
+      .refine((b) => (b.delta === undefined) !== (b.setTo === undefined), "exactly one of delta / setTo")
+      .safeParse(request.body);
+    if (!params.success || !body.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    try {
+      const result = await recordManualTokenTxn(
+        request.organizer!.orgId,
+        params.data.id,
+        request.organizer!.id,
+        body.data,
+      );
+      reply.send(result);
+    } catch (err) {
+      if (err instanceof TokensDisabledError) {
+        reply.code(409).send({ error: "tokens_disabled" });
+        return;
+      }
+      if (err instanceof Error && err.message === "player_not_found") {
+        reply.code(404).send({ error: "not_found" });
+        return;
+      }
+      throw err;
+    }
   });
 }

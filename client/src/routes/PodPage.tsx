@@ -16,12 +16,13 @@ import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
 import { PrepTimer } from "../components/PrepTimer";
+import { StandingBonusEditor } from "../components/StandingBonusEditor";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { SetPicker } from "../components/SetPicker";
 import { ConstructedFormatPicker } from "../components/ConstructedFormatPicker";
 import { SharePopup } from "../components/SharePopup";
 import { entrantDisplayName } from "../lib/entrant";
-import type { ConstructedFormat, Entrant, MatchFormat, PodFormat } from "../lib/types";
+import type { ConstructedFormat, Entrant, MatchFormat, PodFormat, StandingBonusRow } from "../lib/types";
 
 const podFormats: PodFormat[] = ["DRAFT", "SEALED", "CHAOS_DRAFT", "CONSTRUCTED", "CUSTOM"];
 
@@ -43,6 +44,12 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
   const [setCode, setSetCode] = useState(pod.setCode ?? "");
   const [constructedFormat, setConstructedFormat] = useState<ConstructedFormat | "">(pod.constructedFormat ?? "");
   const [constructedFormatCustom, setConstructedFormatCustom] = useState(pod.constructedFormatCustom ?? "");
+  const { data: me } = useMe();
+  const [tokenOverride, setTokenOverride] = useState(
+    pod.tokenParticipation !== null || pod.tokenStandingBonuses !== null,
+  );
+  const [podTokenParticipation, setPodTokenParticipation] = useState(pod.tokenParticipation ?? 0);
+  const [podTokenBonuses, setPodTokenBonuses] = useState<StandingBonusRow[]>(pod.tokenStandingBonuses ?? []);
 
   return (
     <Card className="mb-6 p-6">
@@ -69,6 +76,11 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
               constructedFormat: format === "CONSTRUCTED" && constructedFormat ? constructedFormat : null,
               constructedFormatCustom:
                 format === "CONSTRUCTED" && constructedFormat === "CUSTOM" ? constructedFormatCustom || null : null,
+              ...(me?.tokensEnabled
+                ? tokenOverride
+                  ? { tokenParticipation: podTokenParticipation, tokenStandingBonuses: podTokenBonuses }
+                  : { tokenParticipation: null, tokenStandingBonuses: null }
+                : {}),
             },
             { onSuccess: onDone },
           );
@@ -179,6 +191,29 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
           Mark as this tournament's main event — the winner earns a crown on the Hall of Fame (only one pod per
           tournament can be the main event; checking this unchecks any other)
         </label>
+
+        {me?.tokensEnabled && (
+          <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+              <input type="checkbox" checked={tokenOverride} onChange={(e) => setTokenOverride(e.target.checked)} />
+              Override the tournament's token rewards for this pod
+            </label>
+            {tokenOverride && (
+              <div className="flex flex-col gap-3 rounded-md border border-border bg-surface-sunken p-3">
+                <Field label="Participation tokens">
+                  <TextField
+                    type="number"
+                    min={0}
+                    value={podTokenParticipation}
+                    onChange={(e) => setPodTokenParticipation(Number(e.target.value))}
+                    className="w-28"
+                  />
+                </Field>
+                <StandingBonusEditor rows={podTokenBonuses} onChange={setPodTokenBonuses} />
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-2">
           <Button type="submit" variant="primary" disabled={updatePod.isPending}>

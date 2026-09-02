@@ -14,18 +14,22 @@ import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextFi
 import { RichText } from "../components/RichText";
 import { SetPicker } from "../components/SetPicker";
 import { ConstructedFormatPicker } from "../components/ConstructedFormatPicker";
+import { StandingBonusEditor } from "../components/StandingBonusEditor";
 import { SharePopup } from "../components/SharePopup";
-import type { ConstructedFormat, PodFormat, TournamentStatus } from "../lib/types";
+import type { ConstructedFormat, PodFormat, StandingBonusRow, TournamentStatus } from "../lib/types";
 
 const tournamentStatuses: TournamentStatus[] = ["PLANNING", "ACTIVE", "COMPLETED"];
 
 function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDetail; onDone: () => void }) {
   const update = useUpdateTournament(tournament.id);
+  const { data: me } = useMe();
   const [name, setName] = useState(tournament.name);
   const [startDate, setStartDate] = useState(tournament.startDate.slice(0, 10));
   const [endDate, setEndDate] = useState(tournament.endDate.slice(0, 10));
   const [location, setLocation] = useState(tournament.location ?? "");
   const [status, setStatus] = useState<TournamentStatus>(tournament.status);
+  const [tokenParticipation, setTokenParticipation] = useState(tournament.tokenParticipation);
+  const [tokenBonuses, setTokenBonuses] = useState<StandingBonusRow[]>(tournament.tokenStandingBonuses ?? []);
 
   return (
     <Card className="mb-6 p-6">
@@ -34,7 +38,16 @@ function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDeta
         onSubmit={(e) => {
           e.preventDefault();
           update.mutate(
-            { name, startDate, endDate, location: location.trim() || null, status },
+            {
+              name,
+              startDate,
+              endDate,
+              location: location.trim() || null,
+              status,
+              ...(me?.tokensEnabled
+                ? { tokenParticipation, tokenStandingBonuses: tokenBonuses }
+                : {}),
+            },
             { onSuccess: onDone },
           );
         }}
@@ -68,6 +81,25 @@ function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDeta
             </select>
           </Field>
         </div>
+
+        {me?.tokensEnabled && (
+          <div className="flex flex-col gap-3 rounded-md border border-border bg-surface-sunken p-4">
+            <div className="text-[12px] font-semibold tracking-wide text-ink-secondary uppercase">
+              Token rewards (default for this tournament's pods)
+            </div>
+            <Field label="Participation — tokens for playing in a pod">
+              <TextField
+                type="number"
+                min={0}
+                value={tokenParticipation}
+                onChange={(e) => setTokenParticipation(Number(e.target.value))}
+                className="w-28"
+              />
+            </Field>
+            <StandingBonusEditor rows={tokenBonuses} onChange={setTokenBonuses} />
+          </div>
+        )}
+
         <div className="flex gap-2">
           <Button type="submit" variant="primary" disabled={update.isPending}>
             {update.isPending ? "Saving…" : "Save"}
@@ -167,10 +199,14 @@ function NewPodForm({
   onCreated: () => void;
 }) {
   const createPod = useCreatePod(tournamentId);
+  const { data: me } = useMe();
   const [name, setName] = useState("");
   const [format, setFormat] = useState<PodFormat>("DRAFT");
   const [date, setDate] = useState("");
   const [isTeamEvent, setIsTeamEvent] = useState(false);
+  const [tokenOverride, setTokenOverride] = useState(false);
+  const [podTokenParticipation, setPodTokenParticipation] = useState(0);
+  const [podTokenBonuses, setPodTokenBonuses] = useState<StandingBonusRow[]>([]);
   const [teamSize, setTeamSize] = useState(2);
   const [roundCount, setRoundCount] = useState(3);
   const [matchFormat, setMatchFormat] = useState<"BO1" | "BO3">("BO3");
@@ -213,6 +249,9 @@ function NewPodForm({
             constructedFormat: format === "CONSTRUCTED" && constructedFormat ? constructedFormat : undefined,
             constructedFormatCustom:
               format === "CONSTRUCTED" && constructedFormat === "CUSTOM" ? constructedFormatCustom || undefined : undefined,
+            ...(me?.tokensEnabled && tokenOverride
+              ? { tokenParticipation: podTokenParticipation, tokenStandingBonuses: podTokenBonuses }
+              : {}),
           }, { onSuccess: onCreated });
         }}
       >
@@ -339,6 +378,29 @@ function NewPodForm({
               />
               Send events to the org's configured webhook for this pod (Settings → Webhook)
             </label>
+
+            {me?.tokensEnabled && (
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+                  <input type="checkbox" checked={tokenOverride} onChange={(e) => setTokenOverride(e.target.checked)} />
+                  Override the tournament's token rewards for this pod
+                </label>
+                {tokenOverride && (
+                  <div className="flex flex-col gap-3 rounded-md border border-border bg-surface-sunken p-3">
+                    <Field label="Participation tokens">
+                      <TextField
+                        type="number"
+                        min={0}
+                        value={podTokenParticipation}
+                        onChange={(e) => setPodTokenParticipation(Number(e.target.value))}
+                        className="w-28"
+                      />
+                    </Field>
+                    <StandingBonusEditor rows={podTokenBonuses} onChange={setPodTokenBonuses} />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </details>
 

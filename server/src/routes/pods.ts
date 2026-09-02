@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
@@ -7,6 +7,16 @@ import { findOwnedTournament, findOwnedPod, findOwnedEntrant } from "../services
 import { computePodStandings } from "../services/standings.js";
 import { getLatestRound } from "../services/pairing.js";
 import { emitPodEvent } from "../realtime.js";
+import { syncPodTokenAwards, zStandingBonuses } from "../services/tokens.js";
+
+// A pod's tokenStandingBonuses is a nullable Json column: an explicit `null`
+// (organizer cleared the override → inherit the tournament) must become
+// Prisma.DbNull, while an omitted field stays omitted and an array passes
+// through. Returns the fragment to spread into a create/update `data`.
+function tokenBonusesData(value: unknown): { tokenStandingBonuses?: Prisma.InputJsonValue | typeof Prisma.DbNull } {
+  if (value === undefined) return {};
+  return { tokenStandingBonuses: value === null ? Prisma.DbNull : (value as Prisma.InputJsonValue) };
+}
 
 // Playing in any pod implies attending that pod's tournament — upsert
 // keeps this true even if some of the players were already attached.
@@ -46,6 +56,9 @@ const podCreateSchema = z.object({
   rarePicksEnabled: z.boolean().default(true),
   webhookEnabled: z.boolean().default(true),
   isMainEvent: z.boolean().default(false),
+  // PI-72 — per-pod override of the tournament's token rewards. null = inherit.
+  tokenParticipation: z.number().int().min(0).nullable().optional(),
+  tokenStandingBonuses: zStandingBonuses.nullable().optional(),
   setCode: z.string().trim().toLowerCase().min(2).max(10).optional(),
   constructedFormat: z.enum(constructedFormats).optional(),
   constructedFormatCustom: z.string().trim().min(1).max(60).optional(),
@@ -77,6 +90,8 @@ const podUpdateSchema = z.object({
   rarePicksEnabled: z.boolean().optional(),
   webhookEnabled: z.boolean().optional(),
   isMainEvent: z.boolean().optional(),
+  tokenParticipation: z.number().int().min(0).nullable().optional(),
+  tokenStandingBonuses: zStandingBonuses.nullable().optional(),
   setCode: z.string().trim().toLowerCase().min(2).max(10).nullable().optional(),
   constructedFormat: z.enum(constructedFormats).nullable().optional(),
   constructedFormatCustom: z.string().trim().min(1).max(60).nullable().optional(),
@@ -186,11 +201,14 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
     // first so the DB's partial unique index never gets a chance to reject
     // this in normal operation (it's still the real guarantee against a
     // race, this transaction is just what makes that race unlikely).
+    const { tokenStandingBonuses: _createBonuses, ...createData } = body.data;
     const pod = await prisma.$transaction(async (tx) => {
       if (body.data.isMainEvent) {
         await tx.pod.updateMany({ where: { tournamentId: tournament.id, isMainEvent: true }, data: { isMainEvent: false } });
       }
-      return tx.pod.create({ data: { ...body.data, tournamentId: tournament.id } });
+      return tx.pod.create({
+        data: { ...createData, ...tokenBonusesData(_createBonuses), tournamentId: tournament.id },
+      });
     });
     reply.code(201).send({ pod });
   });
@@ -272,6 +290,7 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
+    const { tokenStandingBonuses: _updateBonuses, ...updateData } = body.data;
     const pod = await prisma.$transaction(async (tx) => {
       if (body.data.isMainEvent) {
         await tx.pod.updateMany({
@@ -281,10 +300,12 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       }
       await tx.pod.updateMany({
         where: { id: params.data.id, tournament: { orgId: request.organizer!.orgId } },
-        data: body.data,
+        data: { ...updateData, ...tokenBonusesData(_updateBonuses) },
       });
       return tx.pod.findUnique({ where: { id: params.data.id } });
     });
+    // Token config may have changed — recompute this pod's auto awards (PI-72).
+    await syncPodTokenAwards(params.data.id);
     reply.send({ pod });
   });
 
@@ -403,6 +424,7 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
         await syncTournamentAttendance(tx, pod.tournamentId, body.data.playerIds);
         return tx.entrant.create({ data: { podId: pod.id, teamId: team.id } });
       });
+      await syncPodTokenAwards(pod.id);
       reply.code(201).send({ entrant });
       return;
     }
@@ -458,6 +480,7 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
         return Promise.all(playerIds.map((playerId) => tx.entrant.create({ data: { podId: pod.id, playerId } })));
       });
 
+      await syncPodTokenAwards(pod.id);
       reply.code(201).send({ entrants });
       return;
     }
@@ -486,6 +509,7 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       await syncTournamentAttendance(tx, pod.tournamentId, [player.id]);
       return tx.entrant.create({ data: { podId: pod.id, playerId: player.id } });
     });
+    await syncPodTokenAwards(pod.id);
     reply.code(201).send({ entrant });
   });
 
@@ -547,6 +571,7 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       where: { id: entrant.id },
       data: { droppedAfterRound: latest?.roundNumber ?? 0 },
     });
+    await syncPodTokenAwards(entrant.podId);
     reply.send({ entrant: updated });
   });
 
@@ -577,6 +602,7 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       where: { id: entrant.id },
       data: { droppedAfterRound: null },
     });
+    await syncPodTokenAwards(entrant.podId);
     reply.send({ entrant: updated });
   });
 
@@ -600,6 +626,7 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
     } else {
       await prisma.entrant.delete({ where: { id: entrant.id } });
     }
+    await syncPodTokenAwards(entrant.podId);
     reply.code(204).send();
   });
 }

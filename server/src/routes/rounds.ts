@@ -5,6 +5,7 @@ import { requireAuth } from "../auth/middleware.js";
 import { findOwnedPod, findOwnedRound, findOwnedMatch } from "../services/ownership.js";
 import { generatePairings, getActiveEntrants, getLatestRound, PairingError } from "../services/pairing.js";
 import { inferCardPullAttribution } from "../services/cardPullInference.js";
+import { syncPodTokenAwards } from "../services/tokens.js";
 import { emitPodEvent, emitTournamentEvent } from "../realtime.js";
 import { sendWebhookEvent, buildMatchesPayload, buildStandingsPayload, fireAndForget } from "../services/webhooks.js";
 
@@ -266,6 +267,9 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     await prisma.round.delete({ where: { id: round.id } });
 
     emitPodEvent(round.podId, "round-unpaired", { roundId: round.id });
+    // Deleting an unplayed final round un-completes the pod — clear its auto
+    // token awards (PI-72). No-op if the pod isn't/wasn't complete.
+    await syncPodTokenAwards(round.podId);
     reply.code(204).send();
   });
 
@@ -413,6 +417,7 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     // The pod may have just become fully decided — see if any of its
     // card pulls can now be attributed.
     await inferCardPullAttribution(round.podId);
+    await syncPodTokenAwards(round.podId);
     reply.send({ round: updated });
   });
 
@@ -450,6 +455,7 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     // A correction on a completed round can change who finished top-3 —
     // refresh any not-yet-confirmed inferred attributions to match.
     await inferCardPullAttribution(round.podId);
+    await syncPodTokenAwards(round.podId);
     reply.send({ match: updated });
   });
 }

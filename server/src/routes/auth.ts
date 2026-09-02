@@ -500,6 +500,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       organizer: request.organizer,
       organization: { id: organization.id, slug: organization.slug, name: organization.name },
       publicLockEnabled: !!organization.publicPasswordHash,
+      tokensEnabled: organization.tokensEnabled,
       organizerCount,
     });
   });

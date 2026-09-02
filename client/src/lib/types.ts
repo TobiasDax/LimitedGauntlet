@@ -62,6 +62,9 @@ export interface Tournament {
   location: string | null;
   description: string | null;
   status: TournamentStatus;
+  // PI-72 — default token rewards for this tournament's pods.
+  tokenParticipation: number;
+  tokenStandingBonuses: StandingBonusRow[] | null;
   createdAt: string;
 }
 
@@ -105,6 +108,9 @@ export interface Pod {
   constructedFormatCustom: string | null;
   prepTimerEndsAt: string | null;
   prepTimerLabel: string | null;
+  // PI-72 — per-pod override of the tournament's token rewards; null = inherit.
+  tokenParticipation: number | null;
+  tokenStandingBonuses: StandingBonusRow[] | null;
   createdAt: string;
   // Present only on pods nested in a tournament-detail response (PI-58) —
   // just enough to derive a progress label client-side, not the full
@@ -267,6 +273,32 @@ export interface PlayerStatsDetail {
   nemesis: HeadToHeadEntry | null;
   victim: HeadToHeadEntry | null;
   headToHead: HeadToHeadEntry[];
+  // PI-72 — null when the org has tokens off (hides every token surface).
+  tokenBalance: number | null;
+}
+
+// PI-72 — tokens (an opt-in per-org player currency).
+export type TokenTxnReason = "POD_PARTICIPATION" | "POD_STANDING" | "MANUAL" | "INITIAL";
+
+export interface TokenLedgerEntry {
+  id: string;
+  delta: number;
+  reason: TokenTxnReason;
+  note: string | null;
+  podName: string | null;
+  organizerName: string | null;
+  createdAt: string;
+}
+
+export interface TokenLedger {
+  balance: number;
+  transactions: TokenLedgerEntry[];
+}
+
+export interface StandingBonusRow {
+  fromPlace: number;
+  toPlace: number;
+  tokens: number;
 }
 
 export interface CardPull {

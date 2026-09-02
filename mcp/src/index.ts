@@ -188,6 +188,25 @@ registerReadWriteTool(
 
 registerReadWriteTool("list_players", "List the org's player roster.", {}, () => api.get("/players"));
 
+registerReadWriteTool(
+  "list_player_token_transactions",
+  "Get a player's token balance + full transaction ledger (PI-72). Errors with 'tokens_disabled' if the org hasn't turned on tokens.",
+  { playerId: z.string() },
+  ({ playerId }) => api.get(`/players/${playerId}/token-ledger`),
+);
+
+registerReadWriteTool(
+  "adjust_player_tokens",
+  "Add, deduct, or set a player's token balance (PI-72). Pass exactly one of `delta` (positive to add, negative to deduct) or `setTo` (the resulting balance). `note` is recorded on the ledger entry. Errors with 'tokens_disabled' if tokens are off for the org.",
+  {
+    playerId: z.string(),
+    delta: z.number().int().optional(),
+    setTo: z.number().int().optional(),
+    note: z.string().optional(),
+  },
+  ({ playerId, ...body }) => api.post(`/players/${playerId}/token-adjust`, body),
+);
+
 // -----------------------------------------------------------------------
 // Writes (non-destructive)
 // -----------------------------------------------------------------------

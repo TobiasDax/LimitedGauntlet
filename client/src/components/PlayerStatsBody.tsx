@@ -83,11 +83,12 @@ export function PlayerStatsBody({
 }) {
   return (
     <div>
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className={`mb-6 grid grid-cols-2 gap-3 ${s.tokenBalance !== null ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
         <StatTile label="Match record" value={`${s.wins}-${s.losses}-${s.draws}`} sub={pct(s.matchWinPct)} />
         <StatTile label="Game win %" value={pct(s.gameWinPct)} />
         <StatTile label="Pod wins" value={String(s.podWins)} />
         <StatTile label="Weekend wins" value={String(s.weekendWins)} />
+        {s.tokenBalance !== null && <StatTile label="Tokens" value={String(s.tokenBalance)} />}
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">

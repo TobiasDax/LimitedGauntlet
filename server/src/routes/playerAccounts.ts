@@ -6,6 +6,7 @@ import { requirePlayerAuth } from "../auth/playerMiddleware.js";
 import { isEmailConfigured, resolveBaseUrl, sendMail } from "../services/mailer.js";
 import { emitPodEvent, emitTournamentEvent } from "../realtime.js";
 import { inferCardPullAttribution } from "../services/cardPullInference.js";
+import { getPlayerTokenLedger, isTokensEnabled, syncPodTokenAwards } from "../services/tokens.js";
 import {
   acceptPlayerInvite,
   authenticatePlayer,
@@ -175,6 +176,17 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
     reply.code(204).send();
   });
 
+  // The logged-in player's own token balance + ledger (PI-72). 404 when the
+  // org has tokens off — the portal then hides the section.
+  app.get("/api/player/tokens", { preHandler: requirePlayerAuth }, async (request, reply) => {
+    const player = request.player!;
+    if (!(await isTokensEnabled(player.orgId))) {
+      reply.code(404).send({ error: "tokens_disabled" });
+      return;
+    }
+    reply.send(await getPlayerTokenLedger(player.orgId, player.id));
+  });
+
   app.get("/api/player/me", { preHandler: requirePlayerAuth }, async (request, reply) => {
     const organization = await prisma.organization.findUniqueOrThrow({
       where: { id: request.player!.orgId },
@@ -326,6 +338,7 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
       emitPodEvent(podId, "result-submitted", { match });
       emitTournamentEvent(tournamentId, "standings-changed", { podId });
       await inferCardPullAttribution(podId);
+      await syncPodTokenAwards(podId);
       reply.send({ match });
     } catch (err) {
       if (isPlayerAccountFailure(err)) {

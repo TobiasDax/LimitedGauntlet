@@ -3,6 +3,7 @@ import { prisma } from "../prisma.js";
 import { computePodStandings } from "./standings.js";
 import { computeGesamtwertung } from "./gesamtwertung.js";
 import { computeHallOfFame } from "./hallOfFame.js";
+import { getPlayerTokenBalance, isTokensEnabled } from "./tokens.js";
 
 export interface HeadToHeadEntry {
   playerId: string;
@@ -63,6 +64,9 @@ export interface PlayerStatsDetail {
   nemesis: HeadToHeadEntry | null;
   victim: HeadToHeadEntry | null;
   headToHead: HeadToHeadEntry[];
+  // PI-72 — the player's token balance, or null when the org has tokens off
+  // (the client's single signal to hide every token surface, public included).
+  tokenBalance: number | null;
 }
 
 export interface PlayerCardPull {
@@ -404,6 +408,7 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
   const gamesPlayed = gamesWon + gamesLost + gamesDrawn;
   const matchesPlayed = wins + losses + draws;
   const priceSum = valueAgg._sum.priceEur;
+  const tokenBalance = (await isTokensEnabled(orgId)) ? await getPlayerTokenBalance(orgId, playerId) : null;
 
   return {
     playerId,
@@ -435,5 +440,6 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
     nemesis,
     victim,
     headToHead: h2h,
+    tokenBalance,
   };
 }

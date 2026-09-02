@@ -8,6 +8,9 @@ interface MeResponse {
   // Whether this org's public pages are behind a password (PI-27). Optional
   // because the login/signup responses don't compute it; /auth/me always does.
   publicLockEnabled?: boolean;
+  // Whether the tokens feature (PI-72) is enabled for this org. Same optionality
+  // as publicLockEnabled — only /auth/me sets it.
+  tokensEnabled?: boolean;
   // How many organizers this org has (PI-34) — drives Settings' "delete my
   // account" vs "leave organization" wording. Always present in practice
   // (every response that sets this cache includes it); optional here only so
@@ -99,6 +102,20 @@ export function useClearPublicLock() {
       queryClient.setQueryData<MeResponse | null>(["me"], (prev) =>
         prev ? { ...prev, publicLockEnabled: false } : prev,
       );
+    },
+  });
+}
+
+// Tokens opt-in (PI-72). Patches the `me` cache and invalidates the player
+// pages, whose token surfaces appear/disappear with the flag.
+export function useToggleTokens() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => api.put<{ tokensEnabled: boolean }>("/settings/tokens", { enabled }),
+    onSuccess: (_data, enabled) => {
+      queryClient.setQueryData<MeResponse | null>(["me"], (prev) => (prev ? { ...prev, tokensEnabled: enabled } : prev));
+      queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
+      queryClient.invalidateQueries({ queryKey: ["tokens"] });
     },
   });
 }

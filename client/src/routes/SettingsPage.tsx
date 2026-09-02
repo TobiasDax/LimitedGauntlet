@@ -6,6 +6,7 @@ import { PublicLockSection } from "../components/settings/PublicLockSection";
 import { OrganizersSection } from "../components/settings/OrganizersSection";
 import { ExportImportSection } from "../components/settings/ExportImportSection";
 import { WebhookSection } from "../components/settings/WebhookSection";
+import { TokensSection } from "../components/settings/TokensSection";
 import { AccountSection } from "../components/settings/AccountSection";
 
 // Organizer settings hub (PI-26). Organizer-only (this route is inside the
@@ -65,6 +66,13 @@ export function SettingsPage() {
         description="Get an HMAC-signed HTTP POST when a round starts, is extended, or completes, and when pairings are posted — for Home Assistant or anything else that accepts a webhook. Configure as many as you like, each delivered to independently; individual pods can opt out from their own edit form."
       >
         <WebhookSection />
+      </SettingsSection>
+
+      <SettingsSection
+        title="Tokens"
+        description="An optional org-wide player currency earned from playing pods and finishing place, spendable on your own prize wall. Off by default."
+      >
+        <TokensSection />
       </SettingsSection>
 
       <SettingsSection title="Account" description="Change your password or email, or delete your account.">

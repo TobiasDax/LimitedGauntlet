@@ -7,7 +7,9 @@ import {
   useSubmitPlayerResult,
 } from "../features/player/usePlayer";
 import { usePlayerPortalRealtime } from "../features/player/usePlayerPortalRealtime";
+import { usePlayerPortalTokens } from "../features/tokens/useTokens";
 import { Stepper } from "../components/Stepper";
+import { PlayerTokenLedger } from "../components/PlayerTokenLedger";
 import { Button, Card, Eyebrow, FormError, ScreenTitle } from "../components/ui";
 import type { PlayerPortalMatch } from "../lib/types";
 
@@ -70,6 +72,7 @@ export function PlayerPortalPage() {
   const { data, isLoading } = usePlayerPortal(!!me);
   const checkIn = useCheckIn();
   usePlayerPortalRealtime(data?.matches.map((m) => m.podId) ?? []);
+  const { data: tokens } = usePlayerPortalTokens();
 
   if (isLoading || !data) return <div className="py-16 text-center text-ink-muted">Loading…</div>;
 
@@ -79,6 +82,13 @@ export function PlayerPortalPage() {
         <Eyebrow>Signed in as {me?.player.displayName}</Eyebrow>
         <ScreenTitle>Your portal</ScreenTitle>
       </div>
+
+      {tokens && (
+        <section>
+          <h2 className="mb-3 font-display text-[16px] font-bold">Your tokens</h2>
+          <PlayerTokenLedger ledger={tokens} />
+        </section>
+      )}
 
       <section>
         <h2 className="mb-3 font-display text-[16px] font-bold">Your matches</h2>

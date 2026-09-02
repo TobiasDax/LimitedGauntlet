@@ -23,6 +23,12 @@ model Organization {
   // password once to view any /o/<slug>/... page — an opt-in, off-by-default
   // exception to "public pages stay open", set only by the organizer.
   publicPasswordHash String?
+  // Opt-in per org (PI-72), default off. When true, players earn "tokens" from
+  // playing pods (participation + a standing bonus), organizers can hand-adjust
+  // balances, and a Tokens tab / balance appear on the player pages. When false
+  // the whole feature is invisible and no tokens are awarded — existing ledger
+  // rows are kept (not deleted) so re-enabling restores them.
+  tokensEnabled Boolean @default(false)
   createdAt DateTime @default(now())
 
   organizers  OrganizerAccount[]
@@ -31,6 +37,7 @@ model Organization {
   organizerInvites OrganizerInvite[]
   playerInvites PlayerInvite[]
   webhooks    OrganizationWebhook[]
+  tokenTransactions TokenTransaction[]
 }
 
 // Outbound webhooks (PI-50): an HMAC-signed HTTP POST fired on round
@@ -85,6 +92,7 @@ model OrganizerAccount {
   oidcRelinkRequests OidcSubjectRelinkRequest[]
   sentInvites  OrganizerInvite[]
   sentPlayerInvites PlayerInvite[]
+  tokenTransactions TokenTransaction[]
 
   @@index([orgId])
 }
@@ -194,6 +202,7 @@ model Player {
   entrants          Entrant[]
   cardPulls         CardPull[]
   playerInvites     PlayerInvite[]
+  tokenTransactions TokenTransaction[]
 
   @@unique([orgId, email])
   @@index([orgId])
@@ -246,6 +255,14 @@ model Tournament {
   // safely as text-plus-links on the client, never as raw HTML.
   description String?
   status    TournamentStatus @default(PLANNING)
+  // Default token rewards for this tournament's pods (PI-72; only in effect when
+  // Organization.tokensEnabled). `tokenParticipation` is the flat award for
+  // playing in a pod; `tokenStandingBonuses` is a JSON array of
+  // { fromPlace, toPlace, tokens } rows — a player's finishing place gets the
+  // tokens of the first row that contains it. A pod can override either
+  // (Pod.tokenParticipation / Pod.tokenStandingBonuses; null = inherit here).
+  tokenParticipation   Int  @default(0)
+  tokenStandingBonuses Json?
   createdAt DateTime         @default(now())
 
   organization Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -357,6 +374,11 @@ model Pod {
   // zero rounds. Only the end time is stored; the countdown ticks client-side.
   prepTimerEndsAt    DateTime?
   prepTimerLabel     String?
+  // Per-pod override of the tournament's token rewards (PI-72). Null on either
+  // = inherit Tournament.tokenParticipation / .tokenStandingBonuses. Only in
+  // effect when Organization.tokensEnabled.
+  tokenParticipation   Int?
+  tokenStandingBonuses Json?
   createdAt          DateTime    @default(now())
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
@@ -364,6 +386,7 @@ model Pod {
   entrants   Entrant[]
   rounds     Round[]
   cardPulls  CardPull[]
+  tokenTransactions TokenTransaction[]
 
   @@index([tournamentId])
 }
@@ -519,5 +542,40 @@ model CardPull {
   pod    Pod     @relation(fields: [podId], references: [id], onDelete: Cascade)
   player Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)
 
+  @@index([podId])
+}
+
+// ---------------------------------------------------------------------------
+// Tokens (PI-72) — an opt-in per-org player currency (Organization.tokensEnabled)
+// ---------------------------------------------------------------------------
+
+enum TokenTxnReason {
+  POD_PARTICIPATION // auto: played in a pod
+  POD_STANDING      // auto: finishing-place bonus
+  MANUAL            // organizer add / deduct / "set balance to X"
+  INITIAL           // organizer seeding a balance from external history
+}
+
+// Append-only ledger. A player's balance is SUM(delta). The two POD_* reasons
+// are recomputed by syncPodTokenAwards whenever a pod's standings or completion
+// state changes (deleted + recreated for that podId); MANUAL/INITIAL rows are
+// only ever created, never touched by automation.
+model TokenTransaction {
+  id          String         @id @default(cuid())
+  orgId       String
+  playerId    String
+  delta       Int
+  reason      TokenTxnReason
+  note        String?
+  podId       String?
+  createdById String?
+  createdAt   DateTime       @default(now())
+
+  organization Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  player       Player            @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  pod          Pod?              @relation(fields: [podId], references: [id], onDelete: Cascade)
+  createdBy    OrganizerAccount? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([orgId, playerId])
   @@index([podId])
 }

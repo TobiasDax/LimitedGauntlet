@@ -14,6 +14,7 @@ Designed from day one as a real multi-group tool: one deployment can host severa
 
 - **Multi-tenant**: one deployment hosts several independent organizations, each with its own roster, login, and public link.
 - **Player self-service** (optional): invite roster players to their own login so they can check themselves into tournaments and report their own match results, at `/o/<slug>/player` — a separate opt-in auth surface that never gates the open public pages.
+- **Tokens** (optional): an org-wide player currency earned automatically from playing pods and finishing place, hand-adjustable by organizers, with a full transaction ledger — for running a prize wall alongside your events. Off by default.
 - **Swiss pairing**: automatic pairing with weekend-wide repeat-opponent avoidance, or hand-pair a round yourself; swap two entrants' seats before a round locks.
 - **Live everything**: pairings, standings, and the round timer update over Socket.IO on every connected device — no manual refresh.
 - **Standings that actually add up**: per-pod Swiss standings (OMW%/GW%/OGW% tiebreakers, with a manual override for intentional-draw endgames), plus tournament-wide standings ranked by average points per pod (so missing an event doesn't tank your rank).

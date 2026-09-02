@@ -9,6 +9,7 @@ import { buildOrgExport, type ExportSections } from "../services/orgExport.js";
 import { ImportInProgressError, parseOrgExport, importOrgData } from "../services/orgImport.js";
 import { generateWebhookSecret, sendTestWebhookEvent } from "../services/webhooks.js";
 import { refreshRealtimeAuthorization } from "../realtime.js";
+import { syncPodTokenAwards } from "../services/tokens.js";
 
 const publicLockSchema = z.object({ password: z.string().min(4).max(200) });
 const passwordChangeSchema = z.object({
@@ -78,6 +79,32 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     });
     refreshRealtimeAuthorization();
     reply.send({ publicLockEnabled: false });
+  });
+
+  // Opt in / out of the tokens feature (PI-72). Off (default) hides everything
+  // token-related and stops auto-awards; ledger rows are never deleted here.
+  app.put("/api/settings/tokens", async (request, reply) => {
+    const body = z.object({ enabled: z.boolean() }).safeParse(request.body);
+    if (!body.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    await prisma.organization.update({
+      where: { id: request.organizer!.orgId },
+      data: { tokensEnabled: body.data.enabled },
+    });
+    // On enable, reconcile every completed pod's auto awards (no-op while the
+    // token config is all zeros; the organizer sets participation / bonuses on
+    // the tournaments and that triggers a recompute). On disable, existing
+    // ledger rows are left frozen.
+    if (body.data.enabled) {
+      const pods = await prisma.pod.findMany({
+        where: { tournament: { orgId: request.organizer!.orgId } },
+        select: { id: true },
+      });
+      for (const pod of pods) await syncPodTokenAwards(pod.id);
+    }
+    reply.send({ tokensEnabled: body.data.enabled });
   });
 
   // --- Account management (PI-28) ---

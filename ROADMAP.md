@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.4.0](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.4.0)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login), PI-52 (player accounts) and PI-64–68 (bulk pod-entrant modal + inline new-player, per-pod rare-picks toggle, standings place column, .xlsx export) shipped in v0.4.0 — browser-verify on the live deploy pending. PI-70/71 (hide the prep timer once a pod is under way; close the new-pod form on create) are code-complete, browser-verify pending. Open ideas: PI-62 (deck photos), PI-69 (drop dead pod columns), PI-72 (prize-points currency — scoping); plus a few small follow-ups noted inline below.
+The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.4.0](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.4.0)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login), PI-52 (player accounts) and PI-64–68 (bulk pod-entrant modal + inline new-player, per-pod rare-picks toggle, standings place column, .xlsx export) shipped in v0.4.0 — browser-verify on the live deploy pending. PI-70/71 (prep-timer visibility; close the new-pod form) and PI-72 (tokens — an opt-in player currency) are code-complete, browser-verify pending. Open ideas: PI-62 (deck photos), PI-69 (drop dead pod columns); plus a few small follow-ups noted inline below.
 
 ## Open items
 
@@ -374,7 +374,7 @@ Idea from Tobias: creating a pod left the (long) new-pod form open with no clear
 - [x] `NewPodForm` (`TournamentPage.tsx`) takes an `onCreated` callback, fired from `createPod.mutate(..., { onSuccess })`; the parent closes the form. The new pod renders directly above where the form was, so no scroll-into-view needed.
 - [ ] Browser-verified.
 
-### PI-72 — Tokens: an org-wide player currency earned from play (v2 idea, scoped 2026-09-02)
+### PI-72 — Tokens: an org-wide player currency earned from play ✅ (code-complete, browser-verify pending)
 Idea from Tobias: players accumulate **tokens** across every event, redeemable for prizes (the prize wall itself is **out of scope** — this app only tracks the balance). A new concept, deliberately named **"tokens"** to stay distinct from match/standings points.
 
 **Spec + decisions (Tobias, 2026-09-02):**
@@ -389,4 +389,9 @@ Idea from Tobias: players accumulate **tokens** across every event, redeemable f
 - **Data model:** a `TokenTransaction` ledger — `playerId`, `orgId`, signed `delta`, `reason` enum (`POD_PARTICIPATION` / `POD_STANDING` / `MANUAL` / `INITIAL`), nullable `createdByOrganizerId` / `podId`, optional `note`, `createdAt`. Balance = `SUM(delta)`. "Set to X" is stored as the adjusting delta with reason `MANUAL` + a note.
 - **Retroactivity:** automatic awards start when the feature ships; pre-existing external history goes in via the manual "set balance".
 - **MCP:** `adjust_player_tokens` (delta + note) and `list_player_token_transactions`.
-- [ ] Not started — needs an implementation plan next.
+- [x] **Built:** `Organization.tokensEnabled` + `Tournament`/`Pod` token config (JSONB bonus list) + `TokenTransaction` ledger (migration `20260903150000`). `server/src/services/tokens.ts` — `syncPodTokenAwards` (idempotent reconciler, hooked next to `inferCardPullAttribution` in every handler that moves a pod's standings/completion — `rounds.ts` × 3, `playerAccounts.ts`, pod entrant add/remove/drop/undrop, pod update, tournament update, and the settings toggle), `recordManualTokenTxn`, balance/ledger getters. Enabling the feature backfills every completed pod.
+- [x] **Routes:** `PUT /api/settings/tokens`; `GET /api/players/:id/token-ledger` + `POST /api/players/:id/token-adjust` (organizer); `GET /api/player/tokens` (PI-52 portal). `computePlayerStats` → `tokenBalance: number | null` (null hides everything). `/auth/me` → `tokensEnabled`.
+- [x] **Frontend:** `TokensSection` in Settings; a `#`-style tab bar on `PlayerStatsPage` (Overview | Tokens) when on; `PlayerTokenLedger` (balance + add/deduct/set form + table), reused read-only in the player portal; balance stat card in `PlayerStatsBody` (public too); `StandingBonusEditor` on the tournament + pod edit forms, all gated on `useMe().tokensEnabled`.
+- [x] **MCP:** `adjust_player_tokens` + `list_player_token_transactions`. **Tests:** `server/src/services/tokens.test.ts` (11 — bonus lookup, config inherit/override, awards + team expansion + recompute + un-complete removal + disabled-org no-op, manual delta/set + disabled rejection).
+- [ ] Browser-verified. **Tobias must run `npx prisma generate` locally.**
+- [ ] **Not done:** the org JSON export/import (PI-38/39) doesn't carry `tokensEnabled`, the token config, or the ledger — a re-import loses all token history. Deferred (the ledger's `podId`/`createdById` refs are awkward in the name-keyed export format); worth its own follow-up.

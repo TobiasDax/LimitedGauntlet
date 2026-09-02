@@ -92,6 +92,17 @@ view your org's pages even when you've set a public-page password (§ PI-27),
 since they've already authenticated. Revoke an account any time from Roster;
 that immediately invalidates their session.
 
+## 5c. Optional: tokens (a player prize-wall currency)
+
+**Settings → Tokens** turns on an org-wide player currency: players accumulate
+"tokens" for playing in pods and for their finishing place, redeemable at a
+prize wall you run outside this app. Set the default reward values on each
+tournament (participation + a place→bonus list), overridable per pod. Organizers
+adjust balances (add / deduct / set) from the Tokens tab on a player's page;
+the balance is public, the transaction ledger is organizer-only (and visible to
+a player logged into their own account). Off by default — turning it on
+backfills tokens for every already-completed pod using the current config.
+
 ## 6. Optional: mint an API token for the MCP server
 
 The app exposes an MCP (Model Context Protocol) server (`mcp/`) so an AI agent can read and manage tournament data directly — pairing, results, standings, card pulls — through the same authenticated API the web app uses. This is entirely optional and runs as a separate local process, not part of the deployed container.
