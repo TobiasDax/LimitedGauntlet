@@ -88,11 +88,11 @@ export function PublicTournamentPage() {
               <span className="font-display text-[20px] font-bold text-accent-strong tabular-nums">
                 {formatEur(pullsData?.total ?? 0)}
               </span>
-              <span className="text-[11px] tracking-wide text-ink-muted uppercase">weekend total</span>
+              <span className="text-[11px] tracking-wide text-ink-muted uppercase">tournament total</span>
             </div>
           </div>
           <p className="mb-6 text-[13px] text-ink-secondary">
-            Every card logged across the weekend, by pod, highest value first.
+            Every card logged across the tournament, by pod, highest value first.
           </p>
           <div className="flex flex-col gap-8">
             {podValueGroups.map(({ pod, pulls, subtotal }) => (

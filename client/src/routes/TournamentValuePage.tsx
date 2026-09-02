@@ -16,7 +16,7 @@ export function TournamentValuePage() {
           {tournamentData?.tournament.name ?? "Tournament overview"}
         </Link>
       </Eyebrow>
-      <ScreenTitle>Best pulls of the weekend</ScreenTitle>
+      <ScreenTitle>Best pulls of the tournament</ScreenTitle>
       <ScreenDek>Every card logged across every pod this tournament, highest value first.</ScreenDek>
 
       {isLoading ? (
@@ -27,7 +27,7 @@ export function TournamentValuePage() {
             <span className="font-display text-[24px] font-bold text-accent-strong tabular-nums">
               {formatEur(data?.total ?? 0)}
             </span>
-            <span className="text-[11px] tracking-wide text-ink-muted uppercase">weekend total</span>
+            <span className="text-[11px] tracking-wide text-ink-muted uppercase">tournament total</span>
           </div>
           <CardGallery pulls={data?.cardPulls ?? []} />
         </>

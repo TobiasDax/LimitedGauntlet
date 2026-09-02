@@ -5,6 +5,7 @@ build/
 *.log
 *.tsbuildinfo
 .DS_Store
+.mcp.json
 
 # Per-deployment Compose customization (network wiring, reverse-proxy
 # labels, etc.) — deliberately local-only, same reasoning as .env. Docker

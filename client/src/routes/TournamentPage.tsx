@@ -468,7 +468,7 @@ export function TournamentPage() {
             to={`/tournaments/${tournament.id}/value`}
             className="inline-block text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-strong"
           >
-            Best pulls of the weekend →
+            Best pulls of the tournament →
           </Link>
           {me && (
             <button
