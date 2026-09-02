@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.3.1](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.3.1)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login) and PI-52 (player accounts) are code-complete, browser-verify pending. Still open: PI-62 (deck photos) is a lower-priority idea; plus a few small follow-ups noted inline below.
+The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.3.1](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.3.1)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login) and PI-52 (player accounts) are code-complete, browser-verify pending. Open ideas: PI-62 (deck photos) and PI-64–68 (bulk pod-entrant modal, inline new-player, per-pod rare-picks toggle, standings place column, spreadsheet export) — none started; plus a few small follow-ups noted inline below.
 
 ## Open items
 
@@ -329,3 +329,27 @@ Idea from Tobias: a player might drop from a running pod partway through the wee
 - [x] **MCP:** `drop_entrant` / `undrop_entrant` added as plain (non-destructive, reversible) tools next to `add_individual_entrant`.
 - [x] **Test:** `pairing.test.ts` — completes round 1 of a 4-entrant pod, drops one entrant, asserts `getActiveEntrants` excludes them and `generatePairings` never pairs them in round 2.
 - [x] Browser-verified by Tobias; released as v0.3.1 (2026-09-01).
+
+### PI-64 — Add pod entrants via a roster checklist modal (not a one-at-a-time dropdown)
+Idea from Tobias: adding players to a pod today is a dropdown where each player is picked and added individually (`IndividualEntrants` / the add-entrant form in `client/src/routes/PodPage.tsx`, backed by `POST /api/pods/:id/entrants` one call per player). Replace with an **"Add players" modal** (reuse the shared `Modal` from `components/ui.tsx`, as PI-45's share popup does) showing the whole org roster as a checklist — already-added players shown checked/disabled — plus a **check-all / uncheck-all** toggle, so a whole pod's worth of entrants goes in with one confirm.
+- Needs a bulk endpoint (`POST /api/pods/:id/entrants` accepting `playerIds: string[]`, or a new `.../entrants/bulk`) that adds each in one transaction and is idempotent on already-present players. Team pods keep the existing per-team form — this is the individual-pod path only.
+- Pairs with PI-65 (same modal).
+- [ ] Not started.
+
+### PI-65 — "Add a new player" from inside the pod entrant modal
+Idea from Tobias: the PI-64 add-players modal should also have an inline "new player" field — typing a name and confirming creates the `Player` on the org roster **and** adds them to the pod in one step, so an organizer doesn't have to bounce to the Roster page mid-setup. Reuses `POST /api/players` (which now enforces case-insensitive roster-name uniqueness) then the bulk-add from PI-64, surfacing the same "name already on the roster" guard.
+- [ ] Not started — depends on PI-64.
+
+### PI-66 — Per-pod "rare picks" toggle (disable value tracking for a pod)
+Idea from Tobias: pod edit (`EditPodForm` in `client/src/routes/PodPage.tsx`) should have a switch to **enable/disable "rare picks"** for that pod. When disabled: the pod's **Value tab is hidden** (`PodTabs.tsx` drops the `/value` entry; `PodValuePage` redirects/404s), and **no card pulls can be added** to that pod by any route — `POST /api/pods/:id/card-pulls` (`cardPulls.ts`) rejects, and the pod is excluded from the tournament "Best Pulls" rollup and the org Treasure Chest / Hall of Fame value stats.
+- New `Pod.rarePicksEnabled Boolean @default(true)` (nullable-column precedent, PI-33). Default on = today's behaviour. Existing `Pod.rarepicUrl` is unrelated (it's the "rare pick image" link field).
+- Decide: block silently (tab just gone) vs. a note on the pod page; and whether an *existing* pull on a pod that's later switched off is hidden or just frozen (lean: hidden from the Value views but not deleted).
+- [ ] Not started.
+
+### PI-67 — Show finishing place as a column in the standings table
+Idea from Tobias: the per-pod standings table (`client/src/components/` standings list, rendered on `PodStandingsPage` + `PublicPodStandingsPage`) doesn't show the rank number — add a **"Place" column** (1, 2, 3, … — or "1st / 2nd / 3rd") as the leftmost column. Purely frontend: the rows already arrive pre-sorted from `computePodStandings`, so place is the array index + 1 (ties share the sorted order the tiebreakers already produced; no special tie-display needed for v1). Check whether the tournament-wide standings (`GesamtwertungList`) wants the same treatment.
+- [ ] Not started.
+
+### PI-68 — Export a tournament as a spreadsheet (CSV / Excel)
+Idea from Tobias: a human-readable spreadsheet export of a tournament — distinct from PI-38's JSON dump, which is a machine round-trip format. Likely one download producing per-pod standings (place, player, points, record, tiebreakers) and the weekend Gesamtwertung, plus maybe a card-pull value sheet. CSV is trivial (no dep); `.xlsx` with multiple named sheets needs a library (e.g. `exceljs` / `xlsx`) — decide whether the multi-sheet nicety is worth the dependency or a zip-of-CSVs is enough. Organizer-only (session auth), sits next to the existing Settings → Export/Import section or as a button on the tournament page.
+- [ ] Not started — needs a scoping pass on exact columns/sheets and the CSV-vs-xlsx call.
