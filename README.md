@@ -4,6 +4,8 @@ A self-hosted, open-source Swiss-tournament tracker for MTG Limited (and other) 
 
 Designed from day one as a real multi-group tool: one deployment can host several isolated organizations, each with their own login, player roster, and public share link.
 
+**Try it live:** [limited-gauntlet.com](https://limited-gauntlet.com) — a public demo with anonymized seed data that resets on a schedule.
+
 ![Tournament Standings — the tournament-wide standings page, average-ranked with per-pod pips](docs/screenshots/gesamtwertung.png)
 
 **Status: solid beta, running in production.** Built over a few days with an AI pair-programmer (Claude Code — see [`PLAN.md`](PLAN.md) for the design rationale and [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) for the full build log, every entry verified live against a running instance, not just typechecked), then hardened through real weekend-tournament use. Auth/multi-tenancy (email+password or OIDC/SSO), Swiss pairing (auto *and* manual, with weekend-wide repeat avoidance and pre-lock swaps), standings, tournament-wide standings, an all-time Hall of Fame, Scryfall-backed card value tracking (the "Treasure Chest"), realtime broadcasts (Socket.IO), a round timer with a Display Mode chime, one-link public read-only sharing per org with share/QR popups, data export/import, and a security-hardened public-exposure posture (rate limiting, closed signup by default, CSP headers, anti-scraping, deployment-safe proxy trust, authorized realtime subscriptions) are all built and browser-tested. Dark mode only for now — light mode is a deliberate v2, not an oversight.
