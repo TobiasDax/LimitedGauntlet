@@ -8,6 +8,7 @@ import {
   useRemoveOrganizer,
 } from "../../features/organizers/useOrganizers";
 import { Button, Card, FormError, TextField } from "../ui";
+import { SharePopup } from "../SharePopup";
 
 function codeOf(err: unknown): string {
   return err instanceof ApiError ? err.message : "request_failed";
@@ -26,31 +27,36 @@ export function OrganizersSection() {
   const cancelInvite = useCancelInvite();
   const removeOrganizer = useRemoveOrganizer();
   const [email, setEmail] = useState("");
-  const [sent, setSent] = useState<string | null>(null);
+  const [shareLink, setShareLink] = useState<string | null>(null);
 
   const errorCode = inviteOrganizer.isError ? codeOf(inviteOrganizer.error) : null;
   const errorText =
     errorCode === "email_taken"
       ? "That email already has an account."
-      : errorCode === "email_not_configured"
-        ? "Email isn't configured on this server, so invites aren't available."
-        : errorCode
-          ? "Something went wrong."
-          : null;
+      : errorCode
+        ? "Something went wrong."
+        : null;
 
   return (
     <div>
+      {shareLink && (
+        <SharePopup
+          url={shareLink}
+          title="Co-organizer invite link"
+          onClose={() => setShareLink(null)}
+        />
+      )}
+
       <Card className="mb-6 p-5">
         <form
           className="flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            setSent(null);
             if (!email.trim()) return;
             inviteOrganizer.mutate(email.trim(), {
-              onSuccess: () => {
-                setSent(email.trim());
+              onSuccess: (res) => {
                 setEmail("");
+                setShareLink(res.link);
               },
             });
           }}
@@ -63,11 +69,10 @@ export function OrganizersSection() {
             onChange={(e) => setEmail(e.target.value)}
           />
           <Button type="submit" variant="primary" disabled={!email.trim() || inviteOrganizer.isPending}>
-            {inviteOrganizer.isPending ? "Sending…" : "Invite"}
+            {inviteOrganizer.isPending ? "Inviting…" : "Invite"}
           </Button>
         </form>
         {errorText && <FormError>{errorText}</FormError>}
-        {sent && <p className="mt-2 text-[13px] text-good">Invite sent to {sent}.</p>}
       </Card>
 
       {isLoading ? (
@@ -111,9 +116,26 @@ export function OrganizersSection() {
                       Invited by {i.invitedByName} · expires {formatDate(i.expiresAt)}
                     </div>
                   </div>
-                  <Button variant="ghost" onClick={() => cancelInvite.mutate(i.id)} disabled={cancelInvite.isPending}>
-                    Cancel
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      disabled={inviteOrganizer.isPending}
+                      onClick={() =>
+                        inviteOrganizer.mutate(i.email, {
+                          onSuccess: (res) => setShareLink(res.link),
+                        })
+                      }
+                    >
+                      Copy link
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => cancelInvite.mutate(i.id)}
+                      disabled={cancelInvite.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
               ))}
             </Card>

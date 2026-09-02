@@ -2,13 +2,13 @@ import { useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button, Modal } from "./ui";
 
-// Share popup (PI-45): shows a public link with a copy button and a scannable
-// QR code (generated client-side — no server round-trip, works offline once the
-// page is loaded). Reusable across public surfaces; the pod link is the primary
-// caller. `path` is an app-relative path; the absolute URL is built from the
-// current origin so it's whatever host the organizer is actually reaching.
-export function SharePopup({ path, title, onClose }: { path: string; title: string; onClose: () => void }) {
-  const url = `${window.location.origin}${path}`;
+// Share popup (PI-45): shows a link with a copy button and a scannable QR code
+// (generated client-side — no server round-trip, works offline once the page is
+// loaded). Pass either `path` (app-relative, combined with the current origin)
+// or `url` (already absolute, used as-is). The pod public link is the primary
+// caller; organizer/player invite links pass `url` directly.
+export function SharePopup({ path, url: urlProp, title, onClose }: { path?: string; url?: string; title: string; onClose: () => void }) {
+  const url = urlProp ?? `${window.location.origin}${path}`;
   const inputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
 

@@ -311,17 +311,13 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // Invite a co-organizer — sends a link to /accept-invite?token=…, same
-  // single-use hashed-token pattern as the email-change flow above. Requires
-  // SMTP: there's no other way for the invitee to receive the link.
+  // Invite a co-organizer — creates a single-use token link to /accept-invite?token=…
+  // and returns it so the organizer can share it directly. SMTP is optional: an
+  // email is also sent when configured, but the link always comes back in the response.
   app.post(
     "/api/settings/organizers/invite",
     { config: { rateLimit: { max: 10, timeWindow: "10 minutes" } } },
     async (request, reply) => {
-      if (!isEmailConfigured()) {
-        reply.code(503).send({ error: "email_not_configured" });
-        return;
-      }
       const body = inviteOrganizerSchema.safeParse(request.body);
       if (!body.success) {
         reply.code(400).send({ error: "invalid_input" });
@@ -357,12 +353,16 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       ]);
 
       const link = `${resolveBaseUrl(requestOrigin(request))}/accept-invite?token=${token}`;
-      await sendMail({
-        to: body.data.email,
-        subject: `You're invited to join ${org.name} on LimitedGauntlet`,
-        text: `${request.organizer!.name} invited you to co-organize ${org.name} on LimitedGauntlet. Accept by opening:\n\n${link}\n\nThis link expires in 7 days. If you weren't expecting this, ignore this email.`,
-      });
-      reply.send({ ok: true });
+      let emailSent = false;
+      if (isEmailConfigured()) {
+        await sendMail({
+          to: body.data.email,
+          subject: `You're invited to join ${org.name} on LimitedGauntlet`,
+          text: `${request.organizer!.name} invited you to co-organize ${org.name} on LimitedGauntlet. Accept by opening:\n\n${link}\n\nThis link expires in 7 days. If you weren't expecting this, ignore this email.`,
+        });
+        emailSent = true;
+      }
+      reply.send({ link, emailSent });
     },
   );
 

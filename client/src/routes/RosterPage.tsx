@@ -10,6 +10,7 @@ import {
 import { useMe } from "../features/auth/useAuth";
 import { ApiError } from "../lib/api";
 import { Button, Card, Eyebrow, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
+import { SharePopup } from "../components/SharePopup";
 import type { Player } from "../lib/types";
 
 const norm = (s: string) => s.trim().toLowerCase();
@@ -41,15 +42,11 @@ function AccountControls({ player, orgSlug }: { player: Player; orgSlug: string 
 
   if (link) {
     return (
-      <div className="flex flex-col items-end gap-1">
-        <span className="text-[11px] tracking-wide text-ink-muted uppercase">Invite link — send to player</span>
-        <div className="flex gap-1">
-          <TextField readOnly value={link} className="w-64 text-[12px]" onFocus={(e) => e.currentTarget.select()} />
-          <Button variant="ghost" onClick={() => navigator.clipboard?.writeText(link)}>
-            Copy
-          </Button>
-        </div>
-      </div>
+      <SharePopup
+        url={link}
+        title="Player invite link"
+        onClose={() => setLink(null)}
+      />
     );
   }
 

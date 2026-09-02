@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "../lib/api";
 import { useInviteInfo, useAcceptInvite } from "../features/auth/useAuth";
+import { useAppConfig } from "../features/config/useAppConfig";
 import { Button, Card, Eyebrow, Field, FormError, ScreenTitle, TextField } from "../components/ui";
+import { SsoButtons } from "../components/SsoButtons";
 
 // Landing page for a co-organizer invite link (PI-34). Public — the token is
 // the proof, so this works for someone with no account yet. Mirrors
@@ -14,6 +16,7 @@ export function AcceptInvitePage() {
   const navigate = useNavigate();
   const { data: invite, isLoading, isError: inviteInvalid } = useInviteInfo(token);
   const acceptInvite = useAcceptInvite();
+  const { data: appConfig } = useAppConfig();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -52,7 +55,15 @@ export function AcceptInvitePage() {
           </>
         )}
 
-        {invite && (
+        {invite && appConfig?.localLoginDisabled ? (
+          <>
+            <p className="mb-4 text-[14px] text-ink-secondary">
+              You've been invited to co-organize <strong>{invite.organizationName}</strong>.
+              Sign in with the SSO account for <strong>{invite.email}</strong> to accept.
+            </p>
+            <SsoButtons providers={appConfig.ssoProviders ?? []} />
+          </>
+        ) : invite && (
           <>
             <p className="mb-4 text-[14px] text-ink-secondary">
               You've been invited to co-organize <strong>{invite.organizationName}</strong> as {invite.email}.

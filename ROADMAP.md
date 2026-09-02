@@ -396,3 +396,19 @@ Idea from Tobias: players accumulate **tokens** across every event, redeemable f
 - [x] **Export / import (PI-38/39):** the `data` section now carries `tokensEnabled`, the tournament + pod token config, and the **hand-made** ledger rows (`MANUAL`/`INITIAL`, keyed by player displayName + `createdAt`, deduped on re-import so it's idempotent). The `POD_PARTICIPATION`/`POD_STANDING` rows aren't exported — `importOrgData` re-runs `syncPodTokenAwards` for every imported pod after the transaction to regenerate them. Import only ever *enables* tokens on the target org, never disables. `createdById` (organizer) isn't round-tripped — imported rows have it null, the note is preserved. Round-trip test in `orgImport.test.ts`.
 - [x] **Excel export (PI-68):** a **Tokens** sheet — one row per player who earned tokens from this tournament's pods (Player · earned here · current org-wide balance), only when the org has tokens on.
 - [ ] Browser-verified. **Tobias must run `npx prisma generate` locally.**
+
+### PI-73 — SSO-only accept-invite page
+On deployments with `LOCAL_LOGIN_DISABLED=true`, the `/accept-invite?token=…` page showed a name + password form — unusable because local login is disabled. The invitee had no way to accept the invite.
+
+Fix: the backend's `linkOrProvisionFromSso` already handles invite-by-email (path 3 in the sso.ts comment — it finds any valid pending invite matching the SSO email and provisions the account into that org). The frontend just wasn't aware: `AcceptInvitePage` now checks `appConfig.localLoginDisabled` and, when true, replaces the password form with SSO buttons + a note telling the invitee to use the email address the invite was sent to.
+- [x] **Built:** `AcceptInvitePage` branches on `localLoginDisabled` — SSO-only mode shows `SsoButtons` with invite context; no backend changes required.
+- [ ] Browser-verified.
+
+### PI-74 — Copy invite link + QR code modal (SMTP-free invite flow)
+On deployments without SMTP configured, organizer invites failed entirely (`503 email_not_configured`) and player invite links were shown in a plain inline text field with no QR code.
+
+The fix makes invite link delivery SMTP-optional and surfaces the link via the existing `SharePopup` (copy + QR code modal):
+- **Organizer invites:** the `POST /api/settings/organizers/invite` endpoint no longer requires SMTP — it always creates the token and returns `{ link, emailSent }`, sending mail only when SMTP is configured. The `OrganizersSection` shows a `SharePopup` after a successful invite (new or re-invite). Pending invites in the list gain a **Copy link** button that re-invites the same email (superseding the old token per the existing behavior) and opens the SharePopup.
+- **Player invites:** `RosterPage` upgrades the post-invite inline link display to a `SharePopup` with QR code. `SharePopup` gains an optional `url` prop for callers that already have an absolute URL (player invite links are built server-side).
+- [x] **Built:** `settings.ts` invite endpoint; `useOrganizers.ts` return type; `OrganizersSection`; `SharePopup` (`url` prop); `RosterPage` player invite upgrade.
+- [ ] Browser-verified.
