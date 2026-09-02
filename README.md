@@ -84,7 +84,6 @@ npm run --workspace server build && npm run --workspace client build   # typeche
 The app is **feature-complete and running in production** ([latest release](https://github.com/TobiasDax/LimitedGauntlet/releases/latest)). The full, always-current backlog lives in [`ROADMAP.md`](ROADMAP.md) — a quick snapshot of what's still planned:
 
 - **Social login via Google** — layer a "Sign in with Google" button on top of the OIDC groundwork; lower priority, not needed for the primary deployment (PI-43).
-- **Public demo instance** — a reset-on-schedule deployment with anonymized seed data so prospective self-hosters can try it without standing one up; lower priority (PI-44).
 
 See [`ROADMAP.md`](ROADMAP.md) for the full list, status, and design notes.
 

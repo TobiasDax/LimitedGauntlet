@@ -8,7 +8,7 @@ The app is **feature-complete and running in production**, with tagged releases 
 
 ## Open items
 
-_None currently — PI-43 and PI-44 below are lower-priority backlog ideas, not committed work._
+_None currently — PI-43 below is a lower-priority backlog idea, not committed work._
 
 ## New improvements (backlog)
 
@@ -153,13 +153,13 @@ Add OIDC as a login/registration option so the app can be used with an external 
 Google as a social-login provider on top of PI-42's OIDC groundwork. **Lower priority** — this is for public/general use, not needed for Tobias's own deployment right now.
 - [ ] Reuse PI-42's OIDC/account-linking machinery (Google is an OIDC provider); mainly the provider config + a "Sign in with Google" button. Optional/off unless configured.
 
-### PI-44 — Public demo instance (lower priority)
-A public demo deployment so prospective self-hosters can try the app without standing one up. **Lower priority.**
+### PI-44 — Public demo instance ✅ (deployed and live 2026-09-02)
+A public demo deployment so prospective self-hosters can try the app without standing one up.
 - [x] **Decided (Tobias, 2026-08-31):** a fully separate deployment (own Postgres, own throwaway data) on an existing-but-unused VPS, hosted **outside this repo** — the compose file/reset script/seed fixture are personal infra, not something other self-hosters need, so they live in a standalone project at `~/Projects/limitedgauntlet-demo/` instead of here.
 - [x] **Reset mechanism:** no pg_dump/volume-snapshot tooling needed — the app already has a clean "load this data" primitive (PI-38/39's export/import), so reset = wipe the Postgres volume, bring up a fresh instance (migrations run automatically on start, same as any deploy), sign up the fixed demo login, then `POST` an anonymized seed export to `/api/settings/import`. Runs hourly via cron.
 - [x] **Anonymization:** since the export format (`orgExport.ts`) uses each player's `displayName` as the identity key throughout the whole document, a plain exact-string swap — real name → fictional name, everywhere it appears — preserves every relationship in the file while removing every real name. A small script does this against a real export pulled from Settings → Export/Import.
 - [x] **Known demo login:** a fixed, published organizer credential, same idea as originally scoped.
-- Full detail (compose file, reset script, anonymizer, setup steps) lives in `~/Projects/limitedgauntlet-demo/README.md`, not here. Once actually deployed, the host itself should get documented in the `claude-memory` repo's infra docs (not done yet — Tobias's VPS isn't in there yet either).
+- [x] **Deployed and live 2026-09-02.** Full detail (compose file, reset script, anonymizer, setup steps) lives in `~/Projects/limitedgauntlet-demo/README.md`, not here. Still TODO: document the demo host in the `claude-memory` repo's infra docs.
 
 ### PI-45 — Share popup with QR code for a pod's public link ✅ (code-complete, browser-verify pending)
 The pod page's "Public link ↗" (`PodPage.tsx`) was a plain anchor that just opened the public pod page in a new tab. Turned it into a proper share affordance: a popup showing the shareable link plus a generated QR code so players can scan it to open the public page on their phone.
