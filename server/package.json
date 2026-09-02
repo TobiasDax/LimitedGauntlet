@@ -22,6 +22,7 @@
     "nodemailer": "^9.0.5",
     "openid-client": "^5.7.1",
     "socket.io": "^4.8.1",
+    "write-excel-file": "^4.1.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {

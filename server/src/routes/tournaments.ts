@@ -5,6 +5,7 @@ import { requireAuth } from "../auth/middleware.js";
 import { findOwnedTournament } from "../services/ownership.js";
 import { computePlayerPairHistory } from "../services/weekendHistory.js";
 import { computeGesamtwertung, countTournamentParticipants } from "../services/gesamtwertung.js";
+import { buildTournamentWorkbook } from "../services/tournamentSpreadsheet.js";
 
 const tournamentCreateSchema = z.object({
   name: z.string().trim().min(1).max(150),
@@ -219,5 +220,26 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
 
     const gesamtwertung = rows.map((row) => ({ ...row, player: playerById.get(row.playerId) }));
     reply.send({ pods, gesamtwertung });
+  });
+
+  // Human-readable .xlsx export (PI-68): Tournament Standings + a sheet per
+  // pod's standings + one flat Matches sheet. Distinct from the JSON org
+  // export in Settings (that's the machine round-trip format).
+  app.get("/api/tournaments/:id/export.xlsx", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const tournament = await findOwnedTournament(params.data.id, request.organizer!.orgId);
+    if (!tournament) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    const { buffer, filename } = await buildTournamentWorkbook(tournament.id);
+    reply
+      .header("Content-Disposition", `attachment; filename="${filename}"`)
+      .type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      .send(buffer);
   });
 }

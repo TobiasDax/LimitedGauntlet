@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useTournament, tournamentStatusLabel, type TournamentDetail } from "../features/tournaments/useTournament";
+import {
+  useTournament,
+  useExportTournamentXlsx,
+  tournamentStatusLabel,
+  type TournamentDetail,
+} from "../features/tournaments/useTournament";
 import { useUpdateTournament, useDeleteTournament } from "../features/tournaments/useTournaments";
 import { useCreatePod, podFormatLabel, podFormatDisplay, podProgressStatus } from "../features/pods/usePods";
 import { useMe } from "../features/auth/useAuth";
@@ -311,6 +316,7 @@ export function TournamentPage() {
   // Pick up players self-checking in/out (PI-52) and any pod result that moves
   // the tournament-wide standings, without a manual refresh.
   useTournamentRealtime(id);
+  const exportXlsx = useExportTournamentXlsx(id ?? "");
   const [showPodForm, setShowPodForm] = useState(false);
   const [editingTournament, setEditingTournament] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -367,6 +373,15 @@ export function TournamentPage() {
               className="inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
             >
               Share public link ↗
+            </button>
+          )}
+          {me && (
+            <button
+              onClick={() => exportXlsx.mutate()}
+              disabled={exportXlsx.isPending}
+              className="inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink disabled:opacity-50"
+            >
+              {exportXlsx.isPending ? "Preparing…" : "Export spreadsheet ↓"}
             </button>
           )}
           {me && sharing && (

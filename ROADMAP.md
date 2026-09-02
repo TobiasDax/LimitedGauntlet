@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.3.1](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.3.1)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login) and PI-52 (player accounts) are code-complete, browser-verify pending. Open ideas: PI-62 (deck photos) and PI-64–68 (bulk pod-entrant modal, inline new-player, per-pod rare-picks toggle, standings place column, spreadsheet export) — none started; plus a few small follow-ups noted inline below.
+The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.3.1](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.3.1)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login) and PI-52 (player accounts) are code-complete, browser-verify pending. PI-64–68 (bulk pod-entrant modal + inline new-player, per-pod rare-picks toggle, standings place column, .xlsx export) are code-complete, browser-verify pending. Open ideas: PI-62 (deck photos); plus a few small follow-ups noted inline below.
 
 ## Open items
 
@@ -352,6 +352,10 @@ Idea from Tobias: the per-pod standings table didn't show the rank number.
 - [x] Added a leftmost `#` column (sequential `i + 1`, muted, right-aligned tabular) to the per-pod standings table on both `PodStandingsPage.tsx` (authed) and `PublicPodPage.tsx` (public). No backend change — rows already arrive pre-sorted from `computePodStandings`. The tournament-wide standings (`GesamtwertungList.tsx`) already had a tie-aware rank badge, so it needed nothing. Sequential (not tie-aware) per the v1 scope — the manual-reorder arrows already handle the intentional-tie case.
 - [ ] Browser-verified.
 
-### PI-68 — Export a tournament as a spreadsheet (CSV / Excel)
-Idea from Tobias: a human-readable spreadsheet export of a tournament — distinct from PI-38's JSON dump, which is a machine round-trip format. Likely one download producing per-pod standings (place, player, points, record, tiebreakers) and the weekend Gesamtwertung, plus maybe a card-pull value sheet. CSV is trivial (no dep); `.xlsx` with multiple named sheets needs a library (e.g. `exceljs` / `xlsx`) — decide whether the multi-sheet nicety is worth the dependency or a zip-of-CSVs is enough. Organizer-only (session auth), sits next to the existing Settings → Export/Import section or as a button on the tournament page.
-- [ ] Not started — needs a scoping pass on exact columns/sheets and the CSV-vs-xlsx call.
+### PI-68 — Export a tournament as a spreadsheet (.xlsx) ✅ (code-complete, browser-verify pending)
+Idea from Tobias: a human-readable spreadsheet export of a tournament, distinct from PI-38's JSON round-trip dump.
+- [x] **Decisions (Tobias):** `.xlsx` multi-sheet; contents = Tournament Standings + a Standings sheet per pod + one flat Matches sheet (round-by-round); download button on the tournament page.
+- [x] **Dependency:** `write-excel-file` (chosen over `exceljs` — `exceljs` pulls transitive advisories in its CSV-read path we don't use; `write-excel-file` audits clean and is write-only, which is all we need).
+- [x] `server/src/services/tournamentSpreadsheet.ts` — `buildTournamentWorkbook(id)` reuses `computePodStandings` + `computeGesamtwertung`, derives W/L/D from Match rows (a bye counts as a win), tie-aware rank on the Gesamtwertung sheet, sanitises sheet names to Excel's 31-char / no-`[]:*?/\` rule. Route `GET /api/tournaments/:id/export.xlsx` (`tournaments.ts`, org-scoped). Frontend `useExportTournamentXlsx` hook (direct fetch → Blob download, same as the org export) + an "Export spreadsheet ↓" button on `TournamentPage`.
+- [x] Smoke-tested end to end against a real Postgres — valid xlsx, correct sheets, bye/pending/draw and dirty pod names all handled.
+- [ ] Browser-verified (download + open in Excel/LibreOffice).
