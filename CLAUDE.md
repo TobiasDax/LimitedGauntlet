@@ -33,6 +33,7 @@ Key business rules (confirmed against real historical data, do not change withou
 - Standings/pairing math must have test coverage against real historical numbers (pseudonymized in the test fixtures — the real data lives outside this repo, see README's "History import" section) — known-good numbers from actual tournament results, not invented test data.
 - No auth dependency beyond the DB — sessions are encrypted cookies (`@fastify/secure-session`), not a separate session store.
 - Public tournament/pod pages (`/o/<slug>/tournaments/<id>/...`) must stay open by default — no login wall that quietly grows over the frictionless slug-is-the-access-control model. The one sanctioned exception is an organizer *explicitly opting in* to a per-org password lock on their own public pages (see ROADMAP PI-27); that's a deliberate owner choice, not a creeping default, and must stay off unless the organizer turns it on.
+- Player accounts (PI-52) are a **second, opt-in auth surface** at `/o/<slug>/player`, not a gate on anything: a player logs in only to check themselves in and report their own results. It must never become a precondition for *reading* a public page. A logged-in player may pass the PI-27 lock for their own org (they've authenticated to it), but the public pages stay open to everyone else exactly as before.
 
 ## Deploy target
 

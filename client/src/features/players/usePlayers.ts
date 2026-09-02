@@ -33,3 +33,21 @@ export function useDeletePlayer() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["players"] }),
   });
 }
+
+// PI-52 — invite a roster player to a self-service account, or revoke one.
+export function useInvitePlayer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, email }: { id: string; email: string }) =>
+      api.post<{ acceptUrl: string; emailSent: boolean }>(`/players/${id}/invite`, { email }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["players"] }),
+  });
+}
+
+export function useRevokePlayerAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/players/${id}/account`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["players"] }),
+  });
+}

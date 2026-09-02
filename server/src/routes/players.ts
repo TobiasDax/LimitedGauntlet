@@ -9,14 +9,30 @@ const playerSchema = z.object({
 
 const paramsSchema = z.object({ id: z.string().min(1) });
 
+// Never send the login credentials (PI-52) back to the client — the roster
+// only cares whether an account exists, exposed as `hasAccount` on the list.
+function publicPlayer<T extends { passwordHash: string | null; email: string | null }>(player: T) {
+  const { passwordHash, email, ...rest } = player;
+  return { ...rest, hasAccount: passwordHash !== null };
+}
+
 export async function playerRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
 
   app.get("/api/players", async (request, reply) => {
-    const players = await prisma.player.findMany({
+    const rows = await prisma.player.findMany({
       where: { orgId: request.organizer!.orgId },
       orderBy: { displayName: "asc" },
+      include: {
+        _count: { select: { playerInvites: { where: { usedAt: null, expiresAt: { gt: new Date() } } } } },
+      },
     });
+    // Never leak the hash or the login email over the wire — the roster UI
+    // only needs to know whether an account / pending invite exists (PI-52).
+    const players = rows.map(({ _count, ...p }) => ({
+      ...publicPlayer(p),
+      pendingInvite: _count.playerInvites > 0,
+    }));
     reply.send({ players });
   });
 
@@ -30,7 +46,7 @@ export async function playerRoutes(app: FastifyInstance): Promise<void> {
     const player = await prisma.player.create({
       data: { orgId: request.organizer!.orgId, displayName: parsed.data.displayName },
     });
-    reply.code(201).send({ player });
+    reply.code(201).send({ player: publicPlayer(player) });
   });
 
   app.patch("/api/players/:id", async (request, reply) => {
@@ -54,8 +70,8 @@ export async function playerRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const player = await prisma.player.findUnique({ where: { id: params.data.id } });
-    reply.send({ player });
+    const player = await prisma.player.findUniqueOrThrow({ where: { id: params.data.id } });
+    reply.send({ player: publicPlayer(player) });
   });
 
   app.delete("/api/players/:id", async (request, reply) => {

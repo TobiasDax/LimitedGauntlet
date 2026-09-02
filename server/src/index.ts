@@ -11,6 +11,7 @@ import { config } from "./config.js";
 import { prisma } from "./prisma.js";
 import { authRoutes } from "./routes/auth.js";
 import { playerRoutes } from "./routes/players.js";
+import { playerAccountRoutes } from "./routes/playerAccounts.js";
 import { tournamentRoutes } from "./routes/tournaments.js";
 import { podRoutes } from "./routes/pods.js";
 import { roundRoutes } from "./routes/rounds.js";
@@ -133,6 +134,7 @@ app.get("/api/healthz", async () => {
 
 await app.register(authRoutes);
 await app.register(playerRoutes);
+await app.register(playerAccountRoutes);
 await app.register(tournamentRoutes);
 await app.register(podRoutes);
 await app.register(roundRoutes);

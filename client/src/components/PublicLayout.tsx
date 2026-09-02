@@ -1,4 +1,4 @@
-import { Outlet, useParams } from "react-router-dom";
+import { Link, Outlet, useParams } from "react-router-dom";
 import { usePublicOrganization, usePublicLockStatus } from "../features/public/usePublic";
 import { PublicUnlockPrompt } from "./PublicUnlockPrompt";
 import { TopBar, type NavItem } from "./TopBar";
@@ -29,9 +29,18 @@ export function PublicLayout() {
     { to: `${base}/treasure-chest`, label: "Treasure Chest" },
   ];
 
+  const playerLink = (
+    <Link
+      to={`${base}/player`}
+      className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
+      Player sign-in
+    </Link>
+  );
+
   return (
     <div className="flex min-h-screen flex-col">
-      <TopBar brandTo={base} orgName={data?.organization.name} navItems={navItems} />
+      <TopBar brandTo={base} orgName={data?.organization.name} navItems={navItems} rightSlot={playerLink} />
 
       <main className="mx-auto w-full max-w-[1180px] flex-1 px-4 pb-24 pt-8 sm:px-8 sm:pt-10">
         <Outlet />

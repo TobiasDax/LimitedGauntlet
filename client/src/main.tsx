@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout.tsx";
 import { PublicLayout } from "./components/PublicLayout.tsx";
+import { PlayerLayout, PlayerProtectedRoute } from "./components/PlayerLayout.tsx";
 import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
 import { LoginPage } from "./routes/LoginPage.tsx";
 import { SignupPage } from "./routes/SignupPage.tsx";
@@ -22,6 +23,9 @@ import { PlayerStatsPage } from "./routes/PlayerStatsPage.tsx";
 import { SettingsPage } from "./routes/SettingsPage.tsx";
 import { VerifyEmailPage } from "./routes/VerifyEmailPage.tsx";
 import { AcceptInvitePage } from "./routes/AcceptInvitePage.tsx";
+import { PlayerAcceptInvitePage } from "./routes/PlayerAcceptInvitePage.tsx";
+import { PlayerLoginPage } from "./routes/PlayerLoginPage.tsx";
+import { PlayerPortalPage } from "./routes/PlayerPortalPage.tsx";
 import { OidcSetupPage } from "./routes/OidcSetupPage.tsx";
 import { OidcRelinkPage } from "./routes/OidcRelinkPage.tsx";
 import { PublicDashboardPage } from "./routes/PublicDashboardPage.tsx";
@@ -40,6 +44,12 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
+          <Route path="/o/:slug/player" element={<PlayerLayout />}>
+            <Route path="login" element={<PlayerLoginPage />} />
+            <Route element={<PlayerProtectedRoute />}>
+              <Route index element={<PlayerPortalPage />} />
+            </Route>
+          </Route>
           <Route path="/o/:slug" element={<PublicLayout />}>
             <Route index element={<PublicDashboardPage />} />
             <Route path="roster" element={<PublicRosterPage />} />
@@ -54,6 +64,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/accept-invite" element={<AcceptInvitePage />} />
+            <Route path="/player/accept-invite" element={<PlayerAcceptInvitePage />} />
             <Route path="/oidc-setup" element={<OidcSetupPage />} />
             <Route path="/oidc-relink" element={<OidcRelinkPage />} />
             <Route element={<ProtectedRoute />}>

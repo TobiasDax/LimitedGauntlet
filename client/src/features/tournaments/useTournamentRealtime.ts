@@ -22,10 +22,13 @@ export function useTournamentRealtime(tournamentId: string | undefined): void {
     if (socket.connected) joinRoom();
     socket.on("connect", joinRoom);
     socket.on("standings-changed", onEvent);
+    // A player self-checking in/out of this tournament (PI-52).
+    socket.on("roster-changed", onEvent);
 
     return () => {
       socket.off("connect", joinRoom);
       socket.off("standings-changed", onEvent);
+      socket.off("roster-changed", onEvent);
       socket.emit("leave", room);
     };
   }, [tournamentId, queryClient]);

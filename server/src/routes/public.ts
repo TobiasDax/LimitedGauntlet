@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { findPublicTournament, findPublicPod, findPublicOrganization } from "../services/ownership.js";
 import { verifyPassword } from "../auth/password.js";
+import { hasValidPlayerSession } from "../services/playerAccounts.js";
 import { computeGesamtwertung, countTournamentParticipants } from "../services/gesamtwertung.js";
 import { computePodStandings } from "../services/standings.js";
 import { computeHallOfFameOverview, computePlayerStats } from "../services/playerStats.js";
@@ -46,6 +47,10 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     const organization = await findPublicOrganization(slug);
     if (!organization || !organization.publicPasswordHash) return; // missing → 404 in handler; unlocked → open
     if (isUnlocked(request, organization.id)) return;
+    // A logged-in player of this org has already authenticated to it (PI-52),
+    // so the public-page password isn't a second gate for them — they read the
+    // same public surface through these routes as the portal links to.
+    if (await hasValidPlayerSession(request, organization.id)) return;
     reply.code(401).send({ error: "locked" });
   });
 

@@ -25,6 +25,10 @@ interface RealtimeAuthorizationStore {
   // session-revoking action also cuts off an already-open realtime subscription
   // rather than leaving it authorized on stale state.
   organizerSessionValid(organizerId: string, orgId: string, authVersion: number): Promise<boolean>;
+  // Same idea for a self-service player session (PI-52) — a logged-in player of
+  // the room's org may subscribe to a locked org's rooms, and a revoked account
+  // (authVersion bumped) loses that subscription on reconnect.
+  playerSessionValid(playerId: string, orgId: string, authVersion: number): Promise<boolean>;
 }
 
 export type RealtimeRoomAuthorizer = (room: unknown, cookieHeader: string | undefined) => Promise<boolean>;
@@ -50,6 +54,13 @@ const defaultAuthorizationStore: RealtimeAuthorizationStore = {
       select: { authVersion: true },
     });
     return organizer !== null && organizer.authVersion === authVersion;
+  },
+  async playerSessionValid(playerId, orgId, authVersion) {
+    const player = await prisma.player.findFirst({
+      where: { id: playerId, orgId, passwordHash: { not: null } },
+      select: { authVersion: true },
+    });
+    return player !== null && player.authVersion === authVersion;
   },
 };
 
@@ -82,9 +93,24 @@ export function createRealtimeRoomAuthorizer(
     if (Array.isArray(unlockedOrgIds) && unlockedOrgIds.includes(organization.id)) return true;
 
     const organizerId = session.get<unknown>("organizerId");
-    if (typeof organizerId !== "string") return false;
-    const authVersion = session.get<unknown>("authVersion");
-    return store.organizerSessionValid(organizerId, organization.id, typeof authVersion === "number" ? authVersion : 0);
+    if (typeof organizerId === "string") {
+      const authVersion = session.get<unknown>("authVersion");
+      if (await store.organizerSessionValid(organizerId, organization.id, typeof authVersion === "number" ? authVersion : 0)) {
+        return true;
+      }
+    }
+
+    const playerId = session.get<unknown>("playerId");
+    if (typeof playerId === "string") {
+      const playerAuthVersion = session.get<unknown>("playerAuthVersion");
+      return store.playerSessionValid(
+        playerId,
+        organization.id,
+        typeof playerAuthVersion === "number" ? playerAuthVersion : 0,
+      );
+    }
+
+    return false;
   };
 }
 

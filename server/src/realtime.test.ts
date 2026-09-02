@@ -12,6 +12,7 @@ function fixture(options?: {
   locked?: boolean;
   sessionValues?: Record<string, unknown>;
   organizerMatches?: boolean;
+  playerMatches?: boolean;
   resourceExists?: boolean;
 }) {
   const parseCookie = vi.fn(() => ({ session: "encoded" }));
@@ -24,11 +25,12 @@ function fixture(options?: {
       : { id: "org-1", publicPasswordHash: options?.locked === false ? null : "hash" },
   );
   const organizerSessionValid = vi.fn(async () => options?.organizerMatches ?? false);
+  const playerSessionValid = vi.fn(async () => options?.playerMatches ?? false);
   const authorize = createRealtimeRoomAuthorizer(
     { parseCookie, decodeSecureSession },
-    { findRoomOrganization, organizerSessionValid },
+    { findRoomOrganization, organizerSessionValid, playerSessionValid },
   );
-  return { authorize, parseCookie, decodeSecureSession, findRoomOrganization, organizerSessionValid };
+  return { authorize, parseCookie, decodeSecureSession, findRoomOrganization, organizerSessionValid, playerSessionValid };
 }
 
 describe("realtime room authorization", () => {
@@ -91,10 +93,19 @@ describe("realtime room authorization", () => {
     const organizerSessionValid = vi.fn(async (_organizerId: string, _orgId: string, authVersion: number) => authVersion === 3);
     const authorize = createRealtimeRoomAuthorizer(
       { parseCookie: () => ({ session: "encoded" }), decodeSecureSession: () => session({ organizerId: "organizer-1", authVersion: 1 }) },
-      { findRoomOrganization, organizerSessionValid },
+      { findRoomOrganization, organizerSessionValid, playerSessionValid: async () => false },
     );
     await expect(authorize("pod:pod-1", "session=stale")).resolves.toBe(false);
     expect(organizerSessionValid).toHaveBeenCalledWith("organizer-1", "org-1", 1);
+  });
+
+  it("allows a current player session into their own locked organization's room (PI-52)", async () => {
+    const f = fixture({ sessionValues: { playerId: "player-1", playerAuthVersion: 4 }, playerMatches: true });
+    await expect(f.authorize("pod:pod-1", "session=good")).resolves.toBe(true);
+    expect(f.playerSessionValid).toHaveBeenCalledWith("player-1", "org-1", 4);
+
+    const revoked = fixture({ sessionValues: { playerId: "player-1", playerAuthVersion: 1 }, playerMatches: false });
+    await expect(revoked.authorize("pod:pod-1", "session=good")).resolves.toBe(false);
   });
 
   it("denies malformed and nonexistent rooms without decoding a session", async () => {
@@ -117,6 +128,7 @@ describe("realtime room authorization", () => {
       {
         findRoomOrganization: async () => ({ id: "org-1", publicPasswordHash: locked ? "hash" : null }),
         organizerSessionValid: async () => false,
+        playerSessionValid: async () => false,
       },
     );
 

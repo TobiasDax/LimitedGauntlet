@@ -29,6 +29,7 @@ model Organization {
   players     Player[]
   tournaments Tournament[]
   organizerInvites OrganizerInvite[]
+  playerInvites PlayerInvite[]
   webhooks    OrganizationWebhook[]
 }
 
@@ -83,6 +84,7 @@ model OrganizerAccount {
   emailChangeRequests EmailChangeRequest[]
   oidcRelinkRequests OidcSubjectRelinkRequest[]
   sentInvites  OrganizerInvite[]
+  sentPlayerInvites PlayerInvite[]
 
   @@index([orgId])
 }
@@ -170,13 +172,52 @@ model Player {
   displayName String
   createdAt   DateTime @default(now())
 
+  // Optional self-service login (PI-52). A plain roster entry has all three
+  // null — the default. An organizer invites a player by email (PlayerInvite);
+  // on accept, `email`/`passwordHash` are set and the player can log in at
+  // /o/<slug>/player to check themselves into tournaments and report their own
+  // match results. `authVersion` bumps on revoke, invalidating any live player
+  // session — the same mechanism OrganizerAccount uses. This is a second auth
+  // surface that never walls the open-by-default public pages; it only unlocks
+  // the player's own write actions.
+  email        String?
+  passwordHash String?
+  authVersion  Int      @default(0)
+
   organization      Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
   tournamentPlayers TournamentPlayer[]
   teamMemberships   TeamMember[]
   entrants          Entrant[]
   cardPulls         CardPull[]
+  playerInvites     PlayerInvite[]
+
+  @@unique([orgId, email])
+  @@index([orgId])
+}
+
+// Pending player-account invites (PI-52). Mirrors OrganizerInvite exactly,
+// just bound to a Player row rather than provisioning a new account: the
+// organizer picks a roster player + supplies an email, the player opens the
+// link and sets a password (accept-player-invite), which fills in
+// Player.email/passwordHash. Single-use (usedAt), time-limited (expiresAt),
+// only the token's SHA-256 hash stored.
+model PlayerInvite {
+  id          String    @id @default(cuid())
+  orgId       String
+  playerId    String
+  email       String
+  tokenHash   String    @unique
+  invitedById String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  organization Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  player       Player           @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  invitedBy    OrganizerAccount @relation(fields: [invitedById], references: [id], onDelete: Cascade)
 
   @@index([orgId])
+  @@index([playerId])
 }
 
 // ---------------------------------------------------------------------------

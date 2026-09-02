@@ -4,6 +4,7 @@ import { useTournament, tournamentStatusLabel, type TournamentDetail } from "../
 import { useUpdateTournament, useDeleteTournament } from "../features/tournaments/useTournaments";
 import { useCreatePod, podFormatLabel, podFormatDisplay, podProgressStatus } from "../features/pods/usePods";
 import { useMe } from "../features/auth/useAuth";
+import { useTournamentRealtime } from "../features/tournaments/useTournamentRealtime";
 import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
 import { RichText } from "../components/RichText";
 import { SetPicker } from "../components/SetPicker";
@@ -307,6 +308,9 @@ export function TournamentPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading } = useTournament(id);
   const { data: me } = useMe();
+  // Pick up players self-checking in/out (PI-52) and any pod result that moves
+  // the tournament-wide standings, without a manual refresh.
+  useTournamentRealtime(id);
   const [showPodForm, setShowPodForm] = useState(false);
   const [editingTournament, setEditingTournament] = useState(false);
   const [sharing, setSharing] = useState(false);

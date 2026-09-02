@@ -16,6 +16,39 @@ export interface Player {
   orgId: string;
   displayName: string;
   createdAt: string;
+  // PI-52 — present on the organizer roster list; the login email/hash itself
+  // is never sent to the client.
+  hasAccount?: boolean;
+  pendingInvite?: boolean;
+}
+
+// PI-52 — the self-service player portal payload (GET /api/player/portal).
+export interface PlayerPortalTournament {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: TournamentStatus;
+  checkedIn: boolean;
+}
+
+export interface PlayerPortalMatch {
+  matchId: string;
+  podId: string;
+  podName: string;
+  tournamentId: string;
+  roundNumber: number;
+  matchFormat: MatchFormat;
+  mySide: "A" | "B";
+  opponentName: string;
+  gamesWonA: number;
+  gamesWonB: number;
+  result: MatchResult;
+}
+
+export interface PlayerSession {
+  player: { id: string; displayName: string };
+  organization: { slug: string; name: string };
 }
 
 export type TournamentStatus = "PLANNING" | "ACTIVE" | "COMPLETED";

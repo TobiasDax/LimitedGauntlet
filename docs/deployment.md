@@ -78,6 +78,20 @@ Socket.IO (used for live pairings/standings/timer updates) shares the same port 
 
 If you're migrating from spreadsheets, a pairing site, or manually-kept docs and want your past results pre-loaded rather than starting from an empty roster, see the README's **History import** section — it covers the data file format, the idempotent import script, and the env vars that control the created organization/login. Turning your actual records into that file's exact JSON shape is the tedious part; if you're running this via Claude Code, the [`import-history`](../.claude/skills/import-history/SKILL.md) skill (`/import-history`) does that conversion interactively instead of you hand-writing it against the TypeScript interfaces.
 
+## 5b. Optional: player self-service accounts
+
+By default an organizer runs everything. If you'd rather let players check
+themselves into tournaments and report their own match results, invite them
+from **Roster** — pick a player, enter their email, and hand them the link
+(it's also emailed automatically when SMTP is configured — see §2). They set a
+password and sign in at `/o/<your-slug>/player`.
+
+This is a separate, opt-in login that never gates the public pages — a player
+account only unlocks that player's own writes. A signed-in player can also
+view your org's pages even when you've set a public-page password (§ PI-27),
+since they've already authenticated. Revoke an account any time from Roster;
+that immediately invalidates their session.
+
 ## 6. Optional: mint an API token for the MCP server
 
 The app exposes an MCP (Model Context Protocol) server (`mcp/`) so an AI agent can read and manage tournament data directly — pairing, results, standings, card pulls — through the same authenticated API the web app uses. This is entirely optional and runs as a separate local process, not part of the deployed container.
