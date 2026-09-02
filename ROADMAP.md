@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.3.1](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.3.1)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. Still open: PI-43 (Google login), PI-52 (player accounts) and PI-62 (deck photos) are unscoped/lower-priority ideas; plus a few small follow-ups noted inline below.
+The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.3.1](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.3.1)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-52 (player accounts) is code-complete, browser-verify pending. Still open: PI-43 (Google login) and PI-62 (deck photos) are lower-priority ideas; plus a few small follow-ups noted inline below.
 
 ## Open items
 
