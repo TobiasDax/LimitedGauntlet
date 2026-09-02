@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { usePublicHallOfFame } from "../features/public/usePublic";
 import { HeadlineStats, HallOfFameList, MostPlayedPairings, BiggestPulls } from "../components/HallOfFameOverview";
@@ -6,6 +7,7 @@ import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 export function PublicHallOfFamePage() {
   const { slug } = useParams<{ slug: string }>();
   const { data, isLoading } = usePublicHallOfFame(slug);
+  const [showGuests, setShowGuests] = useState(false);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;
   if (!data) return <p className="text-ink-muted">Not found.</p>;
@@ -31,6 +33,8 @@ export function PublicHallOfFamePage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
             <HallOfFameList
               rows={data.hallOfFame}
+              showGuests={showGuests}
+              onToggleGuests={() => setShowGuests((v) => !v)}
               playerLinkTo={(id) => `/o/${slug}/hall-of-fame/players/${id}`}
               mainEventLinkTo={(win) => `/o/${slug}/tournaments/${win.tournamentId}/pods/${win.podId}`}
             />

@@ -50,23 +50,31 @@ export function HeadlineStats({
 
 export function HallOfFameList({
   rows,
+  showGuests,
+  onToggleGuests,
   playerLinkTo,
   mainEventLinkTo,
 }: {
   rows: HallOfFameRow[];
+  showGuests: boolean;
+  onToggleGuests: () => void;
   playerLinkTo: (playerId: string) => string;
   // Each crown links to its own pod (a player can have several main-event
   // wins across different tournaments) — takes the win's ids since the
   // public route needs the tournamentId too, the authed one doesn't.
   mainEventLinkTo: (win: HallOfFameRow["mainEventWins"][number]) => string;
 }) {
+  const hasMultiTournamentPlayers = rows.some((r) => r.tournamentsPlayed > 1);
+  const visibleRows = showGuests || !hasMultiTournamentPlayers ? rows : rows.filter((r) => r.tournamentsPlayed > 1);
+  const hiddenCount = rows.length - visibleRows.length;
+
   let rank = 0;
   let prevAvg: number | null = null;
   let prevTotal: number | null = null;
 
   return (
     <div className="flex flex-col gap-0.5">
-      {rows.map((row, i) => {
+      {visibleRows.map((row, i) => {
         const tied = row.average === prevAvg && row.totalPoints === prevTotal;
         if (!tied) rank = i + 1;
         prevAvg = row.average;
@@ -127,6 +135,16 @@ export function HallOfFameList({
           </div>
         );
       })}
+      {hasMultiTournamentPlayers && (hiddenCount > 0 || showGuests) && (
+        <button
+          onClick={onToggleGuests}
+          className="mt-3 text-left text-[12.5px] text-ink-muted hover:text-ink"
+        >
+          {showGuests
+            ? "Hide one-tournament guests"
+            : `Show ${hiddenCount} one-tournament guest${hiddenCount === 1 ? "" : "s"}`}
+        </button>
+      )}
     </div>
   );
 }

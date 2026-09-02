@@ -9,6 +9,7 @@ export function HallOfFamePage() {
   const { data, isLoading } = useHallOfFame();
   const { data: me } = useMe();
   const [sharing, setSharing] = useState(false);
+  const [showGuests, setShowGuests] = useState(false);
 
   return (
     <div>
@@ -49,6 +50,8 @@ export function HallOfFamePage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
             <HallOfFameList
               rows={data.hallOfFame}
+              showGuests={showGuests}
+              onToggleGuests={() => setShowGuests((v) => !v)}
               playerLinkTo={(id) => `/hall-of-fame/players/${id}`}
               mainEventLinkTo={(win) => `/pods/${win.podId}`}
             />
