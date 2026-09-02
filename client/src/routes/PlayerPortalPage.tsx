@@ -87,7 +87,9 @@ export function PlayerPortalPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {data.matches.map((m) => (
-              <MyMatchCard key={m.matchId} match={m} />
+              // Remount when the stored score changes out from under us (an
+              // opponent's entry arrives over realtime) so the steppers re-seed.
+              <MyMatchCard key={`${m.matchId}:${m.gamesWonA}-${m.gamesWonB}`} match={m} />
             ))}
           </div>
         )}

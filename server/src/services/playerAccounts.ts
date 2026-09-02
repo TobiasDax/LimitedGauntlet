@@ -154,15 +154,11 @@ export async function submitPlayerResult(
   gamesWonAInput: number,
   gamesWonBInput: number,
 ) {
-  const participantSelect = {
-    playerId: true,
-    team: { select: { members: { select: { playerId: true } } } },
-  } as const;
   const match = await prisma.match.findFirst({
     where: { id: matchId, round: { pod: { tournament: { orgId } } } },
     include: {
-      entrantA: { select: participantSelect },
-      entrantB: { select: participantSelect },
+      entrantA: { select: { playerId: true, team: { select: { members: { select: { playerId: true } } } } } },
+      entrantB: { select: { playerId: true, team: { select: { members: { select: { playerId: true } } } } } },
       round: { select: { status: true, podId: true, pod: { select: { matchFormat: true, tournamentId: true } } } },
     },
   });

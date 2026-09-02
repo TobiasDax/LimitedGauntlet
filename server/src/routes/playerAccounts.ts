@@ -45,11 +45,6 @@ function entrantName(entrant: { player: { displayName: string } | null; team: { 
   return entrant.player?.displayName ?? entrant.team?.name ?? "—";
 }
 
-const entrantNameInclude = {
-  player: { select: { displayName: true } },
-  team: { select: { name: true } },
-} as const;
-
 export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
   // ---- Organizer-managed: invite a roster player, or revoke an account ----
 
@@ -98,7 +93,11 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
     const count = await revokePlayerAccount(request.organizer!.orgId, params.data.id);
-    reply.code(count === 0 ? 404 : 204).send(count === 0 ? { error: "not_found" } : undefined);
+    if (count === 0) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    reply.code(204).send();
   });
 
   // ---- Public: accept an invite / log in / who am I ----
@@ -218,8 +217,8 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
           ],
         },
         include: {
-          entrantA: { include: entrantNameInclude },
-          entrantB: { include: entrantNameInclude },
+          entrantA: { include: { player: { select: { displayName: true } }, team: { select: { name: true } } } },
+          entrantB: { include: { player: { select: { displayName: true } }, team: { select: { name: true } } } },
           round: {
             select: {
               roundNumber: true,
