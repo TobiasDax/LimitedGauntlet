@@ -6,6 +6,10 @@ Its focus is on bringing multiple tools into one platform to help facilitate a g
 
 Limited Gauntlet provides a robust Swiss tournament engine that is flexible enough to handle edge cases, like intentional draws in final games or custom seat orders for each draft.
 
+**Try it live:** [demo.limited-gauntlet.com](https://demo.limited-gauntlet.com) — a public demo with anonymized seed data that resets on a schedule.  
+**email:** admin@demo.com  
+**password:** admin1234  
+
 ![Hall of Fame — all-time org leaderboard](docs/screenshots/11-hall-of-fame.png)
 
 ---
