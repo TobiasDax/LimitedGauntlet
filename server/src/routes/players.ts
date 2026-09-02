@@ -9,6 +9,22 @@ const playerSchema = z.object({
 
 const paramsSchema = z.object({ id: z.string().min(1) });
 
+// Roster names must be unique within an org (case-insensitively) — two players
+// with the same name create confusing standings and mis-attributed results.
+// Enforced app-layer (Postgres has no portable case-insensitive unique index
+// without citext); the import paths already dedupe by name.
+async function nameTaken(orgId: string, displayName: string, exceptId?: string): Promise<boolean> {
+  const existing = await prisma.player.findFirst({
+    where: {
+      orgId,
+      displayName: { equals: displayName, mode: "insensitive" },
+      ...(exceptId ? { id: { not: exceptId } } : {}),
+    },
+    select: { id: true },
+  });
+  return existing !== null;
+}
+
 // Never send the login credentials (PI-52) back to the client — the roster
 // only cares whether an account exists, exposed as `hasAccount` on the list.
 function publicPlayer<T extends { passwordHash: string | null; email: string | null }>(player: T) {
@@ -43,6 +59,11 @@ export async function playerRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
+    if (await nameTaken(request.organizer!.orgId, parsed.data.displayName)) {
+      reply.code(409).send({ error: "name_taken" });
+      return;
+    }
+
     const player = await prisma.player.create({
       data: { orgId: request.organizer!.orgId, displayName: parsed.data.displayName },
     });
@@ -54,6 +75,11 @@ export async function playerRoutes(app: FastifyInstance): Promise<void> {
     const body = playerSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    if (await nameTaken(request.organizer!.orgId, body.data.displayName, params.data.id)) {
+      reply.code(409).send({ error: "name_taken" });
       return;
     }
 

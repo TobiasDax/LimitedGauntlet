@@ -8,8 +8,11 @@ import {
   useUpdatePlayer,
 } from "../features/players/usePlayers";
 import { useMe } from "../features/auth/useAuth";
-import { Button, Card, Eyebrow, ScreenDek, ScreenTitle, TextField } from "../components/ui";
+import { ApiError } from "../lib/api";
+import { Button, Card, Eyebrow, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
 import type { Player } from "../lib/types";
+
+const norm = (s: string) => s.trim().toLowerCase();
 
 // PI-52 — the per-row "player account" affordance: invite by email, show a
 // pending state with a copyable link (works even with no SMTP), or revoke.
@@ -88,28 +91,73 @@ function AccountControls({ player, orgSlug }: { player: Player; orgSlug: string 
   );
 }
 
-function RosterRow({ player, orgSlug }: { player: Player; orgSlug: string | undefined }) {
+function RosterRow({
+  player,
+  orgSlug,
+  nameTaken,
+}: {
+  player: Player;
+  orgSlug: string | undefined;
+  nameTaken: (name: string, exceptId: string) => boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(player.displayName);
+  const [error, setError] = useState<string | null>(null);
   const update = useUpdatePlayer();
   const remove = useDeletePlayer();
 
   if (editing) {
     return (
       <form
-        className="flex items-center gap-2 px-5 py-3"
+        className="flex flex-col gap-2 px-5 py-3"
         onSubmit={(e) => {
           e.preventDefault();
-          update.mutate({ id: player.id, displayName: name }, { onSuccess: () => setEditing(false) });
+          const next = name.trim();
+          if (!next) return;
+          if (nameTaken(next, player.id)) {
+            setError(`Another player is already named "${next}". Roster names have to be unique.`);
+            return;
+          }
+          update.mutate(
+            { id: player.id, displayName: next },
+            {
+              onSuccess: () => setEditing(false),
+              onError: (err) =>
+                setError(
+                  err instanceof ApiError && err.message === "name_taken"
+                    ? `Another player is already named "${next}". Roster names have to be unique.`
+                    : "Couldn't save that. Try again.",
+                ),
+            },
+          );
         }}
       >
-        <TextField value={name} onChange={(e) => setName(e.target.value)} autoFocus className="flex-1" />
-        <Button type="submit" variant="primary" disabled={update.isPending}>
-          Save
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
-          Cancel
-        </Button>
+        <div className="flex items-center gap-2">
+          <TextField
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError(null);
+            }}
+            autoFocus
+            className="flex-1"
+          />
+          <Button type="submit" variant="primary" disabled={update.isPending}>
+            Save
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setName(player.displayName);
+              setError(null);
+              setEditing(false);
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+        {error && <FormError>{error}</FormError>}
       </form>
     );
   }
@@ -140,6 +188,35 @@ export function RosterPage() {
   const { data: me } = useMe();
   const createPlayer = useCreatePlayer();
   const [newName, setNewName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  // Roster names must be unique within the org (case-insensitively) — a
+  // duplicate splits standings and mis-attributes results. Blocked here off the
+  // already-loaded list; the backend enforces it too (`name_taken`).
+  const players = data?.players ?? [];
+  const nameTaken = (name: string, exceptId?: string) =>
+    players.some((p) => p.id !== exceptId && norm(p.displayName) === norm(name));
+
+  const submit = () => {
+    const next = newName.trim();
+    if (!next) return;
+    if (nameTaken(next)) {
+      setError(`"${next}" is already on the roster. Roster names have to be unique — pick a different one.`);
+      return;
+    }
+    createPlayer.mutate(next, {
+      onSuccess: () => {
+        setNewName("");
+        setError(null);
+      },
+      onError: (err) =>
+        setError(
+          err instanceof ApiError && err.message === "name_taken"
+            ? `"${next}" is already on the roster. Roster names have to be unique — pick a different one.`
+            : "Couldn't add that player. Try again.",
+        ),
+    });
+  };
 
   return (
     <div>
@@ -156,7 +233,7 @@ export function RosterPage() {
       {data && data.players.length > 0 && (
         <Card className="mb-4 divide-y divide-border">
           {data.players.map((p) => (
-            <RosterRow key={p.id} player={p} orgSlug={me?.organization.slug} />
+            <RosterRow key={p.id} player={p} orgSlug={me?.organization.slug} nameTaken={nameTaken} />
           ))}
         </Card>
       )}
@@ -166,20 +243,27 @@ export function RosterPage() {
           className="flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!newName.trim()) return;
-            createPlayer.mutate(newName.trim(), { onSuccess: () => setNewName("") });
+            submit();
           }}
         >
           <TextField
             className="flex-1"
             placeholder="Player name"
             value={newName}
-            onChange={(e) => setNewName(e.target.value)}
+            onChange={(e) => {
+              setNewName(e.target.value);
+              setError(null);
+            }}
           />
           <Button type="submit" variant="primary" disabled={createPlayer.isPending}>
             + Add player
           </Button>
         </form>
+        {error && (
+          <div className="mt-3">
+            <FormError>{error}</FormError>
+          </div>
+        )}
       </Card>
     </div>
   );

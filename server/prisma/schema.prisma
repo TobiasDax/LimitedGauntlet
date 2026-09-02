@@ -169,6 +169,10 @@ model ApiToken {
 model Player {
   id          String   @id @default(cuid())
   orgId       String
+  // Unique within the org, case-insensitively — enforced app-layer in
+  // routes/players.ts (Postgres has no portable case-insensitive unique index
+  // without citext). Duplicate names would split standings and mis-attribute
+  // results, so the roster UI blocks them outright.
   displayName String
   createdAt   DateTime @default(now())
 
