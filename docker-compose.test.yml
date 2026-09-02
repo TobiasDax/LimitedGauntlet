@@ -1,0 +1,23 @@
+# Throwaway Postgres for running the server test suite locally.
+#   sudo docker compose -f docker-compose.test.yml up -d
+#   npm run --workspace server test        # auto-migrates, uses this DB by default
+#   sudo docker compose -f docker-compose.test.yml down -v
+#
+# Bound to 127.0.0.1 only and on a non-default port so it can't collide with a
+# real Postgres (e.g. a running app stack on 5432). Data lives in a tmpfs — the
+# suite creates its own rows per test and never needs them to survive a restart.
+services:
+  test-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: lgtest
+    ports:
+      - "127.0.0.1:5842:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d lgtest"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
