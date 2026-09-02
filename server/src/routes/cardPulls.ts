@@ -85,6 +85,11 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
       reply.code(404).send({ error: "not_found" });
       return;
     }
+    // PI-66: rare-picks tracking is off for this pod — no pulls can be added.
+    if (!pod.rarePicksEnabled) {
+      reply.code(409).send({ error: "rare_picks_disabled" });
+      return;
+    }
 
     if (body.data.playerId) {
       const player = await prisma.player.findFirst({
@@ -263,7 +268,8 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const pulls = await prisma.cardPull.findMany({
-      where: { pod: { tournamentId: tournament.id } },
+      // PI-66: pods with rare-picks tracking off are excluded from the rollup.
+      where: { pod: { tournamentId: tournament.id, rarePicksEnabled: true } },
       include: { player: true, pod: { select: { id: true, name: true } } },
       orderBy: { priceEur: "desc" },
     });
@@ -277,7 +283,9 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
   // "Treasure Chest" page (the org-wide most-valuable-cards gallery).
   app.get("/api/card-pulls/treasure-chest", async (request, reply) => {
     const pulls = await prisma.cardPull.findMany({
-      where: { pod: { excludeFromStats: false, tournament: { orgId: request.organizer!.orgId } } },
+      where: {
+        pod: { excludeFromStats: false, rarePicksEnabled: true, tournament: { orgId: request.organizer!.orgId } },
+      },
       include: {
         player: true,
         pod: { select: { id: true, name: true, tournament: { select: { id: true, name: true } } } },

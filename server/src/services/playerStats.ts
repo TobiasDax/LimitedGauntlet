@@ -263,7 +263,8 @@ export async function computeHallOfFameOverview(orgId: string): Promise<HallOfFa
     prisma.tournament.count({ where: { orgId } }),
     prisma.pod.count({ where: { tournament: { orgId }, excludeFromStats: false } }),
     prisma.cardPull.findMany({
-      where: { pod: { excludeFromStats: false, tournament: { orgId } } },
+      // rarePicksEnabled: PI-66 — pods with value tracking off don't feed the rollups.
+      where: { pod: { excludeFromStats: false, rarePicksEnabled: true, tournament: { orgId } } },
       orderBy: { priceEur: "desc" },
       take: 5,
     }),
@@ -317,11 +318,11 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
     buildLedger(orgId),
     computeHallOfFame(orgId),
     prisma.cardPull.aggregate({
-      where: { playerId, pod: { excludeFromStats: false, tournament: { orgId } } },
+      where: { playerId, pod: { excludeFromStats: false, rarePicksEnabled: true, tournament: { orgId } } },
       _sum: { priceEur: true },
     }),
     prisma.cardPull.findMany({
-      where: { playerId, pod: { excludeFromStats: false, tournament: { orgId } } },
+      where: { playerId, pod: { excludeFromStats: false, rarePicksEnabled: true, tournament: { orgId } } },
       include: { pod: { select: { id: true, name: true, tournament: { select: { id: true, name: true } } } } },
       orderBy: { priceEur: "desc" },
     }),

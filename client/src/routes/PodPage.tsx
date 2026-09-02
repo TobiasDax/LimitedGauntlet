@@ -37,6 +37,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
   const [pointsLoss, setPointsLoss] = useState(pod.pointsLoss);
   const [roundLengthMinutes, setRoundLengthMinutes] = useState(pod.roundLengthMinutes);
   const [excludeFromStats, setExcludeFromStats] = useState(pod.excludeFromStats);
+  const [rarePicksEnabled, setRarePicksEnabled] = useState(pod.rarePicksEnabled);
   const [webhookEnabled, setWebhookEnabled] = useState(pod.webhookEnabled);
   const [isMainEvent, setIsMainEvent] = useState(pod.isMainEvent);
   const [setCode, setSetCode] = useState(pod.setCode ?? "");
@@ -61,6 +62,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
               pointsLoss,
               roundLengthMinutes,
               excludeFromStats,
+              rarePicksEnabled,
               webhookEnabled,
               isMainEvent,
               setCode: setCode || null,
@@ -151,6 +153,16 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
             onChange={(e) => setExcludeFromStats(e.target.checked)}
           />
           Exclude from org-wide stats (Hall of Fame, Treasure Chest) — for one-off, joke, or test pods
+        </label>
+
+        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+          <input
+            type="checkbox"
+            checked={rarePicksEnabled}
+            onChange={(e) => setRarePicksEnabled(e.target.checked)}
+          />
+          Track rare picks (card values) for this pod — off hides the Value tab and blocks adding pulls; existing
+          pulls are kept and reappear if you turn it back on
         </label>
 
         <label className="flex items-center gap-2 text-[13px] text-ink-secondary">

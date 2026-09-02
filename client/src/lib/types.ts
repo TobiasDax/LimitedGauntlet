@@ -97,6 +97,7 @@ export interface Pod {
   rarepicUrl: string | null;
   status: PodStatus;
   excludeFromStats: boolean;
+  rarePicksEnabled: boolean;
   webhookEnabled: boolean;
   isMainEvent: boolean;
   setCode: string | null;

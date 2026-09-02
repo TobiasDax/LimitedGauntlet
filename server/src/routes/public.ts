@@ -218,7 +218,8 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const pulls = await prisma.cardPull.findMany({
-      where: { pod: { tournamentId: tournament.id } },
+      // PI-66: exclude pods with rare-picks tracking turned off.
+      where: { pod: { tournamentId: tournament.id, rarePicksEnabled: true } },
       include: { player: true, pod: { select: { id: true, name: true } } },
       orderBy: { priceEur: "desc" },
     });
@@ -373,7 +374,7 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const pulls = await prisma.cardPull.findMany({
-      where: { pod: { excludeFromStats: false, tournament: { orgId: organization.id } } },
+      where: { pod: { excludeFromStats: false, rarePicksEnabled: true, tournament: { orgId: organization.id } } },
       include: {
         player: true,
         pod: { select: { id: true, name: true, tournament: { select: { id: true, name: true } } } },

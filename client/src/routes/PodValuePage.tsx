@@ -196,25 +196,34 @@ export function PodValuePage() {
 
       <PodTabs podId={id ?? ""} />
 
-      {pod && <AddPullForm podId={pod.id} entrants={pod.entrants} defaultSetCode={pod.setCode ?? ""} />}
-
-      {isLoading ? (
-        <p className="text-ink-muted">Loading…</p>
+      {pod && !pod.rarePicksEnabled ? (
+        <p className="rounded-md border border-border bg-surface-sunken px-4 py-3 text-[13.5px] text-ink-muted">
+          Rare-picks tracking is turned off for this pod. Turn it back on from the pod's edit form to add or view
+          card pulls.
+        </p>
       ) : (
         <>
-          <div className="mb-4 flex items-baseline gap-2">
-            <span className="font-display text-[24px] font-bold text-accent-strong tabular-nums">
-              {formatEur(data?.total ?? 0)}
-            </span>
-            <span className="text-[11px] tracking-wide text-ink-muted uppercase">pod total</span>
-          </div>
-          <CardGallery
-            pulls={data?.cardPulls ?? []}
-            onRemove={(pullId) => deletePull.mutate(pullId)}
-            editableAttribution
-            attributionPlayers={attributionPlayers}
-            onSetAttribution={(pullId, playerId) => setAttribution.mutate({ pullId, playerId })}
-          />
+          {pod && <AddPullForm podId={pod.id} entrants={pod.entrants} defaultSetCode={pod.setCode ?? ""} />}
+
+          {isLoading ? (
+            <p className="text-ink-muted">Loading…</p>
+          ) : (
+            <>
+              <div className="mb-4 flex items-baseline gap-2">
+                <span className="font-display text-[24px] font-bold text-accent-strong tabular-nums">
+                  {formatEur(data?.total ?? 0)}
+                </span>
+                <span className="text-[11px] tracking-wide text-ink-muted uppercase">pod total</span>
+              </div>
+              <CardGallery
+                pulls={data?.cardPulls ?? []}
+                onRemove={(pullId) => deletePull.mutate(pullId)}
+                editableAttribution
+                attributionPlayers={attributionPlayers}
+                onSetAttribution={(pullId, playerId) => setAttribution.mutate({ pullId, playerId })}
+              />
+            </>
+          )}
         </>
       )}
     </div>

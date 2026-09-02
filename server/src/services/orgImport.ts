@@ -98,6 +98,8 @@ const podSchema = z.object({
   roundLengthMinutes: z.number().int().min(1).max(1_440),
   status: z.nativeEnum(PodStatus),
   excludeFromStats: z.boolean(),
+  // Optional so exports predating PI-66 still import — defaults to on.
+  rarePicksEnabled: z.boolean().default(true),
   isMainEvent: z.boolean(),
   teams: z.array(teamSchema).max(IMPORT_LIMITS.teams),
   entrants: z.array(entrantSchema).max(IMPORT_LIMITS.entrants),
@@ -355,6 +357,7 @@ async function importPod(
       roundLengthMinutes: pod.roundLengthMinutes,
       status: pod.status,
       excludeFromStats: pod.excludeFromStats,
+      rarePicksEnabled: pod.rarePicksEnabled,
       isMainEvent: pod.isMainEvent,
     },
   });

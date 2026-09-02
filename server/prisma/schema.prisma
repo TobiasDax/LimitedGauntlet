@@ -332,6 +332,13 @@ model Pod {
   rarepicUrl         String?
   status             PodStatus   @default(SETUP)
   excludeFromStats   Boolean     @default(false)
+  // PI-66: "rare picks" / card-value tracking for this pod. When false, the
+  // pod's Value tab is hidden, no card pulls can be added by any route, and
+  // the pod is excluded from every value rollup (tournament Best Pulls, org
+  // Treasure Chest, Hall-of-Fame value stats). Existing pulls are kept, not
+  // deleted — flipping it back on restores them. Distinct from
+  // excludeFromStats, which only affects standings/HoF aggregates.
+  rarePicksEnabled   Boolean     @default(true)
   // Per-pod opt-out for the org's webhook (PI-50) — default on, mirrors
   // excludeFromStats's opt-out shape (an organizer turns individual noisy/
   // test pods off, rather than needing to opt each real pod in).

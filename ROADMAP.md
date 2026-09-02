@@ -340,11 +340,12 @@ Idea from Tobias: adding players to an individual pod was a one-at-a-time dropdo
 - [x] The `EntrantPickerModal` has a **New player** field: type a name → "Add" appends it as a removable chip. On confirm, `newPlayerNames` goes to the bulk endpoint, which creates each `Player` on the roster **and** adds them to the pod in the same transaction. Case-insensitive collision (against the roster or another new name in the same request) is rejected with `409 name_taken` + the offending name, surfaced as "tick them in the list instead". Client also pre-checks against the loaded roster.
 - [ ] Browser-verified.
 
-### PI-66 — Per-pod "rare picks" toggle (disable value tracking for a pod)
-Idea from Tobias: pod edit (`EditPodForm` in `client/src/routes/PodPage.tsx`) should have a switch to **enable/disable "rare picks"** for that pod. When disabled: the pod's **Value tab is hidden** (`PodTabs.tsx` drops the `/value` entry; `PodValuePage` redirects/404s), and **no card pulls can be added** to that pod by any route — `POST /api/pods/:id/card-pulls` (`cardPulls.ts`) rejects, and the pod is excluded from the tournament "Best Pulls" rollup and the org Treasure Chest / Hall of Fame value stats.
-- New `Pod.rarePicksEnabled Boolean @default(true)` (nullable-column precedent, PI-33). Default on = today's behaviour. Existing `Pod.rarepicUrl` is unrelated (it's the "rare pick image" link field).
-- Decide: block silently (tab just gone) vs. a note on the pod page; and whether an *existing* pull on a pod that's later switched off is hidden or just frozen (lean: hidden from the Value views but not deleted).
-- [ ] Not started.
+### PI-66 — Per-pod "rare picks" toggle (disable value tracking for a pod) ✅ (code-complete, browser-verify pending)
+Idea from Tobias: a per-pod switch to turn card-value tracking off entirely.
+- [x] `Pod.rarePicksEnabled Boolean @default(true)` (migration `20260903120000`). Default on = unchanged behaviour. Distinct from `excludeFromStats` (which only touches standings/HoF aggregates, still lets pulls be added, and doesn't hide the tab). Existing pulls are **kept** when it's turned off and reappear if turned back on.
+- [x] **When off:** `POST /api/pods/:id/card-pulls` → `409 rare_picks_disabled`; the pod is filtered out of every value rollup — per-tournament Best Pulls (`cardPulls.ts` + `public.ts`), org Treasure Chest (both), and the Hall-of-Fame value stats (`playerStats.ts` — 3 queries) + the export's Treasure Vault snapshot (`orgExport.ts`). The flag round-trips through export/import (`orgExport.ts` / `orgImport.ts`, the import field defaults to `true` so pre-PI-66 files still load).
+- [x] **Frontend:** a checkbox in `EditPodForm` (`PodPage.tsx`). `PodTabs.tsx` drops the Value tab when off (reads the cached `usePod`). `PodValuePage` shows an explanatory note instead of the gallery/add form. `PublicPodPage` hides its Value `<section>`.
+- [ ] Browser-verified. No dedicated test (cardPulls/playerStats have no route/service test files) — covered by build + the orgImport round-trip test + browser check.
 
 ### PI-67 — Show finishing place as a column in the standings table ✅ (code-complete, browser-verify pending)
 Idea from Tobias: the per-pod standings table didn't show the rank number.

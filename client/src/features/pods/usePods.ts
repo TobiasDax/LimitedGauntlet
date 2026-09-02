@@ -56,6 +56,7 @@ export interface UpdatePodInput {
   pointsLoss?: number;
   roundLengthMinutes?: number;
   excludeFromStats?: boolean;
+  rarePicksEnabled?: boolean;
   webhookEnabled?: boolean;
   isMainEvent?: boolean;
   setCode?: string | null;

@@ -88,6 +88,7 @@ export interface ExportPod {
   roundLengthMinutes: number;
   status: PodStatus;
   excludeFromStats: boolean;
+  rarePicksEnabled: boolean;
   isMainEvent: boolean;
   teams: ExportTeam[];
   entrants: ExportEntrant[];
@@ -226,6 +227,7 @@ async function buildStructuralData(orgId: string): Promise<ExportData> {
           roundLengthMinutes: pod.roundLengthMinutes,
           status: pod.status,
           excludeFromStats: pod.excludeFromStats,
+          rarePicksEnabled: pod.rarePicksEnabled,
           isMainEvent: pod.isMainEvent,
           teams: pod.teams.map((team) => ({
             name: team.name,
@@ -288,7 +290,7 @@ async function buildHallOfFameSnapshot(orgId: string): Promise<HallOfFameSnapsho
 
 async function buildTreasureVaultSnapshot(orgId: string): Promise<TreasureVaultSnapshotRow[]> {
   const pulls = await prisma.cardPull.findMany({
-    where: { pod: { excludeFromStats: false, tournament: { orgId } } },
+    where: { pod: { excludeFromStats: false, rarePicksEnabled: true, tournament: { orgId } } },
     include: {
       player: { select: { displayName: true } },
       pod: { select: { name: true, tournament: { select: { name: true } } } },

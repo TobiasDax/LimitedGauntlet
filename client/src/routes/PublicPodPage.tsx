@@ -172,16 +172,18 @@ export function PublicPodPage() {
         )}
       </section>
 
-      <section>
-        <h2 className="font-display mb-4 text-[20px] font-bold">Value</h2>
-        <div className="mb-4 flex items-baseline gap-2">
-          <span className="font-display text-[22px] font-bold text-accent-strong tabular-nums">
-            {formatEur(valueData?.total ?? 0)}
-          </span>
-          <span className="text-[11px] tracking-wide text-ink-muted uppercase">pod total</span>
-        </div>
-        <CardGallery pulls={valueData?.cardPulls ?? []} />
-      </section>
+      {pod.rarePicksEnabled && (
+        <section>
+          <h2 className="font-display mb-4 text-[20px] font-bold">Value</h2>
+          <div className="mb-4 flex items-baseline gap-2">
+            <span className="font-display text-[22px] font-bold text-accent-strong tabular-nums">
+              {formatEur(valueData?.total ?? 0)}
+            </span>
+            <span className="text-[11px] tracking-wide text-ink-muted uppercase">pod total</span>
+          </div>
+          <CardGallery pulls={valueData?.cardPulls ?? []} />
+        </section>
+      )}
     </div>
   );
 }

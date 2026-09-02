@@ -73,6 +73,7 @@ const podUpdateSchema = z.object({
   rarepicUrl: z.string().trim().url().optional(),
   status: z.enum(podStatuses).optional(),
   excludeFromStats: z.boolean().optional(),
+  rarePicksEnabled: z.boolean().optional(),
   webhookEnabled: z.boolean().optional(),
   isMainEvent: z.boolean().optional(),
   setCode: z.string().trim().toLowerCase().min(2).max(10).nullable().optional(),
