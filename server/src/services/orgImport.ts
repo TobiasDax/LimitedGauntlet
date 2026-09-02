@@ -5,12 +5,13 @@ import {
   MatchResult,
   PodFormat,
   PodStatus,
+  Prisma,
   RoundStatus,
   TournamentStatus,
-  type Prisma,
 } from "@prisma/client";
 import { prisma } from "../prisma.js";
 import { EXPORT_FORMAT_VERSION, type ExportData } from "./orgExport.js";
+import { syncPodTokenAwards, zStandingBonuses } from "./tokens.js";
 
 // Importer for LimitedGauntlet's own export format (PI-39), the counterpart to
 // buildOrgExport. Imports into an EXISTING org (the caller's) rather than
@@ -20,6 +21,7 @@ import { EXPORT_FORMAT_VERSION, type ExportData } from "./orgExport.js";
 // (player displayName / team name) the export wrote.
 
 export const IMPORT_LIMITS = {
+  tokenLedger: 20_000,
   players: 1_000,
   tournaments: 100,
   rosterPlayers: 1_000,
@@ -80,6 +82,26 @@ const cardPullSchema = z.object({
   imageUri: z.string().max(2_048).nullable().optional(),
 }).strict();
 
+// PI-72 token config — all optional so pre-PI-72 exports still import. The
+// tournament participation value is a plain int; the pod's is nullable (null =
+// inherit the tournament). Both bonus lists are nullable.
+const tournamentTokenFields = {
+  tokenParticipation: z.number().int().min(0).max(100_000).optional(),
+  tokenStandingBonuses: zStandingBonuses.nullable().optional(),
+};
+const podTokenFields = {
+  tokenParticipation: z.number().int().min(0).max(100_000).nullable().optional(),
+  tokenStandingBonuses: zStandingBonuses.nullable().optional(),
+};
+
+const tokenTxnSchema = z.object({
+  player: playerName,
+  delta: z.number().int().min(-1_000_000).max(1_000_000),
+  reason: z.enum(["MANUAL", "INITIAL"]),
+  note: z.string().max(300).nullable().optional(),
+  createdAt: isoDate,
+}).strict();
+
 const podSchema = z.object({
   name: z.string().trim().min(1).max(150),
   date: isoDate.nullable().optional(),
@@ -100,6 +122,7 @@ const podSchema = z.object({
   excludeFromStats: z.boolean(),
   // Optional so exports predating PI-66 still import — defaults to on.
   rarePicksEnabled: z.boolean().default(true),
+  ...podTokenFields,
   isMainEvent: z.boolean(),
   teams: z.array(teamSchema).max(IMPORT_LIMITS.teams),
   entrants: z.array(entrantSchema).max(IMPORT_LIMITS.entrants),
@@ -114,12 +137,15 @@ const tournamentSchema = z.object({
   location: z.string().max(200).nullable().optional(),
   description: z.string().max(10_000).nullable().optional(),
   status: z.nativeEnum(TournamentStatus),
+  ...tournamentTokenFields,
   players: z.array(playerName).max(IMPORT_LIMITS.rosterPlayers),
   pods: z.array(podSchema).max(IMPORT_LIMITS.pods),
 }).strict();
 
 const dataSchema = z.object({
   players: z.array(playerName).max(IMPORT_LIMITS.players),
+  tokensEnabled: z.boolean().optional().default(false),
+  tokenLedger: z.array(tokenTxnSchema).max(IMPORT_LIMITS.tokenLedger).optional().default([]),
   tournaments: z.array(tournamentSchema).max(IMPORT_LIMITS.tournaments),
 }).strict().superRefine((data, ctx) => {
   const tournamentNames = new Set<string>();
@@ -226,7 +252,7 @@ export function parseOrgExport(raw: unknown): ParseResult {
 }
 
 function measureImport(data: ParsedExportData): { records: number; stringCharacters: number } {
-  let records = data.players.length + data.tournaments.length;
+  let records = data.players.length + data.tournaments.length + data.tokenLedger.length;
   let stringCharacters = 0;
   const visit = (value: unknown): void => {
     if (typeof value === "string") stringCharacters += value.length;
@@ -258,10 +284,18 @@ export async function importOrgData(orgId: string, data: ParsedExportData): Prom
   if (importInProgress) throw new ImportInProgressError();
   importInProgress = true;
   try {
-    return await prisma.$transaction((tx) => importOrgDataInTransaction(tx, orgId, data), {
+    const summary = await prisma.$transaction((tx) => importOrgDataInTransaction(tx, orgId, data), {
       maxWait: 5_000,
       timeout: 120_000,
     });
+    // PI-72: the POD_PARTICIPATION / POD_STANDING rows aren't in the export —
+    // regenerate them from the imported pods now that everything's in place.
+    // Outside the import transaction because syncPodTokenAwards runs its own.
+    if (data.tokensEnabled) {
+      const pods = await prisma.pod.findMany({ where: { tournament: { orgId } }, select: { id: true } });
+      for (const pod of pods) await syncPodTokenAwards(pod.id);
+    }
+    return summary;
   } finally {
     importInProgress = false;
   }
@@ -298,6 +332,26 @@ async function importOrgDataInTransaction(db: Prisma.TransactionClient, orgId: s
     return id;
   };
 
+  // PI-72 — enable tokens on the target org if the file has them on (never
+  // disable via import), and restore the hand-made ledger rows (deduped so a
+  // re-import doesn't double them). The POD_* rows regenerate after the tx.
+  if (data.tokensEnabled) {
+    await db.organization.update({ where: { id: orgId }, data: { tokensEnabled: true } });
+  }
+  for (const txn of data.tokenLedger) {
+    const createdAt = new Date(txn.createdAt);
+    const pid = playerId(txn.player);
+    const dupe = await db.tokenTransaction.findFirst({
+      where: { orgId, playerId: pid, delta: txn.delta, reason: txn.reason, note: txn.note ?? null, createdAt },
+      select: { id: true },
+    });
+    if (!dupe) {
+      await db.tokenTransaction.create({
+        data: { orgId, playerId: pid, delta: txn.delta, reason: txn.reason, note: txn.note ?? null, createdAt },
+      });
+    }
+  }
+
   for (const t of data.tournaments) {
     const existing = await db.tournament.findFirst({ where: { orgId, name: t.name } });
     if (existing) {
@@ -314,6 +368,8 @@ async function importOrgDataInTransaction(db: Prisma.TransactionClient, orgId: s
         location: t.location ?? null,
         description: t.description ?? null,
         status: t.status,
+        tokenParticipation: t.tokenParticipation ?? 0,
+        tokenStandingBonuses: t.tokenStandingBonuses ?? Prisma.DbNull,
       },
     });
     summary.tournamentsCreated += 1;
@@ -358,6 +414,8 @@ async function importPod(
       status: pod.status,
       excludeFromStats: pod.excludeFromStats,
       rarePicksEnabled: pod.rarePicksEnabled,
+      tokenParticipation: pod.tokenParticipation ?? null,
+      tokenStandingBonuses: pod.tokenStandingBonuses ?? Prisma.DbNull,
       isMainEvent: pod.isMainEvent,
     },
   });

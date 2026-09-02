@@ -70,7 +70,10 @@ function recordsFromMatches(rounds: { matches: MatchRow[] }[]): Map<string, { w:
 export async function buildTournamentWorkbook(
   tournamentId: string,
 ): Promise<{ buffer: Buffer; filename: string }> {
-  const tournament = await prisma.tournament.findUniqueOrThrow({ where: { id: tournamentId } });
+  const tournament = await prisma.tournament.findUniqueOrThrow({
+    where: { id: tournamentId },
+    include: { organization: { select: { tokensEnabled: true } } },
+  });
 
   const pods = await prisma.pod.findMany({
     where: { tournamentId },
@@ -204,6 +207,36 @@ export async function buildTournamentWorkbook(
       }
     }
     sheets.push({ sheet: sheetName("Matches", usedNames), data });
+  }
+
+  // --- Tokens earned this tournament (PI-72) ------------------------------
+  if (tournament.organization.tokensEnabled) {
+    const podIds = pods.map((p) => p.id);
+    const [earned, balances] = await Promise.all([
+      prisma.tokenTransaction.groupBy({
+        by: ["playerId"],
+        where: { podId: { in: podIds }, reason: { in: ["POD_PARTICIPATION", "POD_STANDING"] } },
+        _sum: { delta: true },
+      }),
+      prisma.tokenTransaction.groupBy({
+        by: ["playerId"],
+        where: { orgId: tournament.orgId },
+        _sum: { delta: true },
+      }),
+    ]);
+    const balanceByPlayer = new Map(balances.map((b) => [b.playerId, b._sum.delta ?? 0]));
+    const names = new Map(
+      (await prisma.player.findMany({ where: { id: { in: earned.map((e) => e.playerId) } }, select: { id: true, displayName: true } })).map(
+        (p) => [p.id, p.displayName],
+      ),
+    );
+    const rows = earned
+      .map((e) => ({ name: names.get(e.playerId) ?? "—", here: e._sum.delta ?? 0, balance: balanceByPlayer.get(e.playerId) ?? 0 }))
+      .sort((a, b) => b.here - a.here || a.name.localeCompare(b.name));
+
+    const data: Row[] = [[header("Player"), header("Tokens earned here"), header("Current balance")]];
+    for (const r of rows) data.push([r.name, r.here, r.balance]);
+    sheets.push({ sheet: sheetName("Tokens", usedNames), data });
   }
 
   const base = (tournament.name.trim() || "tournament").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
