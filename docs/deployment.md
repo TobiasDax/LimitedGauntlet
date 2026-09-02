@@ -134,24 +134,22 @@ OIDC_SCOPE=openid email profile               # must include openid + email
 
 Register the redirect URI `<APP_BASE_URL>/api/auth/oidc/callback` at your provider.
 
-### Google
+### Google and Discord
 
-1. Google Cloud Console → **APIs & Services → Credentials → Create OAuth client ID → Web application**.
-2. Add authorized redirect URI: `<APP_BASE_URL>/api/auth/sso/google/callback`.
-3. Put the client id/secret in `.env`:
+Full console walkthrough (OAuth consent screen, test users vs. publishing,
+redirect-URI exact-match rules, troubleshooting) is in
+[`sso-google-discord.md`](sso-google-discord.md). The short version:
+
+- **Google** — Google Cloud Console → configure the OAuth consent screen, then
+  **Credentials → Create OAuth client ID → Web application**, authorized redirect
+  URI `<APP_BASE_URL>/api/auth/sso/google/callback`.
+- **Discord** — Discord Developer Portal → **New Application → OAuth2**, add
+  redirect `<APP_BASE_URL>/api/auth/sso/discord/callback` (the app requests the
+  `identify` + `email` scopes at login).
 
 ```sh
 GOOGLE_CLIENT_ID=…apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=…
-```
-
-### Discord
-
-1. Discord Developer Portal → **New Application → OAuth2**.
-2. Add a redirect: `<APP_BASE_URL>/api/auth/sso/discord/callback`. Scopes used are `identify` + `email`.
-3. Put the client id/secret in `.env`:
-
-```sh
 DISCORD_CLIENT_ID=…
 DISCORD_CLIENT_SECRET=…
 ```

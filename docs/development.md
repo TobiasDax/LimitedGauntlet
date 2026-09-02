@@ -34,9 +34,23 @@ npm run dev:client   # Vite dev server, proxies /api and /socket.io to :8080
 
 ## Tests and builds
 
+Server tests run against a **real Postgres**, not a mocked database — pairing,
+standings, and other business-rule logic is verified against actual query
+results. They create and drop their own rows, so they need a throwaway database,
+not your dev one. `docker-compose.test.yml` provides it:
+
 ```sh
-npm run --workspace server test   # server unit/integration tests, needs a live Postgres
+docker compose -f docker-compose.test.yml up -d     # tmpfs Postgres on 127.0.0.1:5842
+npm run --workspace server test                     # auto-migrates that DB, then runs
+docker compose -f docker-compose.test.yml down -v   # when done
+```
+
+`npm run --workspace server test` defaults `DATABASE_URL` to that container and
+runs `prisma migrate deploy` against it before the suite (a fast no-op once
+applied). Set `DATABASE_URL` explicitly to point the suite elsewhere.
+
+```sh
 npm run --workspace server build && npm run --workspace client build   # typecheck + build both
 ```
 
-Server tests run against a real Postgres, not a mocked database — pairing, standings, and other business-rule logic is verified against actual query results. The client has no separate test framework; UI changes are verified by hand against a running instance.
+The client has no separate test framework; UI changes are verified by hand against a running instance.
