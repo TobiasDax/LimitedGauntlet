@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.3.1](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.3.1)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login) and PI-52 (player accounts) are code-complete, browser-verify pending. PI-64–68 (bulk pod-entrant modal + inline new-player, per-pod rare-picks toggle, standings place column, .xlsx export) are code-complete, browser-verify pending. Open ideas: PI-62 (deck photos); plus a few small follow-ups noted inline below.
+The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.4.0](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.4.0)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login), PI-52 (player accounts) and PI-64–68 (bulk pod-entrant modal + inline new-player, per-pod rare-picks toggle, standings place column, .xlsx export) shipped in v0.4.0 — browser-verify on the live deploy pending. Open ideas: PI-62 (deck photos); plus a few small follow-ups noted inline below.
 
 ## Open items
 
@@ -149,7 +149,7 @@ Add OIDC as a login/registration option so the app can be used with an external 
 - [x] **SSO-only mode:** `LOCAL_LOGIN_DISABLED=true` (env) disables local password login + local signup so OIDC is the only way in — `POST /api/auth/login`/`/signup` return `local_login_disabled`, and `LoginPage`/`SignupPage` hide the password form + signup link (surfacing only the SSO button). Fail-safe: `isLocalLoginDisabled()` is only honoured when OIDC is actually configured, so the flag can't lock everyone out. Wired into `.env.example`, both compose files, deployment.md §8.
 - [ ] **Follow-up (not built):** UI affordance for an SSO-only account to set its first password is backend-ready (`POST /api/settings/password` accepts no current password when none is set) but the Account form still always asks for a current password — a small UI tweak gated on exposing "has password" to the client.
 
-### PI-43 — Social login: Google + Discord ✅ (code-complete, browser-verify pending)
+### PI-43 — Social login: Google + Discord ✅ (shipped in v0.4.0, browser-verify pending)
 Google and Discord as social-login options on top of PI-42's account-linking machinery. (Discord added to the same pass at Tobias's request.)
 - [x] **Provider registry** (`server/src/services/sso.ts`, replacing `services/oidc.ts`): three providers, each independently optional (same "degrades to password-only" posture as SMTP). `oidc` (existing generic OIDC, unchanged) and `google` share the `openid-client` flow — Google is just the fixed issuer `https://accounts.google.com`. **Discord is not OIDC** (no `id_token`), so it gets a hand-rolled OAuth2 + PKCE path: authorize → token exchange → `GET /users/@me`, identity from `{ id, email, verified, global_name/username }`. No new dependency.
 - [x] **One SSO identity per account** (decision: Tobias). `OrganizerAccount.oidcSubject` now stores a **provider-prefixed** key (`google:123` / `discord:456` / `oidc:<sub>`) — no new table. Data-only migration `20260902160000_prefix_sso_subject` backfills existing generic-OIDC subjects (+ any live relink requests) with the `oidc:` prefix; guard clause makes it re-run-safe. Signing in with a *second* provider for an already-linked account routes through the **existing PI-49 relink flow** (mailbox link / operator CLI), never a silent rebind.
@@ -237,7 +237,7 @@ Tobias flagged a gap: draft pods (the only format where seating around a physica
 - [x] **Visual design (Tobias, referencing the group's existing Outline layout):** a styled two-row grid (`client/src/components/SeatingChart.tsx`, not a plain table) — row 1 holds seats 1..M left-to-right, row 2 holds seats N..M+1 right-to-left, so reading row 1 then row 2 traces the seating order clockwise around the table. A bye's seat renders as a dashed/muted "Round 1 bye" cell. For an odd N, the one unused chair in this two-row layout is always rendered under seat 1 (a blank leading grid cell in row 2), not wherever the bye's table happens to fall — so every seat number keeps a fixed, predictable position on the imaginary table regardless of pod size or who drew the bye.
 - [x] Verified via an ad-hoc Node script (no client test framework exists in this repo) covering 8-seat clean, 8-seat with out-of-order `tableNumber`s, 7-seat and 5-seat with a bye at a non-final raw table number, and the empty/no-round-1 case. Visually confirmed end-to-end via a full Docker build + Postgres + seeded 7-entrant DRAFT pod + Playwright screenshot, including the fixed-empty-slot-under-seat-1 layout.
 
-### PI-52 — Player accounts for self-service check-in ✅ (code-complete, browser-verify pending)
+### PI-52 — Player accounts for self-service check-in ✅ (shipped in v0.4.0, browser-verify pending)
 Idea from Tobias: let non-organizer users (players) have accounts so they can check themselves in / report their own game results, instead of everything going through an organizer.
 - [x] **Identity model:** auth merged onto `Player` as nullable columns (`email`/`passwordHash`/`authVersion`, migration `20260902120000_add_player_accounts`) — same PI-33 "nullable columns for a 1:1 feature" precedent, and consistent with `OrganizerAccount` already merging person + auth. A plain roster entry has all three null. `Player` and `OrganizerAccount` stay separate rows for the same human: an organizer who also plays keeps entering results through the organizer UI and needs no player account; a player "promoted" to organizer just gets a fresh `OrganizerAccount` via the existing PI-34 invite, unrelated to their `Player` row.
 - [x] **Second auth surface, never a wall:** new `playerId`/`playerAuthVersion` session keys (independent of `organizerId`), `requirePlayerAuth` middleware, `services/playerAccounts.ts` for the DB logic + thin `routes/playerAccounts.ts` HTTP wrapper. Player login lives at `/o/<slug>/player` and only unlocks the player's own write actions — the open-by-default public pages are untouched. A logged-in player *does* bypass the PI-27 public-password lock for their own org (HTTP `public.ts` preHandler + `realtime.ts` room authorizer both updated).
@@ -330,29 +330,29 @@ Idea from Tobias: a player might drop from a running pod partway through the wee
 - [x] **Test:** `pairing.test.ts` — completes round 1 of a 4-entrant pod, drops one entrant, asserts `getActiveEntrants` excludes them and `generatePairings` never pairs them in round 2.
 - [x] Browser-verified by Tobias; released as v0.3.1 (2026-09-01).
 
-### PI-64 — Add pod entrants via a roster checklist modal ✅ (code-complete, browser-verify pending)
+### PI-64 — Add pod entrants via a roster checklist modal ✅ (shipped in v0.4.0, browser-verify pending)
 Idea from Tobias: adding players to an individual pod was a one-at-a-time dropdown.
 - [x] `POST /api/pods/:id/entrants` (individual pods) now also accepts a bulk form — `{ playerIds?: string[], newPlayerNames?: string[] }` — adding everyone in one transaction (existing already-in-pod ids are silently skipped, not a 409). The legacy `{ playerId }` single form is untouched (MCP `add_individual_entrant`, back-compat). New `bulkEntrantSchema` + a branch at the top of the handler; team pods unchanged.
 - [x] Frontend: `EntrantPickerModal.tsx` (on the shared `Modal`) — full-roster checklist with already-entered players ticked + disabled, a **Select all / Clear all** toggle, and error surfacing. Replaces the `<select>` + form in `IndividualEntrants` (`PodPage.tsx`) with a **+ Add players** button. New `useAddEntrantsBulk` hook invalidates both `["pods", id]` and `["players"]`.
 - [ ] Browser-verified. No dedicated test (pods.ts has no route-test harness) — covered by build + browser check.
 
-### PI-65 — "Add a new player" from inside the pod entrant modal ✅ (code-complete, browser-verify pending)
+### PI-65 — "Add a new player" from inside the pod entrant modal ✅ (shipped in v0.4.0, browser-verify pending)
 - [x] The `EntrantPickerModal` has a **New player** field: type a name → "Add" appends it as a removable chip. On confirm, `newPlayerNames` goes to the bulk endpoint, which creates each `Player` on the roster **and** adds them to the pod in the same transaction. Case-insensitive collision (against the roster or another new name in the same request) is rejected with `409 name_taken` + the offending name, surfaced as "tick them in the list instead". Client also pre-checks against the loaded roster.
 - [ ] Browser-verified.
 
-### PI-66 — Per-pod "rare picks" toggle (disable value tracking for a pod) ✅ (code-complete, browser-verify pending)
+### PI-66 — Per-pod "rare picks" toggle (disable value tracking for a pod) ✅ (shipped in v0.4.0, browser-verify pending)
 Idea from Tobias: a per-pod switch to turn card-value tracking off entirely.
 - [x] `Pod.rarePicksEnabled Boolean @default(true)` (migration `20260903120000`). Default on = unchanged behaviour. Distinct from `excludeFromStats` (which only touches standings/HoF aggregates, still lets pulls be added, and doesn't hide the tab). Existing pulls are **kept** when it's turned off and reappear if turned back on.
 - [x] **When off:** `POST /api/pods/:id/card-pulls` → `409 rare_picks_disabled`; the pod is filtered out of every value rollup — per-tournament Best Pulls (`cardPulls.ts` + `public.ts`), org Treasure Chest (both), and the Hall-of-Fame value stats (`playerStats.ts` — 3 queries) + the export's Treasure Vault snapshot (`orgExport.ts`). The flag round-trips through export/import (`orgExport.ts` / `orgImport.ts`, the import field defaults to `true` so pre-PI-66 files still load).
 - [x] **Frontend:** a checkbox in `EditPodForm` (`PodPage.tsx`). `PodTabs.tsx` drops the Value tab when off (reads the cached `usePod`). `PodValuePage` shows an explanatory note instead of the gallery/add form. `PublicPodPage` hides its Value `<section>`.
 - [ ] Browser-verified. No dedicated test (cardPulls/playerStats have no route/service test files) — covered by build + the orgImport round-trip test + browser check.
 
-### PI-67 — Show finishing place as a column in the standings table ✅ (code-complete, browser-verify pending)
+### PI-67 — Show finishing place as a column in the standings table ✅ (shipped in v0.4.0, browser-verify pending)
 Idea from Tobias: the per-pod standings table didn't show the rank number.
 - [x] Added a leftmost `#` column (sequential `i + 1`, muted, right-aligned tabular) to the per-pod standings table on both `PodStandingsPage.tsx` (authed) and `PublicPodPage.tsx` (public). No backend change — rows already arrive pre-sorted from `computePodStandings`. The tournament-wide standings (`GesamtwertungList.tsx`) already had a tie-aware rank badge, so it needed nothing. Sequential (not tie-aware) per the v1 scope — the manual-reorder arrows already handle the intentional-tie case.
 - [ ] Browser-verified.
 
-### PI-68 — Export a tournament as a spreadsheet (.xlsx) ✅ (code-complete, browser-verify pending)
+### PI-68 — Export a tournament as a spreadsheet (.xlsx) ✅ (shipped in v0.4.0, browser-verify pending)
 Idea from Tobias: a human-readable spreadsheet export of a tournament, distinct from PI-38's JSON round-trip dump.
 - [x] **Decisions (Tobias):** `.xlsx` multi-sheet; contents = Tournament Standings + a Standings sheet per pod + one flat Matches sheet (round-by-round); download button on the tournament page.
 - [x] **Dependency:** `write-excel-file` (chosen over `exceljs` — `exceljs` pulls transitive advisories in its CSV-read path we don't use; `write-excel-file` audits clean and is write-only, which is all we need).
