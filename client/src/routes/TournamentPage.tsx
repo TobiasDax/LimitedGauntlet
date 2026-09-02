@@ -171,6 +171,9 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
   const [pointsLoss, setPointsLoss] = useState(0);
   const [roundLengthMinutes, setRoundLengthMinutes] = useState(50);
   const [isMainEvent, setIsMainEvent] = useState(false);
+  const [excludeFromStats, setExcludeFromStats] = useState(false);
+  const [rarePicksEnabled, setRarePicksEnabled] = useState(true);
+  const [webhookEnabled, setWebhookEnabled] = useState(true);
   const [setCode, setSetCode] = useState("");
   const [constructedFormat, setConstructedFormat] = useState<ConstructedFormat | "">("");
   const [constructedFormatCustom, setConstructedFormatCustom] = useState("");
@@ -194,6 +197,9 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
             pointsDraw,
             pointsLoss,
             roundLengthMinutes,
+            excludeFromStats,
+            rarePicksEnabled,
+            webhookEnabled,
             isMainEvent,
             setCode: setCode || undefined,
             constructedFormat: format === "CONSTRUCTED" && constructedFormat ? constructedFormat : undefined,
@@ -298,6 +304,33 @@ function NewPodForm({ tournamentId, nextSequenceOrder }: { tournamentId: string;
                 onChange={(e) => setRoundLengthMinutes(Number(e.target.value))}
               />
             </Field>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3">
+            <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+              <input
+                type="checkbox"
+                checked={rarePicksEnabled}
+                onChange={(e) => setRarePicksEnabled(e.target.checked)}
+              />
+              Track rare picks (card values) for this pod
+            </label>
+            <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+              <input
+                type="checkbox"
+                checked={excludeFromStats}
+                onChange={(e) => setExcludeFromStats(e.target.checked)}
+              />
+              Exclude from org-wide stats (Hall of Fame, Treasure Chest) — for one-off, joke, or test pods
+            </label>
+            <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+              <input
+                type="checkbox"
+                checked={webhookEnabled}
+                onChange={(e) => setWebhookEnabled(e.target.checked)}
+              />
+              Send events to the org's configured webhook for this pod (Settings → Webhook)
+            </label>
           </div>
         </details>
 

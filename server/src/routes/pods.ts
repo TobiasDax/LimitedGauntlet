@@ -43,6 +43,7 @@ const podCreateSchema = z.object({
   packConfig: z.string().trim().max(2000).optional(),
   rarepicUrl: z.string().trim().url().optional(),
   excludeFromStats: z.boolean().default(false),
+  rarePicksEnabled: z.boolean().default(true),
   webhookEnabled: z.boolean().default(true),
   isMainEvent: z.boolean().default(false),
   setCode: z.string().trim().toLowerCase().min(2).max(10).optional(),

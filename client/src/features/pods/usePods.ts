@@ -27,6 +27,9 @@ export interface CreatePodInput {
   pointsDraw: number;
   pointsLoss: number;
   roundLengthMinutes: number;
+  excludeFromStats?: boolean;
+  rarePicksEnabled?: boolean;
+  webhookEnabled?: boolean;
   isMainEvent?: boolean;
   setCode?: string;
   constructedFormat?: ConstructedFormat;
