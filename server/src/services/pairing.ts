@@ -68,23 +68,7 @@ export async function generatePairings(podId: string, roundNumber: number): Prom
   // entrant-creation order — shuffle instead for a genuine random draw.
   // Later rounds: sort by points desc, stable on incoming order, so ties
   // within a score group don't reshuffle round to round for no reason.
-  let pool = roundNumber === 1 ? shuffle(infos) : [...infos].sort((a, b) => b.points - a.points);
-
-  let byeEntrantId: string | null = null;
-  if (pool.length % 2 === 1) {
-    let byeIndex = -1;
-    for (let i = pool.length - 1; i >= 0; i--) {
-      if (!pool[i]!.hasHadBye) {
-        byeIndex = i;
-        break;
-      }
-    }
-    if (byeIndex === -1) byeIndex = pool.length - 1; // everyone's had one already
-    byeEntrantId = pool[byeIndex]!.id;
-    pool = [...pool.slice(0, byeIndex), ...pool.slice(byeIndex + 1)];
-  }
-
-  const byId = new Map(pool.map((e) => [e.id, e]));
+  const pool = roundNumber === 1 ? shuffle(infos) : [...infos].sort((a, b) => b.points - a.points);
 
   function pairCost(a: EntrantInfo, b: EntrantInfo): number {
     if (opponents.get(a.id)?.has(b.id)) return Number.POSITIVE_INFINITY;
@@ -99,42 +83,80 @@ export async function generatePairings(podId: string, roundNumber: number): Prom
     return repeatElsewhere * REPEAT_ELSEWHERE_WEIGHT + scoreDiff;
   }
 
-  // Exact minimum-total-cost perfect matching via branch-and-bound, not a
-  // greedy "pair the first entrant with their own cheapest partner and
-  // never look back." A pure greedy pass can lock in a locally-cheap
-  // pairing that blocks a globally better (or fully repeat-free) result
-  // for everyone else — e.g. two players who've only faced each other
-  // getting paired first, forcing a third pair elsewhere to eat an
-  // avoidable repeat that a different first choice would have sidestepped
-  // entirely. Costs are never negative, so once a candidate's own edge
-  // cost already matches or exceeds the best full-matching cost found so
-  // far, no matching built on it (or anything sorted after it) can beat
-  // that best — safe to prune the rest of this branch.
-  function bestMatching(remaining: string[]): { pairs: Array<[string, string]>; cost: number } | null {
-    if (remaining.length === 0) return { pairs: [], cost: 0 };
-    const [first, ...rest] = remaining as [string, ...string[]];
-    const a = byId.get(first)!;
+  // Exact minimum-total-cost perfect matching of one (even-sized) set of
+  // entrants. Returns null when no matching avoids every within-pod repeat.
+  //
+  // `bestMatching` is branch-and-bound, not a greedy "pair the first entrant
+  // with their own cheapest partner and never look back": a pure greedy pass
+  // can lock in a locally-cheap pairing that blocks a globally better (or
+  // fully repeat-free) result for everyone else — e.g. two players who've
+  // only faced each other getting paired first, forcing a third pair to eat
+  // an avoidable repeat a different first choice would have sidestepped.
+  // Costs are never negative, so once a candidate's own edge cost already
+  // matches or exceeds the best full-matching cost found so far, no matching
+  // built on it (or anything sorted after it) can beat that best — safe to
+  // prune the rest of the branch.
+  function solvePool(poolInfos: EntrantInfo[]): { pairs: Array<[string, string]>; cost: number } | null {
+    const byId = new Map(poolInfos.map((e) => [e.id, e]));
 
-    const candidates = rest
-      .map((id) => ({ id, cost: pairCost(a, byId.get(id)!) }))
-      .filter((c) => Number.isFinite(c.cost))
-      .sort((x, y) => x.cost - y.cost);
+    function bestMatching(remaining: string[]): { pairs: Array<[string, string]>; cost: number } | null {
+      if (remaining.length === 0) return { pairs: [], cost: 0 };
+      const [first, ...rest] = remaining as [string, ...string[]];
+      const a = byId.get(first)!;
 
-    let best: { pairs: Array<[string, string]>; cost: number } | null = null;
-    for (const candidate of candidates) {
-      if (best && candidate.cost >= best.cost) break;
-      const nextRemaining = rest.filter((id) => id !== candidate.id);
-      const solvedRest = bestMatching(nextRemaining);
-      if (!solvedRest) continue;
-      const totalCost = candidate.cost + solvedRest.cost;
-      if (!best || totalCost < best.cost) {
-        best = { pairs: [[first, candidate.id], ...solvedRest.pairs], cost: totalCost };
+      const candidates = rest
+        .map((id) => ({ id, cost: pairCost(a, byId.get(id)!) }))
+        .filter((c) => Number.isFinite(c.cost))
+        .sort((x, y) => x.cost - y.cost);
+
+      let best: { pairs: Array<[string, string]>; cost: number } | null = null;
+      for (const candidate of candidates) {
+        if (best && candidate.cost >= best.cost) break;
+        const nextRemaining = rest.filter((id) => id !== candidate.id);
+        const solvedRest = bestMatching(nextRemaining);
+        if (!solvedRest) continue;
+        const totalCost = candidate.cost + solvedRest.cost;
+        if (!best || totalCost < best.cost) {
+          best = { pairs: [[first, candidate.id], ...solvedRest.pairs], cost: totalCost };
+        }
       }
+      return best;
     }
-    return best;
+
+    return bestMatching(poolInfos.map((e) => e.id));
   }
 
-  const solved = bestMatching(pool.map((e) => e.id));
+  // Bye + matching are chosen together: the natural lowest-score bye can
+  // strand a forced repeat pair among the rest (e.g. three entrants left
+  // after a drop, where the two non-bye players already met), so try each
+  // bye candidate in preference order until the remaining pool is actually
+  // matchable. Preference: entrants with no prior bye first (lowest score
+  // first), then everyone (lowest score first) for the "already had one"
+  // fallback.
+  let byeEntrantId: string | null = null;
+  let solved: { pairs: Array<[string, string]>; cost: number } | null;
+
+  if (pool.length % 2 === 0) {
+    solved = solvePool(pool);
+  } else {
+    const tried = new Set<number>();
+    const byeOrder: number[] = [];
+    for (let i = pool.length - 1; i >= 0; i--) if (!pool[i]!.hasHadBye) byeOrder.push(i);
+    for (let i = pool.length - 1; i >= 0; i--) if (!byeOrder.includes(i)) byeOrder.push(i);
+
+    solved = null;
+    for (const byeIndex of byeOrder) {
+      if (tried.has(byeIndex)) continue;
+      tried.add(byeIndex);
+      const attempt = solvePool([...pool.slice(0, byeIndex), ...pool.slice(byeIndex + 1)]);
+      if (attempt) {
+        byeEntrantId = pool[byeIndex]!.id;
+        solved = attempt;
+        break;
+      }
+    }
+  }
+
   if (!solved) {
     throw new PairingError(
       "No valid pairing avoids all within-pod repeat opponents. Use manual pairing to resolve this round.",

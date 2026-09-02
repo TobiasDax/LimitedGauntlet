@@ -206,4 +206,39 @@ describe("generatePairings", () => {
     expect(bye).toBeDefined();
     expect(round2.pairs).toHaveLength(2);
   });
+
+  // Regression: with 3 entrants left after a drop, the natural lowest-score
+  // bye can strand the other two as a forced repeat. The engine must move
+  // the bye to one of the already-met players instead of throwing.
+  it("moves the bye off the lowest scorer when that would strand a repeat pair", async () => {
+    const { org, tournament } = await createOrgAndTournament();
+    const [p1, p2, p3, p4] = await createPlayers(org.id, ["P1", "P2", "P3", "P4"]);
+    const pod = await createPod(tournament.id, { name: "Strand Pod", roundCount: 2 });
+    const [e1, e2, e3, e4] = await Promise.all(
+      [p1, p2, p3, p4].map((p) => prisma.entrant.create({ data: { podId: pod.id, playerId: p!.id } })),
+    );
+
+    // Round 1 hand-built: P1 beats P2, P3 beats P4. So P1 & P3 sit on 3 pts,
+    // P2 & P4 on 0. P1 and P2 have now met.
+    const r1 = await prisma.round.create({ data: { podId: pod.id, roundNumber: 1, status: "ACTIVE" } });
+    await prisma.match.createMany({
+      data: [
+        { roundId: r1.id, tableNumber: 1, entrantAId: e1!.id, entrantBId: e2!.id, result: "A_WINS", gamesWonA: 2, reportedAt: new Date() },
+        { roundId: r1.id, tableNumber: 2, entrantAId: e3!.id, entrantBId: e4!.id, result: "A_WINS", gamesWonA: 2, reportedAt: new Date() },
+      ],
+    });
+    await prisma.round.update({ where: { id: r1.id }, data: { status: "COMPLETED" } });
+
+    // Drop P3 (a 3-pointer). Active: P1 (3), P2 (0), P4 (0). The lowest-score
+    // bye would land on P2 or P4; if it lands on P4, P1 v P2 is a repeat.
+    await prisma.entrant.update({ where: { id: e3!.id }, data: { droppedAfterRound: 1 } });
+
+    const round2 = await generatePairings(pod.id, 2);
+    expect(round2.pairs).toHaveLength(2);
+
+    const realPair = round2.pairs.find((p) => p.entrantBId !== null)!;
+    const met = new Set([`${e1!.id}:${e2!.id}`, `${e2!.id}:${e1!.id}`]);
+    expect(met.has(`${realPair.entrantAId}:${realPair.entrantBId}`)).toBe(false);
+    expect([realPair.entrantAId, realPair.entrantBId]).toContain(e4!.id);
+  });
 });
