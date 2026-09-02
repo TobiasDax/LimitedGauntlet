@@ -374,23 +374,19 @@ Idea from Tobias: creating a pod left the (long) new-pod form open with no clear
 - [x] `NewPodForm` (`TournamentPage.tsx`) takes an `onCreated` callback, fired from `createPod.mutate(..., { onSuccess })`; the parent closes the form. The new pod renders directly above where the form was, so no scroll-into-view needed.
 - [ ] Browser-verified.
 
-### PI-72 — Prize points: an org-wide player currency earned from play, spent on a (external) prize wall (v2 idea)
-Idea from Tobias: players accumulate points across every event, redeemable for prizes (the prize wall itself is **out of scope** — this app just tracks the balance). It's a **new concept, separate from match/standings points** — needs its own name.
+### PI-72 — Tokens: an org-wide player currency earned from play (v2 idea, scoped 2026-09-02)
+Idea from Tobias: players accumulate **tokens** across every event, redeemable for prizes (the prize wall itself is **out of scope** — this app only tracks the balance). A new concept, deliberately named **"tokens"** to stay distinct from match/standings points.
 
-**Spec (Tobias):**
-- Players earn points for: (a) **playing in a pod** (participation), (b) a **standing bonus** based on where they finished.
-- Points accumulate **org-wide, all-time** — one balance per player across all tournaments.
-- Organizers can **set** a player's balance (to import history from external events), **add**, and **deduct** (prize-wall spend).
-- Every transaction is tracked on a **new tab on the player stats page**: point delta, date, and reason — either "manual, by <organizer>" or "automatic, from <pod/event>".
-- **Default point values** (per-participation + the standing bonus) are set in **tournament settings**, and can be **overridden per pod**.
-
-**Open design questions (settle before building):**
-- **Name.** "Prize points" / "store credit" / "tokens" / … — collides with match points, so it needs to be visually and terminologically distinct everywhere.
-- **Standing-bonus shape.** A fixed top-3 (1st/2nd/3rd bonus)? A configurable place→bonus list? A formula? And per-pod override granularity.
-- **Data model.** A `PointTransaction` ledger (`playerId`, `orgId`, signed `delta`, `reason` enum, nullable `createdByOrganizerId` / `podId` / `tournamentId`, optional note, `createdAt`); balance = sum of deltas. "Set to X" recorded as the adjusting delta (or a dedicated entry type).
-- **Team pods.** Each member gets the full participation + standing points (mirrors the "team pods credit each member the team's full match points" rule).
-- **When auto-points fire, and recomputation.** Award once when the pod's last round completes, from the standings at that moment? Do they recompute if a result is corrected afterwards, or does the organizer adjust manually? (Lean: award once, manual fix-ups — recompute is a rabbit hole.)
-- **Retroactivity.** Existing completed pods — backfill, or "automatic starts now" and pre-existing history goes in via the manual "set balance"?
-- **Public visibility.** Balance and/or the ledger on the public player page, or organizer-only?
-- **MCP.** add/deduct/set-points tools (bulk organizer op)?
-- [ ] Not started — scoping/interview only.
+**Spec + decisions (Tobias, 2026-09-02):**
+- Players earn tokens for **playing in a pod** (participation) and a **standing bonus** by finishing place.
+- Tokens accumulate **org-wide, all-time** — one balance per player across all tournaments.
+- Organizers can **set** a balance (import external history), **add**, and **deduct** (prize-wall spend).
+- Every transaction shows on a **new "Tokens" tab on the player stats page**: delta, date, reason — "manual, by \<organizer\>" or "automatic, from \<pod\>".
+- **Config:** `Tournament` holds the default participation value (single int) + a **configurable place→bonus list** (rows like place 1 = 5, place 2 = 3, places 3–4 = 1). Each `Pod` can **override** both (null = inherit the tournament default).
+- **Standing-bonus shape:** a list of `{ fromPlace, toPlace, tokens }` rows, stored as JSON on `Tournament` + `Pod`.
+- **Auto-award + recompute:** awarded when a pod's last configured round is `COMPLETED`, from the standings at that moment; **recomputed** (delete + re-create the pod's auto entries) whenever a later result correction shifts those standings — hooked next to `inferCardPullAttribution(podId)` in `rounds.ts`. Team pods credit **each member** the full participation + standing tokens (mirrors the match-points rule).
+- **Visibility:** current **balance is public** on the player page; the **transaction ledger is private** — visible to organizers, and to the player themselves when logged into their own PI-52 player account (also surfaced in the `/o/<slug>/player` portal).
+- **Data model:** a `TokenTransaction` ledger — `playerId`, `orgId`, signed `delta`, `reason` enum (`POD_PARTICIPATION` / `POD_STANDING` / `MANUAL` / `INITIAL`), nullable `createdByOrganizerId` / `podId`, optional `note`, `createdAt`. Balance = `SUM(delta)`. "Set to X" is stored as the adjusting delta with reason `MANUAL` + a note.
+- **Retroactivity:** automatic awards start when the feature ships; pre-existing external history goes in via the manual "set balance".
+- **MCP:** `adjust_player_tokens` (delta + note) and `list_player_token_transactions`.
+- [ ] Not started — needs an implementation plan next.
