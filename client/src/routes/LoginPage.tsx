@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useLogin } from "../features/auth/useAuth";
 import { useAppConfig } from "../features/config/useAppConfig";
+import { SsoButtons } from "../components/SsoButtons";
 import { Button, Card, Field, FormError, TextField } from "../components/ui";
 import { ApiError } from "../lib/api";
 
@@ -40,14 +41,9 @@ export function LoginPage() {
         </div>
       )}
 
-      {appConfig?.oidcEnabled && (
+      {appConfig?.ssoProviders && appConfig.ssoProviders.length > 0 && (
         <div className="mb-5">
-          {/* Full-page navigation, not fetch — this kicks off a redirect flow. */}
-          <a href="/api/auth/oidc/login" className="block">
-            <Button type="button" variant="primary" className="w-full">
-              Sign in with {appConfig.oidcProviderName || "SSO"}
-            </Button>
-          </a>
+          <SsoButtons providers={appConfig.ssoProviders} />
           {/* The local form is hidden entirely in SSO-only mode, so no divider then. */}
           {!appConfig.localLoginDisabled && (
             <div className="my-5 flex items-center gap-3 text-[11.5px] tracking-wide text-ink-muted uppercase">

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSignup, useSignupStatus } from "../features/auth/useAuth";
 import { useAppConfig } from "../features/config/useAppConfig";
+import { SsoButtons } from "../components/SsoButtons";
 import { Button, Card, Field, FormError, TextField } from "../components/ui";
 import { ApiError } from "../lib/api";
 
@@ -37,14 +38,10 @@ export function SignupPage() {
         // with SSO, which drops the first-time user into the org-setup screen.
         <Card className="p-6 text-center">
           <p className="mb-4 text-[14px] text-ink-secondary">
-            This instance uses single sign-on. Sign in with {appConfig.oidcProviderName || "SSO"} — if you don't have an
-            organization yet, you'll be prompted to create one.
+            This instance uses single sign-on — if you don't have an organization yet, you'll be prompted to
+            create one after signing in.
           </p>
-          <a href="/api/auth/oidc/login" className="block">
-            <Button type="button" variant="primary" className="w-full">
-              Sign in with {appConfig.oidcProviderName || "SSO"}
-            </Button>
-          </a>
+          <SsoButtons providers={appConfig.ssoProviders ?? []} />
         </Card>
       ) : statusLoading ? null : !signupStatus?.allowSignup ? (
         <Card className="p-6 text-center">

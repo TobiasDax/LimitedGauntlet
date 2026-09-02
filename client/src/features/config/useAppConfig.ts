@@ -1,12 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 
+export interface SsoProvider {
+  id: "oidc" | "google" | "discord";
+  label: string;
+}
+
 export interface AppConfig {
   legalLinkUrl: string | null;
   legalLinkLabel: string | null;
-  // Optional SSO login (PI-42): whether it's configured, and the button label.
-  oidcEnabled?: boolean;
-  oidcProviderName?: string;
+  // Configured SSO providers to show a button for (PI-42 / PI-43), in display
+  // order. Empty array = password-only.
+  ssoProviders?: SsoProvider[];
   // SSO-only mode: hide the local password form + signup link entirely.
   localLoginDisabled?: boolean;
 }

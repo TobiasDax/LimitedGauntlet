@@ -70,6 +70,18 @@ export const config = {
     // Space-separated scopes; must include openid + email for account linking.
     scope: process.env.OIDC_SCOPE ?? "openid email profile",
   },
+  // Social login (PI-43), layered on the same PI-42 account-linking machinery.
+  // Each is independently optional — set both id + secret to offer that button.
+  // Google is standards OIDC (fixed issuer); Discord is plain OAuth2 (no
+  // id_token — identity comes from its /users/@me endpoint).
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  },
+  discord: {
+    clientId: process.env.DISCORD_CLIENT_ID ?? "",
+    clientSecret: process.env.DISCORD_CLIENT_SECRET ?? "",
+  },
   // Switch the whole deployment to SSO-only (PI-42): disable local password
   // login + local signup so OIDC is the only way in. Only honoured when OIDC is
   // actually configured (see isLocalLoginDisabled) — a fail-safe so setting
@@ -87,10 +99,27 @@ export function isOidcConfigured(): boolean {
   );
 }
 
-// SSO-only mode is only in effect when OIDC is actually usable — otherwise the
-// flag is ignored so a misconfiguration can't leave the app with no way to log
-// in at all.
+export type SsoProviderId = "oidc" | "google" | "discord";
+
+// Which SSO buttons to show, in the order they render. A provider appears only
+// when its credentials are set — same "degrades to password-only" posture as
+// SMTP. `oidc` uses the operator-chosen label; the social ones are fixed.
+export function configuredSsoProviders(): Array<{ id: SsoProviderId; label: string }> {
+  const providers: Array<{ id: SsoProviderId; label: string }> = [];
+  if (isOidcConfigured()) providers.push({ id: "oidc", label: config.oidc.providerName || "SSO" });
+  if (config.google.clientId && config.google.clientSecret) providers.push({ id: "google", label: "Google" });
+  if (config.discord.clientId && config.discord.clientSecret) providers.push({ id: "discord", label: "Discord" });
+  return providers;
+}
+
+export function isSsoConfigured(): boolean {
+  return configuredSsoProviders().length > 0;
+}
+
+// SSO-only mode is only in effect when at least one SSO provider is actually
+// usable — otherwise the flag is ignored so a misconfiguration can't leave the
+// app with no way to log in at all.
 export function isLocalLoginDisabled(): boolean {
-  return config.localLoginDisabled && isOidcConfigured();
+  return config.localLoginDisabled && isSsoConfigured();
 }
 import { parseTrustedProxies } from "./proxyTrust.js";

@@ -69,11 +69,11 @@ model OrganizerAccount {
   // local password. Password login is rejected for such accounts; they can set
   // a password later from Settings to gain a second way in.
   passwordHash String?
-  // OIDC subject (`sub` claim) of the linked identity-provider account (PI-42).
-  // Set the first time an OIDC login links to (or provisions) this account, so
-  // subsequent logins match on the stable subject even if the IdP email later
-  // changes. One IdP per deployment (issuer is env-configured), so the subject
-  // alone is unique. Null for password-only accounts.
+  // Linked SSO identity (PI-42 / PI-43), provider-prefixed: `oidc:<sub>`,
+  // `google:<sub>`, `discord:<id>`. Set the first time an SSO login links to (or
+  // provisions) this account; subsequent logins match on this stable key even
+  // if the provider email later changes. One SSO identity per account — binding
+  // a different one goes through the PI-49 relink flow. Null for password-only.
   oidcSubject  String?  @unique
   authVersion  Int      @default(0)
   name         String

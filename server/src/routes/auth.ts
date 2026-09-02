@@ -1,14 +1,13 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { requireAuth } from "../auth/middleware.js";
-import { config, isOidcConfigured, isLocalLoginDisabled } from "../config.js";
-import { beginOidcLogin, completeOidcLogin, type OidcIdentity } from "../services/oidc.js";
-import { createOidcRelinkRequest, confirmOidcRelink } from "../services/oidcRelink.js";
-import { isEmailConfigured, resolveBaseUrl, sendMail } from "../services/mailer.js";
+import { config, isLocalLoginDisabled, configuredSsoProviders, type SsoProviderId } from "../config.js";
+import { beginSso, completeSso, isProviderConfigured, linkOrProvisionFromSso } from "../services/sso.js";
+import { confirmOidcRelink } from "../services/oidcRelink.js";
 import { refreshRealtimeAuthorization } from "../realtime.js";
 
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -53,80 +52,6 @@ function requestOrigin(request: { protocol: string; headers: Record<string, unkn
   return host ? `${request.protocol}://${String(host)}` : "";
 }
 
-// OIDC login resolution (PI-42): map a verified external identity to an
-// organizer account. The paths, in order:
-//   1. Known subject → the account we linked before.
-//   2. Verified email matching an existing account → link (record the subject).
-//   3. Verified email matching a pending co-organizer invite → provision a
-//      passwordless account into that org and consume the invite (SSO as an
-//      alternative to the password-set accept-invite flow).
-//   4. Unknown identity + signups open → "needs_registration": the caller sends
-//      them to the org-setup screen to create a brand-new org via SSO.
-//   5. Unknown identity + signups closed → refused; an organizer must invite
-//      this email first.
-type LinkResult =
-  | { status: "ok"; organizerId: string; authVersion: number }
-  | { status: "recovery_required"; emailSent: boolean }
-  | { status: "needs_registration"; identity: OidcIdentity }
-  | { status: "error"; error: string };
-
-async function linkOrProvisionFromOidc(identity: OidcIdentity, origin: string): Promise<LinkResult> {
-  const bySubject = await prisma.organizerAccount.findUnique({ where: { oidcSubject: identity.subject } });
-  if (bySubject) return { status: "ok", organizerId: bySubject.id, authVersion: bySubject.authVersion };
-
-  if (!identity.email || !identity.emailVerified) {
-    return { status: "error", error: "oidc_email_unverified" };
-  }
-
-  const byEmail = await prisma.organizerAccount.findUnique({ where: { email: identity.email } });
-  if (byEmail) {
-    // Link the subject to the existing account if it isn't already, so future
-    // logins match on the stable subject even if the IdP email changes.
-    if (!byEmail.oidcSubject) {
-      const linked = await prisma.organizerAccount.updateMany({ where: { id: byEmail.id, oidcSubject: null }, data: { oidcSubject: identity.subject } });
-      if (linked.count === 1) return { status: "ok", organizerId: byEmail.id, authVersion: byEmail.authVersion };
-    } else if (byEmail.oidcSubject === identity.subject) {
-      return { status: "ok", organizerId: byEmail.id, authVersion: byEmail.authVersion };
-    }
-    const { request: relink, token } = await createOidcRelinkRequest(byEmail.id, identity.subject, byEmail.email);
-    const emailSent = isEmailConfigured();
-    if (emailSent) {
-      const url = `${resolveBaseUrl(origin)}/oidc-relink?token=${encodeURIComponent(token)}`;
-      await sendMail({ to: byEmail.email, subject: "Confirm your LimitedGauntlet SSO relink", text: `Confirm this SSO account relink within one hour: ${url}` });
-    }
-    // No claims or secrets in the log — just enough for an operator to find the
-    // right pending request via the recovery CLI when SMTP isn't configured.
-    console.warn("OIDC subject relink required", { organizerId: byEmail.id, requestId: relink.id, emailSent });
-    return { status: "recovery_required", emailSent };
-  }
-
-  const invite = await prisma.organizerInvite.findFirst({
-    where: { email: identity.email, usedAt: null, expiresAt: { gt: new Date() } },
-    orderBy: { createdAt: "desc" },
-  });
-  if (invite) {
-    const [organizer] = await prisma.$transaction([
-      prisma.organizerAccount.create({
-        data: {
-          orgId: invite.orgId,
-          email: identity.email,
-          name: identity.name || identity.email,
-          passwordHash: null,
-          oidcSubject: identity.subject,
-        },
-      }),
-      prisma.organizerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } }),
-    ]);
-    return { status: "ok", organizerId: organizer.id, authVersion: organizer.authVersion };
-  }
-
-  // No existing account and no invite. When signups are open, let them bootstrap
-  // a new org via the setup screen; otherwise hold the line on closed signup.
-  if (config.allowSignup) {
-    return { status: "needs_registration", identity };
-  }
-  return { status: "error", error: "oidc_no_account" };
-}
 
 function isUniqueConstraintError(err: unknown, target: string): boolean {
   return (
@@ -151,9 +76,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     reply.send({
       legalLinkUrl: config.legalLinkUrl || null,
       legalLinkLabel: config.legalLinkLabel || null,
-      // Whether SSO login is available + the button label (PI-42).
-      oidcEnabled: isOidcConfigured(),
-      oidcProviderName: config.oidc.providerName,
+      // Configured SSO providers to render a button for (PI-42 / PI-43),
+      // in display order — [] means password-only.
+      ssoProviders: configuredSsoProviders(),
       // SSO-only mode: the frontend hides the local password form + signup link.
       localLoginDisabled: isLocalLoginDisabled(),
     });
@@ -390,84 +315,110 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // --- OIDC / SSO login (PI-42) ---
-  // A full-page redirect flow (not fetch/JSON): the browser is sent to the IdP
-  // and comes back to the callback below, which sets the session and redirects
-  // into the SPA. Both routes 404/redirect cleanly when OIDC isn't configured.
+  // --- SSO login (PI-42 / PI-43) ---
+  // A full-page redirect flow (not fetch/JSON): the browser is sent to the
+  // provider and comes back to the callback, which sets the session and
+  // redirects into the SPA. `/api/auth/sso/:provider/*` is the current shape;
+  // `/api/auth/oidc/*` is kept as an alias so an already-registered generic-OIDC
+  // redirect URI (e.g. Pocket ID) needs no change.
 
-  app.get(
-    "/api/auth/oidc/login",
-    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
-    async (request, reply) => {
-      if (!isOidcConfigured()) {
-        reply.code(404).send({ error: "oidc_not_configured" });
-        return;
-      }
-      const origin = requestOrigin(request);
-      try {
-        const start = await beginOidcLogin(origin);
-        request.session.set("oidc", {
-          state: start.state,
-          nonce: start.nonce,
-          codeVerifier: start.codeVerifier,
-          origin,
-        });
-        reply.redirect(start.url);
-      } catch (err) {
-        request.log.error({ err }, "oidc login start failed");
-        reply.redirect("/login?error=oidc_unavailable");
-      }
-    },
-  );
+  const SSO_PROVIDERS = ["oidc", "google", "discord"] as const;
+  function parseProvider(raw: unknown): SsoProviderId | null {
+    return (SSO_PROVIDERS as readonly string[]).includes(raw as string) ? (raw as SsoProviderId) : null;
+  }
 
-  app.get(
-    "/api/auth/oidc/callback",
-    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
-    async (request, reply) => {
-      if (!isOidcConfigured()) {
-        reply.code(404).send({ error: "oidc_not_configured" });
+  async function handleSsoLogin(request: FastifyRequest, reply: FastifyReply, provider: SsoProviderId) {
+    if (!isProviderConfigured(provider)) {
+      reply.code(404).send({ error: "sso_not_configured" });
+      return;
+    }
+    const origin = requestOrigin(request);
+    try {
+      const start = await beginSso(provider, origin);
+      request.session.set("sso", {
+        provider,
+        state: start.state,
+        nonce: start.nonce,
+        codeVerifier: start.codeVerifier,
+        origin,
+      });
+      reply.redirect(start.url);
+    } catch (err) {
+      request.log.error({ err, provider }, "sso login start failed");
+      reply.redirect("/login?error=oidc_unavailable");
+    }
+  }
+
+  async function handleSsoCallback(request: FastifyRequest, reply: FastifyReply, provider: SsoProviderId) {
+    if (!isProviderConfigured(provider)) {
+      reply.code(404).send({ error: "sso_not_configured" });
+      return;
+    }
+    // Read the current key; fall back to the pre-PI-43 `oidc` key so a login
+    // started just before a deploy still completes.
+    const sso = request.session.get("sso");
+    const legacy = request.session.get("oidc");
+    request.session.set("sso", undefined);
+    request.session.set("oidc", undefined);
+    const checks = sso ?? (legacy ? { provider: "oidc" as const, ...legacy } : null);
+    if (!checks || checks.provider !== provider) {
+      reply.redirect("/login?error=oidc_expired");
+      return;
+    }
+    try {
+      const identity = await completeSso(provider, checks.origin, request.query as Record<string, string>, {
+        state: checks.state,
+        nonce: checks.nonce,
+        codeVerifier: checks.codeVerifier,
+      });
+      const result = await linkOrProvisionFromSso(provider, identity, checks.origin);
+      if (result.status === "error") {
+        reply.redirect(`/login?error=${result.error}`);
         return;
       }
-      const checks = request.session.get("oidc");
-      request.session.set("oidc", undefined); // single-use, whatever happens next
-      if (!checks) {
-        reply.redirect("/login?error=oidc_expired");
+      if (result.status === "needs_registration") {
+        // Verified identity, no account yet, signups open — stash it and send
+        // them to the org-setup screen to finish creating their org. `subject`
+        // is already provider-prefixed.
+        request.session.set("oidcPending", { subject: result.subject, email: result.email, name: result.name });
+        reply.redirect("/oidc-setup");
         return;
       }
-      try {
-        const identity = await completeOidcLogin(checks.origin, request.query as Record<string, string>, {
-          state: checks.state,
-          nonce: checks.nonce,
-          codeVerifier: checks.codeVerifier,
-        });
-        const result = await linkOrProvisionFromOidc(identity, checks.origin);
-        if (result.status === "error") {
-          reply.redirect(`/login?error=${result.error}`);
-          return;
-        }
-        if (result.status === "needs_registration") {
-          // Verified identity, no account yet, signups open — stash it and send
-          // them to the org-setup screen to finish creating their org.
-          request.session.set("oidcPending", {
-            subject: result.identity.subject,
-            email: result.identity.email!,
-            name: result.identity.name ?? "",
-          });
-          reply.redirect("/oidc-setup");
-          return;
-        }
-        if (result.status === "recovery_required") {
-          reply.redirect(`/login?error=${result.emailSent ? "oidc_recovery_required" : "oidc_recovery_required_no_email"}`);
-          return;
-        }
-        establishSession(request, { id: result.organizerId, authVersion: result.authVersion });
-        reply.redirect("/");
-      } catch (err) {
-        request.log.error({ err }, "oidc callback failed");
-        reply.redirect("/login?error=oidc_failed");
+      if (result.status === "recovery_required") {
+        reply.redirect(`/login?error=${result.emailSent ? "oidc_recovery_required" : "oidc_recovery_required_no_email"}`);
+        return;
       }
-    },
-  );
+      establishSession(request, { id: result.organizerId, authVersion: result.authVersion });
+      reply.redirect("/");
+    } catch (err) {
+      request.log.error({ err, provider }, "sso callback failed");
+      reply.redirect("/login?error=oidc_failed");
+    }
+  }
+
+  const ssoRateLimit = { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } };
+
+  app.get("/api/auth/sso/:provider/login", ssoRateLimit, async (request, reply) => {
+    const provider = parseProvider((request.params as { provider?: string }).provider);
+    if (!provider) {
+      reply.code(404).send({ error: "sso_not_configured" });
+      return;
+    }
+    await handleSsoLogin(request, reply, provider);
+  });
+
+  app.get("/api/auth/sso/:provider/callback", ssoRateLimit, async (request, reply) => {
+    const provider = parseProvider((request.params as { provider?: string }).provider);
+    if (!provider) {
+      reply.code(404).send({ error: "sso_not_configured" });
+      return;
+    }
+    await handleSsoCallback(request, reply, provider);
+  });
+
+  // Back-compat aliases for the generic OIDC provider.
+  app.get("/api/auth/oidc/login", ssoRateLimit, (request, reply) => handleSsoLogin(request, reply, "oidc"));
+  app.get("/api/auth/oidc/callback", ssoRateLimit, (request, reply) => handleSsoCallback(request, reply, "oidc"));
 
   // The pending OIDC registration for the current session, so the org-setup
   // screen can prefill/gate itself. 404 when there's nothing pending (the page

@@ -111,11 +111,17 @@ docker compose exec app node server/dist/scripts/infer-existing-card-pulls.js
 
 Safe to re-run — it's idempotent and never overwrites an attribution a human has already set or confirmed.
 
-## 8. Optional: SSO login via OIDC
+## 8. Optional: SSO login (OIDC, Google, Discord)
 
-Organizers can sign in through an external identity provider (Authelia, Keycloak, Authentik, Google, etc.) instead of (or alongside) an email + password. It's off unless configured — the app runs password-only until you set the OIDC env vars, and the "Sign in with…" button simply isn't shown.
+Organizers can sign in through an external provider instead of (or alongside) an
+email + password. Up to three are supported, each independently optional — the
+app runs password-only until you configure one, and only configured providers
+get a button.
 
-Set these in `.env` (one provider per deployment):
+Make sure `APP_BASE_URL` is set (it's used to build the redirect URIs and email
+links). All three feed the **same account rules** (see "resolution order" below).
+
+### Generic OIDC (Authelia, Keycloak, Authentik, Pocket ID, …)
 
 ```sh
 OIDC_ISSUER=https://auth.example.com          # provider base URL; discovery at <issuer>/.well-known/openid-configuration
@@ -126,21 +132,65 @@ OIDC_PROVIDER_NAME=Authelia                    # button label: "Sign in with Aut
 OIDC_SCOPE=openid email profile               # must include openid + email
 ```
 
-Register the redirect URI (`<APP_BASE_URL>/api/auth/oidc/callback`) at your provider, and make sure `APP_BASE_URL` is set so links resolve. An SSO login resolves in this order:
+Register the redirect URI `<APP_BASE_URL>/api/auth/oidc/callback` at your provider.
 
-1. **Existing organizer account with a matching verified email** → linked and logged in.
-2. **A pending co-organizer invite** (Settings → Organizers) for that email → a passwordless account is provisioned into that org.
-3. **A brand-new identity, when `ALLOW_SIGNUP=true`** → the user is dropped on a one-time **org-setup screen** to name their new organization, then logged in. (With `ALLOW_SIGNUP=false`, an unknown SSO identity is refused — invite them first.)
+### Google
 
-An SSO-provisioned account has no local password; it can set one from **Settings → Account** if it also wants password login.
+1. Google Cloud Console → **APIs & Services → Credentials → Create OAuth client ID → Web application**.
+2. Add authorized redirect URI: `<APP_BASE_URL>/api/auth/sso/google/callback`.
+3. Put the client id/secret in `.env`:
+
+```sh
+GOOGLE_CLIENT_ID=…apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=…
+```
+
+### Discord
+
+1. Discord Developer Portal → **New Application → OAuth2**.
+2. Add a redirect: `<APP_BASE_URL>/api/auth/sso/discord/callback`. Scopes used are `identify` + `email`.
+3. Put the client id/secret in `.env`:
+
+```sh
+DISCORD_CLIENT_ID=…
+DISCORD_CLIENT_SECRET=…
+```
+
+A Discord account whose email isn't verified on Discord's side can't be matched
+(the login shows "your identity provider didn't share a verified email").
+
+### Resolution order
+
+An SSO login resolves the same way for every provider:
+
+1. **A previously linked identity** → logged straight in.
+2. **An existing organizer account with the same verified email** → linked to this identity and logged in.
+3. **A pending co-organizer invite** (Settings → Organizers) for that email → a passwordless account is provisioned into that org.
+4. **A brand-new identity, when `ALLOW_SIGNUP=true`** → a one-time **org-setup screen** to name their new organization, then logged in. (With `ALLOW_SIGNUP=false`, an unknown identity is refused — invite them first.)
+
+Each account can hold **one** SSO identity at a time. Signing in with a second
+provider for an already-linked account triggers a confirmation relink (see
+"If your identity provider reassigns…" below) rather than a silent rebind. An
+SSO-provisioned account has no local password; it can set one from
+**Settings → Account** if it also wants password login.
 
 ### SSO-only mode
 
-To make OIDC the *only* way in, set `LOCAL_LOGIN_DISABLED=true`. This hides the password form + local signup and rejects `POST /api/auth/login` / local signup — everyone logs in via SSO (existing accounts link by email; new ones self-register through the org-setup screen when signups are open). As a fail-safe it's **ignored unless OIDC is configured**, so a typo can't lock you out of the app entirely.
+To make SSO the *only* way in, set `LOCAL_LOGIN_DISABLED=true`. This hides the
+password form + local signup and rejects `POST /api/auth/login` / local signup.
+As a fail-safe it's **ignored unless at least one SSO provider is configured**,
+so a typo can't lock you out of the app entirely.
 
-### If your identity provider reassigns an organizer's subject
+### If a provider reassigns a subject — or an organizer switches providers
 
-An organizer account is bound to their provider's stable subject identifier, not just their email — deliberately, so a provider that later reuses or changes email addresses can't silently take over an account. If that identity provider account is ever deleted and recreated with the same mailbox (documented Pocket ID behavior, for example), the new subject won't match, and SSO login refuses to sign them in rather than trusting email equality alone.
+An organizer account is bound to one provider-prefixed subject (`google:…`,
+`discord:…`, `oidc:…`), not just their email — deliberately, so a provider that
+later reuses or changes email addresses can't silently take over an account, and
+so switching an account from one provider to another is a deliberate act. This
+fires when a provider account is deleted and recreated with the same mailbox
+(documented Pocket ID behavior), **or** when someone who linked via Google later
+tries "Continue with Discord" for the same email. In every case SSO login
+refuses to rebind on email equality alone.
 
 When that happens, the app emails the organizer's **existing** address a one-time confirmation link (`/oidc-relink?token=…`) — opening it relinks the account to the new subject and revokes every existing session and API token for it, so re-confirm intentionally. If SMTP isn't configured on your deployment, there's no other way to deliver that link, so use the operator recovery CLI instead:
 

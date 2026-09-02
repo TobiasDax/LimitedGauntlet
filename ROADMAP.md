@@ -4,11 +4,11 @@
 
 ## Status
 
-The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.3.1](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.3.1)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-52 (player accounts) is code-complete, browser-verify pending. Still open: PI-43 (Google login) and PI-62 (deck photos) are lower-priority ideas; plus a few small follow-ups noted inline below.
+The app is **feature-complete and running in production**, with tagged releases out (latest: [v0.3.1](https://github.com/TobiasDax/LimitedGauntlet/releases/tag/v0.3.1)) and a public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The whole numbered build (Steps 0–12) and the post-1.0 backlog through PI-63 are done and browser-verified — see `docs/BUILD-LOG.md` for the blow-by-blow. PI-43 (Google + Discord login) and PI-52 (player accounts) are code-complete, browser-verify pending. Still open: PI-62 (deck photos) is a lower-priority idea; plus a few small follow-ups noted inline below.
 
 ## Open items
 
-_None currently — PI-43 below is a lower-priority backlog idea, not committed work._
+_None currently._
 
 ## New improvements (backlog)
 
@@ -149,9 +149,15 @@ Add OIDC as a login/registration option so the app can be used with an external 
 - [x] **SSO-only mode:** `LOCAL_LOGIN_DISABLED=true` (env) disables local password login + local signup so OIDC is the only way in — `POST /api/auth/login`/`/signup` return `local_login_disabled`, and `LoginPage`/`SignupPage` hide the password form + signup link (surfacing only the SSO button). Fail-safe: `isLocalLoginDisabled()` is only honoured when OIDC is actually configured, so the flag can't lock everyone out. Wired into `.env.example`, both compose files, deployment.md §8.
 - [ ] **Follow-up (not built):** UI affordance for an SSO-only account to set its first password is backend-ready (`POST /api/settings/password` accepts no current password when none is set) but the Account form still always asks for a current password — a small UI tweak gated on exposing "has password" to the client.
 
-### PI-43 — Optional social login via Google (lower priority)
-Google as a social-login provider on top of PI-42's OIDC groundwork. **Lower priority** — this is for public/general use, not needed for Tobias's own deployment right now.
-- [ ] Reuse PI-42's OIDC/account-linking machinery (Google is an OIDC provider); mainly the provider config + a "Sign in with Google" button. Optional/off unless configured.
+### PI-43 — Social login: Google + Discord ✅ (code-complete, browser-verify pending)
+Google and Discord as social-login options on top of PI-42's account-linking machinery. (Discord added to the same pass at Tobias's request.)
+- [x] **Provider registry** (`server/src/services/sso.ts`, replacing `services/oidc.ts`): three providers, each independently optional (same "degrades to password-only" posture as SMTP). `oidc` (existing generic OIDC, unchanged) and `google` share the `openid-client` flow — Google is just the fixed issuer `https://accounts.google.com`. **Discord is not OIDC** (no `id_token`), so it gets a hand-rolled OAuth2 + PKCE path: authorize → token exchange → `GET /users/@me`, identity from `{ id, email, verified, global_name/username }`. No new dependency.
+- [x] **One SSO identity per account** (decision: Tobias). `OrganizerAccount.oidcSubject` now stores a **provider-prefixed** key (`google:123` / `discord:456` / `oidc:<sub>`) — no new table. Data-only migration `20260902160000_prefix_sso_subject` backfills existing generic-OIDC subjects (+ any live relink requests) with the `oidc:` prefix; guard clause makes it re-run-safe. Signing in with a *second* provider for an already-linked account routes through the **existing PI-49 relink flow** (mailbox link / operator CLI), never a silent rebind.
+- [x] **Routes:** `GET /api/auth/sso/:provider/{login,callback}` (`:provider` ∈ oidc|google|discord). `/api/auth/oidc/{login,callback}` kept as back-compat aliases so the already-registered Pocket ID redirect URI needs no change. Session key `sso: { provider, … }` (old `oidc` key still read for one release). `linkOrProvisionFromSso` (moved into `sso.ts`, was `linkOrProvisionFromOidc` in `auth.ts`) — logic unchanged beyond the prefix.
+- [x] **Config:** `GOOGLE_CLIENT_ID/SECRET`, `DISCORD_CLIENT_ID/SECRET` (`.env.example` + both compose files). `configuredSsoProviders()` drives the login UI; `isLocalLoginDisabled()` now gates on *any* SSO provider being configured, not just OIDC.
+- [x] **Frontend:** `GET /api/app-config` returns `ssoProviders: [{ id, label }]`; new shared `SsoButtons` component renders one button per provider on `LoginPage` + `SignupPage` (SSO-only mode). Error handling / `?error=` codes unchanged.
+- [x] **Tests:** `server/src/services/sso.test.ts` — Discord `/users/@me` parsing (verified/unverified/missing email, `global_name` fallback), `configuredSsoProviders()` combinations, and `linkOrProvisionFromSso` against real Postgres (prefixed-subject login, verified-email link records the prefix, second-provider → `recovery_required`, unverified refusal, closed-signup refusal). New `server/vitest.config.ts` supplies a throwaway `SESSION_SECRET` for tests that transitively load `config.ts`.
+- [ ] Browser-verified with real Google + Discord OAuth apps. **Tobias must run `npx prisma generate` + register the redirect URIs** (`docs/deployment.md` §8).
 
 ### PI-44 — Public demo instance ✅ (deployed and live 2026-09-02)
 A public demo deployment so prospective self-hosters can try the app without standing one up.

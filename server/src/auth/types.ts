@@ -13,12 +13,15 @@ declare module "@fastify/secure-session" {
     playerAuthVersion?: number;
     // Org ids whose public-page password lock (PI-27) this visitor has entered.
     publicUnlocked?: string[];
-    // In-flight OIDC login (PI-42): PKCE/state/nonce stashed between the
-    // redirect to the IdP and the callback. Cleared once the callback runs.
+    // In-flight SSO login (PI-42 / PI-43): which provider, plus PKCE/state/nonce
+    // stashed between the redirect to the provider and the callback. Cleared
+    // once the callback runs. `oidc` is the pre-PI-43 shape, still read for one
+    // release so a login in flight across a deploy doesn't break.
+    sso?: { provider: "oidc" | "google" | "discord"; state: string; nonce: string; codeVerifier: string; origin: string };
     oidc?: { state: string; nonce: string; codeVerifier: string; origin: string };
-    // A verified OIDC identity that has no account yet, awaiting the org-setup
+    // A verified SSO identity that has no account yet, awaiting the org-setup
     // screen to finish registration (PI-42). Set by the callback, consumed by
-    // POST /api/auth/oidc/complete-registration.
+    // POST /api/auth/oidc/complete-registration. `subject` is provider-prefixed.
     oidcPending?: { subject: string; email: string; name: string };
   }
 }
