@@ -412,3 +412,10 @@ The fix makes invite link delivery SMTP-optional and surfaces the link via the e
 - **Player invites:** `RosterPage` upgrades the post-invite inline link display to a `SharePopup` with QR code. `SharePopup` gains an optional `url` prop for callers that already have an absolute URL (player invite links are built server-side).
 - [x] **Built:** `settings.ts` invite endpoint; `useOrganizers.ts` return type; `OrganizersSection`; `SharePopup` (`url` prop); `RosterPage` player invite upgrade.
 - [ ] Browser-verified.
+
+### PI-75 — Notify the operator on new org signup (scoped, not built)
+On a public deployment with `allowSignup` on (e.g. `app.reginerring.com`), nothing tells the person running the instance when a new organization actually signs up.
+
+Audited 2026-09-03: `POST /api/auth/signup` (`server/src/routes/auth.ts:87`) fires no event on success. The existing webhook system (PI-50, `server/src/services/webhooks.ts`) only covers round/pod lifecycle events and is configured per-org, so it can't catch the creation of the org itself. Email infra already exists and is idle for this purpose (`server/src/services/mailer.ts`, nodemailer/SMTP, used today only for invite/account-change mail).
+- [ ] Cheapest path: fire an admin-alert email via the existing `sendMail()` from `auth.ts` on successful signup, gated by a new `ADMIN_ALERT_EMAIL` env var (no-op if unset, same "inert until configured" posture as SMTP/webhooks elsewhere).
+- [ ] Alternative considered: add an `organization.created` `WebhookEventType` — more flexible (Discord/ntfy/etc.) but has no natural per-org config target since the org doesn't exist yet when the event fires; would need a separate global/operator-level webhook config, not the existing per-org one.
