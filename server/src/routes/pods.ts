@@ -37,9 +37,14 @@ const constructedFormats = ["STANDARD", "MODERN", "LEGACY", "VINTAGE", "PIONEER"
 const matchFormats = ["BO1", "BO3"] as const;
 const podStatuses = ["SETUP", "PAIRING", "IN_PROGRESS", "COMPLETED"] as const;
 
+// PI-82 — "HH:MM", 24h. Kept separate from `date` (both independently optional).
+const startTimePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+const zStartTime = z.string().regex(startTimePattern, "must be HH:MM (24h)");
+
 const podCreateSchema = z.object({
   name: z.string().trim().min(1).max(150),
   date: z.coerce.date().optional(),
+  startTime: zStartTime.optional(),
   format: z.enum(podFormats),
   sequenceOrder: z.number().int().min(0),
   isTeamEvent: z.boolean().default(false),
@@ -56,6 +61,8 @@ const podCreateSchema = z.object({
   rarePicksEnabled: z.boolean().default(true),
   webhookEnabled: z.boolean().default(true),
   isMainEvent: z.boolean().default(false),
+  // PI-81 — explicit opt-in; every pod is "Scheduled" unless marked on-demand.
+  isOnDemand: z.boolean().default(false),
   // PI-72 — per-pod override of the tournament's token rewards. null = inherit.
   tokenParticipation: z.number().int().min(0).nullable().optional(),
   tokenStandingBonuses: zStandingBonuses.nullable().optional(),
@@ -72,7 +79,8 @@ const podCreateSchema = z.object({
 // "omitted" stays "don't touch."
 const podUpdateSchema = z.object({
   name: z.string().trim().min(1).max(150).optional(),
-  date: z.coerce.date().optional(),
+  date: z.coerce.date().nullable().optional(),
+  startTime: zStartTime.nullable().optional(),
   format: z.enum(podFormats).optional(),
   sequenceOrder: z.number().int().min(0).optional(),
   isTeamEvent: z.boolean().optional(),
@@ -90,6 +98,7 @@ const podUpdateSchema = z.object({
   rarePicksEnabled: z.boolean().optional(),
   webhookEnabled: z.boolean().optional(),
   isMainEvent: z.boolean().optional(),
+  isOnDemand: z.boolean().optional(),
   tokenParticipation: z.number().int().min(0).nullable().optional(),
   tokenStandingBonuses: zStandingBonuses.nullable().optional(),
   setCode: z.string().trim().toLowerCase().min(2).max(10).nullable().optional(),
@@ -306,6 +315,57 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
     });
     // Token config may have changed — recompute this pod's auto awards (PI-72).
     await syncPodTokenAwards(params.data.id);
+    reply.send({ pod });
+  });
+
+  // PI-84 — cancel a pod (event called off, never played out) as distinct
+  // from it genuinely finishing. Any stage is allowed (Setup through
+  // Finished) — a real-world event can be called off mid-draft, or marked
+  // canceled after the fact to correct a mistake. Sets excludeFromStats
+  // (covers standings/HoF/playerStats/gesamtwertung, which already check it)
+  // and re-syncs token awards (which doesn't look at excludeFromStats at all
+  // — syncPodTokenAwards has its own canceledAt gate for that).
+  app.post("/api/pods/:id/cancel", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const existing = await findOwnedPod(params.data.id, request.organizer!.orgId);
+    if (!existing) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    const pod = await prisma.pod.update({
+      where: { id: existing.id },
+      data: { canceledAt: new Date(), excludeFromStats: true },
+    });
+    await syncPodTokenAwards(existing.id);
+    reply.send({ pod });
+  });
+
+  // Undoes a mistaken cancel. Simple and symmetric rather than restoring
+  // whatever excludeFromStats value predated the cancel (there's no history
+  // of it) — the pod just goes back to counting again, matching PI-84's "at
+  // minimum re-run the stats/token gate so the pod counts again if
+  // appropriate" framing. No confirm needed here (PI-63's drop/undrop
+  // asymmetry: canceling is consequential, undoing it isn't).
+  app.post("/api/pods/:id/uncancel", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const existing = await findOwnedPod(params.data.id, request.organizer!.orgId);
+    if (!existing) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    const pod = await prisma.pod.update({
+      where: { id: existing.id },
+      data: { canceledAt: null, excludeFromStats: false },
+    });
+    await syncPodTokenAwards(existing.id);
     reply.send({ pod });
   });
 

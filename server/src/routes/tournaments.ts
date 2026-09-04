@@ -33,6 +33,12 @@ const tournamentUpdateSchema = z.object({
 const idParams = z.object({ id: z.string().min(1) });
 const playerIdParams = z.object({ id: z.string().min(1), playerId: z.string().min(1) });
 
+// PI-76 — bulk pod reorder: the client posts the full pod list in its
+// desired order; each pod's sequenceOrder becomes its index in that array.
+const podOrderSchema = z.object({
+  podIds: z.array(z.string().min(1)).min(1).max(1000),
+});
+
 export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
 
@@ -110,6 +116,43 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
 
     const tournament = await prisma.tournament.findUnique({ where: { id: params.data.id } });
     reply.send({ tournament });
+  });
+
+  // PI-76 — organizer reorder of the pod list. Rewrites every pod's
+  // sequenceOrder to its index in the posted array, in one transaction, and
+  // flips Tournament.podsManuallyReordered (PI-82: once used, the pod list
+  // stops auto-sorting by scheduled date/time and sequenceOrder becomes the
+  // sole ordering signal from here on).
+  app.patch("/api/tournaments/:id/pod-order", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    const body = podOrderSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    const tournament = await findOwnedTournament(params.data.id, request.organizer!.orgId);
+    if (!tournament) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    const existingPods = await prisma.pod.findMany({ where: { tournamentId: tournament.id }, select: { id: true } });
+    const existingIds = new Set(existingPods.map((p) => p.id));
+    const postedIds = new Set(body.data.podIds);
+    if (existingIds.size !== postedIds.size || [...existingIds].some((id) => !postedIds.has(id))) {
+      reply.code(400).send({ error: "pod_set_mismatch" });
+      return;
+    }
+
+    await prisma.$transaction([
+      ...body.data.podIds.map((podId, index) =>
+        prisma.pod.update({ where: { id: podId }, data: { sequenceOrder: index } }),
+      ),
+      prisma.tournament.update({ where: { id: tournament.id }, data: { podsManuallyReordered: true } }),
+    ]);
+
+    reply.send({ ok: true });
   });
 
   app.delete("/api/tournaments/:id", async (request, reply) => {

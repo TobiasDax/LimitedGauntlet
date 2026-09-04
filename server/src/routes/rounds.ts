@@ -113,6 +113,12 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
           entrantBId: pair.entrantBId,
         })),
       });
+      // PI-82 — the real "pod actually started" moment, regardless of
+      // format: round 1's Match rows being created (for DRAFT/CHAOS_DRAFT/
+      // SEALED this is the same action as PI-80's "Generate seatings").
+      if (nextRoundNumber === 1) {
+        await tx.pod.update({ where: { id: pod.id }, data: { actualStartedAt: new Date() } });
+      }
       return tx.round.findUniqueOrThrow({ where: { id: created.id }, include: { matches: true } });
     });
 
@@ -178,6 +184,10 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
           entrantBId: pair.entrantBId,
         })),
       });
+      // PI-82 — same "actually started" stamp as the auto-pairing route above.
+      if (nextRoundNumber === 1) {
+        await tx.pod.update({ where: { id: pod.id }, data: { actualStartedAt: new Date() } });
+      }
       return tx.round.findUniqueOrThrow({ where: { id: created.id }, include: { matches: true } });
     });
 
@@ -265,6 +275,12 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
 
     await prisma.match.deleteMany({ where: { roundId: round.id } });
     await prisma.round.delete({ where: { id: round.id } });
+
+    // PI-82 — undoing round 1's pairing undoes the "actually started" stamp
+    // too, since generation was what set it.
+    if (round.roundNumber === 1) {
+      await prisma.pod.update({ where: { id: round.podId }, data: { actualStartedAt: null } });
+    }
 
     emitPodEvent(round.podId, "round-unpaired", { roundId: round.id });
     // Deleting an unplayed final round un-completes the pod — clear its auto

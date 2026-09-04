@@ -19,6 +19,8 @@ export interface CreatePodInput {
   format: PodFormat;
   sequenceOrder: number;
   date?: string;
+  startTime?: string;
+  isOnDemand?: boolean;
   isTeamEvent: boolean;
   teamSize?: number;
   roundCount: number;
@@ -50,7 +52,9 @@ export function useCreatePod(tournamentId: string) {
 
 export interface UpdatePodInput {
   name?: string;
-  date?: string;
+  date?: string | null;
+  startTime?: string | null;
+  isOnDemand?: boolean;
   format?: PodFormat;
   isTeamEvent?: boolean;
   teamSize?: number;
@@ -75,6 +79,31 @@ export function useUpdatePod(podId: string, tournamentId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdatePodInput) => api.patch<{ pod: Pod }>(`/pods/${podId}`, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pods", podId] });
+      if (tournamentId) queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+    },
+  });
+}
+
+// PI-84 — cancel a pod (event called off, distinct from finishing it) /
+// undo a mistaken cancel. Both invalidate the tournament, not just the pod,
+// since cancellation moves the pod's position in the pod-list finished area.
+export function useCancelPod(podId: string, tournamentId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<{ pod: Pod }>(`/pods/${podId}/cancel`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pods", podId] });
+      if (tournamentId) queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+    },
+  });
+}
+
+export function useUncancelPod(podId: string, tournamentId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<{ pod: Pod }>(`/pods/${podId}/uncancel`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pods", podId] });
       if (tournamentId) queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
@@ -146,8 +175,13 @@ export function podFormatDisplay(pod: Pick<Pod, "format" | "constructedFormat" |
 // actually show from real round state instead — same "derived, not
 // stored" approach as PI-51's seating chart: no rounds yet → still setup;
 // the pod's last configured round has completed → finished; anything
-// paired in between → in progress.
-export function podProgressStatus(pod: Pick<Pod, "roundCount" | "rounds">): "Setup" | "In progress" | "Finished" {
+// paired in between → in progress. PI-84: canceled overrides all of that —
+// checked first, since a canceled pod is canceled regardless of how far its
+// rounds got.
+export function podProgressStatus(
+  pod: Pick<Pod, "roundCount" | "rounds"> & { canceledAt?: string | null },
+): "Canceled" | "Setup" | "In progress" | "Finished" {
+  if (pod.canceledAt) return "Canceled";
   const rounds = pod.rounds ?? [];
   if (rounds.length === 0) return "Setup";
   const lastRound = rounds.find((r) => r.roundNumber === pod.roundCount);

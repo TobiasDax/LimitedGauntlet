@@ -47,8 +47,9 @@ export function standingBonusFor(place: number, bonuses: StandingBonus[]): numbe
   return row ? row.tokens : 0;
 }
 
-// The single idempotent reconciler for a pod's automatic token awards. Called
-// after anything that can change the pod's standings or completion state.
+// The single idempotent reconciler for a pod's automatic token awards *and*
+// (PI-77) its completion timestamp. Called after anything that can change the
+// pod's standings, completion, or cancellation state.
 export async function syncPodTokenAwards(podId: string): Promise<void> {
   const pod = await prisma.pod.findUnique({
     where: { id: podId },
@@ -58,13 +59,32 @@ export async function syncPodTokenAwards(podId: string): Promise<void> {
       entrants: { include: { team: { include: { members: { select: { playerId: true } } } } } },
     },
   });
-  if (!pod || !pod.tournament.organization.tokensEnabled) return;
+  if (!pod) return;
+
+  const finalRoundDone = pod.rounds.some((r) => r.roundNumber === pod.roundCount && r.status === "COMPLETED");
+
+  // PI-77: stamp/clear completedAt purely off finalRoundDone, independent of
+  // Organization.tokensEnabled — every deployment needs this for the pod-list
+  // finished/unfinished partition, not just ones with tokens on. Stamped once
+  // (not refreshed on every later sync) so it stays "when it first finished";
+  // cleared back to null if roundCount is raised after completion re-opens
+  // the pod (see the DELETE /api/rounds/:id undo-pairing comment).
+  if (finalRoundDone && !pod.completedAt) {
+    await prisma.pod.update({ where: { id: podId }, data: { completedAt: new Date() } });
+  } else if (!finalRoundDone && pod.completedAt) {
+    await prisma.pod.update({ where: { id: podId }, data: { completedAt: null } });
+  }
+
+  if (!pod.tournament.organization.tokensEnabled) return;
 
   const orgId = pod.tournament.organization.id;
   const AUTO = ["POD_PARTICIPATION", "POD_STANDING"] as const;
 
-  const finalRoundDone = pod.rounds.some((r) => r.roundNumber === pod.roundCount && r.status === "COMPLETED");
-  if (!finalRoundDone) {
+  // PI-84: a canceled pod never earns automatic awards, even if every round
+  // happens to already be COMPLETED (excludeFromStats alone doesn't cover
+  // tokens — this is the audited gap the cancel feature needs closed here).
+  const eligibleForAwards = finalRoundDone && !pod.canceledAt;
+  if (!eligibleForAwards) {
     await prisma.tokenTransaction.deleteMany({ where: { podId, reason: { in: [...AUTO] } } });
     return;
   }

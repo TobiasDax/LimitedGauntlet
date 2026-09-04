@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { usePod, podFormatLabel, podFormatDisplay, useUpdatePod, useDeletePod, type PodDetail } from "../features/pods/usePods";
+import {
+  usePod,
+  podFormatLabel,
+  podFormatDisplay,
+  podProgressStatus,
+  useUpdatePod,
+  useDeletePod,
+  useCancelPod,
+  useUncancelPod,
+  type PodDetail,
+} from "../features/pods/usePods";
 import {
   useAddTeamEntrant,
   useRemoveEntrant,
@@ -13,7 +23,7 @@ import { EntrantPickerModal } from "../components/EntrantPickerModal";
 import { useRounds } from "../features/pods/useRounds";
 import { useTournament } from "../features/tournaments/useTournament";
 import { useMe } from "../features/auth/useAuth";
-import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
+import { Button, Card, Eyebrow, Field, FormError, Modal, ScreenDek, ScreenTitle, StatusPill, TextField } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
 import { PrepTimer } from "../components/PrepTimer";
 import { StandingBonusEditor } from "../components/StandingBonusEditor";
@@ -31,6 +41,8 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
   const [name, setName] = useState(pod.name);
   const [format, setFormat] = useState<PodFormat>(pod.format);
   const [date, setDate] = useState(pod.date ? pod.date.slice(0, 10) : "");
+  const [startTime, setStartTime] = useState(pod.startTime ?? "");
+  const [isOnDemand, setIsOnDemand] = useState(pod.isOnDemand);
   const [roundCount, setRoundCount] = useState(pod.roundCount);
   const [matchFormat, setMatchFormat] = useState<MatchFormat>(pod.matchFormat);
   const [pointsWin, setPointsWin] = useState(pod.pointsWin);
@@ -61,7 +73,9 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
             {
               name,
               format,
-              date: date || undefined,
+              date: date || null,
+              startTime: date && startTime ? startTime : null,
+              isOnDemand,
               roundCount,
               matchFormat,
               pointsWin,
@@ -105,9 +119,19 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
           </Field>
         </div>
 
-        <Field label="Date" hint="Optional">
-          <TextField type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Field>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Date" hint="Optional">
+            <TextField type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Field label="Start time" hint="Optional">
+            <TextField type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} disabled={!date} />
+          </Field>
+        </div>
+
+        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+          <input type="checkbox" checked={isOnDemand} onChange={(e) => setIsOnDemand(e.target.checked)} />
+          On demand — not part of the planned schedule (a spontaneous pod, e.g. an impromptu Chaosdraft)
+        </label>
 
         {(format === "DRAFT" || format === "SEALED") && <SetPicker value={setCode} onChange={setSetCode} />}
         {format === "CONSTRUCTED" && (
@@ -244,6 +268,61 @@ function DeletePodButton({ pod }: { pod: PodDetail }) {
     >
       Delete pod
     </button>
+  );
+}
+
+// PI-84 — cancel a pod (event called off) as distinct from it finishing.
+// Canceling is gated behind an explicit confirm modal (not the native
+// confirm() DeletePodButton/PI-56 use); un-canceling isn't, mirroring
+// PI-63's drop/undrop asymmetry (the consequential direction gets the
+// friction, undoing it doesn't).
+function CancelPodControl({ pod }: { pod: PodDetail }) {
+  const cancelPod = useCancelPod(pod.id, pod.tournamentId);
+  const uncancelPod = useUncancelPod(pod.id, pod.tournamentId);
+  const [confirming, setConfirming] = useState(false);
+
+  if (pod.canceledAt) {
+    return (
+      <button
+        onClick={() => uncancelPod.mutate()}
+        disabled={uncancelPod.isPending}
+        className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-strong disabled:opacity-50"
+      >
+        {uncancelPod.isPending ? "Restoring…" : "Un-cancel pod"}
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setConfirming(true)}
+        className="text-[12.5px] tracking-wide text-critical uppercase hover:text-critical/80"
+      >
+        Cancel pod
+      </button>
+      {confirming && (
+        <Modal title="Cancel this pod?" onClose={() => setConfirming(false)}>
+          <p className="mb-4 text-[13px] text-ink-secondary">
+            "{pod.name}" will be marked canceled — excluded from stats and token awards, and moved into the
+            finished area of the pod list. Nothing is deleted, and this can be undone.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="danger"
+              disabled={cancelPod.isPending}
+              onClick={() => cancelPod.mutate(undefined, { onSuccess: () => setConfirming(false) })}
+            >
+              {cancelPod.isPending ? "Canceling…" : "Cancel pod"}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirming(false)}>
+              Never mind
+            </Button>
+          </div>
+          {cancelPod.isError && <FormError>Something went wrong.</FormError>}
+        </Modal>
+      )}
+    </>
   );
 }
 
@@ -473,6 +552,11 @@ export function PodPage() {
       <ScreenTitle>
         {pod.isMainEvent && <span title="This tournament's main event">👑 </span>}
         {pod.name}
+        {pod.canceledAt && (
+          <span className="ml-3 align-middle">
+            <StatusPill tone="critical">{podProgressStatus(pod)}</StatusPill>
+          </span>
+        )}
       </ScreenTitle>
       <ScreenDek>
         {pod.isTeamEvent
@@ -504,6 +588,7 @@ export function PodPage() {
             Edit pod
           </button>
         )}
+        <CancelPodControl pod={pod} />
         <DeletePodButton pod={pod} />
       </div>
 

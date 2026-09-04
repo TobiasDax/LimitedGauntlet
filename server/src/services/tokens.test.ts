@@ -170,6 +170,49 @@ describe("syncPodTokenAwards", () => {
     await syncPodTokenAwards(pod.id);
     expect(await getPlayerTokenBalance(org.id, players[0]!.id)).toBe(15);
   });
+
+  // PI-77 — completedAt tracking piggybacks on this same reconciler, and is
+  // independent of Organization.tokensEnabled (it drives the pod-list
+  // finished/unfinished partition on every deployment, not just ones with
+  // tokens on).
+  it("stamps completedAt when the pod finishes, even with tokens disabled", async () => {
+    const { tournament } = await setup({ tokensEnabled: false });
+    const { pod } = await completedPod(tournament.id, ["A", "B"]);
+    await syncPodTokenAwards(pod.id);
+    const updated = await prisma.pod.findUniqueOrThrow({ where: { id: pod.id } });
+    expect(updated.completedAt).not.toBeNull();
+  });
+
+  it("clears completedAt when the pod is un-completed, and doesn't re-stamp a later re-run", async () => {
+    const { tournament } = await setup();
+    const { pod, round } = await completedPod(tournament.id, ["A", "B"]);
+    await syncPodTokenAwards(pod.id);
+    const first = (await prisma.pod.findUniqueOrThrow({ where: { id: pod.id } })).completedAt;
+    expect(first).not.toBeNull();
+
+    // Re-running while still complete doesn't move the timestamp forward.
+    await syncPodTokenAwards(pod.id);
+    const second = (await prisma.pod.findUniqueOrThrow({ where: { id: pod.id } })).completedAt;
+    expect(second?.getTime()).toBe(first?.getTime());
+
+    // Re-opening the round clears it back to null.
+    await prisma.round.update({ where: { id: round.id }, data: { status: "ACTIVE" } });
+    await syncPodTokenAwards(pod.id);
+    expect((await prisma.pod.findUniqueOrThrow({ where: { id: pod.id } })).completedAt).toBeNull();
+  });
+
+  // PI-84 — a canceled pod never earns automatic awards even if its rounds
+  // happen to be complete (excludeFromStats alone doesn't cover tokens).
+  it("withholds token awards for a canceled pod but still tracks completedAt", async () => {
+    const { org, tournament } = await setup();
+    const { pod, players } = await completedPod(tournament.id, ["A", "B"]);
+    await prisma.pod.update({ where: { id: pod.id }, data: { canceledAt: new Date() } });
+    await syncPodTokenAwards(pod.id);
+
+    expect(await getPlayerTokenBalance(org.id, players[0]!.id)).toBe(0);
+    expect(await getPlayerTokenBalance(org.id, players[1]!.id)).toBe(0);
+    expect((await prisma.pod.findUniqueOrThrow({ where: { id: pod.id } })).completedAt).not.toBeNull();
+  });
 });
 
 describe("recordManualTokenTxn", () => {

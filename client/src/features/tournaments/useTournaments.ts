@@ -49,6 +49,19 @@ export function useUpdateTournament(id: string) {
   });
 }
 
+// PI-76 — bulk pod reorder: post the full desired pod order for a
+// tournament; the server rewrites each pod's sequenceOrder to its index.
+export function useReorderPods(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (podIds: string[]) =>
+      api.patch<{ ok: true }>(`/tournaments/${tournamentId}/pod-order`, { podIds }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+    },
+  });
+}
+
 export function useDeleteTournament() {
   const queryClient = useQueryClient();
   return useMutation({

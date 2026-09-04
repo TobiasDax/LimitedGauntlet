@@ -183,11 +183,20 @@ async function attachCardPulls(podId: string, pulls: Array<{ cardName: string; p
   }
 }
 
+// PI-77: a deterministic, increasing completedAt per pod within a tournament
+// — one hour after the tournament's start date per sequenceOrder step. Real
+// order is all that matters for the finished-area sort; the exact clock time
+// is arbitrary.
+function completedAtFromSequence(startDate: Date, sequenceOrder: number): Date {
+  return new Date(startDate.getTime() + sequenceOrder * 60 * 60 * 1000);
+}
+
 async function importStandingsPod(
   tournamentId: string,
   sequenceOrder: number,
   pod: LegacyPod,
   playersByName: Map<string, { id: string }>,
+  startDate: Date,
 ) {
   const existing = await prisma.pod.findFirst({ where: { tournamentId, name: pod.name } });
   if (existing) {
@@ -197,6 +206,7 @@ async function importStandingsPod(
   }
 
   const hasRounds = !!pod.rounds && pod.rounds.length > 0;
+  const isComplete = hasRounds || !!pod.points;
   const record = await prisma.pod.create({
     data: {
       tournamentId,
@@ -205,7 +215,12 @@ async function importStandingsPod(
       constructedFormat: pod.constructedFormat,
       constructedFormatCustom: pod.constructedFormatCustom,
       sequenceOrder,
-      status: hasRounds || pod.points ? "COMPLETED" : "SETUP",
+      status: isComplete ? "COMPLETED" : "SETUP",
+      // PI-77: no real per-pod timestamp exists in legacy sources — a
+      // completion order derived from sequenceOrder (this tournament's own
+      // pod order) is a defined, sensible stand-in; see the roadmap's
+      // "fine for historical/imported data" note.
+      completedAt: isComplete ? completedAtFromSequence(startDate, sequenceOrder) : null,
       ...(hasRounds ? { roundCount: pod.rounds!.length } : {}),
     },
   });
@@ -263,6 +278,7 @@ async function importTeamPod(
   sequenceOrder: number,
   pod: LegacyPod,
   playersByName: Map<string, { id: string }>,
+  startDate: Date,
 ) {
   const existing = await prisma.pod.findFirst({ where: { tournamentId, name: pod.name } });
   if (existing) {
@@ -280,6 +296,7 @@ async function importTeamPod(
       constructedFormatCustom: pod.constructedFormatCustom,
       sequenceOrder,
       status: "COMPLETED",
+      completedAt: completedAtFromSequence(startDate, sequenceOrder),
       isTeamEvent: true,
       teamSize: pod.teamSize ?? 2,
       roundCount: pod.roundCount ?? 3,
@@ -333,11 +350,12 @@ async function importTournament(orgId: string, allPlayersByName: Map<string, { i
   }
 
   console.log(`Importing "${t.name}"...`);
+  const startDate = new Date(t.startDate);
   const tournament = await prisma.tournament.create({
     data: {
       orgId,
       name: t.name,
-      startDate: new Date(t.startDate),
+      startDate,
       endDate: new Date(t.endDate),
       location: t.location,
       status: t.status,
@@ -353,9 +371,9 @@ async function importTournament(orgId: string, allPlayersByName: Map<string, { i
   for (const [i, pod] of t.pods.entries()) {
     console.log(`  Pod: ${pod.name}`);
     if (pod.isTeamEvent) {
-      await importTeamPod(tournament.id, i, pod, allPlayersByName);
+      await importTeamPod(tournament.id, i, pod, allPlayersByName, startDate);
     } else {
-      await importStandingsPod(tournament.id, i, pod, allPlayersByName);
+      await importStandingsPod(tournament.id, i, pod, allPlayersByName, startDate);
     }
   }
 }

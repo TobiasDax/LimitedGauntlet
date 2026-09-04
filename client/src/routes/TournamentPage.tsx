@@ -6,8 +6,8 @@ import {
   tournamentStatusLabel,
   type TournamentDetail,
 } from "../features/tournaments/useTournament";
-import { useUpdateTournament, useDeleteTournament } from "../features/tournaments/useTournaments";
-import { useCreatePod, podFormatLabel, podFormatDisplay, podProgressStatus } from "../features/pods/usePods";
+import { useUpdateTournament, useDeleteTournament, useReorderPods } from "../features/tournaments/useTournaments";
+import { useCreatePod, podFormatLabel } from "../features/pods/usePods";
 import { useMe } from "../features/auth/useAuth";
 import { useTournamentRealtime } from "../features/tournaments/useTournamentRealtime";
 import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
@@ -16,6 +16,7 @@ import { SetPicker } from "../components/SetPicker";
 import { ConstructedFormatPicker } from "../components/ConstructedFormatPicker";
 import { StandingBonusEditor } from "../components/StandingBonusEditor";
 import { SharePopup } from "../components/SharePopup";
+import { PodList } from "../components/PodList";
 import type { ConstructedFormat, PodFormat, StandingBonusRow, TournamentStatus } from "../lib/types";
 
 const tournamentStatuses: TournamentStatus[] = ["PLANNING", "ACTIVE", "COMPLETED"];
@@ -203,6 +204,8 @@ function NewPodForm({
   const [name, setName] = useState("");
   const [format, setFormat] = useState<PodFormat>("DRAFT");
   const [date, setDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [isOnDemand, setIsOnDemand] = useState(false);
   const [isTeamEvent, setIsTeamEvent] = useState(false);
   const [tokenOverride, setTokenOverride] = useState(false);
   const [podTokenParticipation, setPodTokenParticipation] = useState(0);
@@ -233,6 +236,8 @@ function NewPodForm({
             format,
             sequenceOrder: nextSequenceOrder,
             date: date || undefined,
+            startTime: date && startTime ? startTime : undefined,
+            isOnDemand,
             isTeamEvent,
             teamSize: isTeamEvent ? teamSize : undefined,
             roundCount,
@@ -274,9 +279,19 @@ function NewPodForm({
           </Field>
         </div>
 
-        <Field label="Date" hint="Optional">
-          <TextField type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Field>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Date" hint="Optional">
+            <TextField type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Field label="Start time" hint="Optional">
+            <TextField type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} disabled={!date} />
+          </Field>
+        </div>
+
+        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+          <input type="checkbox" checked={isOnDemand} onChange={(e) => setIsOnDemand(e.target.checked)} />
+          On demand — not part of the planned schedule (a spontaneous pod, e.g. an impromptu Chaosdraft)
+        </label>
 
         {(format === "DRAFT" || format === "SEALED") && <SetPicker value={setCode} onChange={setSetCode} />}
         {format === "CONSTRUCTED" && (
@@ -420,6 +435,7 @@ export function TournamentPage() {
   // the tournament-wide standings, without a manual refresh.
   useTournamentRealtime(id);
   const exportXlsx = useExportTournamentXlsx(id ?? "");
+  const reorderPods = useReorderPods(id ?? "");
   const [showPodForm, setShowPodForm] = useState(false);
   const [editingTournament, setEditingTournament] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -497,27 +513,12 @@ export function TournamentPage() {
         </div>
       )}
 
-      {tournament.pods.length > 0 && (
-        <div className="mb-6 flex flex-col gap-2">
-          {tournament.pods.map((pod) => (
-            <Link key={pod.id} to={`/pods/${pod.id}`}>
-              <Card className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-surface-raised">
-                <div>
-                  <div className="font-display text-[16px] font-bold">
-                    {pod.isMainEvent && <span title="This tournament's main event">👑 </span>}
-                    {pod.name}
-                  </div>
-                  <div className="text-[12.5px] text-ink-muted">
-                    {podFormatDisplay(pod)}
-                    {pod.isTeamEvent && ` · teams of ${pod.teamSize}`} · {pod.roundCount} rounds
-                  </div>
-                </div>
-                <span className="text-[11.5px] tracking-wide text-ink-secondary uppercase">{podProgressStatus(pod)}</span>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
+      <PodList
+        podsManuallyReordered={tournament.podsManuallyReordered}
+        pods={tournament.pods}
+        podHref={(pod) => `/pods/${pod.id}`}
+        reorder={{ onReorder: (podIds) => reorderPods.mutate(podIds), pending: reorderPods.isPending }}
+      />
 
       {!showPodForm && <Button onClick={() => setShowPodForm(true)}>+ New pod</Button>}
       {showPodForm && (

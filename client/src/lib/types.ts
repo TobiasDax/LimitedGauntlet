@@ -65,6 +65,9 @@ export interface Tournament {
   // PI-72 — default token rewards for this tournament's pods.
   tokenParticipation: number;
   tokenStandingBonuses: StandingBonusRow[] | null;
+  // PI-82 — once true, the pod list is ordered purely by sequenceOrder
+  // (PI-76's manual reorder); until then it's auto-sorted by scheduled date/time.
+  podsManuallyReordered: boolean;
   createdAt: string;
 }
 
@@ -111,6 +114,17 @@ export interface Pod {
   // PI-72 — per-pod override of the tournament's token rewards; null = inherit.
   tokenParticipation: number | null;
   tokenStandingBonuses: StandingBonusRow[] | null;
+  // PI-77 — when this pod's last round completed; null while unfinished.
+  completedAt: string | null;
+  // PI-84 — set when an organizer cancels this pod instead of it finishing.
+  canceledAt: string | null;
+  // PI-81 — explicit opt-in; every pod is "Scheduled" unless marked on-demand.
+  isOnDemand: boolean;
+  // PI-82 — optional scheduled start time, "HH:MM" (24h), alongside `date`.
+  startTime: string | null;
+  // PI-82 — when round 1's pairings were actually generated (regardless of
+  // format); null before that happens. No dedicated UI yet — data capture only.
+  actualStartedAt: string | null;
   createdAt: string;
   // Present only on pods nested in a tournament-detail response (PI-58) —
   // just enough to derive a progress label client-side, not the full

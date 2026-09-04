@@ -263,6 +263,12 @@ model Tournament {
   // (Pod.tokenParticipation / Pod.tokenStandingBonuses; null = inherit here).
   tokenParticipation   Int  @default(0)
   tokenStandingBonuses Json?
+  // PI-82: once an organizer has used PI-76's manual pod reorder, the pod
+  // list stops auto-resorting by scheduled date/time on every pod
+  // create/edit — sequenceOrder becomes purely organizer-controlled from
+  // that point on. False (auto-sort by date/time) until the reorder endpoint
+  // is used for real.
+  podsManuallyReordered Boolean @default(false)
   createdAt DateTime         @default(now())
 
   organization Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -379,6 +385,34 @@ model Pod {
   // effect when Organization.tokensEnabled.
   tokenParticipation   Int?
   tokenStandingBonuses Json?
+  // When this pod's last configured round completed (PI-77) — null while
+  // unfinished. Drives the pod-list finished/unfinished partition and the
+  // finished group's completion-order sort. Stamped/cleared by
+  // syncPodTokenAwards (services/tokens.ts), the one existing hook already
+  // wired into everything that can flip a pod's completion state — kept
+  // independent of Organization.tokensEnabled, unlike the token awards
+  // syncPodTokenAwards otherwise computes.
+  completedAt        DateTime?
+  // Set when an organizer cancels this pod (PI-84) instead of it finishing
+  // normally — an event was called off, not played out. Presence (not a
+  // boolean) doubles as the finished-area sort key alongside completedAt.
+  // Canceling also sets excludeFromStats = true and is additionally checked
+  // by syncPodTokenAwards, which does not otherwise look at excludeFromStats.
+  canceledAt         DateTime?
+  // Explicit opt-in flag (PI-81): every pod is "Scheduled" unless the
+  // organizer marks it on-demand — a spontaneous pod not part of the
+  // planned schedule. Independent of `date`/`startTime` being set.
+  isOnDemand         Boolean     @default(false)
+  // Optional scheduled start time (PI-82), "HH:MM" 24h, alongside the
+  // existing date-only `date`. Kept as a separate nullable field rather than
+  // widening `date` to a timestamp so date and time stay independently
+  // optional (a pod can have a known day with "time TBD").
+  startTime          String?
+  // The moment round 1's Match rows were first created (PI-82) — i.e. seatings
+  // generated / pairing started — regardless of format. Distinct from the
+  // *scheduled* date/startTime above; this is real, not planned. Cleared back
+  // to null if round 1 is later undone (PI-56's "Undo pairing").
+  actualStartedAt    DateTime?
   createdAt          DateTime    @default(now())
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)

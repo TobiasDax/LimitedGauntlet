@@ -124,6 +124,12 @@ const podSchema = z.object({
   rarePicksEnabled: z.boolean().default(true),
   ...podTokenFields,
   isMainEvent: z.boolean(),
+  // Optional so exports predating PI-77/81/82/84 still import.
+  completedAt: isoDate.nullable().optional().default(null),
+  canceledAt: isoDate.nullable().optional().default(null),
+  isOnDemand: z.boolean().optional().default(false),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional().default(null),
+  actualStartedAt: isoDate.nullable().optional().default(null),
   teams: z.array(teamSchema).max(IMPORT_LIMITS.teams),
   entrants: z.array(entrantSchema).max(IMPORT_LIMITS.entrants),
   rounds: z.array(roundSchema).max(IMPORT_LIMITS.rounds),
@@ -138,6 +144,8 @@ const tournamentSchema = z.object({
   description: z.string().max(10_000).nullable().optional(),
   status: z.nativeEnum(TournamentStatus),
   ...tournamentTokenFields,
+  // Optional so exports predating PI-82 still import.
+  podsManuallyReordered: z.boolean().optional().default(false),
   players: z.array(playerName).max(IMPORT_LIMITS.rosterPlayers),
   pods: z.array(podSchema).max(IMPORT_LIMITS.pods),
 }).strict();
@@ -370,6 +378,7 @@ async function importOrgDataInTransaction(db: Prisma.TransactionClient, orgId: s
         status: t.status,
         tokenParticipation: t.tokenParticipation ?? 0,
         tokenStandingBonuses: t.tokenStandingBonuses ?? Prisma.DbNull,
+        podsManuallyReordered: t.podsManuallyReordered,
       },
     });
     summary.tournamentsCreated += 1;
@@ -417,6 +426,11 @@ async function importPod(
       tokenParticipation: pod.tokenParticipation ?? null,
       tokenStandingBonuses: pod.tokenStandingBonuses ?? Prisma.DbNull,
       isMainEvent: pod.isMainEvent,
+      completedAt: pod.completedAt ? new Date(pod.completedAt) : null,
+      canceledAt: pod.canceledAt ? new Date(pod.canceledAt) : null,
+      isOnDemand: pod.isOnDemand,
+      startTime: pod.startTime,
+      actualStartedAt: pod.actualStartedAt ? new Date(pod.actualStartedAt) : null,
     },
   });
 

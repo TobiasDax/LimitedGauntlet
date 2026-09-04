@@ -1,15 +1,15 @@
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   usePublicGesamtwertung,
   usePublicTournament,
   usePublicTournamentCardPulls,
 } from "../features/public/usePublic";
 import { useTournamentRealtime } from "../features/tournaments/useTournamentRealtime";
-import { Card, Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
+import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 import { GesamtwertungList } from "../components/GesamtwertungList";
 import { CardGallery, formatEur } from "../components/CardGallery";
 import { RichText } from "../components/RichText";
-import { podFormatDisplay, podProgressStatus } from "../features/pods/usePods";
+import { PodList } from "../components/PodList";
 import type { CardPull } from "../lib/types";
 
 export function PublicTournamentPage() {
@@ -51,24 +51,11 @@ export function PublicTournamentPage() {
 
       {tournament.description && <RichText text={tournament.description} className="mb-8" />}
 
-      {tournament.pods.length > 0 && (
-        <div className="mb-10 flex flex-col gap-2">
-          {tournament.pods.map((pod) => (
-            <Link key={pod.id} to={`/o/${slug}/tournaments/${id}/pods/${pod.id}`}>
-              <Card className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-surface-raised">
-                <div>
-                  <div className="font-display text-[16px] font-bold">{pod.name}</div>
-                  <div className="text-[12.5px] text-ink-muted">
-                    {podFormatDisplay(pod)}
-                    {pod.isTeamEvent && ` · teams of ${pod.teamSize}`} · {pod.roundCount} rounds
-                  </div>
-                </div>
-                <span className="text-[11.5px] tracking-wide text-ink-secondary uppercase">{podProgressStatus(pod)}</span>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
+      <PodList
+        podsManuallyReordered={tournament.podsManuallyReordered}
+        pods={tournament.pods}
+        podHref={(pod) => `/o/${slug}/tournaments/${id}/pods/${pod.id}`}
+      />
 
       <h2 className="font-display mb-1 text-[22px] font-bold">Tournament Standings</h2>
       <p className="mb-6 text-[13px] text-ink-secondary">

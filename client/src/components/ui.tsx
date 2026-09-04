@@ -1,12 +1,14 @@
 import { useEffect } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 
-type ButtonVariant = "default" | "primary" | "ghost";
+type ButtonVariant = "default" | "primary" | "ghost" | "danger";
 
 const buttonVariants: Record<ButtonVariant, string> = {
   default: "bg-surface-raised border border-border-strong text-ink hover:bg-[#2c2926]",
   primary: "bg-accent border border-accent text-[#241c0a] hover:bg-accent-strong hover:border-accent-strong",
   ghost: "bg-transparent border border-transparent text-ink-secondary hover:text-ink hover:bg-surface-raised",
+  // PI-84 — destructive confirm-modal actions (cancel pod, etc.).
+  danger: "bg-critical border border-critical text-white hover:bg-critical/90",
 };
 
 export function Button({

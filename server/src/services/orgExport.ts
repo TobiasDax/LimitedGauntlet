@@ -108,6 +108,12 @@ export interface ExportPod {
   tokenParticipation: number | null;
   tokenStandingBonuses: ExportStandingBonus[] | null;
   isMainEvent: boolean;
+  // PI-77/81/82/84
+  completedAt: string | null;
+  canceledAt: string | null;
+  isOnDemand: boolean;
+  startTime: string | null;
+  actualStartedAt: string | null;
   teams: ExportTeam[];
   entrants: ExportEntrant[];
   rounds: ExportRound[];
@@ -123,6 +129,8 @@ export interface ExportTournament {
   status: TournamentStatus;
   tokenParticipation: number;
   tokenStandingBonuses: ExportStandingBonus[] | null;
+  // PI-82 — see Tournament.podsManuallyReordered's comment in schema.prisma.
+  podsManuallyReordered: boolean;
   players: string[]; // displayNames on this tournament's roster
   pods: ExportPod[];
 }
@@ -243,6 +251,7 @@ async function buildStructuralData(orgId: string): Promise<ExportData> {
       status: t.status,
       tokenParticipation: t.tokenParticipation,
       tokenStandingBonuses: toStandingBonuses(t.tokenStandingBonuses),
+      podsManuallyReordered: t.podsManuallyReordered,
       players: t.players.map((tp) => tp.player.displayName),
       pods: t.pods.map((pod) => {
         // entrantId -> ref (player displayName or team name), for resolving matches.
@@ -273,6 +282,11 @@ async function buildStructuralData(orgId: string): Promise<ExportData> {
           tokenParticipation: pod.tokenParticipation,
           tokenStandingBonuses: toStandingBonuses(pod.tokenStandingBonuses),
           isMainEvent: pod.isMainEvent,
+          completedAt: iso(pod.completedAt),
+          canceledAt: iso(pod.canceledAt),
+          isOnDemand: pod.isOnDemand,
+          startTime: pod.startTime,
+          actualStartedAt: iso(pod.actualStartedAt),
           teams: pod.teams.map((team) => ({
             name: team.name,
             members: team.members.map((m) => m.player.displayName),
