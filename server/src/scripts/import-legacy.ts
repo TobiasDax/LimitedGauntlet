@@ -241,7 +241,7 @@ async function importStandingsPod(
     };
 
     for (const [i, roundMatches] of pod.rounds!.entries()) {
-      const round = await prisma.round.create({ data: { podId: record.id, roundNumber: i + 1, status: "COMPLETED" } });
+      const round = await prisma.round.create({ data: { podId: record.id, roundNumber: i + 1, status: "COMPLETED", pairingsRevealedAt: new Date() } });
       for (const [tableIndex, m] of roundMatches.entries()) {
         const entrantAId = await entrantFor(m.a);
         const entrantBId = m.b === null ? null : await entrantFor(m.b);
@@ -319,7 +319,7 @@ async function importTeamPod(
   }
 
   for (const [i, roundMatches] of (pod.rounds ?? []).entries()) {
-    const round = await prisma.round.create({ data: { podId: record.id, roundNumber: i + 1, status: "COMPLETED" } });
+    const round = await prisma.round.create({ data: { podId: record.id, roundNumber: i + 1, status: "COMPLETED", pairingsRevealedAt: new Date() } });
     await prisma.match.createMany({
       data: roundMatches.map((m, tableIndex) => {
         const entrantAId = entrantByTeamName.get(m.a);

@@ -128,11 +128,17 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     });
 
     emitPodEvent(pod.id, "pairings-published", { round });
-    const orgId = request.organizer!.orgId;
-    fireAndForget(async () => {
-      const matches = await buildMatchesPayload(pod.id, round.id);
-      await sendWebhookEvent(orgId, pod.id, "pairings.posted", { roundId: round.id, roundNumber: round.roundNumber, matches });
-    });
+    // PI-80 — round 1's pairings.posted webhook fires on reveal instead of
+    // here (a webhook receiver, e.g. a Discord relay, is exactly the kind of
+    // early-leak path the reveal gate exists to close). Every later round
+    // isn't gated, so it fires immediately as before.
+    if (round.roundNumber !== 1) {
+      const orgId = request.organizer!.orgId;
+      fireAndForget(async () => {
+        const matches = await buildMatchesPayload(pod.id, round.id);
+        await sendWebhookEvent(orgId, pod.id, "pairings.posted", { roundId: round.id, roundNumber: round.roundNumber, matches });
+      });
+    }
     reply.code(201).send({ round });
   });
 
@@ -197,11 +203,14 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     });
 
     emitPodEvent(pod.id, "pairings-published", { round });
-    const orgId = request.organizer!.orgId;
-    fireAndForget(async () => {
-      const matches = await buildMatchesPayload(pod.id, round.id);
-      await sendWebhookEvent(orgId, pod.id, "pairings.posted", { roundId: round.id, roundNumber: round.roundNumber, matches });
-    });
+    // PI-80 — same round-1-defers-to-reveal rule as the auto-pairing route above.
+    if (round.roundNumber !== 1) {
+      const orgId = request.organizer!.orgId;
+      fireAndForget(async () => {
+        const matches = await buildMatchesPayload(pod.id, round.id);
+        await sendWebhookEvent(orgId, pod.id, "pairings.posted", { roundId: round.id, roundNumber: round.roundNumber, matches });
+      });
+    }
     reply.code(201).send({ round });
   });
 
@@ -292,6 +301,50 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     // token awards (PI-72). No-op if the pod isn't/wasn't complete.
     await syncPodTokenAwards(round.podId);
     reply.code(204).send();
+  });
+
+  // PI-80 — reveal round 1's pairings. A deliberate, separate action from
+  // both generating the round (which can happen well before this, purely to
+  // produce a seating chart) and starting it (a separate action still, once
+  // everyone's found their seat) — see the Round.pairingsRevealedAt schema
+  // comment. Idempotent: revealing an already-revealed round is a no-op,
+  // not an error, so a client can call this without checking state first.
+  app.post("/api/rounds/:id/reveal-pairings", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+
+    const round = await findOwnedRound(params.data.id, request.organizer!.orgId);
+    if (!round) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    if (round.roundNumber !== 1) {
+      reply.code(400).send({ error: "only_round_one_needs_reveal" });
+      return;
+    }
+
+    const alreadyRevealed = !!round.pairingsRevealedAt;
+    const updated = alreadyRevealed
+      ? round
+      : await prisma.round.update({ where: { id: round.id }, data: { pairingsRevealedAt: new Date() } });
+
+    emitPodEvent(round.podId, "pairings-revealed", { roundId: round.id });
+    // The pairings.posted webhook (e.g. a Discord relay) deliberately didn't
+    // fire back when round 1 was generated (PI-80) — this reveal is the
+    // actual "pairings are now knowable" moment, so it fires here instead.
+    // Only on the real transition, not a repeat call on an already-revealed round.
+    if (!alreadyRevealed) {
+      const orgId = request.organizer!.orgId;
+      const podId = round.podId;
+      fireAndForget(async () => {
+        const matches = await buildMatchesPayload(podId, round.id);
+        await sendWebhookEvent(orgId, podId, "pairings.posted", { roundId: round.id, roundNumber: round.roundNumber, matches });
+      });
+    }
+    reply.send({ round: updated });
   });
 
   app.post("/api/rounds/:id/start", async (request, reply) => {

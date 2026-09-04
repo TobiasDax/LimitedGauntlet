@@ -508,6 +508,20 @@ model Round {
   startedAt   DateTime?
   endsAt      DateTime?
   status      RoundStatus @default(PENDING)
+  // PI-80 — fairness gate for round 1 only: null (the default on every new
+  // round) means its pairings are hidden from the public pod page and from
+  // the organizer's own Pairings tab/Display Mode, even though the Round/
+  // Match rows already exist — round 1 can be generated early purely to
+  // produce PI-79/80's seating chart (DRAFT/CHAOS_DRAFT/SEALED, via the
+  // Seatings tab), or generated the normal way (any format, via the
+  // Pairings tab); either way, the same "generate, then explicitly reveal,
+  // then start" sequence applies uniformly so there's one gating code path
+  // for every format. Rounds 2+ are never gated by this (their pairings are
+  // only ever generated after the previous round's results are already
+  // known, so there's nothing to hide ahead of) — the column exists on
+  // every round for schema simplicity, but is only ever set/checked for
+  // roundNumber === 1.
+  pairingsRevealedAt DateTime?
 
   pod     Pod     @relation(fields: [podId], references: [id], onDelete: Cascade)
   matches Match[]

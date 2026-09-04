@@ -5,7 +5,7 @@ import {
   useCompleteRound,
   useExtendRound,
   useGenerateRound,
-  useManualPairRound,
+  useRevealPairings,
   useRounds,
   useStartRound,
   useSubmitResult,
@@ -15,17 +15,19 @@ import {
 } from "../features/pods/useRounds";
 import type { DroppedSelection } from "../features/pods/useRounds";
 import { entrantDisplayName } from "../lib/entrant";
-import { computeSeatings } from "../lib/seatings";
-import { SeatingChart } from "../components/SeatingChart";
 import { Stepper } from "../components/Stepper";
 import { Button, Card, Eyebrow, FormError, ScreenDek, ScreenTitle } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
 import { EntrantDropControl } from "../components/EntrantDropControl";
+import { ManualPairingForm } from "../components/ManualPairingForm";
 import { PrepTimerDisplay } from "../components/PrepTimer";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { useCountdown } from "../lib/useCountdown";
 import { playChime, playEndChime } from "../lib/chime";
 import type { Entrant, Match, MatchFormat, Round } from "../lib/types";
+
+// PI-79 — same list PodTabs/SeatingsPage gate the Seatings tab on.
+const seatingFormats = new Set(["DRAFT", "CHAOS_DRAFT", "SEALED"]);
 
 // PI-78 — the four ways a match can end drop-wise, alongside its result.
 // Labeled with the actual entrant names, not "Player 1"/"Player 2".
@@ -141,96 +143,6 @@ function ResultEntry({
       </div>
       {!resultsOpen && <p className="text-[11px] text-ink-muted">Start the round to enter results.</p>}
     </form>
-  );
-}
-
-// Manual pairing UI: one dropdown-pair row per expected table, each side
-// filtering out entrants already picked elsewhere so a duplicate is
-// impossible by construction rather than caught after the fact. Backend
-// (`invalid_pairing`) is still the real guard — this is just about not
-// making the organizer hit it in the first place.
-function ManualPairingForm({
-  podId,
-  activeEntrants,
-  roundNumber,
-  onDone,
-  onCancel,
-}: {
-  podId: string;
-  activeEntrants: Entrant[];
-  roundNumber: number;
-  onDone: () => void;
-  onCancel: () => void;
-}) {
-  const manualPair = useManualPairRound(podId);
-  const pairCount = Math.ceil(activeEntrants.length / 2);
-  const [pairs, setPairs] = useState<Array<{ a: string; b: string }>>(() =>
-    Array.from({ length: pairCount }, () => ({ a: "", b: "" })),
-  );
-
-  const usedIds = new Set(pairs.flatMap((p) => [p.a, p.b]).filter(Boolean));
-  const optionsFor = (current: string) =>
-    activeEntrants.filter((e) => e.id === current || !usedIds.has(e.id));
-
-  const update = (i: number, side: "a" | "b", value: string) =>
-    setPairs((prev) => prev.map((p, idx) => (idx === i ? { ...p, [side]: value } : p)));
-
-  const allFilled = pairs.every((p) => p.a);
-
-  return (
-    <div className="mt-5 rounded-lg border border-border bg-surface-sunken p-5">
-      <div className="mb-4 font-display text-[16px] font-bold">Manual pairing — round {roundNumber}</div>
-      <div className="flex flex-col gap-2">
-        {pairs.map((pair, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className="w-14 shrink-0 text-[11px] tracking-wide text-ink-muted uppercase">Table {i + 1}</span>
-            <select
-              className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
-              value={pair.a}
-              onChange={(e) => update(i, "a", e.target.value)}
-            >
-              <option value="">Select…</option>
-              {optionsFor(pair.a).map((e) => (
-                <option key={e.id} value={e.id}>
-                  {entrantDisplayName(e)}
-                </option>
-              ))}
-            </select>
-            <span className="text-[11px] text-ink-muted">vs</span>
-            <select
-              className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
-              value={pair.b}
-              onChange={(e) => update(i, "b", e.target.value)}
-            >
-              <option value="">— Bye —</option>
-              {optionsFor(pair.b).map((e) => (
-                <option key={e.id} value={e.id}>
-                  {entrantDisplayName(e)}
-                </option>
-              ))}
-            </select>
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 flex items-center gap-2">
-        <Button
-          variant="primary"
-          disabled={!allFilled || manualPair.isPending}
-          onClick={() =>
-            manualPair.mutate(
-              pairs.map((p) => ({ entrantAId: p.a, entrantBId: p.b || null })),
-              { onSuccess: onDone },
-            )
-          }
-        >
-          {manualPair.isPending ? "Publishing…" : "Publish pairing"}
-        </Button>
-        <Button variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-      {manualPair.isError && <FormError>{roundErrorMessage(manualPair.error)}</FormError>}
-    </div>
   );
 }
 
@@ -369,7 +281,14 @@ function RoundCard({
   const extendRound = useExtendRound(podId);
   const swapPairing = useSwapPairing(podId);
   const unpairRound = useUnpairRound(podId);
+  const revealPairings = useRevealPairings(podId);
   const [selectedSlot, setSelectedSlot] = useState<SwapSlot | null>(null);
+
+  // PI-80 — round 1 only; every later round is generated after the previous
+  // one's results are already known, so it's never gated. Applies here (and
+  // to display mode, since this component renders both) exactly as scoped:
+  // hidden even though the Round/Match rows already exist.
+  const revealed = round.roundNumber !== 1 || !!round.pairingsRevealedAt;
 
   const allReported = round.matches.every((m) => !m.entrantBId || m.result !== "PENDING");
   const swappable = round.status === "PENDING";
@@ -415,9 +334,19 @@ function RoundCard({
               >
                 Undo pairing
               </Button>
-              <Button variant="primary" onClick={() => startRound.mutate(round.id)} disabled={startRound.isPending}>
-                Start round
-              </Button>
+              {revealed ? (
+                <Button variant="primary" onClick={() => startRound.mutate(round.id)} disabled={startRound.isPending}>
+                  Start round
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  onClick={() => revealPairings.mutate(round.id)}
+                  disabled={revealPairings.isPending}
+                >
+                  {revealPairings.isPending ? "Revealing…" : "Reveal pairings"}
+                </Button>
+              )}
             </>
           )}
           {round.status === "ACTIVE" && (
@@ -437,31 +366,41 @@ function RoundCard({
         </div>
       </div>
 
-      {swappable && (
-        <p className="mb-3 text-[12px] text-ink-muted">
-          Click a name, then click another to swap their seats — only works before the round starts.
+      {!revealed ? (
+        <p className="text-[13px] text-ink-muted">
+          Pairings are generated but hidden — find seatings on the Seatings tab, then reveal here once everyone's
+          ready to see their opponent.
         </p>
-      )}
+      ) : (
+        <>
+          {swappable && (
+            <p className="mb-3 text-[12px] text-ink-muted">
+              Click a name, then click another to swap their seats — only works before the round starts.
+            </p>
+          )}
 
-      <div className="flex flex-col gap-2">
-        {round.matches.map((m) => (
-          <MatchCard
-            key={m.id}
-            match={m}
-            entrantById={entrantById}
-            podId={podId}
-            matchFormat={matchFormat}
-            swappable={swappable}
-            resultsOpen={resultsOpen}
-            selectedSlot={selectedSlot}
-            onSelectSlot={handleSelectSlot}
-          />
-        ))}
-      </div>
+          <div className="flex flex-col gap-2">
+            {round.matches.map((m) => (
+              <MatchCard
+                key={m.id}
+                match={m}
+                entrantById={entrantById}
+                podId={podId}
+                matchFormat={matchFormat}
+                swappable={swappable}
+                resultsOpen={resultsOpen}
+                selectedSlot={selectedSlot}
+                onSelectSlot={handleSelectSlot}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       {completeRound.isError && <FormError>{roundErrorMessage(completeRound.error)}</FormError>}
       {swapPairing.isError && <FormError>{roundErrorMessage(swapPairing.error)}</FormError>}
       {unpairRound.isError && <FormError>{roundErrorMessage(unpairRound.error)}</FormError>}
+      {revealPairings.isError && <FormError>{roundErrorMessage(revealPairings.error)}</FormError>}
     </div>
   );
 }
@@ -492,15 +431,6 @@ export function PairingsPage() {
   const activeEntrants = pod.entrants.filter(
     (e) => e.droppedAfterRound === null || e.droppedAfterRound >= nextRoundNumber,
   );
-  // Draft seating chart (PI-51): derived from round 1's pairings, not
-  // stored — a manual edit to round 1 corrects it automatically. Only
-  // meaningful for formats where packs actually get passed around a table.
-  // Shown only while round 1 is still PENDING — once the round starts, the
-  // physical draft has already happened and the page's focus shifts to
-  // gameplay, so the chart gets out of the way.
-  const showSeatingChart =
-    (pod.format === "DRAFT" || pod.format === "CHAOS_DRAFT") && rounds[0]?.status === "PENDING";
-  const seatByEntrantId = showSeatingChart ? computeSeatings(rounds[0]?.matches ?? [], pod.entrants.length) : null;
 
   return (
     <div>
@@ -527,10 +457,6 @@ export function PairingsPage() {
         </p>
       )}
 
-      {seatByEntrantId && seatByEntrantId.size > 0 && (
-        <SeatingChart seatByEntrantId={seatByEntrantId} entrantById={entrantById} entrantCount={pod.entrants.length} />
-      )}
-
       <PodTabs podId={pod.id} />
 
       <PrepTimerDisplay endsAt={pod.prepTimerEndsAt} label={pod.prepTimerLabel} size={displayMode ? "large" : "normal"} />
@@ -548,6 +474,16 @@ export function PairingsPage() {
             </div>
           ))}
         </Card>
+      )}
+
+      {canGenerateNext && nextRoundNumber === 1 && seatingFormats.has(pod.format) && (
+        <p className="mb-3 text-[12px] text-ink-muted">
+          Want a seating chart first? Head to the{" "}
+          <Link to={`/pods/${id}/seating`} className="text-link underline hover:text-link-strong">
+            Seatings tab
+          </Link>{" "}
+          instead — it generates round 1 the same way, but shows only who sits where, not who plays whom.
+        </p>
       )}
 
       {canGenerateNext && !showManual && (

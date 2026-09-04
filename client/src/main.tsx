@@ -16,6 +16,7 @@ import { PodPage } from "./routes/PodPage.tsx";
 import { GesamtwertungPage } from "./routes/GesamtwertungPage.tsx";
 import { PodStandingsPage } from "./routes/PodStandingsPage.tsx";
 import { PairingsPage } from "./routes/PairingsPage.tsx";
+import { SeatingsPage } from "./routes/SeatingsPage.tsx";
 import { PodValuePage } from "./routes/PodValuePage.tsx";
 import { TournamentValuePage } from "./routes/TournamentValuePage.tsx";
 import { TreasureChestPage } from "./routes/TreasureChestPage.tsx";
@@ -77,6 +78,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/tournaments/:id/value" element={<TournamentValuePage />} />
               <Route path="/pods/:id" element={<PodPage />} />
               <Route path="/pods/:id/standings" element={<PodStandingsPage />} />
+              <Route path="/pods/:id/seating" element={<SeatingsPage />} />
               <Route path="/pods/:id/rounds" element={<PairingsPage />} />
               <Route path="/pods/:id/value" element={<PodValuePage />} />
               <Route path="/hall-of-fame" element={<HallOfFamePage />} />

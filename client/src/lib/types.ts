@@ -178,6 +178,11 @@ export interface Round {
   startedAt: string | null;
   endsAt: string | null;
   status: RoundStatus;
+  // PI-80 — null = round 1's pairings are hidden (matches is empty on the
+  // public API in that state; on the authed API matches stays populated,
+  // and the client is responsible for not rendering it). Only ever
+  // meaningful when roundNumber === 1.
+  pairingsRevealedAt: string | null;
   matches: Match[];
 }
 

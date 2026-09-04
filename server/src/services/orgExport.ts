@@ -59,6 +59,10 @@ export interface ExportRound {
   status: RoundStatus;
   startedAt: string | null;
   endsAt: string | null;
+  // PI-80 — round-tripped for fidelity; import always treats restored data
+  // as already knowable regardless of this value (see orgImport.ts), since
+  // the reveal gate is about a live event unfolding, not data restoration.
+  pairingsRevealedAt: string | null;
   matches: ExportMatch[];
 }
 
@@ -303,6 +307,7 @@ async function buildStructuralData(orgId: string): Promise<ExportData> {
             status: round.status,
             startedAt: iso(round.startedAt),
             endsAt: iso(round.endsAt),
+            pairingsRevealedAt: iso(round.pairingsRevealedAt),
             matches: round.matches.map((m) => ({
               tableNumber: m.tableNumber,
               a: refByEntrantId.get(m.entrantAId) ?? "",

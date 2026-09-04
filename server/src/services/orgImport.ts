@@ -55,6 +55,11 @@ const roundSchema = z.object({
   status: z.nativeEnum(RoundStatus),
   startedAt: isoDate.nullable().optional(),
   endsAt: isoDate.nullable().optional(),
+  // Optional so exports predating PI-80 still import. Whatever comes in
+  // here is ignored on import anyway (see importPod) — a restored pod's
+  // round 1 always comes back already revealed, since the reveal gate is
+  // about a live event unfolding, not data restoration.
+  pairingsRevealedAt: isoDate.nullable().optional(),
   matches: z.array(matchSchema).max(IMPORT_LIMITS.matches),
 }).strict();
 
@@ -492,6 +497,9 @@ async function importPod(
         status: round.status,
         startedAt: round.startedAt ? new Date(round.startedAt) : null,
         endsAt: round.endsAt ? new Date(round.endsAt) : null,
+        // Data restoration, not a live event unfolding — always comes back
+        // revealed regardless of what the export carried (see roundSchema).
+        pairingsRevealedAt: new Date(),
       },
     });
     for (const m of round.matches) {

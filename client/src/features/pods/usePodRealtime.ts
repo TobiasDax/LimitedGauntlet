@@ -5,6 +5,7 @@ import { getSocket } from "../../lib/socket";
 const POD_EVENTS = [
   "pairings-published",
   "pairings-updated",
+  "pairings-revealed",
   "round-started",
   "round-extended",
   "round-completed",

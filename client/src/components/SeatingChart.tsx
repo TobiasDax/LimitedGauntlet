@@ -2,7 +2,7 @@ import { entrantDisplayName } from "../lib/entrant";
 import type { Entrant } from "../lib/types";
 import { Card } from "./ui";
 
-// Draft seating chart (PI-51): a physical table layout derived from round
+// Pod seating chart (PI-51, sealed added in PI-79): a physical table layout derived from round
 // 1's pairings — two rows of ceil(N/2) seats, the second row reversed, so
 // reading row 1 left-to-right then row 2 right-to-left traces the seating
 // order clockwise around the table (seat 1 → 2 → … → N → back to 1). Matches

@@ -117,6 +117,22 @@ export function usePublicRounds(slug: string | undefined, podId: string | undefi
   });
 }
 
+// PI-79/80 — deliberately public even before round 1's pairings are
+// revealed (that's the point: find your seat, then discover your opponent
+// once you get there). Never carries opponent pairings — just entrant→seat.
+export interface PublicSeatAssignment {
+  entrantId: string;
+  seat: number;
+}
+
+export function usePublicSeating(slug: string | undefined, podId: string | undefined) {
+  return useQuery({
+    queryKey: ["public", "pods", podId, "seating"],
+    queryFn: () => api.get<{ seats: PublicSeatAssignment[] }>(`/public/o/${slug}/pods/${podId}/seating`),
+    enabled: !!slug && !!podId,
+  });
+}
+
 export function usePublicStandings(slug: string | undefined, podId: string | undefined) {
   return useQuery({
     queryKey: ["public", "pods", podId, "standings"],

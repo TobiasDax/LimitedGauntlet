@@ -22,6 +22,15 @@ export function useGenerateRound(podId: string) {
   });
 }
 
+// PI-80 — reveal round 1's pairings (a no-op if already revealed).
+export function useRevealPairings(podId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (roundId: string) => api.post<{ round: Round }>(`/rounds/${roundId}/reveal-pairings`),
+    onSuccess: () => invalidatePod(queryClient, podId),
+  });
+}
+
 export interface ManualPair {
   entrantAId: string;
   entrantBId: string | null;

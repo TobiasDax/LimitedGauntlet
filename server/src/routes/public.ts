@@ -7,6 +7,8 @@ import { hasValidPlayerSession } from "../services/playerAccounts.js";
 import { computeGesamtwertung, countTournamentParticipants } from "../services/gesamtwertung.js";
 import { computePodStandings } from "../services/standings.js";
 import { computeHallOfFameOverview, computePlayerStats } from "../services/playerStats.js";
+import { computeSeatings } from "../services/seatings.js";
+import { redactUnrevealedRound1 } from "../services/pairingsVisibility.js";
 
 const tournamentParams = z.object({ slug: z.string().min(1), id: z.string().min(1) });
 const podParams = z.object({ slug: z.string().min(1), id: z.string().min(1) });
@@ -262,7 +264,39 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
       orderBy: { roundNumber: "asc" },
       include: { matches: { orderBy: { tableNumber: "asc" } } },
     });
-    reply.send({ rounds });
+    // Matches are stripped server-side, not just hidden client-side — this
+    // is the untrusted-device path (a player's own phone), so there's no
+    // client to trust here.
+    reply.send({ rounds: redactUnrevealedRound1(rounds) });
+  });
+
+  // PI-79/80 — the seating chart is intentionally public *before* the
+  // pairings reveal above (that's the point: find your seat, then walk over
+  // and discover your opponent there, same as the old paper-seating-chart
+  // era). Computed server-side from round 1's Match rows and reduced to a
+  // plain entrant→seat list — deliberately never the raw {entrantAId,
+  // entrantBId} match shape, which is exactly the "opponent pairing" this
+  // route must not carry regardless of reveal state.
+  app.get("/api/public/o/:slug/pods/:id/seating", async (request, reply) => {
+    const params = podParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const pod = await findPublicPod(params.data.slug, params.data.id);
+    if (!pod) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    const [round1, entrantCount] = await Promise.all([
+      prisma.round.findUnique({
+        where: { podId_roundNumber: { podId: pod.id, roundNumber: 1 } },
+        include: { matches: { orderBy: { tableNumber: "asc" } } },
+      }),
+      prisma.entrant.count({ where: { podId: pod.id } }),
+    ]);
+    const seats = round1 ? computeSeatings(round1.matches, entrantCount) : [];
+    reply.send({ seats });
   });
 
   app.get("/api/public/o/:slug/pods/:id/standings", async (request, reply) => {

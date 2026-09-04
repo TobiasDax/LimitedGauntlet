@@ -1,8 +1,11 @@
 import type { Match } from "./types";
 
-// Draft pod seating chart, derived from round 1's pairings rather than
-// stored separately — so a manual edit to round 1 automatically corrects
-// the seatings too. Standard MTG draft convention for an N-seat pod: seat i
+// Pod seating chart (draft, chaos draft, and — since PI-79 — sealed too:
+// the physical seat is just as arbitrary for sealed as the raw tableNumber
+// order already was for draft, so this needs no format-specific logic),
+// derived from round 1's pairings rather than stored separately — so a
+// manual edit to round 1 automatically corrects the seatings too. Standard
+// MTG draft convention for an N-seat pod: seat i
 // pairs with seat i+M in round 1, where M = ceil(N/2) is the table count. A
 // bye (odd N) always lands on seat M, since M is the only table whose
 // partner slot (M+M = N+1) falls outside the pod.

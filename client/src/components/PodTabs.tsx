@@ -3,10 +3,15 @@ import { usePod } from "../features/pods/usePods";
 
 const tabs = [
   { suffix: "", label: "Entrants" },
+  { suffix: "/seating", label: "Seatings" },
   { suffix: "/rounds", label: "Pairings" },
   { suffix: "/standings", label: "Standings" },
   { suffix: "/value", label: "Value" },
 ];
+
+// PI-79 — the formats where packs (or a sealed pool) actually get seated
+// around a physical table; same list `SeatingsPage` gates on.
+const seatingFormats = new Set(["DRAFT", "CHAOS_DRAFT", "SEALED"]);
 
 export function PodTabs({ podId }: { podId: string }) {
   const { pathname } = useLocation();
@@ -14,8 +19,11 @@ export function PodTabs({ podId }: { podId: string }) {
   const base = `/pods/${podId}`;
 
   // PI-66: the Value tab is hidden when rare-picks tracking is off for this
-  // pod. Data is cached (every pod sub-page uses usePod), so no extra fetch.
-  const visible = data && data.pod.rarePicksEnabled === false ? tabs.filter((t) => t.suffix !== "/value") : tabs;
+  // pod. PI-80: the Seatings tab only exists for formats with a seating
+  // chart. Data is cached (every pod sub-page uses usePod), so no extra fetch.
+  let visible = tabs;
+  if (data?.pod.rarePicksEnabled === false) visible = visible.filter((t) => t.suffix !== "/value");
+  if (data && !seatingFormats.has(data.pod.format)) visible = visible.filter((t) => t.suffix !== "/seating");
 
   return (
     <div className="mb-6 flex gap-1 border-b border-border">

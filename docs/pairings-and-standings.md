@@ -2,7 +2,7 @@
 
 ## Pairing
 
-Round 1 pairings are randomized — or a custom seating/playing order, when a draft's physical seating matters (see the seating chart on the Pairings page). From round 2 onward, pairing is Swiss-standard within the pod: entrants are grouped by their current record and paired within those groups, and two entrants who have already played each other in that pod are never paired together again.
+Round 1 pairings are randomized — or a custom seating/playing order, when a draft, chaos draft, or sealed pod's physical seating matters (see the Seatings tab). Round 1's pairings stay hidden from everyone — the organizer's own Pairings tab and Display Mode included, not just the public pod page — until the organizer explicitly reveals them there; that's a deliberate extra step so a player can't glimpse their opponent early via a screen-share or a phone before physical play starts. From round 2 onward, pairing is Swiss-standard within the pod: entrants are grouped by their current record and paired within those groups, and two entrants who have already played each other in that pod are never paired together again.
 
 On top of that pod-local hard-avoid, there's a soft avoidance across the whole tournament: if the same weekend has multiple pods (e.g. a Friday draft, a Saturday draft, a chaos draft), pairing tries to avoid rematching two entrants who already played each other in an *earlier* pod that weekend too. It's a preference, not a hard rule — with enough pods and a small enough player pool it can't always be honored — but it's what makes "everyone plays everyone" actually happen across a whole weekend, instead of the same two people drawing each other every event.
 

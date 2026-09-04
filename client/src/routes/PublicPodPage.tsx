@@ -3,6 +3,7 @@ import {
   usePublicPod,
   usePublicPodCardPulls,
   usePublicRounds,
+  usePublicSeating,
   usePublicStandings,
 } from "../features/public/usePublic";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
@@ -10,9 +11,13 @@ import { podFormatDisplay } from "../features/pods/usePods";
 import { entrantDisplayName } from "../lib/entrant";
 import { useCountdown } from "../lib/useCountdown";
 import { PrepTimerDisplay } from "../components/PrepTimer";
+import { SeatingChart } from "../components/SeatingChart";
 import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 import { CardGallery, formatEur } from "../components/CardGallery";
 import type { Entrant, Match, Round } from "../lib/types";
+
+// PI-79 — same list PodTabs/SeatingsPage gate the Seatings tab on.
+const seatingFormats = new Set(["DRAFT", "CHAOS_DRAFT", "SEALED"]);
 
 function PublicMatchRow({ match, entrantById }: { match: Match; entrantById: Map<string, Entrant> }) {
   const a = entrantById.get(match.entrantAId);
@@ -46,6 +51,9 @@ function PublicMatchRow({ match, entrantById }: { match: Match; entrantById: Map
 
 function PublicRoundSection({ round, entrantById }: { round: Round; entrantById: Map<string, Entrant> }) {
   const countdown = useCountdown(round.status === "ACTIVE" ? round.endsAt : null);
+  // PI-80 — round 1 only; the server already strips `matches` in this state,
+  // this just picks the right copy instead of rendering an empty list.
+  const hidden = round.roundNumber === 1 && !round.pairingsRevealedAt;
 
   return (
     <div className="rounded-lg border border-border bg-surface-sunken p-5">
@@ -62,11 +70,17 @@ function PublicRoundSection({ round, entrantById }: { round: Round; entrantById:
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-2">
-        {round.matches.map((m) => (
-          <PublicMatchRow key={m.id} match={m} entrantById={entrantById} />
-        ))}
-      </div>
+      {hidden ? (
+        <p className="text-[13px] text-ink-muted">
+          Pairings aren't revealed yet — check the Seating section below to find your table.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {round.matches.map((m) => (
+            <PublicMatchRow key={m.id} match={m} entrantById={entrantById} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -81,6 +95,7 @@ export function PublicPodPage() {
   const { data: roundsData } = usePublicRounds(slug, podId);
   const { data: standingsData } = usePublicStandings(slug, podId);
   const { data: valueData } = usePublicPodCardPulls(slug, podId);
+  const { data: seatingData } = usePublicSeating(slug, podId);
   usePodRealtime(podId, tournamentId);
 
   if (!podData) return <p className="text-ink-muted">Loading…</p>;
@@ -88,6 +103,7 @@ export function PublicPodPage() {
   const pod = podData.pod;
   const entrantById = new Map(pod.entrants.map((e) => [e.id, e]));
   const rounds = [...(roundsData?.rounds ?? [])].reverse();
+  const seatByEntrantId = new Map((seatingData?.seats ?? []).map((s) => [s.entrantId, s.seat]));
 
   return (
     <div>
@@ -102,6 +118,13 @@ export function PublicPodPage() {
       </ScreenDek>
 
       <PrepTimerDisplay endsAt={pod.prepTimerEndsAt} label={pod.prepTimerLabel} size="large" />
+
+      {seatingFormats.has(pod.format) && seatByEntrantId.size > 0 && (
+        <section className="mb-12">
+          <h2 className="font-display mb-4 text-[20px] font-bold">Seating</h2>
+          <SeatingChart seatByEntrantId={seatByEntrantId} entrantById={entrantById} entrantCount={pod.entrants.length} />
+        </section>
+      )}
 
       <section className="mb-12">
         <h2 className="font-display mb-4 text-[20px] font-bold">Pairings</h2>
