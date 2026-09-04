@@ -33,11 +33,16 @@ const swapSchema = z.object({
   sideB: z.enum(["A", "B"]),
 });
 
+// PI-78 — a player can drop mid-match now, not just between rounds: the
+// organizer records whatever result was actually played, and separately
+// says who (if anyone) dropped. "NONE" is the default so every existing
+// caller (which never sent this field) behaves exactly as before.
 const resultSchema = z.object({
   result: z.enum(["A_WINS", "B_WINS", "DRAW"]),
   gamesWonA: z.number().int().min(0),
   gamesWonB: z.number().int().min(0),
   gamesDrawn: z.number().int().min(0).default(0),
+  dropped: z.enum(["NONE", "A", "B", "BOTH"]).default("NONE"),
 });
 
 async function checkNextRoundAllowed(
@@ -461,10 +466,23 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const updated = await prisma.match.update({
-      where: { id: match.id },
-      data: { ...body.data, reportedAt: new Date() },
-    });
+    const { dropped, ...resultData } = body.data;
+    const [updated] = await prisma.$transaction([
+      prisma.match.update({
+        where: { id: match.id },
+        data: { ...resultData, reportedAt: new Date() },
+      }),
+      // Same field, same semantics PI-63 already established ("excluded
+      // starting next round") — just settable during an ACTIVE round now,
+      // via round.roundNumber, instead of only after the round COMPLETEs
+      // via the standalone drop route's latest-round lookup.
+      ...(dropped === "A" || dropped === "BOTH"
+        ? [prisma.entrant.update({ where: { id: match.entrantAId }, data: { droppedAfterRound: round.roundNumber } })]
+        : []),
+      ...(dropped === "B" || dropped === "BOTH"
+        ? [prisma.entrant.update({ where: { id: match.entrantBId }, data: { droppedAfterRound: round.roundNumber } })]
+        : []),
+    ]);
     emitPodEvent(round.podId, "result-submitted", { match: updated });
     const resultPod = await prisma.pod.findUniqueOrThrow({ where: { id: round.podId }, select: { tournamentId: true } });
     emitTournamentEvent(resultPod.tournamentId, "standings-changed", { podId: round.podId });

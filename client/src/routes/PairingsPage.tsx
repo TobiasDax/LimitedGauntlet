@@ -13,25 +13,44 @@ import {
   useUnpairRound,
   roundErrorMessage,
 } from "../features/pods/useRounds";
+import type { DroppedSelection } from "../features/pods/useRounds";
 import { entrantDisplayName } from "../lib/entrant";
 import { computeSeatings } from "../lib/seatings";
 import { SeatingChart } from "../components/SeatingChart";
 import { Stepper } from "../components/Stepper";
-import { Button, Eyebrow, FormError, ScreenDek, ScreenTitle } from "../components/ui";
+import { Button, Card, Eyebrow, FormError, ScreenDek, ScreenTitle } from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
+import { EntrantDropControl } from "../components/EntrantDropControl";
 import { PrepTimerDisplay } from "../components/PrepTimer";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { useCountdown } from "../lib/useCountdown";
 import { playChime, playEndChime } from "../lib/chime";
 import type { Entrant, Match, MatchFormat, Round } from "../lib/types";
 
+// PI-78 — the four ways a match can end drop-wise, alongside its result.
+// Labeled with the actual entrant names, not "Player 1"/"Player 2".
+function droppedOptions(entrantA: Entrant | undefined, entrantB: Entrant | undefined) {
+  const nameA = entrantA ? entrantDisplayName(entrantA) : "Seat A";
+  const nameB = entrantB ? entrantDisplayName(entrantB) : "Seat B";
+  return [
+    { value: "NONE" as const, label: "No one dropped" },
+    { value: "A" as const, label: `${nameA} dropped` },
+    { value: "B" as const, label: `${nameB} dropped` },
+    { value: "BOTH" as const, label: "Both dropped" },
+  ];
+}
+
 function ResultEntry({
   match,
+  entrantA,
+  entrantB,
   podId,
   matchFormat,
   resultsOpen,
 }: {
   match: Match;
+  entrantA: Entrant | undefined;
+  entrantB: Entrant | undefined;
   podId: string;
   matchFormat: MatchFormat;
   resultsOpen: boolean;
@@ -42,6 +61,7 @@ function ResultEntry({
   const [a, setA] = useState(match.gamesWonA);
   const [b, setB] = useState(match.gamesWonB);
   const [d, setD] = useState(match.gamesDrawn);
+  const [dropped, setDropped] = useState<DroppedSelection>("NONE");
 
   if (match.result !== "PENDING" && !editing) {
     const label =
@@ -61,6 +81,7 @@ function ResultEntry({
             setA(match.gamesWonA);
             setB(match.gamesWonB);
             setD(match.gamesDrawn);
+            setDropped("NONE");
             setEditing(true);
           }}
           className="text-[11px] text-link underline hover:text-link-strong"
@@ -78,8 +99,8 @@ function ResultEntry({
         e.preventDefault();
         const result = a > b ? "A_WINS" : b > a ? "B_WINS" : "DRAW";
         submitResult.mutate(
-          { matchId: match.id, result, gamesWonA: a, gamesWonB: b, gamesDrawn: d },
-          { onSuccess: () => setEditing(false) },
+          { matchId: match.id, result, gamesWonA: a, gamesWonB: b, gamesDrawn: d, dropped },
+          { onSuccess: () => { setEditing(false); setDropped("NONE"); } },
         );
       }}
     >
@@ -88,6 +109,17 @@ function ResultEntry({
         <span className="text-ink-muted">–</span>
         <Stepper value={b} onChange={setB} max={maxGames} ariaLabel="Seat B games won" className="flex-1" />
       </div>
+      <select
+        value={dropped}
+        onChange={(e) => setDropped(e.target.value as DroppedSelection)}
+        className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-[12.5px] text-ink outline-none focus:border-accent"
+      >
+        {droppedOptions(entrantA, entrantB).map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
       <div className="flex items-center gap-3">
         <Button
           type="submit"
@@ -264,7 +296,16 @@ function MatchCard({
           )}
         </div>
       </div>
-      {b && <ResultEntry match={match} podId={podId} matchFormat={matchFormat} resultsOpen={resultsOpen} />}
+      {b && (
+        <ResultEntry
+          match={match}
+          entrantA={a}
+          entrantB={b}
+          podId={podId}
+          matchFormat={matchFormat}
+          resultsOpen={resultsOpen}
+        />
+      )}
     </div>
   );
 }
@@ -445,6 +486,9 @@ export function PairingsPage() {
     pod.entrants.length >= 2 &&
     rounds.length < pod.roundCount &&
     (rounds.length === 0 || lastRound?.status === "COMPLETED");
+  // Same between-rounds gate PodPage's roster uses (PI-63) — dropping mid-round
+  // instead goes through ResultEntry's dropdown (PI-78).
+  const canModifyRoster = rounds.length === 0 || lastRound?.status === "COMPLETED";
   const activeEntrants = pod.entrants.filter(
     (e) => e.droppedAfterRound === null || e.droppedAfterRound >= nextRoundNumber,
   );
@@ -492,6 +536,19 @@ export function PairingsPage() {
       <PrepTimerDisplay endsAt={pod.prepTimerEndsAt} label={pod.prepTimerLabel} size={displayMode ? "large" : "normal"} />
 
       {pod.entrants.length < 2 && <p className="text-ink-muted">Add at least 2 entrants before pairing round 1.</p>}
+
+      {/* PI-78 — the between-rounds drop control lives here too, next to
+          the pairing action it actually gates, not just on the Entrants tab. */}
+      {canModifyRoster && pod.entrants.length > 0 && (
+        <Card className="mb-5 divide-y divide-border">
+          {pod.entrants.map((e) => (
+            <div key={e.id} className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-[13.5px] font-semibold">{entrantDisplayName(e)}</span>
+              <EntrantDropControl podId={pod.id} entrant={e} canModifyRoster={canModifyRoster} />
+            </div>
+          ))}
+        </Card>
+      )}
 
       {canGenerateNext && !showManual && (
         <div className="mb-5 flex items-center gap-3">

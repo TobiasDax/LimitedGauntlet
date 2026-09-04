@@ -87,12 +87,18 @@ export function useExtendRound(podId: string) {
   });
 }
 
+// PI-78 — who (if anyone) dropped when this result was reported. "NONE" is
+// the default the backend assumes when the field is omitted entirely, so
+// every pre-PI-78 caller of this mutation keeps working unchanged.
+export type DroppedSelection = "NONE" | "A" | "B" | "BOTH";
+
 export interface SubmitResultInput {
   matchId: string;
   result: MatchResult;
   gamesWonA: number;
   gamesWonB: number;
   gamesDrawn: number;
+  dropped?: DroppedSelection;
 }
 
 export function useSubmitResult(podId: string) {

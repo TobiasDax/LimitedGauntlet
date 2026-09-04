@@ -11,15 +11,10 @@ import {
   useUncancelPod,
   type PodDetail,
 } from "../features/pods/usePods";
-import {
-  useAddTeamEntrant,
-  useRemoveEntrant,
-  useDropEntrant,
-  useUndropEntrant,
-  entrantErrorMessage,
-} from "../features/pods/useEntrants";
+import { useAddTeamEntrant, useRemoveEntrant, entrantErrorMessage } from "../features/pods/useEntrants";
 import { usePlayers } from "../features/players/usePlayers";
 import { EntrantPickerModal } from "../components/EntrantPickerModal";
+import { EntrantDropControl } from "../components/EntrantDropControl";
 import { useRounds } from "../features/pods/useRounds";
 import { useTournament } from "../features/tournaments/useTournament";
 import { useMe } from "../features/auth/useAuth";
@@ -333,41 +328,6 @@ function alreadyEnteredPlayerIds(entrants: Entrant[]): Set<string> {
     if (e.team) for (const m of e.team.members) ids.add(m.playerId);
   }
   return ids;
-}
-
-// Drop/undrop toggle + "Dropped" badge shared by the individual and team
-// entrant lists. Disabled between an active/pending round (PI-63) — the
-// title attribute explains why rather than hiding the control outright.
-function EntrantDropControl({
-  podId,
-  entrant,
-  canModifyRoster,
-}: {
-  podId: string;
-  entrant: Entrant;
-  canModifyRoster: boolean;
-}) {
-  const dropEntrant = useDropEntrant(podId);
-  const undropEntrant = useUndropEntrant(podId);
-  const dropped = entrant.droppedAfterRound !== null;
-  const pending = dropped ? undropEntrant.isPending : dropEntrant.isPending;
-
-  return (
-    <div className="flex items-center gap-3">
-      {dropped && <span className="text-[12px] tracking-wide text-ink-muted uppercase">Dropped</span>}
-      <Button
-        variant="ghost"
-        disabled={!canModifyRoster || pending}
-        title={canModifyRoster ? undefined : "Finish the current round before changing who's dropped."}
-        onClick={() => (dropped ? undropEntrant.mutate(entrant.id) : dropEntrant.mutate(entrant.id))}
-      >
-        {dropped ? "Un-drop" : "Drop"}
-      </Button>
-      {(dropEntrant.isError || undropEntrant.isError) && (
-        <FormError>{entrantErrorMessage(dropEntrant.error ?? undropEntrant.error)}</FormError>
-      )}
-    </div>
-  );
 }
 
 function IndividualEntrants({
