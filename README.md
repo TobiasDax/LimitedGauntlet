@@ -316,6 +316,16 @@ LEGAL_LINK_URL=
 LEGAL_LINK_LABEL=
 ```
 
+### Web Analytics
+
+Optional deployer-configured web analytics — currently [Umami](https://umami.is) only, via env vars, never a hardcoded default. Off by default: leave `TRACKING_PROVIDER` empty and no tracking script is ever added to any page. Set all three to enable, pointing at your own Umami instance; each is strictly validated at startup (script URL must be `https://`, code must be a well-formed UUID) — the app refuses to start on a bad value rather than silently shipping an unvalidated script tag. See [docs/deployment.md § 10](docs/deployment.md#10-optional-web-analytics-umami) for the full setup guide.
+
+```
+TRACKING_PROVIDER=
+TRACKING_SCRIPT_URL=
+TRACKING_CODE=
+```
+
 ---
 
 # Roadmap

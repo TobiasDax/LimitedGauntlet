@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { TrackingScript } from "./components/TrackingScript.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { PublicLayout } from "./components/PublicLayout.tsx";
 import { PlayerLayout, PlayerProtectedRoute } from "./components/PlayerLayout.tsx";
@@ -42,6 +43,7 @@ const queryClient = new QueryClient();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      <TrackingScript />
       <BrowserRouter>
         <Routes>
           <Route path="/o/:slug/player" element={<PlayerLayout />}>

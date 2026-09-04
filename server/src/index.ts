@@ -49,7 +49,13 @@ const app = Fastify({
 
 // CSP tuned to what this app actually loads: same-origin scripts/styles
 // (Vite's build, no external CDN), Scryfall's card-image CDN, and
-// same-origin fetch/WebSocket (API + Socket.IO share this origin).
+// same-origin fetch/WebSocket (API + Socket.IO share this origin), plus the
+// deployer's own tracking script host when PI-85 analytics are configured
+// (its origin is parsed from the already-validated TRACKING_SCRIPT_URL, never
+// trusted as anything but an origin to allowlist). Without that addition, an
+// external analytics script would be silently blocked by CSP — a failure
+// that's invisible in the UI, so this has to be wired at startup rather than
+// discovered by a self-hoster staring at devtools.
 // frameAncestors 'none' blocks embedding this app in an iframe elsewhere
 // (clickjacking) — there's no legitimate reason to embed it. HSTS only
 // turned on once SESSION_COOKIE_SECURE says we're actually behind TLS —
@@ -64,14 +70,15 @@ const app = Fastify({
 // into every single asset failing with ERR_SSL_PROTOCOL_ERROR and the SPA
 // never mounting. Caught by loading the app in a real browser after adding
 // this CSP — it typechecks fine either way, this only shows up at runtime.
+const trackingOrigin = config.tracking ? new URL(config.tracking.scriptUrl).origin : null;
 await app.register(fastifyHelmet, {
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       imgSrc: ["'self'", "https://cards.scryfall.io", "data:"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      connectSrc: ["'self'"],
+      scriptSrc: trackingOrigin ? ["'self'", trackingOrigin] : ["'self'"],
+      connectSrc: trackingOrigin ? ["'self'", trackingOrigin] : ["'self'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       frameAncestors: ["'none'"],

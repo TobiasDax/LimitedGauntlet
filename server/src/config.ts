@@ -87,6 +87,15 @@ export const config = {
   // actually configured (see isLocalLoginDisabled) — a fail-safe so setting
   // this without a working IdP can't lock everyone out of the app.
   localLoginDisabled: process.env.LOCAL_LOGIN_DISABLED === "true",
+  // Optional deployer-configured web analytics (PI-85), Umami first. Unset
+  // TRACKING_PROVIDER = fully inert, same "off by default" posture as
+  // everything else here. See trackingProviders.ts for validation + the
+  // provider registry; index.ts adds the script host to CSP when this is set.
+  tracking: parseTrackingConfig({
+    provider: process.env.TRACKING_PROVIDER,
+    scriptUrl: process.env.TRACKING_SCRIPT_URL,
+    code: process.env.TRACKING_CODE,
+  }),
 };
 
 export function isEmailConfigured(): boolean {
@@ -123,3 +132,4 @@ export function isLocalLoginDisabled(): boolean {
   return config.localLoginDisabled && isSsoConfigured();
 }
 import { parseTrustedProxies } from "./proxyTrust.js";
+import { parseTrackingConfig } from "./trackingProviders.js";

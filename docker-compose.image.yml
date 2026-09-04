@@ -49,6 +49,9 @@ services:
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       LOCAL_LOGIN_DISABLED: ${LOCAL_LOGIN_DISABLED:-false}
+      TRACKING_PROVIDER: ${TRACKING_PROVIDER:-}
+      TRACKING_SCRIPT_URL: ${TRACKING_SCRIPT_URL:-}
+      TRACKING_CODE: ${TRACKING_CODE:-}
     depends_on:
       db:
         condition: service_healthy

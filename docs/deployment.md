@@ -243,6 +243,20 @@ const expected = "sha256=" + crypto.createHmac("sha256", WEBHOOK_SECRET).update(
 
 The webhook URL only needs to be reachable from the container — a LAN address (e.g. your Home Assistant at `http://192.168.1.231:8123/api/webhook/…`) works fine. Loopback and link-local addresses (including cloud metadata endpoints) are refused as a target. Delivery is fire-and-forget with a 5-second timeout and no retries — a slow or unreachable receiver never blocks a round operation, and a failed delivery is just logged, not surfaced in the UI (use the Settings page's "Send test event" button to check your setup works).
 
+## 10. Optional: web analytics (Umami)
+
+Off by default — no tracking script is added to any page unless you configure it. If you run your own [Umami](https://umami.is) instance and want its snippet on every page this app serves (organizer pages and public `/o/<slug>/...` pages alike), set three env vars:
+
+```
+TRACKING_PROVIDER=umami
+TRACKING_SCRIPT_URL=https://analytics.example.com/script.js   # your own Umami instance's script host
+TRACKING_CODE=3d9f1e2a-7b4c-4a1d-9e6f-2c8b1a0d5f3e             # that site's Website ID (Umami → Settings → Websites)
+```
+
+All three are validated at startup — an unset `TRACKING_PROVIDER` disables the feature entirely; anything else invalid (an unknown provider, a non-`https://` script URL, a code that isn't a well-formed UUID) makes the app refuse to start with a clear error rather than silently shipping a broken or unsafe script tag. `TRACKING_SCRIPT_URL`'s origin is also added to the app's Content-Security-Policy automatically — without that, the browser would silently block the script (a CSP failure that shows nothing in the UI), so there's nothing else to configure by hand.
+
+Only Umami is supported today (`TRACKING_PROVIDER=umami` is the only valid value), but the mechanism is provider-abstracted internally (`server/src/trackingProviders.ts`) so a second provider can be added later without redesigning this.
+
 ## Updating
 
 **Published image (Option A):**

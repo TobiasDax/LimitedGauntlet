@@ -6,6 +6,14 @@ export interface SsoProvider {
   label: string;
 }
 
+// Deployer-configured web analytics (PI-85). Already validated server-side
+// (trackingProviders.ts) before this ever reaches the client.
+export interface TrackingConfig {
+  provider: "umami";
+  scriptUrl: string;
+  code: string;
+}
+
 export interface AppConfig {
   legalLinkUrl: string | null;
   legalLinkLabel: string | null;
@@ -14,6 +22,8 @@ export interface AppConfig {
   ssoProviders?: SsoProvider[];
   // SSO-only mode: hide the local password form + signup link entirely.
   localLoginDisabled?: boolean;
+  // null/undefined = analytics unconfigured on this deployment.
+  tracking?: TrackingConfig | null;
 }
 
 // Public, no-auth config the frontend chrome needs on every page (incl.
