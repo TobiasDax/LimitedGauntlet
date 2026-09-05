@@ -351,8 +351,6 @@ model Pod {
   pointsDraw         Int         @default(1)
   pointsLoss         Int         @default(0)
   roundLengthMinutes Int         @default(50)
-  packConfig         String?
-  rarepicUrl         String?
   status             PodStatus   @default(SETUP)
   excludeFromStats   Boolean     @default(false)
   // PI-66: "rare picks" / card-value tracking for this pod. When false, the

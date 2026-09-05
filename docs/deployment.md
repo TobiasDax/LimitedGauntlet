@@ -261,6 +261,23 @@ The browser never talks to `TRACKING_SCRIPT_URL` directly: this app proxies the 
 
 Only Umami is supported today (`TRACKING_PROVIDER=umami` is the only valid value), but the mechanism is provider-abstracted internally (`server/src/trackingProviders.ts`) so a second provider can be added later without redesigning this.
 
+## 11. Optional: operator alert on a new org signup
+
+Only relevant on a deployment with `ALLOW_SIGNUP=true` — with signups open to the public, nothing otherwise tells you when a new organization actually gets created. Off by default:
+
+```
+ADMIN_WEBHOOK_URL=http://192.168.1.231:8123/api/webhook/limitedgauntlet-signup   # your own receiver
+ADMIN_WEBHOOK_SECRET=<a random string, 16+ characters>
+```
+
+An unset `ADMIN_WEBHOOK_URL` disables this entirely. When set, `ADMIN_WEBHOOK_SECRET` must be at least 16 characters — the app refuses to start otherwise, rather than signing every alert with something trivially guessable.
+
+This fires an HMAC-signed HTTP POST (`X-LimitedGauntlet-Signature`, same scheme as the per-org webhooks configured in Settings) with an `organization.created` event whenever a new org is created — the plain signup form and the SSO-bootstrapped registration flow both trigger it; accepting an invite into an *existing* org does not, since that org was already announced when it was first created. The payload carries the org's name, slug, and the creating organizer's email.
+
+Deliberately not email-based: a public instance's own SMTP credentials are exactly the kind of thing you don't want sitting on infrastructure a stranger can trigger by signing up. `http://` is accepted (not just `https://`) since the realistic receiver is often a plain-http LAN or Tailscale-only endpoint — Home Assistant's built-in [Webhook automation trigger](https://www.home-assistant.io/docs/automation/trigger/#webhook-trigger) is a natural fit (generates a URL, no custom code needed on that end), but the receiver is entirely up to you — Discord, ntfy, a small script, anything that accepts an HTTP POST.
+
+Delivery is fire-and-forget with a 5-second timeout, same posture as the per-org webhooks — a slow or unreachable receiver never blocks the signup request, and a failed delivery is just logged.
+
 ## Updating
 
 **Published image (Option A):**

@@ -52,6 +52,8 @@ services:
       TRACKING_PROVIDER: ${TRACKING_PROVIDER:-}
       TRACKING_SCRIPT_URL: ${TRACKING_SCRIPT_URL:-}
       TRACKING_CODE: ${TRACKING_CODE:-}
+      ADMIN_WEBHOOK_URL: ${ADMIN_WEBHOOK_URL:-}
+      ADMIN_WEBHOOK_SECRET: ${ADMIN_WEBHOOK_SECRET:-}
     depends_on:
       db:
         condition: service_healthy

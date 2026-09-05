@@ -10,6 +10,8 @@ import {
   deliverWebhook,
   isLoopbackOrLinkLocalAddress,
   isSafeWebhookTarget,
+  parseAdminWebhookConfig,
+  sendAdminWebhookEvent,
   sendTestWebhookEvent,
   sendWebhookEvent,
 } from "./webhooks.js";
@@ -324,5 +326,77 @@ describe("sendTestWebhookEvent", () => {
       data: { slug: `webhook-test-send-2-${Date.now()}-${Math.random()}`, name: "Test Org" },
     });
     await expect(sendTestWebhookEvent(org.id, "does-not-exist")).resolves.toEqual({ ok: false, error: "not_found" });
+  });
+});
+
+describe("parseAdminWebhookConfig", () => {
+  it("is inert when ADMIN_WEBHOOK_URL is unset", () => {
+    expect(parseAdminWebhookConfig({})).toBeNull();
+    expect(parseAdminWebhookConfig({ url: "  " })).toBeNull();
+  });
+
+  it("accepts a valid http:// or https:// URL with a long-enough secret", () => {
+    expect(parseAdminWebhookConfig({ url: "http://192.168.1.231:8123/api/webhook/abc", secret: "a".repeat(16) })).toEqual({
+      url: "http://192.168.1.231:8123/api/webhook/abc",
+      secret: "a".repeat(16),
+    });
+    expect(parseAdminWebhookConfig({ url: "https://example.com/hook", secret: "a".repeat(16) })).toEqual({
+      url: "https://example.com/hook",
+      secret: "a".repeat(16),
+    });
+  });
+
+  it.each(["not-a-url", "javascript:alert(1)", "ftp://example.com/hook"])(
+    "rejects a malformed or non-http(s) ADMIN_WEBHOOK_URL %s",
+    (url) => {
+      expect(() => parseAdminWebhookConfig({ url, secret: "a".repeat(16) })).toThrow(/ADMIN_WEBHOOK_URL/);
+    },
+  );
+
+  it.each(["", "too-short"])("rejects a missing or too-short ADMIN_WEBHOOK_SECRET %s", (secret) => {
+    expect(() => parseAdminWebhookConfig({ url: "https://example.com/hook", secret })).toThrow(/ADMIN_WEBHOOK_SECRET/);
+  });
+});
+
+describe("sendAdminWebhookEvent", () => {
+  it("delivers a signed organization.created event to the configured URL", async () => {
+    const upstream = await withTestServer(() => ({ status: 200 }));
+    try {
+      const secret = "a".repeat(16);
+      await sendAdminWebhookEvent(
+        { url: upstream.url, secret },
+        { orgName: "New Org", orgSlug: "new-org", creatorEmail: "organizer@example.com" },
+      );
+      expect(upstream.requests).toHaveLength(1);
+      const req = upstream.requests[0]!;
+      const payload = JSON.parse(req.body);
+      expect(payload.event).toBe("organization.created");
+      expect(payload.data).toEqual({ orgName: "New Org", orgSlug: "new-org", creatorEmail: "organizer@example.com" });
+      const expectedSignature = `sha256=${createHmac("sha256", secret).update(req.body).digest("hex")}`;
+      expect(req.headers["x-limitedgauntlet-signature"]).toBe(expectedSignature);
+    } finally {
+      await upstream.close();
+    }
+  });
+
+  it("never throws when a safe (non-loopback) target is unreachable", async () => {
+    // Port 1 on the machine's own real interface: a safe (non-loopback)
+    // target per isSafeWebhookTarget, but nothing is listening — exercises
+    // the fetch-failure path, distinct from the SSRF-skip path below.
+    await expect(
+      sendAdminWebhookEvent(
+        { url: `http://${ownNonLoopbackAddress()}:1`, secret: "a".repeat(16) },
+        { orgName: "New Org", orgSlug: "new-org", creatorEmail: "organizer@example.com" },
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("skips delivery to a loopback/link-local target instead of throwing", async () => {
+    await expect(
+      sendAdminWebhookEvent(
+        { url: "http://127.0.0.1:9/hook", secret: "a".repeat(16) },
+        { orgName: "New Org", orgSlug: "new-org", creatorEmail: "organizer@example.com" },
+      ),
+    ).resolves.toBeUndefined();
   });
 });

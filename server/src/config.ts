@@ -96,6 +96,15 @@ export const config = {
     scriptUrl: process.env.TRACKING_SCRIPT_URL,
     code: process.env.TRACKING_CODE,
   }),
+  // Optional operator-level webhook (PI-75), fired on a new org signup.
+  // Unset ADMIN_WEBHOOK_URL = fully inert, same "off by default" posture as
+  // everything else here. Deliberately separate from the per-org webhooks
+  // (Settings, PI-50): there's no Organization row yet at the moment this
+  // fires. See services/webhooks.ts for validation + delivery.
+  adminWebhook: parseAdminWebhookConfig({
+    url: process.env.ADMIN_WEBHOOK_URL,
+    secret: process.env.ADMIN_WEBHOOK_SECRET,
+  }),
 };
 
 export function isEmailConfigured(): boolean {
@@ -133,3 +142,4 @@ export function isLocalLoginDisabled(): boolean {
 }
 import { parseTrustedProxies } from "./proxyTrust.js";
 import { parseTrackingConfig } from "./trackingProviders.js";
+import { parseAdminWebhookConfig } from "./services/webhooks.js";

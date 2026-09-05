@@ -8,6 +8,7 @@ import { requireAuth } from "../auth/middleware.js";
 import { config, isLocalLoginDisabled, configuredSsoProviders, type SsoProviderId } from "../config.js";
 import { beginSso, completeSso, isProviderConfigured, linkOrProvisionFromSso } from "../services/sso.js";
 import { confirmOidcRelink } from "../services/oidcRelink.js";
+import { fireAndForget, sendAdminWebhookEvent } from "../services/webhooks.js";
 import { refreshRealtimeAuthorization } from "../realtime.js";
 
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -59,6 +60,18 @@ function isUniqueConstraintError(err: unknown, target: string): boolean {
     err.code === "P2002" &&
     Array.isArray(err.meta?.target) &&
     (err.meta.target as string[]).includes(target)
+  );
+}
+
+// PI-75 — fired from both ways a brand-new org gets created (plain signup
+// and the OIDC-bootstrapped flow below), never from accept-invite (that
+// joins an existing org, which was already notified when it was created).
+// No-op when ADMIN_WEBHOOK_URL isn't configured.
+function notifyAdminOfNewOrg(organization: { name: string; slug: string }, creatorEmail: string): void {
+  if (!config.adminWebhook) return;
+  const webhook = config.adminWebhook;
+  fireAndForget(() =>
+    sendAdminWebhookEvent(webhook, { orgName: organization.name, orgSlug: organization.slug, creatorEmail }),
   );
 }
 
@@ -131,6 +144,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
 
         establishSession(request, organizer);
+        notifyAdminOfNewOrg(organization, organizer.email);
         reply.code(201).send({
           organization: { id: organization.id, slug: organization.slug, name: organization.name },
           organizer: { id: organizer.id, name: organizer.name, email: organizer.email },
@@ -475,6 +489,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
         request.session.set("oidcPending", undefined);
         establishSession(request, organizer);
+        notifyAdminOfNewOrg(organization, organizer.email);
         reply.code(201).send({
           organizer: { id: organizer.id, orgId: organizer.orgId, name: organizer.name, email: organizer.email },
           organization: { id: organization.id, slug: organization.slug, name: organization.name },

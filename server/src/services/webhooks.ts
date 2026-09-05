@@ -16,6 +16,7 @@ export type WebhookEventType =
   | "round.completed"
   | "pairings.posted"
   | "pod.completed"
+  | "organization.created"
   | "test";
 
 export interface WebhookPayload {
@@ -252,4 +253,73 @@ export async function sendTestWebhookEvent(
     timestamp: new Date().toISOString(),
     data: { message: "This is a test event from LimitedGauntlet." },
   });
+}
+
+// PI-75 — a single, deployer-configured, operator-level webhook (env vars,
+// not a per-Organization row), fired when a brand-new org signs up on a
+// deployment with ALLOW_SIGNUP on. There's no Organization row to hang a
+// per-org webhook off of at the moment this fires — the org is what just got
+// created — so this is deliberately separate from sendWebhookEvent above,
+// even though it reuses the exact same delivery/signing/SSRF-guard pieces.
+// Deliberately receiver-agnostic (not Home-Assistant-specific): any
+// self-hoster can point ADMIN_WEBHOOK_URL at their own automation platform,
+// Discord, ntfy, whatever. Takes the parsed config as a parameter rather
+// than importing config.ts directly, to avoid a config.ts <-> webhooks.ts
+// circular import (config.ts imports parseAdminWebhookConfig from here).
+export interface AdminWebhookConfig {
+  url: string;
+  secret: string;
+}
+
+// Same "pure, throw clearly on malformed config, inert if unset" shape as
+// parseTrustedProxies/parseTrackingConfig. Unlike PI-85's TRACKING_SCRIPT_URL
+// (a public analytics vendor, https-only), this allows http:// too — same
+// allowance settings.ts's per-org webhookUrl schema gives organizers, since
+// the real-world target here is just as likely to be a plain-http LAN/
+// Tailscale receiver (Home Assistant, etc.) as a public https endpoint.
+export function parseAdminWebhookConfig(env: { url?: string; secret?: string }): AdminWebhookConfig | null {
+  const urlRaw = env.url?.trim();
+  if (!urlRaw) return null;
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(urlRaw);
+  } catch {
+    throw new Error(`ADMIN_WEBHOOK_URL must be a valid absolute URL (got: "${urlRaw}")`);
+  }
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new Error(`ADMIN_WEBHOOK_URL must use http:// or https:// (got: "${urlRaw}")`);
+  }
+
+  const secret = env.secret?.trim() ?? "";
+  if (secret.length < 16) {
+    throw new Error("ADMIN_WEBHOOK_SECRET must be set and at least 16 characters long when ADMIN_WEBHOOK_URL is configured");
+  }
+
+  return { url: parsedUrl.toString(), secret };
+}
+
+// Never throws — a webhook problem must never fail the signup request that
+// triggered it, same posture as sendWebhookEvent. Call via fireAndForget from
+// the signup route, same as every other webhook trigger point.
+export async function sendAdminWebhookEvent(
+  webhook: AdminWebhookConfig,
+  data: { orgName: string; orgSlug: string; creatorEmail: string },
+): Promise<void> {
+  try {
+    if (!(await isSafeWebhookTarget(webhook.url))) {
+      console.warn("Admin webhook delivery skipped: target resolves to a loopback/link-local address");
+      return;
+    }
+    const result = await deliverWebhook(webhook.url, webhook.secret, {
+      event: "organization.created",
+      timestamp: new Date().toISOString(),
+      data,
+    });
+    if (!result.ok) {
+      console.warn("Admin webhook delivery failed", result);
+    }
+  } catch (err) {
+    console.error("Admin webhook dispatch failed", err);
+  }
 }

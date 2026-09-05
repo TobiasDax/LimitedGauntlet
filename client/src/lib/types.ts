@@ -99,8 +99,6 @@ export interface Pod {
   pointsDraw: number;
   pointsLoss: number;
   roundLengthMinutes: number;
-  packConfig: string | null;
-  rarepicUrl: string | null;
   status: PodStatus;
   excludeFromStats: boolean;
   rarePicksEnabled: boolean;
