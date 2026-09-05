@@ -16,6 +16,11 @@ interface MeResponse {
   // (every response that sets this cache includes it); optional here only so
   // reads don't need a non-null assertion before the first load.
   organizerCount?: number;
+  // Whether this account has ever set a local password (PI-42). false = SSO
+  // only. Drives Settings → Account: "Set password" vs "Change password", and
+  // whether the destructive actions ask for a current password. Only /auth/me
+  // sets it (login/signup responses don't), so treat undefined as "has one".
+  hasPassword?: boolean;
 }
 
 export function useMe() {
@@ -131,17 +136,25 @@ export function useLogout() {
   });
 }
 
-// Account management (PI-28).
+// Account management (PI-28). currentPassword is optional — an SSO-only
+// account (PI-42) omits it (setting a first password, or re-confirming a
+// destructive action via the typed name alone).
 export function useChangePassword() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { currentPassword: string; newPassword: string }) =>
+    mutationFn: (input: { currentPassword?: string; newPassword: string }) =>
       api.post<{ ok: true }>("/settings/password", input),
+    onSuccess: () => {
+      // An SSO-only account just set its first password — flip the cached
+      // flag so the rest of Settings → Account switches to password mode.
+      queryClient.setQueryData<MeResponse | null>(["me"], (prev) => (prev ? { ...prev, hasPassword: true } : prev));
+    },
   });
 }
 
 export function useRequestEmailChange() {
   return useMutation({
-    mutationFn: (input: { currentPassword: string; newEmail: string }) =>
+    mutationFn: (input: { currentPassword?: string; newEmail: string }) =>
       api.post<{ ok: true }>("/settings/email", input),
   });
 }
@@ -170,7 +183,7 @@ export function useConfirmOidcRelink() {
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { currentPassword: string; confirmName: string }) =>
+    mutationFn: (input: { currentPassword?: string; confirmName: string }) =>
       api.post<void>("/settings/delete-account", input),
     onSuccess: () => {
       queryClient.setQueryData(["me"], null);

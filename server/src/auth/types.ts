@@ -33,6 +33,11 @@ declare module "fastify" {
       orgId: string;
       email: string;
       name: string;
+      // false for an SSO-only account (PI-42) that has never set a local
+      // password. The Settings → Account UI and the password-gated routes
+      // (settings.ts) branch on this — an SSO-only account re-verifies a
+      // destructive action with the typed-name confirmation alone.
+      hasPassword: boolean;
     };
     // Set by requirePlayerAuth (PI-52) — a logged-in roster player, scoped to
     // their own org. Every player-scoped query must filter by player.orgId,

@@ -14,7 +14,12 @@ function codeOf(err: unknown): string {
   return err instanceof ApiError ? err.message : "request_failed";
 }
 
-function ChangePasswordForm() {
+// PI-42 follow-up — an SSO-only account (hasPassword false) has no current
+// password to enter. "Change password" becomes "Set password" (no current
+// field), and the destructive forms drop the password field entirely,
+// re-confirming via the typed name alone (see settings.ts).
+
+function ChangePasswordForm({ hasPassword }: { hasPassword: boolean }) {
   const changePassword = useChangePassword();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -24,7 +29,13 @@ function ChangePasswordForm() {
 
   return (
     <Card className="p-5">
-      <div className="mb-3 text-[14px] font-semibold">Change password</div>
+      <div className="mb-3 text-[14px] font-semibold">{hasPassword ? "Change password" : "Set password"}</div>
+      {!hasPassword && (
+        <p className="mb-3 text-[13px] text-ink-muted">
+          You sign in with SSO and have no password set. Adding one is optional — it lets you also sign in with email
+          and password.
+        </p>
+      )}
       <form
         className="flex flex-col gap-2"
         onSubmit={(e) => {
@@ -40,7 +51,7 @@ function ChangePasswordForm() {
             return;
           }
           changePassword.mutate(
-            { currentPassword: current, newPassword: next },
+            { currentPassword: hasPassword ? current : undefined, newPassword: next },
             {
               onSuccess: () => {
                 setDone(true);
@@ -52,12 +63,14 @@ function ChangePasswordForm() {
           );
         }}
       >
-        <TextField type="password" autoComplete="current-password" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        {hasPassword && (
+          <TextField type="password" autoComplete="current-password" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        )}
         <TextField type="password" autoComplete="new-password" placeholder="New password (min 8)" value={next} onChange={(e) => setNext(e.target.value)} />
         <TextField type="password" autoComplete="new-password" placeholder="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         <div>
-          <Button type="submit" variant="primary" disabled={!current || !next || changePassword.isPending}>
-            {changePassword.isPending ? "Saving…" : "Change password"}
+          <Button type="submit" variant="primary" disabled={(hasPassword && !current) || !next || changePassword.isPending}>
+            {changePassword.isPending ? "Saving…" : hasPassword ? "Change password" : "Set password"}
           </Button>
         </div>
       </form>
@@ -65,12 +78,12 @@ function ChangePasswordForm() {
       {changePassword.isError && (
         <FormError>{codeOf(changePassword.error) === "invalid_password" ? "Current password is incorrect." : "Something went wrong."}</FormError>
       )}
-      {done && <p className="mt-2 text-[13px] text-good">Password changed.</p>}
+      {done && <p className="mt-2 text-[13px] text-good">{hasPassword ? "Password changed." : "Password set."}</p>}
     </Card>
   );
 }
 
-function ChangeEmailForm({ currentEmail }: { currentEmail: string }) {
+function ChangeEmailForm({ currentEmail, hasPassword }: { currentEmail: string; hasPassword: boolean }) {
   const requestChange = useRequestEmailChange();
   const [current, setCurrent] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -100,7 +113,7 @@ function ChangeEmailForm({ currentEmail }: { currentEmail: string }) {
           e.preventDefault();
           setSent(false);
           requestChange.mutate(
-            { currentPassword: current, newEmail },
+            { currentPassword: hasPassword ? current : undefined, newEmail },
             {
               onSuccess: () => {
                 setSent(true);
@@ -111,10 +124,12 @@ function ChangeEmailForm({ currentEmail }: { currentEmail: string }) {
           );
         }}
       >
-        <TextField type="password" autoComplete="current-password" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        {hasPassword && (
+          <TextField type="password" autoComplete="current-password" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        )}
         <TextField type="email" placeholder="New email address" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
         <div>
-          <Button type="submit" variant="primary" disabled={!current || !newEmail || requestChange.isPending}>
+          <Button type="submit" variant="primary" disabled={(hasPassword && !current) || !newEmail || requestChange.isPending}>
             {requestChange.isPending ? "Sending…" : "Send confirmation link"}
           </Button>
         </div>
@@ -128,7 +143,17 @@ function ChangeEmailForm({ currentEmail }: { currentEmail: string }) {
 // PI-34: when co-organizers exist, "delete account" only removes THIS
 // organizer's own access — the org and everyone else's data are untouched.
 // Solo organizers keep the original behavior (deletes the whole org).
-function DeleteAccountForm({ orgName, email, organizerCount }: { orgName: string; email: string; organizerCount: number }) {
+function DeleteAccountForm({
+  orgName,
+  email,
+  organizerCount,
+  hasPassword,
+}: {
+  orgName: string;
+  email: string;
+  organizerCount: number;
+  hasPassword: boolean;
+}) {
   const navigate = useNavigate();
   const deleteAccount = useDeleteAccount();
   const [open, setOpen] = useState(false);
@@ -137,6 +162,7 @@ function DeleteAccountForm({ orgName, email, organizerCount }: { orgName: string
 
   const leaving = organizerCount > 1;
   const expected = leaving ? email : orgName;
+  const canSubmit = (!hasPassword || !!password) && confirmName.trim() === expected && !deleteAccount.isPending;
 
   return (
     <Card className="border-critical/40 p-5">
@@ -165,19 +191,17 @@ function DeleteAccountForm({ orgName, email, organizerCount }: { orgName: string
             e.preventDefault();
             if (confirmName.trim() !== expected) return;
             deleteAccount.mutate(
-              { currentPassword: password, confirmName },
+              { currentPassword: hasPassword ? password : undefined, confirmName },
               { onSuccess: () => navigate("/login") },
             );
           }}
         >
-          <TextField type="password" autoComplete="current-password" placeholder="Current password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          {hasPassword && (
+            <TextField type="password" autoComplete="current-password" placeholder="Current password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          )}
           <TextField placeholder={`Type "${expected}" to confirm`} value={confirmName} onChange={(e) => setConfirmName(e.target.value)} />
           <div className="flex gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={!password || confirmName.trim() !== expected || deleteAccount.isPending}
-            >
+            <Button type="submit" variant="primary" disabled={!canSubmit}>
               {deleteAccount.isPending ? (leaving ? "Leaving…" : "Deleting…") : leaving ? "Leave organization" : "Permanently delete"}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
@@ -198,12 +222,14 @@ function DeleteAccountForm({ orgName, email, organizerCount }: { orgName: string
 // shown when there IS more than one organizer; for a solo organizer,
 // "Delete account" already does this, so a second identical-looking button
 // would just be confusing.
-function DeleteOrganizationForm({ orgName }: { orgName: string }) {
+function DeleteOrganizationForm({ orgName, hasPassword }: { orgName: string; hasPassword: boolean }) {
   const navigate = useNavigate();
   const deleteOrganization = useDeleteOrganization();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmName, setConfirmName] = useState("");
+
+  const canSubmit = (!hasPassword || !!password) && confirmName.trim() === orgName && !deleteOrganization.isPending;
 
   return (
     <Card className="border-critical/40 p-5">
@@ -223,19 +249,17 @@ function DeleteOrganizationForm({ orgName }: { orgName: string }) {
             e.preventDefault();
             if (confirmName.trim() !== orgName) return;
             deleteOrganization.mutate(
-              { currentPassword: password, confirmName },
+              { currentPassword: hasPassword ? password : undefined, confirmName },
               { onSuccess: () => navigate("/login") },
             );
           }}
         >
-          <TextField type="password" autoComplete="current-password" placeholder="Current password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          {hasPassword && (
+            <TextField type="password" autoComplete="current-password" placeholder="Current password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          )}
           <TextField placeholder={`Type "${orgName}" to confirm`} value={confirmName} onChange={(e) => setConfirmName(e.target.value)} />
           <div className="flex gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={!password || confirmName.trim() !== orgName || deleteOrganization.isPending}
-            >
+            <Button type="submit" variant="primary" disabled={!canSubmit}>
               {deleteOrganization.isPending ? "Deleting…" : "Permanently delete"}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
@@ -255,12 +279,15 @@ export function AccountSection() {
   const { data: me } = useMe();
   if (!me) return null;
   const organizerCount = me.organizerCount ?? 1;
+  // Undefined (login/signup cache, pre-/auth/me) is treated as "has a
+  // password" — the safe default; /auth/me corrects it on first load.
+  const hasPassword = me.hasPassword ?? true;
   return (
     <div className="flex flex-col gap-4">
-      <ChangePasswordForm />
-      <ChangeEmailForm currentEmail={me.organizer.email} />
-      <DeleteAccountForm orgName={me.organization.name} email={me.organizer.email} organizerCount={organizerCount} />
-      {organizerCount > 1 && <DeleteOrganizationForm orgName={me.organization.name} />}
+      <ChangePasswordForm hasPassword={hasPassword} />
+      <ChangeEmailForm currentEmail={me.organizer.email} hasPassword={hasPassword} />
+      <DeleteAccountForm orgName={me.organization.name} email={me.organizer.email} organizerCount={organizerCount} hasPassword={hasPassword} />
+      {organizerCount > 1 && <DeleteOrganizationForm orgName={me.organization.name} hasPassword={hasPassword} />}
     </div>
   );
 }

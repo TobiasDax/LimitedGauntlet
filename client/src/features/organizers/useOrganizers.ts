@@ -53,7 +53,7 @@ export function useRemoveOrganizer() {
 export function useDeleteOrganization() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { currentPassword: string; confirmName: string }) =>
+    mutationFn: (input: { currentPassword?: string; confirmName: string }) =>
       api.post<void>("/settings/delete-organization", input),
     onSuccess: () => {
       queryClient.setQueryData(["me"], null);

@@ -523,6 +523,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       publicLockEnabled: !!organization.publicPasswordHash,
       tokensEnabled: organization.tokensEnabled,
       organizerCount,
+      // PI-42 follow-up — drives Settings → Account: an SSO-only account
+      // (never set a local password) shows "Set password" instead of
+      // "Change password", and skips the current-password field on the
+      // destructive actions.
+      hasPassword: request.organizer!.hasPassword,
     });
   });
 }

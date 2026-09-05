@@ -2,12 +2,16 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "../prisma.js";
 import { hashApiToken } from "./apiToken.js";
 
-function setOrganizer(request: FastifyRequest, account: { id: string; orgId: string; email: string; name: string }) {
+function setOrganizer(
+  request: FastifyRequest,
+  account: { id: string; orgId: string; email: string; name: string; passwordHash: string | null },
+) {
   request.organizer = {
     id: account.id,
     orgId: account.orgId,
     email: account.email,
     name: account.name,
+    hasPassword: account.passwordHash != null,
   };
 }
 

@@ -19,16 +19,20 @@ const passwordChangeSchema = z.object({
   currentPassword: z.string().optional(),
   newPassword: z.string().min(8).max(200),
 });
+// currentPassword optional on all three, same reasoning as passwordChangeSchema
+// above: an SSO-only account (PI-42, no local password) has nothing to verify,
+// and re-confirms these actions with the typed name alone. A password account
+// still has it required + verified in the route.
 const emailChangeSchema = z.object({
-  currentPassword: z.string().min(1),
+  currentPassword: z.string().optional(),
   newEmail: z.string().trim().toLowerCase().email(),
 });
 const deleteAccountSchema = z.object({
-  currentPassword: z.string().min(1),
+  currentPassword: z.string().optional(),
   confirmName: z.string().min(1),
 });
 const deleteOrganizationSchema = z.object({
-  currentPassword: z.string().min(1),
+  currentPassword: z.string().optional(),
   confirmName: z.string().min(1),
 });
 const inviteOrganizerSchema = z.object({ email: z.string().trim().toLowerCase().email() });
@@ -154,15 +158,14 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       const account = await prisma.organizerAccount.findUniqueOrThrow({ where: { id: request.organizer!.id } });
-      // An OIDC-only account (PI-42) has no password to re-verify — it must set
-      // one first (Settings → Account) before these password-gated actions.
-      if (!account.passwordHash) {
-        reply.code(400).send({ error: "password_required" });
-        return;
-      }
-      if (!(await verifyPassword(account.passwordHash, body.data.currentPassword))) {
-        reply.code(401).send({ error: "invalid_password" });
-        return;
+      // A password account must re-verify; an SSO-only one (PI-42, passwordHash
+      // null) has nothing to verify and re-confirms via the new-address link
+      // it still has to click below.
+      if (account.passwordHash) {
+        if (!body.data.currentPassword || !(await verifyPassword(account.passwordHash, body.data.currentPassword))) {
+          reply.code(401).send({ error: "invalid_password" });
+          return;
+        }
       }
       if (body.data.newEmail === account.email) {
         reply.code(400).send({ error: "same_email" });
@@ -213,15 +216,13 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       const account = await prisma.organizerAccount.findUniqueOrThrow({ where: { id: request.organizer!.id } });
-      // An OIDC-only account (PI-42) has no password to re-verify — it must set
-      // one first (Settings → Account) before these password-gated actions.
-      if (!account.passwordHash) {
-        reply.code(400).send({ error: "password_required" });
-        return;
-      }
-      if (!(await verifyPassword(account.passwordHash, body.data.currentPassword))) {
-        reply.code(401).send({ error: "invalid_password" });
-        return;
+      // A password account must re-verify; an SSO-only one (PI-42, passwordHash
+      // null) has nothing to verify and re-confirms via the typed name below.
+      if (account.passwordHash) {
+        if (!body.data.currentPassword || !(await verifyPassword(account.passwordHash, body.data.currentPassword))) {
+          reply.code(401).send({ error: "invalid_password" });
+          return;
+        }
       }
       const organizerCount = await prisma.organizerAccount.count({ where: { orgId: account.orgId } });
       const confirmName = body.data.confirmName.trim();
@@ -260,15 +261,13 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       const account = await prisma.organizerAccount.findUniqueOrThrow({ where: { id: request.organizer!.id } });
-      // An OIDC-only account (PI-42) has no password to re-verify — it must set
-      // one first (Settings → Account) before these password-gated actions.
-      if (!account.passwordHash) {
-        reply.code(400).send({ error: "password_required" });
-        return;
-      }
-      if (!(await verifyPassword(account.passwordHash, body.data.currentPassword))) {
-        reply.code(401).send({ error: "invalid_password" });
-        return;
+      // A password account must re-verify; an SSO-only one (PI-42, passwordHash
+      // null) has nothing to verify and re-confirms via the typed org name below.
+      if (account.passwordHash) {
+        if (!body.data.currentPassword || !(await verifyPassword(account.passwordHash, body.data.currentPassword))) {
+          reply.code(401).send({ error: "invalid_password" });
+          return;
+        }
       }
       const org = await prisma.organization.findUniqueOrThrow({ where: { id: account.orgId } });
       if (body.data.confirmName.trim() !== org.name) {
