@@ -57,6 +57,14 @@ describe("proxyTrackingScript", () => {
       await upstream.close();
     }
   });
+
+  it("returns 504 instead of throwing when the upstream is unreachable", async () => {
+    // Port 1: nothing listens there, so the request fails fast (connection
+    // refused) rather than actually waiting out the 5s timeout — exercises
+    // the same catch branch a real hang/timeout would hit.
+    const result = await proxyTrackingScript("http://127.0.0.1:1/script.js");
+    expect(result.status).toBe(504);
+  });
 });
 
 describe("proxyTrackingSend", () => {
@@ -93,5 +101,10 @@ describe("proxyTrackingSend", () => {
     } finally {
       await upstream.close();
     }
+  });
+
+  it("returns 504 instead of throwing when the upstream is unreachable", async () => {
+    const result = await proxyTrackingSend("http://127.0.0.1:1", "{}", {});
+    expect(result.status).toBe(504);
   });
 });

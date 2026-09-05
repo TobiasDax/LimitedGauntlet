@@ -18,19 +18,38 @@
 // is covered by tracking.test.ts against a real local HTTP server, same
 // idiom as webhooks.ts/deliverWebhook.
 
+// Same 5s ceiling as deliverWebhook (webhooks.ts) and the same reasoning: a
+// slow/dead upstream must never hold a request open indefinitely. GET
+// /stats.js loads on every rendered page and POST /api/send fires on every
+// analytics event, both unauthenticated, so an upstream that hangs instead
+// of erroring would otherwise tie up a server-side socket per request for
+// as long as Node's default fetch timeouts (5 minutes) allow.
+const FETCH_TIMEOUT_MS = 5_000;
+
 export interface ProxiedScript {
   status: number;
   contentType: string;
   body: ArrayBuffer;
 }
 
+// Never throws — a hung/unreachable/erroring upstream degrades to a 504
+// response for the route handler to relay, same "caller never has to
+// catch" posture as deliverWebhook.
 export async function proxyTrackingScript(scriptUrl: string): Promise<ProxiedScript> {
-  const res = await fetch(scriptUrl);
-  return {
-    status: res.status,
-    contentType: res.headers.get("content-type") ?? "application/javascript",
-    body: await res.arrayBuffer(),
-  };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(scriptUrl, { signal: controller.signal });
+    return {
+      status: res.status,
+      contentType: res.headers.get("content-type") ?? "application/javascript",
+      body: await res.arrayBuffer(),
+    };
+  } catch {
+    return { status: 504, contentType: "text/plain", body: new ArrayBuffer(0) };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export interface ProxiedSend {
@@ -45,23 +64,33 @@ export interface ProxiedSend {
 // deployer/this app configures. That's why routes/tracking.ts mounts this
 // at exactly POST /api/send: it's Umami's fixed convention, not a naming
 // choice made here.
+// Never throws — same posture as proxyTrackingScript above.
 export async function proxyTrackingSend(
   upstreamOrigin: string,
   body: string,
   forwardedHeaders: { contentType?: string; userAgent?: string; forwardedFor?: string },
 ): Promise<ProxiedSend> {
-  const res = await fetch(`${upstreamOrigin}/api/send`, {
-    method: "POST",
-    headers: {
-      "content-type": forwardedHeaders.contentType ?? "application/json",
-      ...(forwardedHeaders.userAgent ? { "user-agent": forwardedHeaders.userAgent } : {}),
-      ...(forwardedHeaders.forwardedFor ? { "x-forwarded-for": forwardedHeaders.forwardedFor } : {}),
-    },
-    body,
-  });
-  return {
-    status: res.status,
-    contentType: res.headers.get("content-type") ?? "application/json",
-    body: await res.text(),
-  };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${upstreamOrigin}/api/send`, {
+      method: "POST",
+      headers: {
+        "content-type": forwardedHeaders.contentType ?? "application/json",
+        ...(forwardedHeaders.userAgent ? { "user-agent": forwardedHeaders.userAgent } : {}),
+        ...(forwardedHeaders.forwardedFor ? { "x-forwarded-for": forwardedHeaders.forwardedFor } : {}),
+      },
+      body,
+      signal: controller.signal,
+    });
+    return {
+      status: res.status,
+      contentType: res.headers.get("content-type") ?? "application/json",
+      body: await res.text(),
+    };
+  } catch {
+    return { status: 504, contentType: "application/json", body: "{}" };
+  } finally {
+    clearTimeout(timeout);
+  }
 }

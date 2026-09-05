@@ -14,11 +14,13 @@ export async function trackingRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/stats.js", async (_request, reply) => {
     const { status, contentType, body } = await proxyTrackingScript(scriptUrl);
-    reply
-      .code(status)
-      .header("content-type", contentType)
-      .header("cache-control", "public, max-age=3600")
-      .send(Buffer.from(body));
+    // Only cache a genuine success — an unconditional cache-control here
+    // would have a transient upstream error (Umami restarting, briefly
+    // misconfigured) cached by the browser and any CDN in front of this app
+    // for the full hour, keeping the tracker broken long after upstream
+    // recovers.
+    const cacheControl = status >= 200 && status < 300 ? "public, max-age=3600" : "no-store";
+    reply.code(status).header("content-type", contentType).header("cache-control", cacheControl).send(Buffer.from(body));
   });
 
   app.post("/api/send", async (request, reply) => {
