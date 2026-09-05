@@ -140,6 +140,32 @@ describe("linkOrProvisionFromSso", () => {
     expect(res.status).toBe("recovery_required");
   });
 
+  it("PI-86: an SSO login for an existing account consumes a pending invite, adding a membership", async () => {
+    const orgA = await makeOrg();
+    const orgB = await makeOrg();
+    const email = `multi-${Math.random()}@example.com`;
+    const sub = uniq("multi");
+    const acc = await prisma.organizerAccount.create({
+      data: { name: "M", email, passwordHash: "h", oidcSubject: `google:${sub}`, memberships: { create: { orgId: orgA.id } } },
+    });
+    const invite = await prisma.organizerInvite.create({
+      data: {
+        orgId: orgB.id,
+        email,
+        tokenHash: `hash-${Math.random()}`,
+        invitedById: acc.id,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    const res = await linkOrProvisionFromSso("google", verified({ subject: sub, email }), "https://app.example");
+    expect(res).toEqual({ status: "ok", organizerId: acc.id, authVersion: acc.authVersion, landOrgId: orgB.id });
+
+    const memberships = await prisma.organizerMembership.findMany({ where: { accountId: acc.id }, select: { orgId: true } });
+    expect(memberships.map((m) => m.orgId).sort()).toEqual([orgA.id, orgB.id].sort());
+    expect((await prisma.organizerInvite.findUniqueOrThrow({ where: { id: invite.id } })).usedAt).not.toBeNull();
+  });
+
   it("refuses an unverified email", async () => {
     const res = await linkOrProvisionFromSso("google", verified({ emailVerified: false }), "https://app.example");
     expect(res).toEqual({ status: "error", error: "oidc_email_unverified" });

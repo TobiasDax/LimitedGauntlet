@@ -62,6 +62,31 @@ describe("player accounts (PI-52)", () => {
     await expect(acceptPlayerInvite(token, "hunter2!")).rejects.toMatchObject({ code: "invalid_or_expired" });
   });
 
+  it("PI-86: the same identity spans two orgs; each org's login resolves to its own roster entry", async () => {
+    const a = await setup();
+    const b = await setup();
+    const email = `span-${a.unique}@example.com`;
+    const playerA = await makePlayer(a.org.id, "Same Person");
+    const playerB = await makePlayer(b.org.id, "Same Person");
+
+    const { token: tokenA } = await createPlayerInvite(a.org.id, playerA.id, a.organizer.id, email);
+    const { identity } = await acceptPlayerInvite(tokenA, "hunter2!");
+
+    // Accept in org B — links the *same* identity (existing password must match).
+    const { token: tokenB } = await createPlayerInvite(b.org.id, playerB.id, b.organizer.id, email);
+    await expect(acceptPlayerInvite(tokenB, "wrong-pw")).rejects.toMatchObject({ code: "wrong_password" });
+    const acceptedB = await acceptPlayerInvite(tokenB, "hunter2!");
+    expect(acceptedB.identity.id).toBe(identity.id);
+
+    expect((await authenticatePlayer(a.org.slug, email, "hunter2!"))?.player.id).toBe(playerA.id);
+    expect((await authenticatePlayer(b.org.slug, email, "hunter2!"))?.player.id).toBe(playerB.id);
+
+    // Revoke in A doesn't touch B.
+    await revokePlayerAccount(a.org.id, playerA.id);
+    expect(await authenticatePlayer(a.org.slug, email, "hunter2!")).toBeNull();
+    expect((await authenticatePlayer(b.org.slug, email, "hunter2!"))?.player.id).toBe(playerB.id);
+  });
+
   it("won't invite a player who already has an account", async () => {
     const { org, organizer, unique } = await setup();
     const player = await makePlayer(org.id, "Cara");
