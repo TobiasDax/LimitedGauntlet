@@ -54,11 +54,18 @@ export function SeatingChart({
   return (
     <Card className="mb-6 p-5">
       <div className="mb-3 text-[11.5px] font-semibold tracking-wide text-ink-muted uppercase">Seating chart</div>
-      <div className="flex flex-col gap-2">
-        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${tableCount}, minmax(0, 1fr))` }}>
+      {/* w-full on both the flex wrapper and each grid row: a grid nested in a
+          flex-col container should stretch to the cross-axis width via the
+          default align-items: stretch, but WebKit/Safari doesn't reliably do
+          that once the grid's own cells have min-w-0 + truncate content — the
+          rows sat at their content width instead of filling the card, same
+          as the pairings list already does. Explicit w-full sidesteps the
+          implicit-stretch quirk entirely. */}
+      <div className="flex w-full flex-col gap-2">
+        <div className="grid w-full gap-2" style={{ gridTemplateColumns: `repeat(${tableCount}, minmax(0, 1fr))` }}>
           {topRow.map(cell)}
         </div>
-        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${tableCount}, minmax(0, 1fr))` }}>
+        <div className="grid w-full gap-2" style={{ gridTemplateColumns: `repeat(${tableCount}, minmax(0, 1fr))` }}>
           {emptyBottomSlot && <div key="empty" aria-hidden="true" />}
           {bottomRow.map(cell)}
         </div>

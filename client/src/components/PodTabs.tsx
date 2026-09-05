@@ -26,7 +26,11 @@ export function PodTabs({ podId }: { podId: string }) {
   if (data && !seatingFormats.has(data.pod.format)) visible = visible.filter((t) => t.suffix !== "/seating");
 
   return (
-    <div className="mb-6 flex gap-1 border-b border-border">
+    // overflow-x-auto + shrink-0/whitespace-nowrap on each tab: once five tabs
+    // (Entrants/Seatings/Pairings/Standings/Value) don't fit a narrow phone
+    // screen, the row scrolls horizontally instead of the tabs shrinking or
+    // wrapping onto a second line.
+    <div className="mb-6 flex gap-1 overflow-x-auto border-b border-border">
       {visible.map((tab) => {
         const href = `${base}${tab.suffix}`;
         const active = pathname === href;
@@ -34,7 +38,7 @@ export function PodTabs({ podId }: { podId: string }) {
           <Link
             key={tab.suffix}
             to={href}
-            className={`-mb-px border-b-2 px-3 py-2 text-[12.5px] tracking-wide uppercase ${
+            className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-[12.5px] tracking-wide whitespace-nowrap uppercase ${
               active ? "border-accent text-ink" : "border-transparent text-ink-secondary hover:text-ink"
             }`}
           >
