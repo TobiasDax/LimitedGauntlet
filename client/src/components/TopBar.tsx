@@ -120,6 +120,9 @@ export function TopBar({
             className="order-last flex w-full flex-col gap-1 pt-1 sm:hidden"
             aria-label="Primary"
           >
+            {orgSlot && (
+              <div className="border-border mb-1 border-b pb-2">{orgSlot}</div>
+            )}
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
