@@ -7,7 +7,6 @@ import { Footer } from "./Footer";
 // PI-86 — switch which org's portal this player session is in; the URL slug
 // follows. Plain <select> to keep the player chrome minimal.
 function PlayerOrgSwitcher() {
-  const navigate = useNavigate();
   const { data: me } = usePlayerMe();
   const switchOrg = usePlayerSwitchOrg();
   const orgs = me?.organizations ?? [];
@@ -19,10 +18,7 @@ function PlayerOrgSwitcher() {
       aria-label="Organization"
       disabled={switchOrg.isPending}
       value={me.organization.slug}
-      onChange={(e) => {
-        const slug = e.target.value;
-        switchOrg.mutate(slug, { onSuccess: () => navigate(`/o/${slug}/player`) });
-      }}
+      onChange={(e) => switchOrg.mutate(e.target.value)}
       className="border-border-strong rounded border bg-surface px-2 py-1 text-[13px] text-ink-secondary"
     >
       {orgs.map((o) => (

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { ApiError } from "../lib/api";
 import { useMe, useSwitchOrg, useSignupStatus, useCreateOrganization } from "../features/auth/useAuth";
 import { Button, Card, Field, FormError, TextField } from "../components/ui";
@@ -17,7 +16,6 @@ export function OrganizationsPage() {
   const { data: signupStatus } = useSignupStatus();
   const switchOrg = useSwitchOrg();
   const createOrg = useCreateOrganization();
-  const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -53,11 +51,7 @@ export function OrganizationsPage() {
               {o.id === me.activeOrgId ? (
                 <span className="text-[12px] tracking-wide text-accent uppercase">Current</span>
               ) : (
-                <Button
-                  variant="primary"
-                  disabled={switchOrg.isPending}
-                  onClick={() => switchOrg.mutate(o.id, { onSuccess: () => navigate("/") })}
-                >
+                <Button variant="primary" disabled={switchOrg.isPending} onClick={() => switchOrg.mutate(o.id)}>
                   Open
                 </Button>
               )}
@@ -93,7 +87,7 @@ export function OrganizationsPage() {
               e.preventDefault();
               const finalSlug = slug || slugify(name);
               if (!slugPattern.test(finalSlug)) return;
-              createOrg.mutate({ orgName: name.trim(), orgSlug: finalSlug }, { onSuccess: () => navigate("/") });
+              createOrg.mutate({ orgName: name.trim(), orgSlug: finalSlug });
             }}
           >
             <Field label="Name">

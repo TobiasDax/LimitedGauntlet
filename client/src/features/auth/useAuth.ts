@@ -94,26 +94,23 @@ export function useLogin() {
   });
 }
 
-// PI-86 — switch the active org, then hard-refresh everything (org-scoped data
-// changes wholesale).
+// PI-86 — switch the active org. Every page's data is org-scoped, so rather
+// than chase down each cache the cleanest correct thing is a full reload onto
+// the dashboard — org switching is rare and the whole tenant context changes.
 export function useSwitchOrg() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (orgId: string) => api.post<{ ok: true; activeOrgId: string }>("/auth/switch-org", { orgId }),
-    onSuccess: () => queryClient.clear(),
+    onSuccess: () => window.location.assign("/"),
   });
 }
 
 // PI-86 — an existing organizer creates another org for themselves (adds a
-// membership, not a new account). Distinct from useSignup.
+// membership, not a new account). Distinct from useSignup. Full reload for the
+// same reason as useSwitchOrg — you land in a fresh, empty tenant.
 export function useCreateOrganization() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { orgName: string; orgSlug: string }) => api.post<MeResponse>("/auth/organizations", input),
-    onSuccess: (data) => {
-      queryClient.clear();
-      queryClient.setQueryData(["me"], data);
-    },
+    onSuccess: () => window.location.assign("/"),
   });
 }
 
