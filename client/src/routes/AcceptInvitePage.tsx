@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "../lib/api";
-import { useInviteInfo, useAcceptInvite } from "../features/auth/useAuth";
+import { useInviteInfo, useAcceptInvite, useMe } from "../features/auth/useAuth";
 import { useAppConfig } from "../features/config/useAppConfig";
 import { Button, Card, Eyebrow, Field, FormError, ScreenTitle, TextField } from "../components/ui";
 import { SsoButtons } from "../components/SsoButtons";
@@ -17,6 +17,7 @@ export function AcceptInvitePage() {
   const { data: invite, isLoading, isError: inviteInvalid } = useInviteInfo(token);
   const acceptInvite = useAcceptInvite();
   const { data: appConfig } = useAppConfig();
+  const { data: me } = useMe();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -55,15 +56,66 @@ export function AcceptInvitePage() {
           </>
         )}
 
-        {invite && appConfig?.localLoginDisabled ? (
+        {invite && me?.identity && me.identity.email !== invite.email && (
+          <>
+            <p className="mb-4 text-[14px] text-ink-secondary">
+              This invite is for <strong>{invite.email}</strong>, but you're signed in as{" "}
+              <strong>{me.identity.email}</strong>. Log out and accept as {invite.email} (or via SSO with
+              that identity).
+            </p>
+            <Link to="/login">
+              <Button variant="ghost">Go to login</Button>
+            </Link>
+          </>
+        )}
+
+        {/* PI-86 — already signed in as the invited identity: one click adds the org. */}
+        {invite && me?.identity && me.identity.email === invite.email && (
           <>
             <p className="mb-4 text-[14px] text-ink-secondary">
               You've been invited to co-organize <strong>{invite.organizationName}</strong>.
-              Sign in with the SSO account for <strong>{invite.email}</strong> to accept.
             </p>
-            <SsoButtons providers={appConfig.ssoProviders ?? []} />
+            {acceptInvite.isError && (
+              <FormError>
+                {acceptInvite.error instanceof ApiError && acceptInvite.error.message === "already_member"
+                  ? "You're already a member of this organization."
+                  : "Something went wrong."}
+              </FormError>
+            )}
+            <Button
+              variant="primary"
+              disabled={acceptInvite.isPending}
+              onClick={() => acceptInvite.mutate({ token }, { onSuccess: () => navigate("/") })}
+            >
+              {acceptInvite.isPending ? "Joining…" : `Join ${invite.organizationName}`}
+            </Button>
           </>
-        ) : invite && (
+        )}
+
+        {invite && !me?.identity && (invite.accountExists || appConfig?.localLoginDisabled) ? (
+          <>
+            <p className="mb-4 text-[14px] text-ink-secondary">
+              {invite.accountExists ? (
+                <>
+                  <strong>{invite.email}</strong> already has a LimitedGauntlet account. Log in as that
+                  identity to accept this invite to <strong>{invite.organizationName}</strong>.
+                </>
+              ) : (
+                <>
+                  You've been invited to co-organize <strong>{invite.organizationName}</strong>. Sign in
+                  with the SSO account for <strong>{invite.email}</strong> to accept.
+                </>
+              )}
+            </p>
+            {appConfig?.localLoginDisabled ? (
+              <SsoButtons providers={appConfig.ssoProviders ?? []} />
+            ) : (
+              <Link to="/login">
+                <Button variant="primary">Go to login</Button>
+              </Link>
+            )}
+          </>
+        ) : invite && !me?.identity && (
           <>
             <p className="mb-4 text-[14px] text-ink-secondary">
               You've been invited to co-organize <strong>{invite.organizationName}</strong> as {invite.email}.
@@ -113,7 +165,7 @@ export function AcceptInvitePage() {
               {localError && <FormError>{localError}</FormError>}
               {acceptInvite.isError && (
                 <FormError>
-                  {acceptInvite.error instanceof ApiError && acceptInvite.error.message === "email_taken"
+                  {acceptInvite.error instanceof ApiError && acceptInvite.error.message === "account_exists"
                     ? "That email now has an account — log in instead."
                     : acceptInvite.error instanceof ApiError && acceptInvite.error.message === "invalid_or_expired"
                       ? "This invite is invalid or has expired."

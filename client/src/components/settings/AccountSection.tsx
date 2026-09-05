@@ -192,7 +192,9 @@ function DeleteAccountForm({
             if (confirmName.trim() !== expected) return;
             deleteAccount.mutate(
               { currentPassword: hasPassword ? password : undefined, confirmName },
-              { onSuccess: () => navigate("/login") },
+              // PI-86 — "leave" keeps you logged in (route to the chooser); a
+              // solo delete logs you out.
+              { onSuccess: (data) => navigate(data?.left ? "/organizations" : "/login") },
             );
           }}
         >

@@ -2,24 +2,34 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../../lib/api";
 import type { Organizer, Organization } from "../../lib/types";
 
-interface MeResponse {
+export interface OrgSummary {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+export interface MeResponse {
+  // PI-86 — the login itself, org-independent (only /auth/me + auth responses set it).
+  identity?: { id: string; email: string; name: string; hasPassword: boolean };
+  // Every org this login belongs to (PI-86). Empty = a membership-less account.
+  organizations?: OrgSummary[];
+  // The org currently in context. null = no active org → ProtectedRoute sends
+  // the user to the org chooser (/organizations), so any component rendered
+  // *inside* a protected route can rely on organizer/organization being set.
+  activeOrgId?: string | null;
+
   organizer: Organizer;
   organization: Organization;
   // Whether this org's public pages are behind a password (PI-27). Optional
   // because the login/signup responses don't compute it; /auth/me always does.
   publicLockEnabled?: boolean;
-  // Whether the tokens feature (PI-72) is enabled for this org. Same optionality
-  // as publicLockEnabled — only /auth/me sets it.
+  // Whether the tokens feature (PI-72) is enabled for this org.
   tokensEnabled?: boolean;
   // How many organizers this org has (PI-34) — drives Settings' "delete my
-  // account" vs "leave organization" wording. Always present in practice
-  // (every response that sets this cache includes it); optional here only so
-  // reads don't need a non-null assertion before the first load.
+  // account" vs "leave organization" wording.
   organizerCount?: number;
   // Whether this account has ever set a local password (PI-42). false = SSO
-  // only. Drives Settings → Account: "Set password" vs "Change password", and
-  // whether the destructive actions ask for a current password. Only /auth/me
-  // sets it (login/signup responses don't), so treat undefined as "has one".
+  // only. Drives Settings → Account. Treat undefined as "has one".
   hasPassword?: boolean;
 }
 
@@ -58,10 +68,8 @@ export interface SignupInput {
 export function useSignup() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: SignupInput) => api.post<{ organizer: Organizer; organization: Organization }>("/auth/signup", input),
-    onSuccess: ({ organizer, organization }) => {
-      queryClient.setQueryData<MeResponse>(["me"], { organizer, organization });
-    },
+    mutationFn: (input: SignupInput) => api.post<MeResponse>("/auth/signup", input),
+    onSuccess: (data) => queryClient.setQueryData(["me"], data),
   });
 }
 
@@ -74,14 +82,35 @@ export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: LoginInput) => api.post<MeResponse>("/auth/login", input),
-    onSuccess: ({ organizer, organization }) => {
-      // Set the cache synchronously rather than invalidating — an
-      // invalidated query still shows its previous (unauthenticated,
-      // null) data until the background refetch resolves, and
-      // ProtectedRoute reads that stale null in the gap and bounces
-      // straight back to /login before the real session ever lands.
-      queryClient.setQueryData<MeResponse>(["me"], { organizer, organization });
+    onSuccess: (data) => {
+      // Set the cache synchronously rather than invalidating — an invalidated
+      // query still shows its previous (null) data until the background
+      // refetch resolves, and ProtectedRoute reads that stale null in the gap.
+      // PI-86: `data` may have activeOrgId=null (multi-org account with no
+      // resumable org, or a membership-less one) — ProtectedRoute then routes
+      // to /organizations.
+      queryClient.setQueryData(["me"], data);
     },
+  });
+}
+
+// PI-86 — switch the active org. Every page's data is org-scoped, so rather
+// than chase down each cache the cleanest correct thing is a full reload onto
+// the dashboard — org switching is rare and the whole tenant context changes.
+export function useSwitchOrg() {
+  return useMutation({
+    mutationFn: (orgId: string) => api.post<{ ok: true; activeOrgId: string }>("/auth/switch-org", { orgId }),
+    onSuccess: () => window.location.assign("/"),
+  });
+}
+
+// PI-86 — an existing organizer creates another org for themselves (adds a
+// membership, not a new account). Distinct from useSignup. Full reload for the
+// same reason as useSwitchOrg — you land in a fresh, empty tenant.
+export function useCreateOrganization() {
+  return useMutation({
+    mutationFn: (input: { orgName: string; orgSlug: string }) => api.post<MeResponse>("/auth/organizations", input),
+    onSuccess: () => window.location.assign("/"),
   });
 }
 
@@ -180,14 +209,17 @@ export function useConfirmOidcRelink() {
   });
 }
 
+// PI-86 — "leave org" (co-organizers remain) returns { left: true } and the
+// session stays alive; a solo delete returns 204 and logs out. Either way we
+// clear caches; the caller routes on `left`.
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { currentPassword?: string; confirmName: string }) =>
-      api.post<void>("/settings/delete-account", input),
-    onSuccess: () => {
-      queryClient.setQueryData(["me"], null);
+      api.post<{ left?: boolean } | null>("/settings/delete-account", input),
+    onSuccess: (data) => {
       queryClient.clear();
+      if (!data?.left) queryClient.setQueryData(["me"], null);
     },
   });
 }
@@ -197,21 +229,22 @@ export function useDeleteAccount() {
 export function useInviteInfo(token: string) {
   return useQuery({
     queryKey: ["invite", token],
-    queryFn: () => api.get<{ email: string; organizationName: string }>(`/auth/invite/${token}`),
+    queryFn: () => api.get<{ email: string; organizationName: string; accountExists: boolean }>(`/auth/invite/${token}`),
     enabled: !!token,
     retry: false,
   });
 }
 
+// PI-86 — `name`/`password` only for the not-logged-in path. When already
+// signed in as the invited identity, accepting just adds a membership.
 export function useAcceptInvite() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { token: string; name: string; password: string }) =>
+    mutationFn: (input: { token: string; name?: string; password?: string }) =>
       api.post<MeResponse>("/auth/accept-invite", input),
     onSuccess: (data) => {
-      // Same reasoning as useLogin: set the cache synchronously so the new
-      // organizer is authenticated the instant they're redirected.
-      queryClient.setQueryData<MeResponse>(["me"], data);
+      queryClient.clear();
+      queryClient.setQueryData(["me"], data);
     },
   });
 }
@@ -239,7 +272,7 @@ export function useCompleteOidcRegistration() {
     mutationFn: (input: { orgName: string; orgSlug: string; organizerName: string }) =>
       api.post<MeResponse>("/auth/oidc/complete-registration", input),
     onSuccess: (data) => {
-      queryClient.setQueryData<MeResponse>(["me"], data);
+      queryClient.setQueryData(["me"], data);
     },
   });
 }

@@ -31,11 +31,15 @@ function navLinkClass({ isActive }: { isActive: boolean }): string {
 export function TopBar({
   brandTo,
   orgName,
+  orgSlot,
   navItems,
   rightSlot,
 }: {
   brandTo: string;
   orgName?: string;
+  // PI-86 — an interactive org element (the switcher). Replaces the plain
+  // orgName span when given.
+  orgSlot?: ReactNode;
   navItems: NavItem[];
   rightSlot?: ReactNode;
 }) {
@@ -73,9 +77,9 @@ export function TopBar({
           LimitedGauntlet
         </Link>
 
-        {orgName && (
+        {(orgSlot || orgName) && (
           <div className="border-border hidden flex-col gap-px border-l pl-5 sm:flex">
-            <span className="text-[13px] text-ink-secondary">{orgName}</span>
+            {orgSlot ?? <span className="text-[13px] text-ink-secondary">{orgName}</span>}
           </div>
         )}
 
@@ -116,6 +120,9 @@ export function TopBar({
             className="order-last flex w-full flex-col gap-1 pt-1 sm:hidden"
             aria-label="Primary"
           >
+            {orgSlot && (
+              <div className="border-border mb-1 border-b pb-2">{orgSlot}</div>
+            )}
             {navItems.map((item) => (
               <NavLink
                 key={item.to}

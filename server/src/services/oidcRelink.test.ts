@@ -25,11 +25,11 @@ async function makeOrganizer(overrides?: { oidcSubject?: string | null }) {
   const org = await prisma.organization.create({ data: { slug: `oidc-relink-${unique}`, name: "Test Org" } });
   const organizer = await prisma.organizerAccount.create({
     data: {
-      orgId: org.id,
       name: "Organizer",
       email: `organizer-${unique}@example.com`,
       passwordHash: null,
       oidcSubject: overrides?.oidcSubject ?? `old-subject-${unique}`,
+      memberships: { create: { orgId: org.id } },
     },
   });
   return { org, organizer };
@@ -37,9 +37,9 @@ async function makeOrganizer(overrides?: { oidcSubject?: string | null }) {
 
 describe("oidcRelink", () => {
   it("confirms a mailbox-token relink: rotates subject + authVersion, revokes API tokens, consumes other pending requests", async () => {
-    const { organizer } = await makeOrganizer();
+    const { org, organizer } = await makeOrganizer();
     await prisma.apiToken.create({
-      data: { organizerId: organizer.id, name: "old token", tokenHash: `hash-${Math.random()}` },
+      data: { organizerId: organizer.id, orgId: org.id, name: "old token", tokenHash: `hash-${Math.random()}` },
     });
     const stale = await createOidcRelinkRequest(organizer.id, subj("stale-subject"), organizer.email);
     const newSubject = subj("new-subject");

@@ -23,6 +23,7 @@ import { TreasureChestPage } from "./routes/TreasureChestPage.tsx";
 import { HallOfFamePage } from "./routes/HallOfFamePage.tsx";
 import { PlayerStatsPage } from "./routes/PlayerStatsPage.tsx";
 import { SettingsPage } from "./routes/SettingsPage.tsx";
+import { OrganizationsPage } from "./routes/OrganizationsPage.tsx";
 import { VerifyEmailPage } from "./routes/VerifyEmailPage.tsx";
 import { AcceptInvitePage } from "./routes/AcceptInvitePage.tsx";
 import { PlayerAcceptInvitePage } from "./routes/PlayerAcceptInvitePage.tsx";
@@ -71,6 +72,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/oidc-setup" element={<OidcSetupPage />} />
             <Route path="/oidc-relink" element={<OidcRelinkPage />} />
             <Route element={<ProtectedRoute />}>
+              <Route path="/organizations" element={<OrganizationsPage />} />
               <Route path="/" element={<DashboardPage />} />
               <Route path="/roster" element={<RosterPage />} />
               <Route path="/tournaments/:id" element={<TournamentPage />} />

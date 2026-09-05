@@ -49,6 +49,9 @@ export interface PlayerPortalMatch {
 export interface PlayerSession {
   player: { id: string; displayName: string };
   organization: { slug: string; name: string };
+  // PI-86 — every org this player login has a roster entry in, for the
+  // in-portal switcher. Present on /player/me, login and accept responses.
+  organizations?: { slug: string; name: string }[];
 }
 
 export type TournamentStatus = "PLANNING" | "ACTIVE" | "COMPLETED";

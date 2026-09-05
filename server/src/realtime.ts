@@ -28,7 +28,7 @@ interface RealtimeAuthorizationStore {
   // Same idea for a self-service player session (PI-52) — a logged-in player of
   // the room's org may subscribe to a locked org's rooms, and a revoked account
   // (authVersion bumped) loses that subscription on reconnect.
-  playerSessionValid(playerId: string, orgId: string, authVersion: number): Promise<boolean>;
+  playerSessionValid(identityId: string, orgId: string, authVersion: number): Promise<boolean>;
 }
 
 export type RealtimeRoomAuthorizer = (room: unknown, cookieHeader: string | undefined) => Promise<boolean>;
@@ -49,18 +49,23 @@ const defaultAuthorizationStore: RealtimeAuthorizationStore = {
     return tournament?.organization ?? null;
   },
   async organizerSessionValid(organizerId, orgId, authVersion) {
-    const organizer = await prisma.organizerAccount.findFirst({
-      where: { id: organizerId, orgId },
-      select: { authVersion: true },
-    });
-    return organizer !== null && organizer.authVersion === authVersion;
+    // PI-86 — a member of the org (any membership) with a matching authVersion.
+    const [account, membership] = await Promise.all([
+      prisma.organizerAccount.findUnique({ where: { id: organizerId }, select: { authVersion: true } }),
+      prisma.organizerMembership.findUnique({
+        where: { accountId_orgId: { accountId: organizerId, orgId } },
+        select: { id: true },
+      }),
+    ]);
+    return account !== null && membership !== null && account.authVersion === authVersion;
   },
-  async playerSessionValid(playerId, orgId, authVersion) {
-    const player = await prisma.player.findFirst({
-      where: { id: playerId, orgId, passwordHash: { not: null } },
-      select: { authVersion: true },
-    });
-    return player !== null && player.authVersion === authVersion;
+  async playerSessionValid(identityId, orgId, authVersion) {
+    // PI-86 — the identity has a Player row in this org and a matching authVersion.
+    const [identity, player] = await Promise.all([
+      prisma.playerIdentity.findUnique({ where: { id: identityId }, select: { authVersion: true } }),
+      prisma.player.findFirst({ where: { identityId, orgId }, select: { id: true } }),
+    ]);
+    return identity !== null && player !== null && identity.authVersion === authVersion;
   },
 };
 
@@ -100,11 +105,11 @@ export function createRealtimeRoomAuthorizer(
       }
     }
 
-    const playerId = session.get<unknown>("playerId");
-    if (typeof playerId === "string") {
+    const playerIdentityId = session.get<unknown>("playerIdentityId");
+    if (typeof playerIdentityId === "string") {
       const playerAuthVersion = session.get<unknown>("playerAuthVersion");
       return store.playerSessionValid(
-        playerId,
+        playerIdentityId,
         organization.id,
         typeof playerAuthVersion === "number" ? playerAuthVersion : 0,
       );

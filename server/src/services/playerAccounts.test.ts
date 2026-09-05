@@ -19,7 +19,7 @@ async function setup() {
   const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const org = await prisma.organization.create({ data: { slug: `pa-${unique}`, name: "PA Org" } });
   const organizer = await prisma.organizerAccount.create({
-    data: { orgId: org.id, name: "Org", email: `org-${unique}@example.com`, passwordHash: "x" },
+    data: { name: "Org", email: `org-${unique}@example.com`, passwordHash: "x", memberships: { create: { orgId: org.id } } },
   });
   const tournament = await prisma.tournament.create({
     data: { orgId: org.id, name: "T", startDate: new Date(), endDate: new Date() },
@@ -38,9 +38,10 @@ describe("player accounts (PI-52)", () => {
     const email = `alice-${unique}@example.com`;
 
     const { token } = await createPlayerInvite(org.id, player.id, organizer.id, email);
-    const { player: accepted } = await acceptPlayerInvite(token, "hunter2!");
+    const { player: accepted, identity } = await acceptPlayerInvite(token, "hunter2!");
     expect(accepted.email).toBe(email);
-    expect(accepted.passwordHash).toBeTruthy();
+    expect(accepted.identityId).toBe(identity.id);
+    expect(identity.passwordHash).toBeTruthy();
 
     const auth = await authenticatePlayer(org.slug, email, "hunter2!");
     expect(auth?.player.id).toBe(player.id);
@@ -61,6 +62,31 @@ describe("player accounts (PI-52)", () => {
     await expect(acceptPlayerInvite(token, "hunter2!")).rejects.toMatchObject({ code: "invalid_or_expired" });
   });
 
+  it("PI-86: the same identity spans two orgs; each org's login resolves to its own roster entry", async () => {
+    const a = await setup();
+    const b = await setup();
+    const email = `span-${a.unique}@example.com`;
+    const playerA = await makePlayer(a.org.id, "Same Person");
+    const playerB = await makePlayer(b.org.id, "Same Person");
+
+    const { token: tokenA } = await createPlayerInvite(a.org.id, playerA.id, a.organizer.id, email);
+    const { identity } = await acceptPlayerInvite(tokenA, "hunter2!");
+
+    // Accept in org B — links the *same* identity (existing password must match).
+    const { token: tokenB } = await createPlayerInvite(b.org.id, playerB.id, b.organizer.id, email);
+    await expect(acceptPlayerInvite(tokenB, "wrong-pw")).rejects.toMatchObject({ code: "wrong_password" });
+    const acceptedB = await acceptPlayerInvite(tokenB, "hunter2!");
+    expect(acceptedB.identity.id).toBe(identity.id);
+
+    expect((await authenticatePlayer(a.org.slug, email, "hunter2!"))?.player.id).toBe(playerA.id);
+    expect((await authenticatePlayer(b.org.slug, email, "hunter2!"))?.player.id).toBe(playerB.id);
+
+    // Revoke in A doesn't touch B.
+    await revokePlayerAccount(a.org.id, playerA.id);
+    expect(await authenticatePlayer(a.org.slug, email, "hunter2!")).toBeNull();
+    expect((await authenticatePlayer(b.org.slug, email, "hunter2!"))?.player.id).toBe(playerB.id);
+  });
+
   it("won't invite a player who already has an account", async () => {
     const { org, organizer, unique } = await setup();
     const player = await makePlayer(org.id, "Cara");
@@ -71,18 +97,22 @@ describe("player accounts (PI-52)", () => {
     ).rejects.toMatchObject({ code: "already_has_account" });
   });
 
-  it("revoke clears credentials and bumps authVersion", async () => {
+  it("revoke unlinks this org's roster entry from the identity", async () => {
     const { org, organizer, unique } = await setup();
     const player = await makePlayer(org.id, "Dan");
-    const { token } = await createPlayerInvite(org.id, player.id, organizer.id, `dan-${unique}@example.com`);
-    await acceptPlayerInvite(token, "hunter2!");
+    const email = `dan-${unique}@example.com`;
+    const { token } = await createPlayerInvite(org.id, player.id, organizer.id, email);
+    const { identity } = await acceptPlayerInvite(token, "hunter2!");
 
     const count = await revokePlayerAccount(org.id, player.id);
     expect(count).toBe(1);
     const after = await prisma.player.findUniqueOrThrow({ where: { id: player.id } });
-    expect(after.passwordHash).toBeNull();
+    expect(after.identityId).toBeNull();
     expect(after.email).toBeNull();
-    expect(after.authVersion).toBe(1);
+    // The shared identity row survives (it may be a login for other orgs).
+    expect(await prisma.playerIdentity.findUnique({ where: { id: identity.id } })).not.toBeNull();
+    // Login no longer resolves for this org.
+    expect(await authenticatePlayer(org.slug, email, "hunter2!")).toBeNull();
     // Wrong org can't revoke.
     expect(await revokePlayerAccount("some-other-org", player.id)).toBe(0);
   });

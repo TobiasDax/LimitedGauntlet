@@ -31,9 +31,24 @@ const resultSchema = z.object({
   gamesWonB: z.number().int().min(0).max(10),
 });
 
-function establishPlayerSession(request: FastifyRequest, player: { id: string; authVersion: number }): void {
-  request.session.set("playerId", player.id);
-  request.session.set("playerAuthVersion", player.authVersion);
+function establishPlayerSession(
+  request: FastifyRequest,
+  identity: { id: string; authVersion: number },
+  orgId: string,
+): void {
+  request.session.set("playerIdentityId", identity.id);
+  request.session.set("playerAuthVersion", identity.authVersion);
+  request.session.set("playerOrgId", orgId);
+}
+
+// PI-86 — every org this player identity has a roster entry in, oldest first.
+async function playerOrganizations(identityId: string) {
+  const players = await prisma.player.findMany({
+    where: { identityId },
+    orderBy: { createdAt: "asc" },
+    select: { organization: { select: { slug: true, name: true } } },
+  });
+  return players.map((p) => p.organization);
 }
 
 function requestOrigin(request: FastifyRequest): string {
@@ -132,15 +147,17 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       try {
-        const { player, organization } = await acceptPlayerInvite(body.data.token, body.data.password);
-        establishPlayerSession(request, player);
+        const { identity, player, organization } = await acceptPlayerInvite(body.data.token, body.data.password);
+        establishPlayerSession(request, identity, organization.id);
         reply.code(201).send({
           player: { id: player.id, displayName: player.displayName },
           organization: { slug: organization.slug, name: organization.name },
+          organizations: await playerOrganizations(identity.id),
         });
       } catch (err) {
         if (isPlayerAccountFailure(err)) {
-          reply.code(err.code === "email_taken" ? 409 : 400).send({ error: err.code });
+          const status = err.code === "email_taken" ? 409 : err.code === "wrong_password" ? 401 : 400;
+          reply.code(status).send({ error: err.code });
           return;
         }
         throw err;
@@ -162,18 +179,41 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
         reply.code(401).send({ error: "invalid_credentials" });
         return;
       }
-      establishPlayerSession(request, result.player);
+      establishPlayerSession(request, result.identity, result.organization.id);
       reply.send({
         player: { id: result.player.id, displayName: result.player.displayName },
         organization: { slug: result.organization.slug, name: result.organization.name },
+        organizations: await playerOrganizations(result.identity.id),
       });
     },
   );
 
   app.post("/api/player/logout", async (request, reply) => {
-    request.session.set("playerId", undefined);
+    request.session.set("playerIdentityId", undefined);
     request.session.set("playerAuthVersion", undefined);
+    request.session.set("playerOrgId", undefined);
     reply.code(204).send();
+  });
+
+  // PI-86 — switch which org's portal this player session is in. Validates the
+  // identity has a roster entry in the target org.
+  app.post("/api/player/switch-org", { preHandler: requirePlayerAuth }, async (request, reply) => {
+    const parsed = z.object({ orgSlug: z.string().trim().min(1) }).safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const org = await prisma.organization.findUnique({ where: { slug: parsed.data.orgSlug }, select: { id: true, slug: true, name: true } });
+    const player = org
+      ? await prisma.player.findFirst({ where: { identityId: request.player!.identityId, orgId: org.id }, select: { id: true } })
+      : null;
+    if (!org || !player) {
+      reply.code(404).send({ error: "not_a_member" });
+      return;
+    }
+    request.session.set("playerOrgId", org.id);
+    await prisma.playerIdentity.update({ where: { id: request.player!.identityId }, data: { lastActiveOrgId: org.id } });
+    reply.send({ ok: true, organization: { slug: org.slug, name: org.name } });
   });
 
   // The logged-in player's own token balance + ledger (PI-72). 404 when the
@@ -195,6 +235,7 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
     reply.send({
       player: { id: request.player!.id, displayName: request.player!.displayName },
       organization,
+      organizations: await playerOrganizations(request.player!.identityId),
     });
   });
 

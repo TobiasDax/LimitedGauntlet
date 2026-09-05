@@ -224,24 +224,39 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
           return;
         }
       }
-      const organizerCount = await prisma.organizerAccount.count({ where: { orgId: account.orgId } });
+      const orgId = request.organizer!.orgId;
+      const organizerCount = await prisma.organizerMembership.count({ where: { orgId } });
       const confirmName = body.data.confirmName.trim();
 
       if (organizerCount > 1) {
+        // "Leave" — drop just this org's membership (PI-86: the account
+        // survives; it stays valid with its other memberships, or lands on
+        // the chooser if this was the last one). Also drop this org's API
+        // tokens for this account, so leaving actually revokes access.
         if (confirmName !== account.email) {
           reply.code(400).send({ error: "name_mismatch" });
           return;
         }
-        await prisma.organizerAccount.delete({ where: { id: account.id } });
-      } else {
-        const org = await prisma.organization.findUniqueOrThrow({ where: { id: account.orgId } });
-        if (confirmName !== org.name) {
-          reply.code(400).send({ error: "name_mismatch" });
-          return;
+        await prisma.$transaction([
+          prisma.organizerMembership.delete({ where: { accountId_orgId: { accountId: account.id, orgId } } }),
+          prisma.apiToken.deleteMany({ where: { organizerId: account.id, orgId } }),
+        ]);
+        if (account.lastActiveOrgId === orgId) {
+          await prisma.organizerAccount.update({ where: { id: account.id }, data: { lastActiveOrgId: null } });
         }
-        // Deleting the org cascades to organizers, players, tournaments, pods, …
-        await prisma.organization.delete({ where: { id: org.id } });
+        // Stay logged in — just clear the active org so the next request
+        // re-resolves (another membership, or the chooser).
+        request.session.set("activeOrgId", undefined);
+        reply.send({ left: true });
+        return;
       }
+      const org = await prisma.organization.findUniqueOrThrow({ where: { id: orgId } });
+      if (confirmName !== org.name) {
+        reply.code(400).send({ error: "name_mismatch" });
+        return;
+      }
+      // Deleting the org cascades to memberships, players, tournaments, pods, …
+      await prisma.organization.delete({ where: { id: org.id } });
       request.session.delete();
       reply.code(204).send();
     },
@@ -269,7 +284,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
           return;
         }
       }
-      const org = await prisma.organization.findUniqueOrThrow({ where: { id: account.orgId } });
+      const org = await prisma.organization.findUniqueOrThrow({ where: { id: request.organizer!.orgId } });
       if (body.data.confirmName.trim() !== org.name) {
         reply.code(400).send({ error: "name_mismatch" });
         return;
@@ -286,11 +301,11 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/settings/organizers", async (request, reply) => {
     const orgId = request.organizer!.orgId;
-    const [organizers, invites] = await Promise.all([
-      prisma.organizerAccount.findMany({
+    const [members, invites] = await Promise.all([
+      prisma.organizerMembership.findMany({
         where: { orgId },
         orderBy: { createdAt: "asc" },
-        select: { id: true, name: true, email: true, createdAt: true },
+        select: { createdAt: true, account: { select: { id: true, name: true, email: true } } },
       }),
       prisma.organizerInvite.findMany({
         where: { orgId, usedAt: null, expiresAt: { gt: new Date() } },
@@ -299,7 +314,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       }),
     ]);
     reply.send({
-      organizers,
+      organizers: members.map((m) => ({
+        id: m.account.id,
+        name: m.account.name,
+        email: m.account.email,
+        createdAt: m.createdAt,
+      })),
       invites: invites.map((i) => ({
         id: i.id,
         email: i.email,
@@ -447,13 +467,22 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       reply.code(400).send({ error: "cannot_remove_self" });
       return;
     }
-    const { count } = await prisma.organizerAccount.deleteMany({
-      where: { id: params.data.id, orgId: request.organizer!.orgId },
+    // PI-86 — remove the membership, not the account (they may be in other
+    // orgs). Their API tokens for this org go too.
+    const orgId = request.organizer!.orgId;
+    const membership = await prisma.organizerMembership.findUnique({
+      where: { accountId_orgId: { accountId: params.data.id, orgId } },
+      select: { id: true },
     });
-    if (count === 0) {
+    if (!membership) {
       reply.code(404).send({ error: "not_found" });
       return;
     }
+    await prisma.$transaction([
+      prisma.organizerMembership.delete({ where: { id: membership.id } }),
+      prisma.apiToken.deleteMany({ where: { organizerId: params.data.id, orgId } }),
+      prisma.organizerAccount.updateMany({ where: { id: params.data.id, lastActiveOrgId: orgId }, data: { lastActiveOrgId: null } }),
+    ]);
     reply.code(204).send();
   });
 

@@ -112,7 +112,7 @@ export function SignupPage() {
               {signup.error instanceof ApiError && signup.error.status === 409
                 ? signup.error.message === "slug_taken"
                   ? "That URL slug is already taken — try a different one."
-                  : "That email is already in use."
+                  : "That email already has an account. Log in, then add another organization from the organization menu in the top bar."
                 : signup.error instanceof ApiError && signup.error.status === 403
                   ? "Signups just closed — ask whoever's running this instance."
                   : "Something went wrong. Try again."}

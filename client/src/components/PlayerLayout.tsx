@@ -1,8 +1,34 @@
 import { Link, Navigate, Outlet, useNavigate, useParams } from "react-router-dom";
-import { usePlayerMe, usePlayerLogout } from "../features/player/usePlayer";
+import { usePlayerMe, usePlayerLogout, usePlayerSwitchOrg } from "../features/player/usePlayer";
 import { Button } from "./ui";
 import { TopBar } from "./TopBar";
 import { Footer } from "./Footer";
+
+// PI-86 — switch which org's portal this player session is in; the URL slug
+// follows. Plain <select> to keep the player chrome minimal.
+function PlayerOrgSwitcher() {
+  const { data: me } = usePlayerMe();
+  const switchOrg = usePlayerSwitchOrg();
+  const orgs = me?.organizations ?? [];
+  if (!me || orgs.length <= 1) {
+    return <span className="text-[13px] text-ink-secondary">{me ? `${me.organization.name} · Player` : "Player sign-in"}</span>;
+  }
+  return (
+    <select
+      aria-label="Organization"
+      disabled={switchOrg.isPending}
+      value={me.organization.slug}
+      onChange={(e) => switchOrg.mutate(e.target.value)}
+      className="border-border-strong rounded border bg-surface px-2 py-1 text-[13px] text-ink-secondary"
+    >
+      {orgs.map((o) => (
+        <option key={o.slug} value={o.slug}>
+          {o.name} · Player
+        </option>
+      ))}
+    </select>
+  );
+}
 
 // Chrome for the self-service player portal (PI-52), mounted at
 // /o/:slug/player/*. Independent of PublicLayout — no public-lock gate here
@@ -38,7 +64,7 @@ export function PlayerLayout() {
     <div className="flex min-h-screen flex-col">
       <TopBar
         brandTo={me ? base : `${base}/login`}
-        orgName={me ? `${me.organization.name} · Player` : "Player sign-in"}
+        orgSlot={<PlayerOrgSwitcher />}
         navItems={[]}
         rightSlot={rightSlot}
       />
