@@ -40,6 +40,19 @@ export function usePlayerLogout() {
   });
 }
 
+// PI-86 — switch which org's portal this player session is in. The URL slug
+// follows (the caller navigates), and portal data is org-scoped so it's refetched.
+export function usePlayerSwitchOrg() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (orgSlug: string) =>
+      api.post<{ ok: true; organization: { slug: string; name: string } }>("/player/switch-org", { orgSlug }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["player"] });
+    },
+  });
+}
+
 export function usePlayerInviteInfo(token: string) {
   return useQuery({
     queryKey: ["player", "invite", token],

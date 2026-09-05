@@ -2,6 +2,7 @@ import { Link, Outlet, useNavigate } from "react-router-dom";
 import { useLogout, useMe } from "../features/auth/useAuth";
 import { Button } from "./ui";
 import { TopBar, type NavItem } from "./TopBar";
+import { OrgSwitcher } from "./OrgSwitcher";
 import { Footer } from "./Footer";
 
 const NAV_ITEMS: NavItem[] = [
@@ -46,7 +47,7 @@ export function Layout() {
     <div className="flex min-h-screen flex-col">
       <TopBar
         brandTo="/"
-        orgName={me?.organization.name}
+        orgSlot={me ? <OrgSwitcher /> : undefined}
         navItems={me ? NAV_ITEMS : []}
         rightSlot={rightSlot}
       />
