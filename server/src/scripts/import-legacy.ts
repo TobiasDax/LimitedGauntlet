@@ -113,7 +113,12 @@ async function upsertOrg() {
   const password = process.env.IMPORT_ORGANIZER_PASSWORD ?? randomBytes(9).toString("base64url");
   const passwordHash = await hashPassword(password);
   await prisma.organizerAccount.create({
-    data: { orgId: org.id, email, passwordHash, name: process.env.IMPORT_ORGANIZER_NAME ?? "Organizer" },
+    data: {
+      email,
+      passwordHash,
+      name: process.env.IMPORT_ORGANIZER_NAME ?? "Organizer",
+      memberships: { create: { orgId: org.id } },
+    },
   });
 
   console.log(`Created org "${slug}" with organizer login ${email}`);

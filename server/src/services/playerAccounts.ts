@@ -20,6 +20,7 @@ export type PlayerAccountError =
   | "already_has_account"
   | "email_taken"
   | "invalid_or_expired"
+  | "wrong_password"
   | "not_your_match"
   | "round_not_active";
 
@@ -43,7 +44,7 @@ export async function createPlayerInvite(
 ): Promise<{ token: string; playerName: string }> {
   const player = await prisma.player.findFirst({ where: { id: playerId, orgId } });
   if (!player) throw new PlayerAccountFailure("not_found");
-  if (player.passwordHash) throw new PlayerAccountFailure("already_has_account");
+  if (player.identityId) throw new PlayerAccountFailure("already_has_account");
 
   const emailTaken = await prisma.player.findFirst({
     where: { orgId, email, id: { not: playerId } },
@@ -79,6 +80,10 @@ export async function getPlayerInvite(token: string) {
   return invite;
 }
 
+// PI-86 — links the invited Player row to the shared PlayerIdentity for that
+// email, creating the identity (with this password) if it's the person's first
+// player login anywhere. When the identity already exists, the given password
+// must match it (proves it's them) — the invite is bound to that identity.
 export async function acceptPlayerInvite(token: string, password: string) {
   const invite = await prisma.playerInvite.findUnique({ where: { tokenHash: hashInviteToken(token) } });
   if (!invite || invite.usedAt || invite.expiresAt < new Date()) {
@@ -89,32 +94,44 @@ export async function acceptPlayerInvite(token: string, password: string) {
   });
   if (taken) throw new PlayerAccountFailure("email_taken");
 
-  const passwordHash = await hashPassword(password);
+  let identity = await prisma.playerIdentity.findUnique({ where: { email: invite.email } });
+  if (identity) {
+    if (!(await verifyPassword(identity.passwordHash, password))) {
+      throw new PlayerAccountFailure("wrong_password");
+    }
+  } else {
+    identity = await prisma.playerIdentity.create({
+      data: { email: invite.email, passwordHash: await hashPassword(password) },
+    });
+  }
+
   const [player] = await prisma.$transaction([
-    prisma.player.update({ where: { id: invite.playerId }, data: { email: invite.email, passwordHash } }),
+    prisma.player.update({ where: { id: invite.playerId }, data: { email: invite.email, identityId: identity.id } }),
     prisma.playerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } }),
   ]);
   const organization = await prisma.organization.findUniqueOrThrow({ where: { id: invite.orgId } });
-  return { player, organization };
+  return { identity, player, organization };
 }
 
 export async function authenticatePlayer(orgSlug: string, email: string, password: string) {
   const organization = await prisma.organization.findUnique({ where: { slug: orgSlug } });
   if (!organization) return null;
-  const player = await prisma.player.findFirst({
-    where: { orgId: organization.id, email, passwordHash: { not: null } },
-  });
-  if (!player?.passwordHash || !(await verifyPassword(player.passwordHash, password))) return null;
-  return { player, organization };
+  const identity = await prisma.playerIdentity.findUnique({ where: { email } });
+  if (!identity || !(await verifyPassword(identity.passwordHash, password))) return null;
+  const player = await prisma.player.findFirst({ where: { identityId: identity.id, orgId: organization.id } });
+  if (!player) return null;
+  return { identity, player, organization };
 }
 
-// Revoke: clears the credentials and bumps authVersion so any live player
-// session dies on its next request (auth/playerMiddleware.ts). Returns the
-// number of rows touched (0 = not this org's player).
+// PI-86 — revoke unlinks THIS org's Player row from the identity (and clears
+// its denormalized email). The identity row survives — the player keeps any
+// login for other orgs. The unlink alone drops the live session for this org
+// (playerMiddleware.ts re-checks the (identity, org) link every request), so
+// no authVersion bump. Returns rows touched (0 = not this org's player).
 export async function revokePlayerAccount(orgId: string, playerId: string): Promise<number> {
   const { count } = await prisma.player.updateMany({
-    where: { id: playerId, orgId },
-    data: { email: null, passwordHash: null, authVersion: { increment: 1 } },
+    where: { id: playerId, orgId, identityId: { not: null } },
+    data: { email: null, identityId: null },
   });
   if (count > 0) await prisma.playerInvite.deleteMany({ where: { playerId } });
   return count;
@@ -123,15 +140,15 @@ export async function revokePlayerAccount(orgId: string, playerId: string): Prom
 // True when the request carries a still-valid player session for this org —
 // used by the PI-27 public-lock bypass and the realtime room authorizer.
 export async function hasValidPlayerSession(request: FastifyRequest, orgId: string): Promise<boolean> {
-  const playerId = request.session.get("playerId");
-  if (!playerId) return false;
-  const player = await prisma.player.findFirst({
-    where: { id: playerId, orgId },
-    select: { authVersion: true, passwordHash: true },
-  });
-  if (!player || !player.passwordHash) return false;
+  const identityId = request.session.get("playerIdentityId");
+  if (!identityId) return false;
+  const [identity, player] = await Promise.all([
+    prisma.playerIdentity.findUnique({ where: { id: identityId }, select: { authVersion: true } }),
+    prisma.player.findFirst({ where: { identityId, orgId }, select: { id: true } }),
+  ]);
+  if (!identity || !player) return false;
   const sessionVersion = request.session.get("playerAuthVersion");
-  return (sessionVersion ?? 0) === player.authVersion;
+  return (sessionVersion ?? 0) === identity.authVersion;
 }
 
 function playerOnEntrant(

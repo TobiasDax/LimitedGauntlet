@@ -111,10 +111,10 @@ describe("linkOrProvisionFromSso", () => {
     const org = await makeOrg();
     const sub = uniq("known");
     const acc = await prisma.organizerAccount.create({
-      data: { orgId: org.id, name: "A", email: `a-${Math.random()}@x.com`, passwordHash: "h", oidcSubject: `google:${sub}` },
+      data: { name: "A", email: `a-${Math.random()}@x.com`, passwordHash: "h", oidcSubject: `google:${sub}`, memberships: { create: { orgId: org.id } } },
     });
     const res = await linkOrProvisionFromSso("google", verified({ subject: sub }), "https://app.example");
-    expect(res).toEqual({ status: "ok", organizerId: acc.id, authVersion: acc.authVersion });
+    expect(res).toEqual({ status: "ok", organizerId: acc.id, authVersion: acc.authVersion, landOrgId: undefined });
   });
 
   it("links an unbound account by verified email, storing the prefixed subject", async () => {
@@ -122,7 +122,7 @@ describe("linkOrProvisionFromSso", () => {
     const email = `link-${Math.random()}@example.com`;
     const sub = uniq("disc");
     const acc = await prisma.organizerAccount.create({
-      data: { orgId: org.id, name: "B", email, passwordHash: "h" },
+      data: { name: "B", email, passwordHash: "h", memberships: { create: { orgId: org.id } } },
     });
     const res = await linkOrProvisionFromSso("discord", verified({ subject: sub, email }), "https://app.example");
     expect(res.status).toBe("ok");
@@ -134,7 +134,7 @@ describe("linkOrProvisionFromSso", () => {
     const org = await makeOrg();
     const email = `two-${Math.random()}@example.com`;
     await prisma.organizerAccount.create({
-      data: { orgId: org.id, name: "C", email, passwordHash: "h", oidcSubject: `google:${uniq("first")}` },
+      data: { name: "C", email, passwordHash: "h", oidcSubject: `google:${uniq("first")}`, memberships: { create: { orgId: org.id } } },
     });
     const res = await linkOrProvisionFromSso("discord", verified({ subject: uniq("second"), email }), "https://app.example");
     expect(res.status).toBe("recovery_required");

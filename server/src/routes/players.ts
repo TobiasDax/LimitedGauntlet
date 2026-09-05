@@ -33,9 +33,11 @@ async function nameTaken(orgId: string, displayName: string, exceptId?: string):
 
 // Never send the login credentials (PI-52) back to the client — the roster
 // only cares whether an account exists, exposed as `hasAccount` on the list.
-function publicPlayer<T extends { passwordHash: string | null; email: string | null }>(player: T) {
-  const { passwordHash, email, ...rest } = player;
-  return { ...rest, hasAccount: passwordHash !== null };
+// PI-86 — the login lives on the linked PlayerIdentity now; a linked
+// `identityId` means the roster entry has a self-service account.
+function publicPlayer<T extends { identityId: string | null; email: string | null }>(player: T) {
+  const { identityId, email, ...rest } = player;
+  return { ...rest, hasAccount: identityId !== null };
 }
 
 export async function playerRoutes(app: FastifyInstance): Promise<void> {

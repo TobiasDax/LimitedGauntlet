@@ -251,10 +251,30 @@ export async function completeSso(
 //   5. Unknown identity + signups closed → refused; an organizer must invite
 //      this email first.
 export type SsoLinkResult =
-  | { status: "ok"; organizerId: string; authVersion: number }
+  | { status: "ok"; organizerId: string; authVersion: number; landOrgId?: string }
   | { status: "recovery_required"; emailSent: boolean }
   | { status: "needs_registration"; subject: string; email: string; name: string }
   | { status: "error"; error: string };
+
+// PI-86 — an SSO login for an account that already exists also consumes any
+// pending co-organizer invite for that email: it adds a membership rather
+// than being ignored (the pre-PI-86 bug). Returns the org to land in.
+async function consumePendingInvite(accountId: string, email: string): Promise<string | undefined> {
+  const invite = await prisma.organizerInvite.findFirst({
+    where: { email, usedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!invite) return undefined;
+  const existing = await prisma.organizerMembership.findUnique({
+    where: { accountId_orgId: { accountId, orgId: invite.orgId } },
+    select: { id: true },
+  });
+  await prisma.$transaction([
+    ...(existing ? [] : [prisma.organizerMembership.create({ data: { accountId, orgId: invite.orgId } })]),
+    prisma.organizerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } }),
+  ]);
+  return invite.orgId;
+}
 
 export async function linkOrProvisionFromSso(
   provider: SsoProviderId,
@@ -264,7 +284,10 @@ export async function linkOrProvisionFromSso(
   const subject = `${provider}:${identity.subject}`;
 
   const bySubject = await prisma.organizerAccount.findUnique({ where: { oidcSubject: subject } });
-  if (bySubject) return { status: "ok", organizerId: bySubject.id, authVersion: bySubject.authVersion };
+  if (bySubject) {
+    const landOrgId = identity.email ? await consumePendingInvite(bySubject.id, identity.email) : undefined;
+    return { status: "ok", organizerId: bySubject.id, authVersion: bySubject.authVersion, landOrgId };
+  }
 
   if (!identity.email || !identity.emailVerified) {
     return { status: "error", error: "oidc_email_unverified" };
@@ -279,9 +302,13 @@ export async function linkOrProvisionFromSso(
         where: { id: byEmail.id, oidcSubject: null },
         data: { oidcSubject: subject },
       });
-      if (linked.count === 1) return { status: "ok", organizerId: byEmail.id, authVersion: byEmail.authVersion };
+      if (linked.count === 1) {
+        const landOrgId = await consumePendingInvite(byEmail.id, identity.email);
+        return { status: "ok", organizerId: byEmail.id, authVersion: byEmail.authVersion, landOrgId };
+      }
     } else if (byEmail.oidcSubject === subject) {
-      return { status: "ok", organizerId: byEmail.id, authVersion: byEmail.authVersion };
+      const landOrgId = await consumePendingInvite(byEmail.id, identity.email);
+      return { status: "ok", organizerId: byEmail.id, authVersion: byEmail.authVersion, landOrgId };
     }
     // Account already bound to a different SSO identity (another provider, or the
     // same provider's subject changed) — never a silent rebind; go through the
@@ -308,16 +335,16 @@ export async function linkOrProvisionFromSso(
     const [organizer] = await prisma.$transaction([
       prisma.organizerAccount.create({
         data: {
-          orgId: invite.orgId,
           email: identity.email,
           name: identity.name || identity.email,
           passwordHash: null,
           oidcSubject: subject,
+          memberships: { create: { orgId: invite.orgId } },
         },
       }),
       prisma.organizerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } }),
     ]);
-    return { status: "ok", organizerId: organizer.id, authVersion: organizer.authVersion };
+    return { status: "ok", organizerId: organizer.id, authVersion: organizer.authVersion, landOrgId: invite.orgId };
   }
 
   if (config.allowSignup) {

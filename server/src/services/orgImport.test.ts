@@ -80,7 +80,7 @@ describe("token export → import round-trip (PI-72)", () => {
     const u = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const src = await prisma.organization.create({ data: { slug: `xr-src-${u}`, name: "Src", tokensEnabled: true } });
     const organizer = await prisma.organizerAccount.create({
-      data: { orgId: src.id, name: "O", email: `o-${u}@x.com`, passwordHash: "x" },
+      data: { name: "O", email: `o-${u}@x.com`, passwordHash: "x", memberships: { create: { orgId: src.id } } },
     });
     const tournament = await prisma.tournament.create({
       data: {

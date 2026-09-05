@@ -100,11 +100,11 @@ describe("realtime room authorization", () => {
   });
 
   it("allows a current player session into their own locked organization's room (PI-52)", async () => {
-    const f = fixture({ sessionValues: { playerId: "player-1", playerAuthVersion: 4 }, playerMatches: true });
+    const f = fixture({ sessionValues: { playerIdentityId: "player-1", playerAuthVersion: 4 }, playerMatches: true });
     await expect(f.authorize("pod:pod-1", "session=good")).resolves.toBe(true);
     expect(f.playerSessionValid).toHaveBeenCalledWith("player-1", "org-1", 4);
 
-    const revoked = fixture({ sessionValues: { playerId: "player-1", playerAuthVersion: 1 }, playerMatches: false });
+    const revoked = fixture({ sessionValues: { playerIdentityId: "player-1", playerAuthVersion: 1 }, playerMatches: false });
     await expect(revoked.authorize("pod:pod-1", "session=good")).resolves.toBe(false);
   });
 

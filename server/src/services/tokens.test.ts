@@ -20,7 +20,7 @@ async function setup(opts?: { tokensEnabled?: boolean }) {
     data: { slug: `tok-${u}`, name: "Tok", tokensEnabled: opts?.tokensEnabled ?? true },
   });
   const organizer = await prisma.organizerAccount.create({
-    data: { orgId: org.id, name: "Org", email: `o-${u}@x.com`, passwordHash: "x" },
+    data: { name: "Org", email: `o-${u}@x.com`, passwordHash: "x", memberships: { create: { orgId: org.id } } },
   });
   const tournament = await prisma.tournament.create({
     data: {

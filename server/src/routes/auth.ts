@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
-import { requireAuth } from "../auth/middleware.js";
+import { requireAuth, requireOrganizerIdentity } from "../auth/middleware.js";
 import { config, isLocalLoginDisabled, configuredSsoProviders, type SsoProviderId } from "../config.js";
 import { beginSso, completeSso, isProviderConfigured, linkOrProvisionFromSso } from "../services/sso.js";
 import { confirmOidcRelink } from "../services/oidcRelink.js";
@@ -28,8 +28,11 @@ const loginSchema = z.object({
 
 const acceptInviteSchema = z.object({
   token: z.string().min(1),
-  name: z.string().trim().min(1).max(100),
-  password: z.string().min(8).max(200),
+  // Only for the not-logged-in path (a brand-new account). When the invitee is
+  // already signed in as the invited identity, accepting just adds a
+  // membership — no name/password.
+  name: z.string().trim().min(1).max(100).optional(),
+  password: z.string().min(8).max(200).optional(),
 });
 
 // Finishing an OIDC-bootstrapped registration (PI-42): the email/subject come
@@ -43,9 +46,60 @@ const completeOidcRegistrationSchema = z.object({
 
 const oidcRelinkSchema = z.object({ token: z.string().min(1).max(200) });
 
-function establishSession(request: { session: { set: (key: "organizerId" | "authVersion", value: string | number) => void } }, account: { id: string; authVersion?: number }) {
+function establishSession(request: FastifyRequest, account: { id: string; authVersion?: number }) {
   request.session.set("organizerId", account.id);
   request.session.set("authVersion", account.authVersion ?? 0);
+  // PI-86 — drop any active-org left over from a previous login in this
+  // browser; the middleware (or enterOrg) re-resolves it for this identity.
+  request.session.set("activeOrgId", undefined);
+}
+
+// PI-86 — put the session into `orgId` and return the org-scoped bits every
+// login/signup/accept response carries. Also records `lastActiveOrgId` so the
+// next login resumes here. Caller has already established the identity session
+// and knows the org is a real membership.
+async function enterOrg(request: FastifyRequest, accountId: string, orgId: string) {
+  request.session.set("activeOrgId", orgId);
+  await prisma.organizerAccount.update({ where: { id: accountId }, data: { lastActiveOrgId: orgId } });
+  const [organization, organizerCount] = await Promise.all([
+    prisma.organization.findUniqueOrThrow({ where: { id: orgId } }),
+    prisma.organizerMembership.count({ where: { orgId } }),
+  ]);
+  return {
+    organizer: { id: accountId, orgId, name: "", email: "" }, // name/email filled by callers that have them
+    organization: { id: organization.id, slug: organization.slug, name: organization.name },
+    publicLockEnabled: !!organization.publicPasswordHash,
+    tokensEnabled: organization.tokensEnabled,
+    organizerCount,
+  };
+}
+
+function identityPayload(account: { id: string; email: string; name: string; passwordHash: string | null }) {
+  return { id: account.id, email: account.email, name: account.name, hasPassword: account.passwordHash != null };
+}
+
+// Every org this account is a member of, oldest first — for the switcher / chooser.
+async function listMemberships(accountId: string) {
+  const memberships = await prisma.organizerMembership.findMany({
+    where: { accountId },
+    orderBy: { createdAt: "asc" },
+    select: { organization: { select: { id: true, slug: true, name: true } } },
+  });
+  return memberships.map((m) => m.organization);
+}
+
+// The org a returning login lands in: their last active one if it's still a
+// membership, else the oldest; null when the account has no memberships (the
+// frontend routes to the org chooser).
+async function resolveLoginOrg(account: { id: string; lastActiveOrgId: string | null }): Promise<string | null> {
+  const memberships = await prisma.organizerMembership.findMany({
+    where: { accountId: account.id },
+    orderBy: { createdAt: "asc" },
+    select: { orgId: true },
+  });
+  if (memberships.length === 0) return null;
+  const orgIds = new Set(memberships.map((m) => m.orgId));
+  return account.lastActiveOrgId && orgIds.has(account.lastActiveOrgId) ? account.lastActiveOrgId : memberships[0]!.orgId;
 }
 
 function requestOrigin(request: { protocol: string; headers: Record<string, unknown> }): string {
@@ -134,10 +188,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           });
           const organizer = await tx.organizerAccount.create({
             data: {
-              orgId: organization.id,
               name: organizerName,
               email: organizerEmail,
               passwordHash,
+              memberships: { create: { orgId: organization.id } },
             },
           });
           return { organization, organizer };
@@ -145,9 +199,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
         establishSession(request, organizer);
         notifyAdminOfNewOrg(organization, organizer.email);
+        await enterOrg(request, organizer.id, organization.id);
         reply.code(201).send({
           organization: { id: organization.id, slug: organization.slug, name: organization.name },
           organizer: { id: organizer.id, name: organizer.name, email: organizer.email },
+          organizations: [{ id: organization.id, slug: organization.slug, name: organization.name }],
+          activeOrgId: organization.id,
           publicLockEnabled: false,
           organizerCount: 1, // a brand-new org can't have co-organizers yet
         });
@@ -191,17 +248,25 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
 
-      const [organization, organizerCount] = await Promise.all([
-        prisma.organization.findUniqueOrThrow({ where: { id: account.orgId } }),
-        prisma.organizerAccount.count({ where: { orgId: account.orgId } }),
-      ]);
-
       establishSession(request, account);
+      const organizations = await listMemberships(account.id);
+      const landOrgId = await resolveLoginOrg(account);
+      if (!landOrgId) {
+        // Valid login, but no org — the frontend routes to the chooser.
+        request.session.set("activeOrgId", undefined);
+        reply.send({ identity: identityPayload(account), organizations, activeOrgId: null });
+        return;
+      }
+      const entered = await enterOrg(request, account.id, landOrgId);
       reply.send({
-        organizer: { id: account.id, orgId: account.orgId, name: account.name, email: account.email },
-        organization: { id: organization.id, slug: organization.slug, name: organization.name },
-        publicLockEnabled: !!organization.publicPasswordHash,
-        organizerCount,
+        identity: identityPayload(account),
+        organizations,
+        activeOrgId: landOrgId,
+        organizer: { id: account.id, orgId: landOrgId, name: account.name, email: account.email },
+        organization: entered.organization,
+        publicLockEnabled: entered.publicLockEnabled,
+        tokensEnabled: entered.tokensEnabled,
+        organizerCount: entered.organizerCount,
       });
     },
   );
@@ -285,12 +350,18 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       reply.code(404).send({ error: "invalid_or_expired" });
       return;
     }
-    reply.send({ email: invite.email, organizationName: invite.organization.name });
+    // PI-86 — the accept page shows "log in to accept" instead of the
+    // name+password form when the invited email already has an account.
+    const existing = await prisma.organizerAccount.findUnique({ where: { email: invite.email }, select: { id: true } });
+    reply.send({ email: invite.email, organizationName: invite.organization.name, accountExists: !!existing });
   });
 
-  // Accept a co-organizer invite: the invitee sets their own name + password
-  // and a new OrganizerAccount is created in the inviting org. Roles are
-  // equal for v1 — this is a full organizer, same access as anyone else.
+  // Accept a co-organizer invite. Two paths (PI-86):
+  //   - already signed in as the invited identity → just add a membership.
+  //     Signed in as anyone else → refused (the invite is bound to its email).
+  //   - not signed in, no account for the invited email → create the account
+  //     + first membership from the supplied name/password.
+  // Not signed in but the email already has an account → tell them to log in.
   app.post(
     "/api/auth/accept-invite",
     { config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } },
@@ -306,31 +377,71 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         reply.code(400).send({ error: "invalid_or_expired" });
         return;
       }
-      const taken = await prisma.organizerAccount.findUnique({ where: { email: invite.email } });
-      if (taken) {
-        reply.code(409).send({ error: "email_taken" });
-        return;
+
+      const sessionOrganizerId = request.session.get("organizerId");
+      let account: Awaited<ReturnType<typeof prisma.organizerAccount.findUnique>> = null;
+
+      if (sessionOrganizerId) {
+        account = await prisma.organizerAccount.findUnique({ where: { id: sessionOrganizerId } });
+        if (!account) {
+          request.session.delete();
+          reply.code(401).send({ error: "unauthenticated" });
+          return;
+        }
+        if (account.email !== invite.email) {
+          reply.code(403).send({ error: "invite_identity_mismatch", invitedEmail: invite.email });
+          return;
+        }
+        const alreadyMember = await prisma.organizerMembership.findUnique({
+          where: { accountId_orgId: { accountId: account.id, orgId: invite.orgId } },
+          select: { id: true },
+        });
+        if (alreadyMember) {
+          await prisma.organizerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } });
+          reply.code(409).send({ error: "already_member" });
+          return;
+        }
+        await prisma.$transaction([
+          prisma.organizerMembership.create({ data: { accountId: account.id, orgId: invite.orgId } }),
+          prisma.organizerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } }),
+        ]);
+      } else {
+        const existing = await prisma.organizerAccount.findUnique({ where: { email: invite.email } });
+        if (existing) {
+          reply.code(409).send({ error: "account_exists" });
+          return;
+        }
+        if (!body.data.name || !body.data.password) {
+          reply.code(400).send({ error: "invalid_input" });
+          return;
+        }
+        const passwordHash = await hashPassword(body.data.password);
+        const [created] = await prisma.$transaction([
+          prisma.organizerAccount.create({
+            data: {
+              email: invite.email,
+              name: body.data.name,
+              passwordHash,
+              memberships: { create: { orgId: invite.orgId } },
+            },
+          }),
+          prisma.organizerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } }),
+        ]);
+        account = created;
+        establishSession(request, created);
       }
 
-      const passwordHash = await hashPassword(body.data.password);
-      const [organizer] = await prisma.$transaction([
-        prisma.organizerAccount.create({
-          data: { orgId: invite.orgId, email: invite.email, name: body.data.name, passwordHash },
-        }),
-        prisma.organizerInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } }),
-      ]);
-
-      const [organization, organizerCount] = await Promise.all([
-        prisma.organization.findUniqueOrThrow({ where: { id: invite.orgId } }),
-        prisma.organizerAccount.count({ where: { orgId: invite.orgId } }),
-      ]);
-
-      establishSession(request, organizer);
+      const entered = await enterOrg(request, account.id, invite.orgId);
+      const organizations = await listMemberships(account.id);
       reply.code(201).send({
-        organizer: { id: organizer.id, orgId: organizer.orgId, name: organizer.name, email: organizer.email },
-        organization: { id: organization.id, slug: organization.slug, name: organization.name },
-        publicLockEnabled: !!organization.publicPasswordHash,
-        organizerCount,
+        identity: identityPayload(account),
+        organizations,
+        activeOrgId: invite.orgId,
+        organizer: { id: account.id, orgId: invite.orgId, name: account.name, email: account.email },
+        organization: entered.organization,
+        publicLockEnabled: entered.publicLockEnabled,
+        tokensEnabled: entered.tokensEnabled,
+        organizerCount: entered.organizerCount,
       });
     },
   );
@@ -409,6 +520,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       establishSession(request, { id: result.organizerId, authVersion: result.authVersion });
+      if (result.landOrgId) {
+        // A fresh membership from a pending invite — land there, not wherever
+        // they were last. Otherwise the middleware resolves it on /auth/me.
+        request.session.set("activeOrgId", result.landOrgId);
+        await prisma.organizerAccount.update({
+          where: { id: result.organizerId },
+          data: { lastActiveOrgId: result.landOrgId },
+        });
+      }
       reply.redirect("/");
     } catch (err) {
       request.log.error({ err, provider }, "sso callback failed");
@@ -477,11 +597,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           const organization = await tx.organization.create({ data: { name: orgName, slug: orgSlug } });
           const organizer = await tx.organizerAccount.create({
             data: {
-              orgId: organization.id,
               name: organizerName,
               email: pending.email,
               passwordHash: null,
               oidcSubject: pending.subject,
+              memberships: { create: { orgId: organization.id } },
             },
           });
           return { organization, organizer };
@@ -490,8 +610,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         request.session.set("oidcPending", undefined);
         establishSession(request, organizer);
         notifyAdminOfNewOrg(organization, organizer.email);
+        await enterOrg(request, organizer.id, organization.id);
         reply.code(201).send({
-          organizer: { id: organizer.id, orgId: organizer.orgId, name: organizer.name, email: organizer.email },
+          identity: identityPayload(organizer),
+          organizations: [{ id: organization.id, slug: organization.slug, name: organization.name }],
+          activeOrgId: organization.id,
+          organizer: { id: organizer.id, orgId: organization.id, name: organizer.name, email: organizer.email },
           organization: { id: organization.id, slug: organization.slug, name: organization.name },
           publicLockEnabled: false,
           organizerCount: 1,
@@ -512,12 +636,31 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.get("/api/auth/me", { preHandler: requireAuth }, async (request, reply) => {
+  // Identity-only preHandler (PI-86) — works while the session is between orgs.
+  app.get("/api/auth/me", { preHandler: requireOrganizerIdentity }, async (request, reply) => {
+    const identity = request.identity!;
+    const organizations = await listMemberships(identity.id);
+
+    if (!request.organizer) {
+      // No active org — the frontend routes to the chooser.
+      reply.send({
+        identity,
+        organizations,
+        activeOrgId: null,
+        hasPassword: identity.hasPassword,
+      });
+      return;
+    }
+
+    const orgId = request.organizer.orgId;
     const [organization, organizerCount] = await Promise.all([
-      prisma.organization.findUniqueOrThrow({ where: { id: request.organizer!.orgId } }),
-      prisma.organizerAccount.count({ where: { orgId: request.organizer!.orgId } }),
+      prisma.organization.findUniqueOrThrow({ where: { id: orgId } }),
+      prisma.organizerMembership.count({ where: { orgId } }),
     ]);
     reply.send({
+      identity,
+      organizations,
+      activeOrgId: orgId,
       organizer: request.organizer,
       organization: { id: organization.id, slug: organization.slug, name: organization.name },
       publicLockEnabled: !!organization.publicPasswordHash,
@@ -527,7 +670,36 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // (never set a local password) shows "Set password" instead of
       // "Change password", and skips the current-password field on the
       // destructive actions.
-      hasPassword: request.organizer!.hasPassword,
+      hasPassword: identity.hasPassword,
     });
   });
+
+  // PI-86 — the account's orgs, for the switcher / chooser.
+  app.get("/api/auth/organizations", { preHandler: requireOrganizerIdentity }, async (request, reply) => {
+    reply.send({ organizations: await listMemberships(request.identity!.id), activeOrgId: request.session.get("activeOrgId") ?? null });
+  });
+
+  // PI-86 — switch the active org. Validates membership, then the next /auth/me
+  // reflects the new org; the frontend invalidates its caches.
+  app.post(
+    "/api/auth/switch-org",
+    { preHandler: requireOrganizerIdentity, config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const parsed = z.object({ orgId: z.string().min(1) }).safeParse(request.body);
+      if (!parsed.success) {
+        reply.code(400).send({ error: "invalid_input" });
+        return;
+      }
+      const membership = await prisma.organizerMembership.findUnique({
+        where: { accountId_orgId: { accountId: request.identity!.id, orgId: parsed.data.orgId } },
+        select: { id: true },
+      });
+      if (!membership) {
+        reply.code(404).send({ error: "not_a_member" });
+        return;
+      }
+      await enterOrg(request, request.identity!.id, parsed.data.orgId);
+      reply.send({ ok: true, activeOrgId: parsed.data.orgId });
+    },
+  );
 }
