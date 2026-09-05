@@ -7,10 +7,11 @@ export interface SsoProvider {
 }
 
 // Deployer-configured web analytics (PI-85). Already validated server-side
-// (trackingProviders.ts) before this ever reaches the client.
+// (trackingProviders.ts) before this ever reaches the client. No scriptUrl
+// here on purpose — the real analytics host is proxied same-origin
+// (routes/tracking.ts) and never sent to the browser.
 export interface TrackingConfig {
   provider: "umami";
-  scriptUrl: string;
   code: string;
 }
 

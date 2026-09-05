@@ -20,6 +20,7 @@ import { hallOfFameRoutes } from "./routes/hallOfFame.js";
 import { apiTokenRoutes } from "./routes/apiTokens.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { publicRoutes } from "./routes/public.js";
+import { trackingRoutes } from "./routes/tracking.js";
 import { createAppRealtimeRoomAuthorizer, initRealtime } from "./realtime.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -49,13 +50,16 @@ const app = Fastify({
 
 // CSP tuned to what this app actually loads: same-origin scripts/styles
 // (Vite's build, no external CDN), Scryfall's card-image CDN, and
-// same-origin fetch/WebSocket (API + Socket.IO share this origin), plus the
-// deployer's own tracking script host when PI-85 analytics are configured
-// (its origin is parsed from the already-validated TRACKING_SCRIPT_URL, never
-// trusted as anything but an origin to allowlist). Without that addition, an
-// external analytics script would be silently blocked by CSP — a failure
-// that's invisible in the UI, so this has to be wired at startup rather than
-// discovered by a self-hoster staring at devtools.
+// same-origin fetch/WebSocket (API + Socket.IO share this origin). PI-85's
+// analytics script (when configured) is same-origin too — routes/tracking.ts
+// proxies it from the deployer's TRACKING_SCRIPT_URL — so script-src/
+// connect-src never need a third-party origin added at all; the original
+// approach here allowlisted the tracking host directly, but that meant this
+// app's own CSP had to be loosened per-deployment, and a third-party
+// "analytics.*" host serving a stock "script.js" filename is exactly what
+// ad-blocker lists filter — found on the marketing site (a separate static
+// repo) and fixed the same way there first, see that repo's
+// ANALYTICS-CSP-FINDINGS.md.
 // frameAncestors 'none' blocks embedding this app in an iframe elsewhere
 // (clickjacking) — there's no legitimate reason to embed it. HSTS only
 // turned on once SESSION_COOKIE_SECURE says we're actually behind TLS —
@@ -70,15 +74,14 @@ const app = Fastify({
 // into every single asset failing with ERR_SSL_PROTOCOL_ERROR and the SPA
 // never mounting. Caught by loading the app in a real browser after adding
 // this CSP — it typechecks fine either way, this only shows up at runtime.
-const trackingOrigin = config.tracking ? new URL(config.tracking.scriptUrl).origin : null;
 await app.register(fastifyHelmet, {
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       imgSrc: ["'self'", "https://cards.scryfall.io", "data:"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: trackingOrigin ? ["'self'", trackingOrigin] : ["'self'"],
-      connectSrc: trackingOrigin ? ["'self'", trackingOrigin] : ["'self'"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       frameAncestors: ["'none'"],
@@ -150,6 +153,7 @@ await app.register(hallOfFameRoutes);
 await app.register(apiTokenRoutes);
 await app.register(settingsRoutes);
 await app.register(publicRoutes);
+await app.register(trackingRoutes);
 
 // Serves the built SPA in production. During `npm run dev`, the Vite dev
 // server runs separately and this directory won't exist yet — that's fine,

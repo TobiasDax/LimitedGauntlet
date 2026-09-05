@@ -82,9 +82,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // SSO-only mode: the frontend hides the local password form + signup link.
       localLoginDisabled: isLocalLoginDisabled(),
       // Deployer-configured web analytics (PI-85) — already validated by
-      // trackingProviders.ts at startup, so this is safe to ship as-is; the
-      // client only ever turns it into a <script> tag via DOM properties.
-      tracking: config.tracking,
+      // trackingProviders.ts at startup. Only provider+code go over the
+      // wire: scriptUrl (the real analytics host) stays server-side, since
+      // routes/tracking.ts proxies it same-origin and the browser never
+      // needs to know it.
+      tracking: config.tracking ? { provider: config.tracking.provider, code: config.tracking.code } : null,
     });
   });
 

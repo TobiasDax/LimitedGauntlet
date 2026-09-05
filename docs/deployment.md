@@ -255,7 +255,9 @@ TRACKING_SCRIPT_URL=https://analytics.example.com/script.js   # your own Umami i
 TRACKING_CODE=3d9f1e2a-7b4c-4a1d-9e6f-2c8b1a0d5f3e             # that site's Website ID (Umami → Settings → Websites)
 ```
 
-All three are validated at startup — an unset `TRACKING_PROVIDER` disables the feature entirely; anything else invalid (an unknown provider, a non-`https://` script URL, a code that isn't a well-formed UUID) makes the app refuse to start with a clear error rather than silently shipping a broken or unsafe script tag. `TRACKING_SCRIPT_URL`'s origin is also added to the app's Content-Security-Policy automatically — without that, the browser would silently block the script (a CSP failure that shows nothing in the UI), so there's nothing else to configure by hand.
+All three are validated at startup — an unset `TRACKING_PROVIDER` disables the feature entirely; anything else invalid (an unknown provider, a non-`https://` script URL, a code that isn't a well-formed UUID) makes the app refuse to start with a clear error rather than silently shipping a broken or unsafe script tag.
+
+The browser never talks to `TRACKING_SCRIPT_URL` directly: this app proxies the script and Umami's collect endpoint through its own origin (`GET /stats.js`, `POST /api/send`), so the page only ever loads `/stats.js` same-origin. That means the app's Content-Security-Policy never needs widening for this — `script-src`/`connect-src` stay `'self'` regardless of whether analytics are configured — and it also sidesteps ad-blocker lists that specifically filter third-party `analytics.*` hostnames serving a stock `script.js`, a real gap the original CSP-allowlist approach had. Nothing else to configure by hand either way.
 
 Only Umami is supported today (`TRACKING_PROVIDER=umami` is the only valid value), but the mechanism is provider-abstracted internally (`server/src/trackingProviders.ts`) so a second provider can be added later without redesigning this.
 
