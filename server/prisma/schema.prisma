@@ -31,13 +31,14 @@ model Organization {
   tokensEnabled Boolean @default(false)
   createdAt DateTime @default(now())
 
-  organizers  OrganizerAccount[]
+  memberships OrganizerMembership[]
   players     Player[]
   tournaments Tournament[]
   organizerInvites OrganizerInvite[]
   playerInvites PlayerInvite[]
   webhooks    OrganizationWebhook[]
   tokenTransactions TokenTransaction[]
+  apiTokens   ApiToken[]
 }
 
 // Outbound webhooks (PI-50): an HMAC-signed HTTP POST fired on round
@@ -68,9 +69,11 @@ model OrganizationWebhook {
   @@index([orgId])
 }
 
+// An organizer's identity (PI-86 — split from membership). One row per person:
+// login credentials + name, no org. Which org(s) they can act in is
+// OrganizerMembership below. Before PI-86 this row carried a single `orgId`.
 model OrganizerAccount {
   id           String   @id @default(cuid())
-  orgId        String
   email        String   @unique
   // Nullable since PI-42: an account provisioned purely via OIDC (SSO) has no
   // local password. Password login is rejected for such accounts; they can set
@@ -84,16 +87,36 @@ model OrganizerAccount {
   oidcSubject  String?  @unique
   authVersion  Int      @default(0)
   name         String
+  // PI-86 — where a login with more than one membership resumes on next login.
+  // Null until they first switch orgs; the middleware falls back to the only /
+  // oldest membership. Cleared/ignored if that membership is later removed.
+  lastActiveOrgId String?
   createdAt    DateTime @default(now())
 
-  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  memberships  OrganizerMembership[]
   apiTokens    ApiToken[]
   emailChangeRequests EmailChangeRequest[]
   oidcRelinkRequests OidcSubjectRelinkRequest[]
   sentInvites  OrganizerInvite[]
   sentPlayerInvites PlayerInvite[]
   tokenTransactions TokenTransaction[]
+}
 
+// PI-86 — the access grant: this account may act in this org. Roles are flat
+// (every member of an org is equal, same as PI-34). Deleting either side
+// cascades this row away; the account itself survives a membership deletion
+// as long as any other membership remains (a membership-less account is
+// valid — it lands on the org chooser).
+model OrganizerMembership {
+  id        String   @id @default(cuid())
+  accountId String
+  orgId     String
+  createdAt DateTime @default(now())
+
+  account      OrganizerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, orgId])
   @@index([orgId])
 }
 
@@ -160,14 +183,21 @@ model EmailChangeRequest {
 model ApiToken {
   id          String    @id @default(cuid())
   organizerId String
+  // PI-86 — the token acts as `organizer` IN this org, and only this one. An
+  // organizer can be a member of several orgs, so a token can't inherit "the"
+  // org from the account any more. Mint-time choice, defaulting to the active
+  // org. Cascades away with either the account or the org.
+  orgId       String
   name        String
   tokenHash   String    @unique
   createdAt   DateTime  @default(now())
   lastUsedAt  DateTime?
 
-  organizer OrganizerAccount @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  organizer    OrganizerAccount @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([organizerId])
+  @@index([orgId])
 }
 
 // ---------------------------------------------------------------------------
@@ -184,19 +214,19 @@ model Player {
   displayName String
   createdAt   DateTime @default(now())
 
-  // Optional self-service login (PI-52). A plain roster entry has all three
-  // null — the default. An organizer invites a player by email (PlayerInvite);
-  // on accept, `email`/`passwordHash` are set and the player can log in at
-  // /o/<slug>/player to check themselves into tournaments and report their own
-  // match results. `authVersion` bumps on revoke, invalidating any live player
-  // session — the same mechanism OrganizerAccount uses. This is a second auth
-  // surface that never walls the open-by-default public pages; it only unlocks
-  // the player's own write actions.
+  // Optional self-service login (PI-52, split from the login in PI-86). A plain
+  // roster entry has both null — the default. An organizer invites a player by
+  // email (PlayerInvite); on accept, `email` is filled and `identityId` links
+  // to the shared PlayerIdentity — the actual login, which can be linked from a
+  // Player row in several orgs at once. Revoking (organizer) clears both here;
+  // the PlayerIdentity row survives (it may still be a login elsewhere). This
+  // is a second auth surface that never walls the open-by-default public pages;
+  // it only unlocks the player's own write actions.
   email        String?
-  passwordHash String?
-  authVersion  Int      @default(0)
+  identityId   String?
 
   organization      Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  identity          PlayerIdentity?    @relation(fields: [identityId], references: [id], onDelete: SetNull)
   tournamentPlayers TournamentPlayer[]
   teamMemberships   TeamMember[]
   entrants          Entrant[]
@@ -206,6 +236,29 @@ model Player {
 
   @@unique([orgId, email])
   @@index([orgId])
+  @@index([identityId])
+}
+
+// PI-86 — a player's shared login, one row per person, independent of any org.
+// `Player.identityId` links a per-org roster entry to it. Mirrors
+// OrganizerAccount's role for organizers (kept a distinct name rather than
+// renaming OrganizerAccount → OrganizerIdentity, a repo-wide change). Password
+// is required — an identity only ever exists because someone accepted an
+// invite and set one (PI-52 had no passwordless player login).
+model PlayerIdentity {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  // "Log this login out everywhere" counter, checked in playerMiddleware.ts —
+  // reserved for a future password-change / global-logout. Per-org revoke does
+  // NOT bump this: it just unlinks the org's Player row (identityId → null), so
+  // the player keeps any session for the other orgs they're still in.
+  authVersion  Int      @default(0)
+  // PI-86 — last org this login viewed in the portal; the switcher resumes there.
+  lastActiveOrgId String?
+  createdAt    DateTime @default(now())
+
+  players Player[]
 }
 
 // Pending player-account invites (PI-52). Mirrors OrganizerInvite exactly,
