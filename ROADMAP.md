@@ -608,10 +608,15 @@ Idea from Tobias: he's standing up his own Umami instance and wants its tracking
 - **Pre-build check (not a decision, just a to-do):** confirm `OrganizerInvite.invitedBy` / `tokenTransactions.organizer` and the other identity-keyed relations don't implicitly assume inviter and invitee share an org.
 
 **Phasing (single PR, but this is the build order):**
-1. Schema + backfill migration (memberships, `ApiToken.orgId`, `PlayerIdentity`, then drop `OrganizerAccount.orgId`).
+1. Schema + backfill migration (memberships, `ApiToken.orgId`, `PlayerIdentity`, then drop `OrganizerAccount.orgId`). — **done, on branch `pi86-multi-org` (commit `f99a545`)**; migration `20260905160000` verified against the test DB's realistic volumes (1088 accounts, 3503 players, 86 player logins). `tsc` is red on that branch until phases 2+ land — that's why it's a branch, not on `main`.
 2. Organizer middleware + session `activeOrgId`; `switch-org` / `organizations` endpoints; `/me` membership list + chooser flag.
 3. Organizer invite flows add memberships; "leave org" deletes a membership; mismatch-identity block.
 4. `ApiToken` org scoping (route + mint UI).
 5. Player middleware + `PlayerIdentity` session, invite flow, switcher.
 6. Frontend: `TopBar` switcher, `/organizations` chooser route, `AcceptInvitePage` "Join", Settings membership list, player-portal switcher.
 7. Test coverage for the multi-membership paths + a full browser pass (Tobias, live).
+
+**Deployment (this migration touches production auth data — do not rush it):**
+- **Back up the live DB before upgrading.** The `20260905160000` migration drops `OrganizerAccount.orgId`, `Player.passwordHash`, `Player.authVersion` after backfilling — irreversible once the columns are gone.
+- **Roll it out on the demo instance first**, exercise organizer login / SSO / an invite / a player login there, *then* the live site.
+- The `PlayerIdentity` backfill picks the most-recently-created row's password when someone had a login in more than one org (independent passwords today). Check the live data for any such case before deploying — if there is one, that person may need a password reset in the org whose password wasn't chosen.
