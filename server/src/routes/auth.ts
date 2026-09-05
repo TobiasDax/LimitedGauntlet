@@ -679,6 +679,57 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     reply.send({ organizations: await listMemberships(request.identity!.id), activeOrgId: request.session.get("activeOrgId") ?? null });
   });
 
+  // PI-86 — an existing organizer creates another org for themselves (a new
+  // Organization + a membership, NOT a new account). Distinct from signup,
+  // which is for a brand-new person. Gated on ALLOW_SIGNUP, same as the
+  // "create a new one" affordance on the chooser.
+  app.post(
+    "/api/auth/organizations",
+    { preHandler: requireOrganizerIdentity, config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } },
+    async (request, reply) => {
+      if (!config.allowSignup) {
+        reply.code(403).send({ error: "signup_disabled" });
+        return;
+      }
+      const parsed = z
+        .object({
+          orgName: z.string().trim().min(1).max(100),
+          orgSlug: z.string().trim().min(3).max(40).regex(slugPattern, "lowercase letters, numbers, and hyphens only"),
+        })
+        .safeParse(request.body);
+      if (!parsed.success) {
+        reply.code(400).send({ error: "invalid_input", issues: parsed.error.issues });
+        return;
+      }
+      const accountId = request.identity!.id;
+      let organization;
+      try {
+        organization = await prisma.organization.create({
+          data: { name: parsed.data.orgName, slug: parsed.data.orgSlug, memberships: { create: { accountId } } },
+        });
+      } catch (err) {
+        if (isUniqueConstraintError(err, "slug")) {
+          reply.code(409).send({ error: "slug_taken" });
+          return;
+        }
+        throw err;
+      }
+      notifyAdminOfNewOrg(organization, request.identity!.email);
+      const entered = await enterOrg(request, accountId, organization.id);
+      const organizations = await listMemberships(accountId);
+      reply.code(201).send({
+        identity: request.identity,
+        organizations,
+        activeOrgId: organization.id,
+        organizer: { id: accountId, orgId: organization.id, name: request.identity!.name, email: request.identity!.email },
+        organization: entered.organization,
+        publicLockEnabled: false,
+        tokensEnabled: false,
+        organizerCount: 1,
+      });
+    },
+  );
+
   // PI-86 — switch the active org. Validates membership, then the next /auth/me
   // reflects the new org; the frontend invalidates its caches.
   app.post(

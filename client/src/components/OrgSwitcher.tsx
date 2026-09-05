@@ -30,10 +30,8 @@ export function OrgSwitcher() {
   if (!me?.organization) return null;
   const orgs = me.organizations ?? [];
 
-  if (orgs.length <= 1) {
-    return <span className="text-[13px] text-ink-secondary">{me.organization.name}</span>;
-  }
-
+  // Always a menu (even with one org) so "Manage organizations" — the way to
+  // create or join another — is always reachable.
   return (
     <div ref={ref} className="relative">
       <button

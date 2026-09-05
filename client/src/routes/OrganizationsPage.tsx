@@ -1,19 +1,37 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMe, useSwitchOrg } from "../features/auth/useAuth";
-import { useSignupStatus } from "../features/auth/useAuth";
-import { Button, Card } from "../components/ui";
+import { ApiError } from "../lib/api";
+import { useMe, useSwitchOrg, useSignupStatus, useCreateOrganization } from "../features/auth/useAuth";
+import { Button, Card, Field, FormError, TextField } from "../components/ui";
 
-// PI-86 — the org chooser. Shown when a login has no active org: several
-// memberships and nothing to resume, or a membership-less account. Also the
-// "manage organizations" target from the switcher.
+const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const slugify = (s: string) =>
+  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+
+// PI-86 — the org chooser. Shown when a login has no active org (several
+// memberships, nothing to resume, or a membership-less account) and as the
+// "manage organizations" target from the switcher. An existing organizer can
+// also spin up another org here — that adds a membership, not a new account.
 export function OrganizationsPage() {
   const { data: me } = useMe();
   const { data: signupStatus } = useSignupStatus();
   const switchOrg = useSwitchOrg();
+  const createOrg = useCreateOrganization();
   const navigate = useNavigate();
+  const [showCreate, setShowCreate] = useState(false);
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugEdited, setSlugEdited] = useState(false);
 
   if (!me) return null;
   const orgs = me.organizations ?? [];
+
+  const createError =
+    createOrg.error instanceof ApiError && createOrg.error.message === "slug_taken"
+      ? "That URL is already taken — pick another."
+      : createOrg.isError
+        ? "Something went wrong."
+        : null;
 
   return (
     <div className="mx-auto max-w-[520px]">
@@ -38,9 +56,7 @@ export function OrganizationsPage() {
                 <Button
                   variant="primary"
                   disabled={switchOrg.isPending}
-                  onClick={() =>
-                    switchOrg.mutate(o.id, { onSuccess: () => navigate("/") })
-                  }
+                  onClick={() => switchOrg.mutate(o.id, { onSuccess: () => navigate("/") })}
                 >
                   Open
                 </Button>
@@ -51,22 +67,71 @@ export function OrganizationsPage() {
       )}
 
       <div className="border-border border-t pt-5 text-[13px] text-ink-muted">
-        Joining another organization is by invitation — an organizer there sends you an invite link.
-        {signupStatus?.allowSignup && (
+        Joining an organization someone else runs is by invitation — they send you a link.
+        {signupStatus?.allowSignup && !showCreate && (
           <>
             {" "}
             Or{" "}
             <button
               type="button"
-              onClick={() => navigate("/signup")}
+              onClick={() => setShowCreate(true)}
               className="text-link underline hover:text-link-strong"
             >
-              create a new one
+              create another one
             </button>
             .
           </>
         )}
       </div>
+
+      {showCreate && (
+        <Card className="mt-4 p-5">
+          <div className="mb-3 text-[14px] font-semibold">New organization</div>
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const finalSlug = slug || slugify(name);
+              if (!slugPattern.test(finalSlug)) return;
+              createOrg.mutate({ orgName: name.trim(), orgSlug: finalSlug }, { onSuccess: () => navigate("/") });
+            }}
+          >
+            <Field label="Name">
+              <TextField
+                required
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (!slugEdited) setSlug(slugify(e.target.value));
+                }}
+              />
+            </Field>
+            <Field label="URL" hint="lowercase letters, numbers, hyphens">
+              <div className="flex items-center gap-1 text-[13px] text-ink-muted">
+                /o/
+                <TextField
+                  required
+                  minLength={3}
+                  value={slug}
+                  onChange={(e) => {
+                    setSlugEdited(true);
+                    setSlug(e.target.value);
+                  }}
+                />
+              </div>
+            </Field>
+            {createError && <FormError>{createError}</FormError>}
+            <div className="flex gap-2">
+              <Button type="submit" variant="primary" disabled={!name || createOrg.isPending}>
+                {createOrg.isPending ? "Creating…" : "Create"}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
     </div>
   );
 }

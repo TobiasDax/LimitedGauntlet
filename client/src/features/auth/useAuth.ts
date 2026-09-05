@@ -104,6 +104,19 @@ export function useSwitchOrg() {
   });
 }
 
+// PI-86 — an existing organizer creates another org for themselves (adds a
+// membership, not a new account). Distinct from useSignup.
+export function useCreateOrganization() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { orgName: string; orgSlug: string }) => api.post<MeResponse>("/auth/organizations", input),
+    onSuccess: (data) => {
+      queryClient.clear();
+      queryClient.setQueryData(["me"], data);
+    },
+  });
+}
+
 // Public-page password lock (PI-27). Both mutations patch the `me` cache's
 // publicLockEnabled directly so the Settings UI reflects the new state instantly.
 export function useSetPublicLock() {
