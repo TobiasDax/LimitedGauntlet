@@ -50,7 +50,26 @@ runs `prisma migrate deploy` against it before the suite (a fast no-op once
 applied). Set `DATABASE_URL` explicitly to point the suite elsewhere.
 
 ```sh
-npm run --workspace server build && npm run --workspace client build   # typecheck + build both
+npm run build   # typecheck + build all three workspaces (server, mcp, client)
 ```
 
 The client has no separate test framework; UI changes are verified by hand against a running instance.
+
+## Continuous integration
+
+`.forgejo/workflows/ci.yml` runs the typecheck/build of all three workspaces
+plus the server test suite (against a throwaway Postgres 16 service container)
+on every push to `main` and every pull request.
+
+It runs on **Forgejo Actions**, not GitHub Actions — `origin` is the Forgejo
+instance and GitHub is only a downstream push-mirror, so Forgejo is where
+pushes and PRs actually land. It needs a runner:
+
+- Register an [`act_runner`](https://forgejo.org/docs/latest/admin/actions/)
+  against the Forgejo instance with a **Docker backend** (it needs to start the
+  Postgres service container), advertising the `ubuntu-latest` label.
+- Enable Actions for the repository (Settings → Advanced, or instance-wide).
+
+The GHCR image publish (`.github/workflows/docker-publish.yml`) stays
+GitHub-only — it's guarded with `if: github.server_url == 'https://github.com'`
+so a Forgejo runner picking it up is a no-op.

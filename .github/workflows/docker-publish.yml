@@ -5,6 +5,10 @@ name: Publish Docker image
 # tagged image instead of building locally. workflow_dispatch is there
 # for a manual re-push (e.g. after editing this file) without cutting a
 # new release.
+#
+# GitHub-only. `origin` is a Forgejo instance and Forgejo Actions also reads
+# .github/workflows/, so the job is guarded to no-op there (GHCR auth and
+# github.repository are GitHub concepts). CI on Forgejo is .forgejo/workflows/ci.yml.
 on:
   release:
     types: [published]
@@ -17,6 +21,7 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    if: ${{ github.server_url == 'https://github.com' }}
     steps:
       - uses: actions/checkout@v4
 

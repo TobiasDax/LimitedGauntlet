@@ -1,0 +1,64 @@
+name: CI
+
+# Typecheck + server test suite on every push and PR.
+#
+# Runs on Forgejo Actions: `origin` is the Forgejo instance, GitHub is only a
+# downstream push-mirror, so this is where pushes and PRs actually land. Needs
+# a registered runner with a Docker backend advertising the `ubuntu-latest`
+# label — see docs/development.md "Continuous integration".
+#
+# The GHCR image publish (.github/workflows/docker-publish.yml) stays
+# GitHub-only and is guarded to no-op if a Forgejo runner picks it up.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: lgtest
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lgtest"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+
+    env:
+      # Same shape as docker-compose.test.yml / server/vitest.config.ts, but
+      # pointing at the service container above instead of 127.0.0.1:5842.
+      DATABASE_URL: postgresql://postgres:test@postgres:5432/lgtest
+      # Throwaway 32-byte hex — config.ts requires it and some modules load
+      # config.ts at import time. Never a real secret.
+      SESSION_SECRET: "0000000000000000000000000000000000000000000000000000000000000000"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate --workspace server
+
+      - name: Typecheck + build (server, mcp, client)
+        run: |
+          npm run build --workspace server
+          npm run build --workspace mcp
+          npm run build --workspace client
+
+      - name: Apply migrations to the test database
+        run: npm run prisma:deploy --workspace server
+
+      - name: Server test suite
+        run: npm run test --workspace server
