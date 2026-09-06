@@ -72,7 +72,7 @@ function PublicRoundSection({ round, entrantById }: { round: Round; entrantById:
       </div>
       {hidden ? (
         <p className="text-[13px] text-ink-muted">
-          Pairings aren't revealed yet — check the Seating section below to find your table.
+          Pairings aren't revealed yet — check the Seating section above to find your table.
         </p>
       ) : (
         <div className="flex flex-col gap-2">
@@ -104,6 +104,11 @@ export function PublicPodPage() {
   const entrantById = new Map(pod.entrants.map((e) => [e.id, e]));
   const rounds = [...(roundsData?.rounds ?? [])].reverse();
   const seatByEntrantId = new Map((seatingData?.seats ?? []).map((s) => [s.entrantId, s.seat]));
+  // The seating chart is only useful while people are finding their seats —
+  // once round 1 is under way it's just noise, so drop it then.
+  const round1 = (roundsData?.rounds ?? []).find((r) => r.roundNumber === 1);
+  const showSeating =
+    seatingFormats.has(pod.format) && seatByEntrantId.size > 0 && (!round1 || round1.status === "PENDING");
 
   return (
     <div>
@@ -119,7 +124,7 @@ export function PublicPodPage() {
 
       <PrepTimerDisplay endsAt={pod.prepTimerEndsAt} label={pod.prepTimerLabel} size="large" />
 
-      {seatingFormats.has(pod.format) && seatByEntrantId.size > 0 && (
+      {showSeating && (
         <section className="mb-12">
           <h2 className="font-display mb-4 text-[20px] font-bold">Seating</h2>
           <SeatingChart seatByEntrantId={seatByEntrantId} entrantById={entrantById} entrantCount={pod.entrants.length} />
