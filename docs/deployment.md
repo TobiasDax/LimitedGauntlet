@@ -180,8 +180,8 @@ An SSO login resolves the same way for every provider:
 Each account can hold **one** SSO identity at a time. Signing in with a second
 provider for an already-linked account triggers a confirmation relink (see
 "If your identity provider reassigns…" below) rather than a silent rebind. An
-SSO-provisioned account has no local password; it can set one from
-**Settings → Account** if it also wants password login.
+SSO-provisioned account has no local password; it can set one from the
+**Profile** page if it also wants password login.
 
 ### SSO-only mode
 

@@ -23,6 +23,7 @@ import { TreasureChestPage } from "./routes/TreasureChestPage.tsx";
 import { HallOfFamePage } from "./routes/HallOfFamePage.tsx";
 import { PlayerStatsPage } from "./routes/PlayerStatsPage.tsx";
 import { SettingsPage } from "./routes/SettingsPage.tsx";
+import { ProfilePage } from "./routes/ProfilePage.tsx";
 import { OrganizationsPage } from "./routes/OrganizationsPage.tsx";
 import { VerifyEmailPage } from "./routes/VerifyEmailPage.tsx";
 import { AcceptInvitePage } from "./routes/AcceptInvitePage.tsx";
@@ -87,6 +88,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/hall-of-fame/players/:playerId" element={<PlayerStatsPage />} />
               <Route path="/treasure-chest" element={<TreasureChestPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
               {/* Old standalone API-tokens link now lives inside Settings (PI-26). */}
               <Route path="/api-tokens" element={<Navigate to="/settings" replace />} />
             </Route>

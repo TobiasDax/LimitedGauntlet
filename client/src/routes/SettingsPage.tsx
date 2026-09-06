@@ -7,19 +7,19 @@ import { OrganizersSection } from "../components/settings/OrganizersSection";
 import { ExportImportSection } from "../components/settings/ExportImportSection";
 import { WebhookSection } from "../components/settings/WebhookSection";
 import { TokensSection } from "../components/settings/TokensSection";
-import { AccountSection } from "../components/settings/AccountSection";
+import { OrgDangerSection } from "../components/settings/OrgDangerSection";
 
-// Organizer settings hub (PI-26). Organizer-only (this route is inside the
-// authed/ProtectedRoute block); the API-token routes it drives are themselves
-// session-auth-only, never bearer-auth'd. More sections land here: PI-27
-// (public-page password lock) and PI-28 (account: email/password/delete).
+// Org-scoped settings hub (PI-26; PI-87 split the identity bits out to
+// /profile). Everything here acts on the *active* organization — switch orgs
+// from the top bar. Organizer-only (inside the authed/ProtectedRoute block);
+// the API-token routes it drives are session-auth-only, never bearer.
 export function SettingsPage() {
   const { data: me } = useMe();
   return (
     <div>
       <Eyebrow>Your organization</Eyebrow>
       <ScreenTitle>Settings</ScreenTitle>
-      <ScreenDek>Manage your organization and account.</ScreenDek>
+      <ScreenDek>Settings for {me?.organization?.name ?? "this organization"}. Your login lives on Profile.</ScreenDek>
 
       <SettingsSection
         title="Public page access"
@@ -75,8 +75,11 @@ export function SettingsPage() {
         <TokensSection />
       </SettingsSection>
 
-      <SettingsSection title="Account" description="Change your password or email, or delete your account.">
-        <AccountSection />
+      <SettingsSection
+        title="Leave or delete this organization"
+        description="Remove your own access, or permanently delete the whole organization and everything in it."
+      >
+        <OrgDangerSection />
       </SettingsSection>
     </div>
   );

@@ -17,13 +17,15 @@ export function Layout() {
   const logout = useLogout();
   const navigate = useNavigate();
 
+  const linkClass =
+    "text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
   const rightSlot = me ? (
     <>
-      <Link
-        to="/settings"
-        className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-      >
+      <Link to="/settings" className={linkClass}>
         Settings
+      </Link>
+      <Link to="/profile" className={linkClass}>
+        Profile
       </Link>
       <Button
         variant="ghost"

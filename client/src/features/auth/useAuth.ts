@@ -29,7 +29,7 @@ export interface MeResponse {
   // account" vs "leave organization" wording.
   organizerCount?: number;
   // Whether this account has ever set a local password (PI-42). false = SSO
-  // only. Drives Settings → Account. Treat undefined as "has one".
+  // only. Drives the Profile page. Treat undefined as "has one".
   hasPassword?: boolean;
 }
 
@@ -175,8 +175,12 @@ export function useChangePassword() {
       api.post<{ ok: true }>("/settings/password", input),
     onSuccess: () => {
       // An SSO-only account just set its first password — flip the cached
-      // flag so the rest of Settings → Account switches to password mode.
-      queryClient.setQueryData<MeResponse | null>(["me"], (prev) => (prev ? { ...prev, hasPassword: true } : prev));
+      // flag (both places it lives) so Profile switches to password mode.
+      queryClient.setQueryData<MeResponse | null>(["me"], (prev) =>
+        prev
+          ? { ...prev, hasPassword: true, identity: prev.identity ? { ...prev.identity, hasPassword: true } : prev.identity }
+          : prev,
+      );
     },
   });
 }

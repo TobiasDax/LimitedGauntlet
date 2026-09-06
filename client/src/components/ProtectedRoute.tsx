@@ -12,8 +12,9 @@ export function ProtectedRoute() {
     return <Navigate to="/login" replace />;
   }
   // PI-86 — a valid login with no active org (multi-org account between orgs,
-  // or a membership-less one) goes to the chooser. /organizations renders it.
-  if (me.activeOrgId === null && pathname !== "/organizations") {
+  // or a membership-less one) goes to the chooser. /organizations renders it;
+  // /profile is identity-only (PI-87) so it works without an org too.
+  if (me.activeOrgId === null && pathname !== "/organizations" && pathname !== "/profile") {
     return <Navigate to="/organizations" replace />;
   }
   return <Outlet />;
