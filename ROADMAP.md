@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — tagged releases (latest **v0.6.0**), a public demo at [limited-gauntlet.com](https://limited-gauntlet.com), and the full numbered build (Steps 0–12) plus the PI-1…PI-74 backlog all shipped and browser-verified. That whole history is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) — the roadmap below is only what's still open or awaiting a live browser-verify.
+The app is **feature-complete and running in production** — tagged releases (latest **v0.7.0**), a public demo at [limited-gauntlet.com](https://limited-gauntlet.com), and the full numbered build (Steps 0–12) plus the PI-1…PI-74 backlog all shipped and browser-verified. That whole history is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) — the roadmap below is only what's still open or awaiting a live browser-verify.
 
 **Shipped, browser-verify on a live deploy still pending:** PI-75 (operator signup webhook), PI-76–PI-84 (the pod-list cluster — organizer reorder, finished-pods sink, Scheduled/On-demand tabs, scheduled + actual timestamps, date dividers, pod cancel; first live pass 2026-09-05 found PI-77's sink broken on pre-existing data — needs the `20260905140000` backfill migration applied first), PI-85 (deployer analytics), PI-87 (Settings/Profile split). **PI-86** (one login across multiple orgs) is merged and verified on the demo — **the live rollout still needs a DB backup first** (see PI-86's deployment note).
 
@@ -271,7 +271,7 @@ Idea from Tobias: he's standing up his own Umami instance and wants its tracking
 
 Not feature work — these harden the project itself. None is a live bug at this app's scale (Tobias's own event is 8–10 players); they matter because it's a public OSS project anyone can `docker compose up`, and because a year of AI-assisted sessions has no automated gate catching regressions. PI-88 is the keystone — do it first; PI-90 and PI-91 are much safer once CI is green/red on every change.
 
-### PI-88 — CI: run typecheck + tests on every push and PR ✅ (live on Forgejo Actions 2026-09-07)
+### PI-88 — CI: run typecheck + tests on every push and PR ✅ (live on Forgejo Actions 2026-09-07, v0.7.0)
 Was: `.github/workflows/` had one workflow — `docker-publish.yml`, GHCR image on `release: published`. **Nothing ran `tsc -b` or the test suite on a push or PR.** The server suite is substantial and load-bearing — ~16 test files / ~118 cases against a real Postgres (`docker-compose.test.yml`), covering the pairing / standings / Gesamtwertung math against real historical numbers exactly as `CLAUDE.md` requires — but running it was entirely manual and on trust.
 
 - [x] **Runs on Forgejo, not GitHub.** `origin` is the Forgejo instance on DaxLite; GitHub is a downstream push-mirror that only sees `main` *after* the sync and never sees a Forgejo PR. New workflow at **`.forgejo/workflows/ci.yml`** (Forgejo reads both `.forgejo/workflows/` and `.github/workflows/`; picked the Forgejo-native path).
@@ -300,7 +300,7 @@ Was: `.github/workflows/` had one workflow — `docker-publish.yml`, GHCR image 
 - [ ] **Depends on PI-88** — a dependency-bump PR is only safe to merge quickly when CI actually exercises it. (Dependabot PRs land on GitHub, where the mirror + `docker-publish` live; the Forgejo-side CI is the real gate, so a bump is easiest to vet by pulling it to Forgejo as a branch. Acceptable — security-advisory visibility is the main win, the auto-merge convenience is secondary.)
 - [ ] Decide Dependabot vs Renovate: Renovate groups better and self-hosts on Forgejo, but it's a whole service to run. Lean **Dependabot** for the "minimal moving parts" reason unless the Forgejo-side story pushes toward Renovate.
 
-### PI-91 — ESLint + Prettier ✅ (2026-09-07)
+### PI-91 — ESLint + Prettier ✅ (2026-09-07, v0.7.0)
 Was: **no linter or formatter config in the repo**. `tsc` strict + `noUncheckedIndexedAccess` was the only static gate.
 
 - [x] **ESLint** — single flat `eslint.config.mjs` at the root for all three workspaces. `@eslint/js` recommended + `typescript-eslint` **`recommendedTypeChecked`** (typed linting via `projectService`); client override adds `react-hooks` + `react-refresh`; `*.test.ts` override relaxes the `no-unsafe-*` / `no-floating-promises` rules; `eslint-config-prettier` last.
@@ -320,7 +320,7 @@ PI-88 shipped `.forgejo/workflows/ci.yml` (typecheck + builds + server suite). T
 - [ ] **Boot smoke test.** Bring up the freshly-built image + a Postgres container, poll `/api/healthz` until 200, tear down. Proves the container starts, Prisma `migrate deploy` runs clean on an empty DB, and the server binds — none of which the vitest suite exercises (it imports modules, never boots the HTTP server via `entrypoint.sh`). Reuse `docker-compose.yml` with an override pointing `app.image` at the built tag, or a plain `docker run`.
 - [ ] **Lint** — once **PI-91** lands, add `npm run lint` as a CI step. Gated on that; listed here so it isn't forgotten.
 
-### PI-93 — Tag-triggered GHCR build + release (kept on GitHub Actions) ✅ (2026-09-08, first real release still pending)
+### PI-93 — Tag-triggered GHCR build + release (kept on GitHub Actions) ✅ (2026-09-08, v0.7.0 — first release on the new path)
 The old `docker-publish.yml` triggered on `release: published` — meaning a human had to create the GitHub Release *first*, after the Forgejo→GitHub push-mirror had synced the tag. The mirror was on an **8h interval with `sync_on_commit` off**, so a release meant: push tag → wait (or hit "Synchronize Now") → verify SHAs → `gh release create`. That gap burned a past release (stale commit).
 
 **Decision (2026-09-08): keep it on GitHub, don't move to Forgejo.** GHCR and GitHub Releases are both GitHub infrastructure — GitHub Actions gets `GITHUB_TOKEN` for free (GHCR push *and* Release API), the build runs on GitHub's runners (not the DaxLite N100 that's juggling ~44 services), and the whole public artifact chain stays where it's consumed from. Moving to Forgejo would have meant a long-lived GH PAT in Forgejo secrets, homelab build load, and *still* touching the GitHub API for a public Release page. Forgejo Actions stays CI-only.
@@ -329,5 +329,5 @@ The old `docker-publish.yml` triggered on `release: published` — meaning a hum
 - [x] **Mirror PAT:** replaced with one carrying **Contents: RW + Workflows: RW** (fine-grained) — the `workflow` bit is mandatory for any push touching `.github/workflows/`, which every workflow edit since would otherwise have silently failed the whole mirror push.
 - [x] **`docker-publish.yml` rewritten:** trigger `release: published` → `push: tags: ['v*.*.*']`. The mirrored tag arriving *is* the trigger — no race, the workflow can't run before the tag exists on GitHub. Adds a `softprops/action-gh-release@v2` step that opens the release as a **draft** with auto-generated notes (image + GHCR tags publish immediately; the public notes wait for a human to curate + publish). `permissions: contents: write`. `workflow_dispatch` kept (rebuilds `:latest` from `main`). Guard `if: github.server_url == 'https://github.com'` unchanged.
 - [x] **`release` skill rewritten** (v0.2.0) — the mirror-pause dance (old steps 6/8) collapses to: push tag → Action auto-fires → `gh release edit --notes-file … --draft=false`. `workflow`-scope troubleshooting note kept.
-- [ ] **First real release on the new path** — cut the next `vX.Y.Z` and confirm end to end: tag → mirror → Action builds → GHCR `:X.Y.Z`/`:X.Y`/`:latest` → draft release created → publish. Until then this is committed but unexercised.
+- [x] **First release on the new path: v0.7.0** — exercised the pipeline end to end: tag → mirror → GitHub Action builds → GHCR `:0.7.0`/`:0.7`/`:latest` → draft release → published.
 - [ ] **Multi-arch** (`linux/amd64,linux/arm64`) — natural add via buildx, decide when an ARM deploy target is real (RPi etc.); skip otherwise.
