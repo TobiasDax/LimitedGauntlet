@@ -7,6 +7,10 @@ build/
 .DS_Store
 .mcp.json
 
+# Scratch release notes — drafted per release, fed to `gh release edit -F`,
+# then deleted. The published GitHub Release is the permanent copy.
+/RELEASE_NOTES_v*.md
+
 # Per-deployment Compose customization (network wiring, reverse-proxy
 # labels, etc.) — deliberately local-only, same reasoning as .env. Docker
 # Compose auto-merges this alongside docker-compose.yml with no flag

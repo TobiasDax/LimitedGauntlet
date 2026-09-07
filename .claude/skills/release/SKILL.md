@@ -24,7 +24,7 @@ There is no `gh release create` step and no manual mirror sync. The old race (cr
 - Update `"version"` in the **root** `package.json` only (single shared version — `server`/`client`/`mcp` stay unversioned, per PI-22).
 - In `ROADMAP.md`, mark any items this release ships as `✅` and note the version, matching how earlier items were closed out. Move fully-done items to `docs/BUILD-LOG.md` if that's the pattern for the section.
 
-**4. Draft release notes** to a scratch file at the repo root, `RELEASE_NOTES_vX.Y.Z.md` (untracked — deleted after use):
+**4. Draft release notes** to a scratch file at the repo root, `RELEASE_NOTES_vX.Y.Z.md` (gitignored via `/RELEASE_NOTES_v*.md`; deleted in step 10):
 - `git log <last-tag>..HEAD --oneline` for the raw list.
 - Cross-reference `ROADMAP.md`'s `✅` items and `docs/BUILD-LOG.md` for what each change actually does — write it grouped by theme (e.g. "Pairing & ops", "Security", "CI & tooling"), like the v0.1.0 notes, not a commit-subject dump.
 - "Known limitations" section only if something genuinely relevant changed.
@@ -61,7 +61,7 @@ gh release edit vX.Y.Z --repo TobiasDax/LimitedGauntlet \
 - `https://api.github.com/repos/TobiasDax/LimitedGauntlet/releases/tags/vX.Y.Z?cb=<random>` — `draft: false`, notes present.
 - `https://api.github.com/orgs/... ` isn't needed; confirm the image tags exist: `docker buildx imagetools inspect ghcr.io/tobiasdax/limitedgauntlet:X.Y.Z` (or check the package page). `:X.Y.Z`, `:X.Y`, `:latest` should all be present for a normal release.
 
-**10. Clean up.** Delete `RELEASE_NOTES_vX.Y.Z.md` (ask first — Tobias has wanted to confirm this every time).
+**10. Clean up.** `rm RELEASE_NOTES_vX.Y.Z.md` — the published release is the permanent copy. No need to ask; it's gitignored (`/RELEASE_NOTES_v*.md`) so it was never going to be committed anyway.
 
 ## Troubleshooting
 
