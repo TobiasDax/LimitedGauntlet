@@ -269,7 +269,7 @@ Idea from Tobias: he's standing up his own Umami instance and wants its tracking
 
 Not feature work — these harden the project itself. None is a live bug at this app's scale (Tobias's own event is 8–10 players); they matter because it's a public OSS project anyone can `docker compose up`, and because a year of AI-assisted sessions has no automated gate catching regressions. PI-88 is the keystone — do it first; PI-90 and PI-91 are much safer once CI is green/red on every change.
 
-### PI-88 — CI: run typecheck + tests on every push and PR ✅ (workflow committed; Forgejo runner pending)
+### PI-88 — CI: run typecheck + tests on every push and PR ✅ (live on Forgejo Actions 2026-09-07)
 Was: `.github/workflows/` had one workflow — `docker-publish.yml`, GHCR image on `release: published`. **Nothing ran `tsc -b` or the test suite on a push or PR.** The server suite is substantial and load-bearing — ~16 test files / ~118 cases against a real Postgres (`docker-compose.test.yml`), covering the pairing / standings / Gesamtwertung math against real historical numbers exactly as `CLAUDE.md` requires — but running it was entirely manual and on trust.
 
 - [x] **Runs on Forgejo, not GitHub.** `origin` is the Forgejo instance on DaxLite; GitHub is a downstream push-mirror that only sees `main` *after* the sync and never sees a Forgejo PR. New workflow at **`.forgejo/workflows/ci.yml`** (Forgejo reads both `.forgejo/workflows/` and `.github/workflows/`; picked the Forgejo-native path).
@@ -277,7 +277,7 @@ Was: `.github/workflows/` had one workflow — `docker-publish.yml`, GHCR image 
 - [x] **The workflow** (`push` to `main` + `pull_request`): Postgres 16 service container, then `npm ci` → `prisma generate` → `npm run build` for server + mcp + client (the `tsc` typecheck for each, plus the client's real `vite build` — the one thing the dev sandbox can't run at all) → `prisma migrate deploy` → `npm run test --workspace server`. `DATABASE_URL`/`SESSION_SECRET` mirror `docker-compose.test.yml` / `server/vitest.config.ts`, pointed at the service container.
 - [x] Root `package.json` `build` script now also builds `mcp` (was client + server only — mcp went untypechecked by `npm run build`).
 - [x] `docs/development.md` gains a "Continuous integration" section covering the runner requirement.
-- [ ] **Runner setup (Tobias).** Register an `act_runner` (Docker backend, `ubuntu-latest` label) against the DaxLite Forgejo instance — one more small container in that compose stack — and enable Actions for the repo. Until then the workflow is committed but inert.
+- [x] **Runner live.** `forgejo-runner` v6 container on DaxLite (`/opt/docker/arcane-projects/forgejo-runner/`), Docker backend, `ubuntu-latest` label. First green run 2026-09-07. DNS was the whole fight: the runner container and the job containers both sit on Docker networks where the only resolver reachable was tailnet MagicDNS (`100.100.100.100`), which SERVFAILs public names (tailnet has no override-local-DNS). Fix: public resolvers (`9.9.9.9`/`1.1.1.1`) for both, plus a static `git.shire-census.ts.net → 100.90.42.72` host entry (the Forgejo tailnet sidecar) — set via `extra_hosts` on the runner service and `container.options` in the runner's `data/config.yml` for job containers.
 - [ ] Optional follow-up: a status badge in the README + branch protection on `main` requiring the check.
 
 ### PI-89 — Guard the pairing search against pathological pod sizes
