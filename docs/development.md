@@ -63,13 +63,32 @@ on every push to `main` and every pull request.
 
 It runs on **Forgejo Actions**, not GitHub Actions — `origin` is the Forgejo
 instance and GitHub is only a downstream push-mirror, so Forgejo is where
-pushes and PRs actually land. It needs a runner:
+pushes and PRs actually land. Status is on the repo's **Actions** tab in the
+Forgejo instance (there's no public CI badge — the instance isn't reachable
+outside the tailnet, and the GitHub mirror runs no CI of its own).
+
+It needs a runner:
 
 - Register an [`act_runner`](https://forgejo.org/docs/latest/admin/actions/)
   against the Forgejo instance with a **Docker backend** (it needs to start the
   Postgres service container), advertising the `ubuntu-latest` label.
 - Enable Actions for the repository (Settings → Advanced, or instance-wide).
+- The runner and the job containers it spawns both need working DNS for
+  public names (`data.forgejo.org` for actions, the npm registry) *and* for
+  the Forgejo instance's own hostname. If that hostname is only resolvable via
+  a split-DNS / VPN resolver that won't forward public queries, give both a
+  public resolver plus a static host entry for the instance — `extra_hosts`
+  on the runner service, `container.options: "--dns ... --add-host ..."` in
+  the runner's `config.yml` for the job containers.
 
 The GHCR image publish (`.github/workflows/docker-publish.yml`) stays
 GitHub-only — it's guarded with `if: github.server_url == 'https://github.com'`
 so a Forgejo runner picking it up is a no-op.
+
+### Requiring CI before merge
+
+In the Forgejo repo: **Settings → Branches → Add rule** for `main` →
+enable **Enable Status Check** and select the `check` job → save. With
+"Block merge without successful status checks" on, a PR can't be merged
+until CI is green. (Direct pushes to `main` by an admin still bypass this
+unless **Block pushes** is also enabled.)
