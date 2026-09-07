@@ -31,9 +31,9 @@ export function usePodRealtime(podId: string | undefined, tournamentId?: string)
     const room = `pod:${podId}`;
 
     const onEvent = () => {
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes(podId) });
+      void queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes(podId) });
       if (tournamentId) {
-        queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes(tournamentId) });
+        void queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes(tournamentId) });
       }
     };
 

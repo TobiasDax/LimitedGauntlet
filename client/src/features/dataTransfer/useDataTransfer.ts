@@ -23,7 +23,7 @@ export function useExportOrg() {
 
       const res = await fetch(`/api/settings/export?${params.toString()}`, { credentials: "include" });
       if (!res.ok) {
-        const body = await res.json().catch(() => undefined);
+        const body: unknown = await res.json().catch(() => undefined);
         throw new ApiError(res.status, body);
       }
       const blob = await res.blob();

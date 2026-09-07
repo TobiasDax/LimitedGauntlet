@@ -6,7 +6,7 @@ export function useAddIndividualEntrant(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (playerId: string) => api.post<{ entrant: Entrant }>(`/pods/${podId}/entrants`, { playerId }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
   });
 }
 
@@ -18,9 +18,9 @@ export function useAddEntrantsBulk(podId: string) {
     mutationFn: (input: { playerIds?: string[]; newPlayerNames?: string[] }) =>
       api.post<{ entrants: Entrant[] }>(`/pods/${podId}/entrants`, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pods", podId] });
+      void queryClient.invalidateQueries({ queryKey: ["pods", podId] });
       // New players land on the org roster too.
-      queryClient.invalidateQueries({ queryKey: ["players"] });
+      void queryClient.invalidateQueries({ queryKey: ["players"] });
     },
   });
 }
@@ -30,7 +30,7 @@ export function useAddTeamEntrant(podId: string) {
   return useMutation({
     mutationFn: (input: { teamName: string; playerIds: string[] }) =>
       api.post<{ entrant: Entrant }>(`/pods/${podId}/entrants`, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
   });
 }
 
@@ -38,7 +38,7 @@ export function useRemoveEntrant(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (entrantId: string) => api.delete<void>(`/entrants/${entrantId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
   });
 }
 
@@ -48,7 +48,7 @@ export function useDropEntrant(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (entrantId: string) => api.post<{ entrant: Entrant }>(`/entrants/${entrantId}/drop`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
   });
 }
 
@@ -56,7 +56,7 @@ export function useUndropEntrant(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (entrantId: string) => api.post<{ entrant: Entrant }>(`/entrants/${entrantId}/undrop`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
   });
 }
 
@@ -69,7 +69,7 @@ export function useSetManualTiebreak(podId: string) {
   return useMutation({
     mutationFn: ({ entrantId, manualTiebreak }: { entrantId: string; manualTiebreak: number | null }) =>
       api.patch<{ entrant: Entrant }>(`/entrants/${entrantId}`, { manualTiebreak }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId, "standings"] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["pods", podId, "standings"] }),
   });
 }
 
@@ -79,10 +79,7 @@ export function entrantErrorMessage(err: unknown): string {
     if (err.message === "already_dropped" || err.message === "not_dropped")
       return "That entrant's drop status just changed — reload and try again.";
     if (err.message === "name_taken") {
-      const name =
-        typeof err.body === "object" && err.body && "name" in err.body
-          ? String((err.body as { name: unknown }).name)
-          : null;
+      const name = typeof err.body === "object" && err.body && "name" in err.body ? String(err.body.name) : null;
       return name
         ? `A player named "${name}" already exists — tick them in the list instead of adding a new one.`
         : "That name is already on the roster.";

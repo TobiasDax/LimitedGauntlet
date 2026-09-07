@@ -22,7 +22,7 @@ export function useCreateTournament() {
   return useMutation({
     mutationFn: (input: CreateTournamentInput) => api.post<{ tournament: Tournament }>("/tournaments", input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      void queryClient.invalidateQueries({ queryKey: ["tournaments"] });
     },
   });
 }
@@ -43,8 +43,8 @@ export function useUpdateTournament(id: string) {
   return useMutation({
     mutationFn: (input: UpdateTournamentInput) => api.patch<{ tournament: Tournament }>(`/tournaments/${id}`, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tournaments", id] });
-      queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      void queryClient.invalidateQueries({ queryKey: ["tournaments", id] });
+      void queryClient.invalidateQueries({ queryKey: ["tournaments"] });
     },
   });
 }
@@ -56,7 +56,7 @@ export function useReorderPods(tournamentId: string) {
   return useMutation({
     mutationFn: (podIds: string[]) => api.patch<{ ok: true }>(`/tournaments/${tournamentId}/pod-order`, { podIds }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+      void queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
     },
   });
 }
@@ -66,7 +66,7 @@ export function useDeleteTournament() {
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/tournaments/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      void queryClient.invalidateQueries({ queryKey: ["tournaments"] });
     },
   });
 }

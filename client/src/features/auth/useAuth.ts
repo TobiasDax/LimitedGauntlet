@@ -150,8 +150,8 @@ export function useToggleTokens() {
       queryClient.setQueryData<MeResponse | null>(["me"], (prev) =>
         prev ? { ...prev, tokensEnabled: enabled } : prev,
       );
-      queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
-      queryClient.invalidateQueries({ queryKey: ["tokens"] });
+      void queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
+      void queryClient.invalidateQueries({ queryKey: ["tokens"] });
     },
   });
 }
@@ -203,7 +203,7 @@ export function useVerifyEmailChange() {
   return useMutation({
     mutationFn: (token: string) => api.post<{ ok: true; email: string }>("/auth/verify-email-change", { token }),
     // If the confirming browser is also logged in, refresh its cached email.
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["me"] }),
   });
 }
 
@@ -215,7 +215,7 @@ export function useConfirmOidcRelink() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (token: string) => api.post<{ ok: true }>("/auth/oidc/relink", { token }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["me"] }),
   });
 }
 

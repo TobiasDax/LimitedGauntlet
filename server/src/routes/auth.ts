@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
-import { requireAuth, requireOrganizerIdentity } from "../auth/middleware.js";
+import { requireOrganizerIdentity } from "../auth/middleware.js";
 import { config, isLocalLoginDisabled, configuredSsoProviders, type SsoProviderId } from "../config.js";
 import { beginSso, completeSso, isProviderConfigured, linkOrProvisionFromSso } from "../services/sso.js";
 import { confirmOidcRelink } from "../services/oidcRelink.js";
@@ -106,7 +106,7 @@ async function resolveLoginOrg(account: { id: string; lastActiveOrgId: string | 
 
 function requestOrigin(request: { protocol: string; headers: Record<string, unknown> }): string {
   const host = request.headers.host;
-  return host ? `${request.protocol}://${String(host)}` : "";
+  return typeof host === "string" && host ? `${request.protocol}://${host}` : "";
 }
 
 function isUniqueConstraintError(err: unknown, target: string): boolean {

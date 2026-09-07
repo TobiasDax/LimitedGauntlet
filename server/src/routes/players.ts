@@ -36,7 +36,8 @@ async function nameTaken(orgId: string, displayName: string, exceptId?: string):
 // PI-86 — the login lives on the linked PlayerIdentity now; a linked
 // `identityId` means the roster entry has a self-service account.
 function publicPlayer<T extends { identityId: string | null; email: string | null }>(player: T) {
-  const { identityId, email, ...rest } = player;
+  // email + identityId destructured out so neither reaches the public shape.
+  const { identityId, email: _email, ...rest } = player;
   return { ...rest, hasAccount: identityId !== null };
 }
 

@@ -32,7 +32,7 @@ export function OidcSetupPage() {
   }, [pending?.suggestedName]);
 
   useEffect(() => {
-    if (!isLoading && !pending) navigate("/login", { replace: true });
+    if (!isLoading && !pending) void navigate("/login", { replace: true });
   }, [isLoading, pending, navigate]);
 
   if (isLoading) return <p className="text-ink-muted">Loading…</p>;

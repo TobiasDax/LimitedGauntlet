@@ -275,16 +275,16 @@ describe("buildMatchesPayload / buildStandingsPayload", () => {
       prisma.player.create({ data: { orgId: org.id, displayName: "Bob" } }),
     ]);
     const [entrantA, entrantB] = await Promise.all([
-      prisma.entrant.create({ data: { podId: pod.id, playerId: alice!.id } }),
-      prisma.entrant.create({ data: { podId: pod.id, playerId: bob!.id } }),
+      prisma.entrant.create({ data: { podId: pod.id, playerId: alice.id } }),
+      prisma.entrant.create({ data: { podId: pod.id, playerId: bob.id } }),
     ]);
     const round = await prisma.round.create({ data: { podId: pod.id, roundNumber: 1, status: "ACTIVE" } });
     await prisma.match.create({
       data: {
         roundId: round.id,
         tableNumber: 1,
-        entrantAId: entrantA!.id,
-        entrantBId: entrantB!.id,
+        entrantAId: entrantA.id,
+        entrantBId: entrantB.id,
         result: "A_WINS",
         gamesWonA: 2,
         gamesWonB: 0,
@@ -294,12 +294,12 @@ describe("buildMatchesPayload / buildStandingsPayload", () => {
 
     const matches = await buildMatchesPayload(pod.id, round.id);
     expect(matches).toEqual([
-      { tableNumber: 1, entrantA: { id: entrantA!.id, name: "Alice" }, entrantB: { id: entrantB!.id, name: "Bob" } },
+      { tableNumber: 1, entrantA: { id: entrantA.id, name: "Alice" }, entrantB: { id: entrantB.id, name: "Bob" } },
     ]);
 
     const standings = await buildStandingsPayload(pod.id);
-    expect(standings[0]).toMatchObject({ rank: 1, entrant: { id: entrantA!.id, name: "Alice" }, points: 3 });
-    expect(standings[1]).toMatchObject({ rank: 2, entrant: { id: entrantB!.id, name: "Bob" }, points: 0 });
+    expect(standings[0]).toMatchObject({ rank: 1, entrant: { id: entrantA.id, name: "Alice" }, points: 3 });
+    expect(standings[1]).toMatchObject({ rank: 2, entrant: { id: entrantB.id, name: "Bob" }, points: 0 });
   });
 });
 

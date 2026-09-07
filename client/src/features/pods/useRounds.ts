@@ -11,7 +11,7 @@ export function useRounds(podId: string | undefined) {
 }
 
 function invalidatePod(queryClient: ReturnType<typeof useQueryClient>, podId: string) {
-  queryClient.invalidateQueries({ queryKey: ["pods", podId] });
+  void queryClient.invalidateQueries({ queryKey: ["pods", podId] });
 }
 
 export function useGenerateRound(podId: string) {

@@ -10,7 +10,7 @@ import {
   TournamentStatus,
 } from "@prisma/client";
 import { prisma } from "../prisma.js";
-import { EXPORT_FORMAT_VERSION, type ExportData } from "./orgExport.js";
+import { EXPORT_FORMAT_VERSION } from "./orgExport.js";
 import { syncPodTokenAwards, zStandingBonuses } from "./tokens.js";
 
 // Importer for LimitedGauntlet's own export format (PI-39), the counterpart to

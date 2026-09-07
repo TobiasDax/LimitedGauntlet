@@ -36,7 +36,7 @@ export function useUnlockPublic(slug: string | undefined) {
     onSuccess: () => {
       // Re-check lock status and let every gated public query refetch now that
       // the session cookie marks this org unlocked.
-      queryClient.invalidateQueries({ queryKey: ["public"] });
+      void queryClient.invalidateQueries({ queryKey: ["public"] });
     },
   });
 }

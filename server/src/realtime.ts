@@ -150,7 +150,7 @@ export function initRealtime(httpServer: HttpServer, authorizeRoom: RealtimeRoom
       }
     });
     socket.on("leave", (room: unknown) => {
-      if (typeof room === "string") socket.leave(room);
+      if (typeof room === "string") void socket.leave(room);
     });
   });
 

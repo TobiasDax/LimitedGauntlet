@@ -49,7 +49,7 @@ function AddPullForm({
   // submitting the code; falls through to the raw text as-is when it
   // doesn't match any known name, so an uncommon code (e.g. a bonus-sheet
   // set not in the list at all) can still be typed directly.
-  const sets = setsData?.sets ?? [];
+  const sets = useMemo(() => setsData?.sets ?? [], [setsData?.sets]);
   const codeByName = useMemo(() => new Map(sets.map((s) => [s.name.toLowerCase(), s.code])), [sets]);
   const nameByCode = useMemo(() => new Map(sets.map((s) => [s.code, s.name])), [sets]);
   const [setInput, setSetInput] = useState(() => nameByCode.get(defaultSetCode) ?? defaultSetCode);

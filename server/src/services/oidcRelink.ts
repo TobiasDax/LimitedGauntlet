@@ -109,9 +109,7 @@ export interface PendingOidcRelink {
 
 // Looks up the organizer by email and their most recent still-usable relink
 // request, for the operator CLI to preview before confirming.
-export async function findPendingOidcRelink(
-  email: string,
-): Promise<
+export async function findPendingOidcRelink(email: string): Promise<
   | { organizer: null; request: null }
   | {
       organizer: { id: string; name: string; email: string; oidcSubject: string | null };

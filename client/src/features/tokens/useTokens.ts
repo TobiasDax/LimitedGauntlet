@@ -26,8 +26,8 @@ export function useAdjustTokens(playerId: string) {
     mutationFn: (input: { delta?: number; setTo?: number; note?: string }) =>
       api.post<{ balance: number }>(`/players/${playerId}/token-adjust`, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tokens", "ledger", playerId] });
-      queryClient.invalidateQueries({ queryKey: ["hall-of-fame", "players", playerId] });
+      void queryClient.invalidateQueries({ queryKey: ["tokens", "ledger", playerId] });
+      void queryClient.invalidateQueries({ queryKey: ["hall-of-fame", "players", playerId] });
     },
   });
 }

@@ -240,7 +240,8 @@ export async function buildStandingsPayload(podId: string): Promise<WebhookStand
 export async function sendTestWebhookEvent(
   orgId: string,
   webhookId: string,
-): Promise<DeliveryResult & { error?: "not_found" | "unsafe_target" | string }> {
+  // `error`, when set: "not_found" | "unsafe_target" | a delivery error string.
+): Promise<DeliveryResult> {
   const webhook = await prisma.organizationWebhook.findFirst({
     where: { id: webhookId, orgId },
     select: { url: true, secret: true },

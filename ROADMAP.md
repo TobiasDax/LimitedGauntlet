@@ -12,7 +12,7 @@ The app is **feature-complete and running in production** — tagged releases (l
 
 - **PI-39** — organizer data import: v1 shipped, the `legacy-data.json` import step is still open.
 - **PI-62** — deck photos: scoped via interview, not started.
-- **PI-89 – PI-91** — project-health items from the 2026-09-06 code audit: pairing-size guard, dependency automation, ESLint + Prettier. (PI-88, CI on Forgejo Actions, is done.)
+- **PI-89 – PI-90** — project-health items from the 2026-09-06 code audit: pairing-size guard, dependency automation. (PI-88 CI and PI-91 ESLint + Prettier are done.)
 - **PI-92 – PI-93** — CI follow-ups now that Forgejo runners work: expand the checks (migration drift, image build on PRs, boot smoke test); move the GHCR image publish off the GitHub mirror.
 
 ## New improvements (backlog)
@@ -299,13 +299,17 @@ Was: `.github/workflows/` had one workflow — `docker-publish.yml`, GHCR image 
 - [ ] **Depends on PI-88** — a dependency-bump PR is only safe to merge quickly when CI actually exercises it. (Dependabot PRs land on GitHub, where the mirror + `docker-publish` live; the Forgejo-side CI is the real gate, so a bump is easiest to vet by pulling it to Forgejo as a branch. Acceptable — security-advisory visibility is the main win, the auto-merge convenience is secondary.)
 - [ ] Decide Dependabot vs Renovate: Renovate groups better and self-hosts on Forgejo, but it's a whole service to run. Lean **Dependabot** for the "minimal moving parts" reason unless the Forgejo-side story pushes toward Renovate.
 
-### PI-91 — ESLint + Prettier
-There is **no linter or formatter config in the repo** — `eslint` / `prettier` / `biome` appear in no `package.json` and no config file exists. `tsc` in strict mode + `noUncheckedIndexedAccess` is the only static gate. That's caught real bugs (the Zod `.partial()` default-reset in build-log Step 3), but it doesn't catch unused vars, stray `console.log`, floating promises, import-order drift, or style inconsistency across ~23k lines and a year of separate sessions.
+### PI-91 — ESLint + Prettier ✅ (2026-09-07)
+Was: **no linter or formatter config in the repo**. `tsc` strict + `noUncheckedIndexedAccess` was the only static gate.
 
-- [ ] **ESLint** flat config with `typescript-eslint` (typed linting on), plus `eslint-plugin-react-hooks` + `eslint-plugin-react-refresh` for the client. **Prettier** for formatting, `eslint-config-prettier` to switch off rules that would fight it.
-- [ ] **Start lenient.** Get to zero errors on the current tree without a mass reformat, then tighten rule by rule. Decide whether to take the one-time repo-wide `prettier --write` commit (noisy but clean) or format-on-touch.
-- [ ] **`@typescript-eslint/no-floating-promises` needs deliberate handling** — this codebase intentionally fires-and-forgets (the `fireAndForget` helper, webhook delivery, realtime emits). Either the helper's signature makes that explicit to the rule, or those call sites get an explicit `void`. Don't let the rule force `await` where non-blocking is the point.
-- [ ] Add `npm run lint` at the root and wire it into **PI-88**'s CI.
+- [x] **ESLint** — single flat `eslint.config.mjs` at the root for all three workspaces. `@eslint/js` recommended + `typescript-eslint` **`recommendedTypeChecked`** (typed linting via `projectService`); client override adds `react-hooks` + `react-refresh`; `*.test.ts` override relaxes the `no-unsafe-*` / `no-floating-promises` rules; `eslint-config-prettier` last.
+- [x] **Prettier** — `.prettierrc.json` (`printWidth: 120`, otherwise defaults). `.prettierignore` scopes it to `ts/tsx/js/mjs` + non-lock JSON; prose (`*.md`, `docs/`), YAML, and generated files are left alone.
+- [x] **One-time `prettier --write` (option A)** — separate mechanical commit, ~97 files, no logic change. Formatting is now real and CI-enforced.
+- [x] **Lenient-start rule choices** (all in `eslint.config.mjs` with a comment each): `no-non-null-assertion` off (~190 deliberate `x!.y`), `no-console` off (server logging), `require-await` off (Fastify plugins are `async (app) =>` by convention), `no-unused-vars` allows `^_`, `no-misused-promises` with `checksVoidReturn: { attributes: false, properties: false }` (async JSX handlers + `mutate(v, { onSuccess: () => navigate(x) })` are fine; the rest of the rule stays on).
+- [x] **`no-floating-promises` kept ON** — the ~26 real hits were `queryClient.invalidateQueries(...)` in mutation callbacks + a couple of `socket`/`navigate` spots; all got an explicit `void` prefix (the documented intent marker). `fireAndForget()` already returns `void` so its call sites were never flagged.
+- [x] **~20 genuine fixes** landed in the lint-fix commit: unused imports removed, `res.json()`/`JSON.parse` results narrowed to `unknown`, a ternary-as-statement → `if/else`, a `[object Object]` stringify guarded, two `?? []` values wrapped in `useMemo` (defeated memoization), a redundant `| string` union dropped.
+- [x] `npm run lint` / `format` / `format:check` scripts; `format:check` + `lint` wired into `.forgejo/workflows/ci.yml` after `prisma generate`.
+- [ ] **2 warnings left, deliberately:** `react-refresh/only-export-components` on `CardGallery.tsx` / `GesamtwertungList.tsx` (each colocates one small helper with its component). Splitting them into new files is pure churn for a dev-only HMR nicety — left as warnings, CI doesn't fail on warnings. Revisit if the list grows.
 
 ### PI-92 — Expand CI: migration drift, image build on PRs, boot smoke test
 PI-88 shipped `.forgejo/workflows/ci.yml` (typecheck + builds + server suite). Three cheap additions catch classes of breakage that suite doesn't touch. Keep it one workflow file; if the image steps drag on the N100 runner, split them into a job that only runs on `pull_request` + pushes to `main`, not every branch.

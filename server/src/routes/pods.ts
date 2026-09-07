@@ -15,7 +15,7 @@ import { syncPodTokenAwards, zStandingBonuses } from "../services/tokens.js";
 // through. Returns the fragment to spread into a create/update `data`.
 function tokenBonusesData(value: unknown): { tokenStandingBonuses?: Prisma.InputJsonValue | typeof Prisma.DbNull } {
   if (value === undefined) return {};
-  return { tokenStandingBonuses: value === null ? Prisma.DbNull : (value as Prisma.InputJsonValue) };
+  return { tokenStandingBonuses: value === null ? Prisma.DbNull : value };
 }
 
 // Playing in any pod implies attending that pod's tournament — upsert

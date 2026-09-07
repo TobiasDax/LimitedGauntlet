@@ -27,7 +27,7 @@ export function useExportTournamentXlsx(tournamentId: string) {
     mutationFn: async () => {
       const res = await fetch(`/api/tournaments/${tournamentId}/export.xlsx`, { credentials: "include" });
       if (!res.ok) {
-        const body = await res.json().catch(() => undefined);
+        const body: unknown = await res.json().catch(() => undefined);
         throw new ApiError(res.status, body);
       }
       const blob = await res.blob();

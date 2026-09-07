@@ -45,7 +45,7 @@ export function useCreatePod(tournamentId: string) {
   return useMutation({
     mutationFn: (input: CreatePodInput) => api.post<{ pod: Pod }>(`/tournaments/${tournamentId}/pods`, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+      void queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
     },
   });
 }
@@ -80,8 +80,8 @@ export function useUpdatePod(podId: string, tournamentId?: string) {
   return useMutation({
     mutationFn: (input: UpdatePodInput) => api.patch<{ pod: Pod }>(`/pods/${podId}`, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pods", podId] });
-      if (tournamentId) queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+      void queryClient.invalidateQueries({ queryKey: ["pods", podId] });
+      if (tournamentId) void queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
     },
   });
 }
@@ -94,8 +94,8 @@ export function useCancelPod(podId: string, tournamentId?: string) {
   return useMutation({
     mutationFn: () => api.post<{ pod: Pod }>(`/pods/${podId}/cancel`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pods", podId] });
-      if (tournamentId) queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+      void queryClient.invalidateQueries({ queryKey: ["pods", podId] });
+      if (tournamentId) void queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
     },
   });
 }
@@ -105,8 +105,8 @@ export function useUncancelPod(podId: string, tournamentId?: string) {
   return useMutation({
     mutationFn: () => api.post<{ pod: Pod }>(`/pods/${podId}/uncancel`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pods", podId] });
-      if (tournamentId) queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+      void queryClient.invalidateQueries({ queryKey: ["pods", podId] });
+      if (tournamentId) void queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
     },
   });
 }
@@ -116,7 +116,7 @@ export function useDeletePod(tournamentId: string) {
   return useMutation({
     mutationFn: (podId: string) => api.delete<void>(`/pods/${podId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
+      void queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
     },
   });
 }
@@ -130,7 +130,7 @@ export function useSetPrepTimer(podId: string) {
   return useMutation({
     mutationFn: (input: { minutes: number; label?: string }) =>
       api.post<{ pod: Pod }>(`/pods/${podId}/prep-timer`, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
   });
 }
 
@@ -138,7 +138,7 @@ export function useClearPrepTimer(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => api.delete<void>(`/pods/${podId}/prep-timer`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["pods", podId] }),
   });
 }
 

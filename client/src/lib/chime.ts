@@ -26,7 +26,7 @@ export function playChime(): void {
   tone(880, 0, 0.35);
   tone(1174.66, 0.18, 0.45);
 
-  setTimeout(() => ctx.close(), 1200);
+  setTimeout(() => void ctx.close(), 1200);
 }
 
 // Countdown bell played when a round's timer hits zero.

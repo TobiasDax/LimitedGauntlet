@@ -40,7 +40,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (res.status === 204) return undefined as T;
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : undefined;
+  const data: unknown = text ? JSON.parse(text) : undefined;
 
   if (!res.ok) throw new ApiError(res.status, data);
   return data as T;

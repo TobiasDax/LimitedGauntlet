@@ -3,11 +3,7 @@ export class ApiError extends Error {
     public status: number,
     public body: unknown,
   ) {
-    super(
-      typeof body === "object" && body && "error" in body
-        ? String((body as { error: unknown }).error)
-        : "request_failed",
-    );
+    super(typeof body === "object" && body && "error" in body ? String(body.error) : "request_failed");
   }
 }
 
@@ -20,7 +16,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (res.status === 204) return undefined as T;
 
-  const body = await res.json().catch(() => undefined);
+  const body: unknown = await res.json().catch(() => undefined);
   if (!res.ok) throw new ApiError(res.status, body);
   return body as T;
 }
