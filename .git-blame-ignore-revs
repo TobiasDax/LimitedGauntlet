@@ -1,0 +1,6 @@
+# Reformat-only commits — skipped by `git blame` when
+# blame.ignoreRevsFile is set to this file (GitHub/Forgejo web blame use it automatically):
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# PI-91: prettier --write across the tree (mechanical, no logic change)
+8a8fb4d852c8f9292b483a781cb8811ee6ef56df
