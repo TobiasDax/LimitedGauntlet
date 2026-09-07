@@ -1,0 +1,13 @@
+# Prettier is scoped to code (ts/tsx/js/mjs) + non-lock JSON.
+# Prose, config, and generated files are left alone.
+**/dist/
+node_modules/
+package-lock.json
+*.md
+docs/
+design/
+.env.example
+*.yml
+*.yaml
+client/src/assets/
+client/public/

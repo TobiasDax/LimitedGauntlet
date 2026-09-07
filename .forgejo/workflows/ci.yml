@@ -51,6 +51,11 @@ jobs:
       - name: Generate Prisma client
         run: npm run prisma:generate --workspace server
 
+      - name: Lint + format check
+        run: |
+          npm run format:check
+          npm run lint
+
       - name: Typecheck + build (server, mcp, client)
         run: |
           npm run build --workspace server
