@@ -127,7 +127,11 @@ export function PublicPodPage() {
       {showSeating && (
         <section className="mb-12">
           <h2 className="font-display mb-4 text-[20px] font-bold">Seating</h2>
-          <SeatingChart seatByEntrantId={seatByEntrantId} entrantById={entrantById} entrantCount={pod.entrants.length} />
+          <SeatingChart
+            seatByEntrantId={seatByEntrantId}
+            entrantById={entrantById}
+            entrantCount={pod.entrants.length}
+          />
         </section>
       )}
 
@@ -173,11 +177,16 @@ export function PublicPodPage() {
               </thead>
               <tbody>
                 {standingsData.standings.map((row, i) => (
-                  <tr key={row.entrantId} className={i === 0 ? "bg-accent-wash shadow-[inset_3px_0_0_var(--color-accent)]" : ""}>
+                  <tr
+                    key={row.entrantId}
+                    className={i === 0 ? "bg-accent-wash shadow-[inset_3px_0_0_var(--color-accent)]" : ""}
+                  >
                     <td className="border-t border-border px-4 py-3.5 text-right text-[13px] font-semibold tabular-nums text-ink-muted">
                       {i + 1}
                     </td>
-                    <td className="border-t border-border px-4 py-3.5 font-semibold">{entrantDisplayName(row.entrant)}</td>
+                    <td className="border-t border-border px-4 py-3.5 font-semibold">
+                      {entrantDisplayName(row.entrant)}
+                    </td>
                     <td className="border-t border-border px-4 py-3.5 text-right text-[15px] font-bold tabular-nums">
                       {row.points}
                     </td>

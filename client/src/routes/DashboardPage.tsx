@@ -13,7 +13,8 @@ const statusLabel: Record<TournamentStatus, string> = {
 };
 
 function formatDateRange(start: string, end: string): string {
-  const fmt = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
@@ -44,7 +45,11 @@ export function DashboardPage() {
         </button>
       )}
       {me && sharing && (
-        <SharePopup title="Share your organization" path={`/o/${me.organization.slug}`} onClose={() => setSharing(false)} />
+        <SharePopup
+          title="Share your organization"
+          path={`/o/${me.organization.slug}`}
+          onClose={() => setSharing(false)}
+        />
       )}
 
       {isLoading && <p className="text-ink-muted">Loading…</p>}
@@ -70,7 +75,9 @@ export function DashboardPage() {
                     {t.location && ` · ${t.location}`}
                   </div>
                 </div>
-                <span className="text-[11.5px] tracking-wide text-ink-secondary uppercase">{statusLabel[t.status]}</span>
+                <span className="text-[11.5px] tracking-wide text-ink-secondary uppercase">
+                  {statusLabel[t.status]}
+                </span>
               </Card>
             </Link>
           ))}
@@ -109,7 +116,12 @@ export function DashboardPage() {
             }}
           >
             <Field label="Name">
-              <TextField required value={name} onChange={(e) => setName(e.target.value)} placeholder="2026 - Sommer GP Eichstätt" />
+              <TextField
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="2026 - Sommer GP Eichstätt"
+              />
             </Field>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Start date">
@@ -122,7 +134,10 @@ export function DashboardPage() {
             <Field label="Location" hint="Optional">
               <TextField value={location} onChange={(e) => setLocation(e.target.value)} />
             </Field>
-            <Field label="Description" hint="Optional · Markdown supported (headings, lists, bold/italic, tables, links)">
+            <Field
+              label="Description"
+              hint="Optional · Markdown supported (headings, lists, bold/italic, tables, links)"
+            >
               <Textarea
                 rows={3}
                 value={description}

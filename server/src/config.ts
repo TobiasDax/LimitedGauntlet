@@ -112,9 +112,7 @@ export function isEmailConfigured(): boolean {
 }
 
 export function isOidcConfigured(): boolean {
-  return (
-    config.oidc.issuer.length > 0 && config.oidc.clientId.length > 0 && config.oidc.clientSecret.length > 0
-  );
+  return config.oidc.issuer.length > 0 && config.oidc.clientId.length > 0 && config.oidc.clientSecret.length > 0;
 }
 
 export type SsoProviderId = "oidc" | "google" | "discord";

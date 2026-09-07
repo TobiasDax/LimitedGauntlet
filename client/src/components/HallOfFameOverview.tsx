@@ -136,10 +136,7 @@ export function HallOfFameList({
         );
       })}
       {hasMultiTournamentPlayers && (hiddenCount > 0 || showGuests) && (
-        <button
-          onClick={onToggleGuests}
-          className="mt-3 text-left text-[12.5px] text-ink-muted hover:text-ink"
-        >
+        <button onClick={onToggleGuests} className="mt-3 text-left text-[12.5px] text-ink-muted hover:text-ink">
           {showGuests
             ? "Hide one-tournament guests"
             : `Show ${hiddenCount} one-tournament guest${hiddenCount === 1 ? "" : "s"}`}

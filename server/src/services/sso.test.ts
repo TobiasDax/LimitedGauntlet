@@ -111,7 +111,13 @@ describe("linkOrProvisionFromSso", () => {
     const org = await makeOrg();
     const sub = uniq("known");
     const acc = await prisma.organizerAccount.create({
-      data: { name: "A", email: `a-${Math.random()}@x.com`, passwordHash: "h", oidcSubject: `google:${sub}`, memberships: { create: { orgId: org.id } } },
+      data: {
+        name: "A",
+        email: `a-${Math.random()}@x.com`,
+        passwordHash: "h",
+        oidcSubject: `google:${sub}`,
+        memberships: { create: { orgId: org.id } },
+      },
     });
     const res = await linkOrProvisionFromSso("google", verified({ subject: sub }), "https://app.example");
     expect(res).toEqual({ status: "ok", organizerId: acc.id, authVersion: acc.authVersion, landOrgId: undefined });
@@ -134,9 +140,19 @@ describe("linkOrProvisionFromSso", () => {
     const org = await makeOrg();
     const email = `two-${Math.random()}@example.com`;
     await prisma.organizerAccount.create({
-      data: { name: "C", email, passwordHash: "h", oidcSubject: `google:${uniq("first")}`, memberships: { create: { orgId: org.id } } },
+      data: {
+        name: "C",
+        email,
+        passwordHash: "h",
+        oidcSubject: `google:${uniq("first")}`,
+        memberships: { create: { orgId: org.id } },
+      },
     });
-    const res = await linkOrProvisionFromSso("discord", verified({ subject: uniq("second"), email }), "https://app.example");
+    const res = await linkOrProvisionFromSso(
+      "discord",
+      verified({ subject: uniq("second"), email }),
+      "https://app.example",
+    );
     expect(res.status).toBe("recovery_required");
   });
 
@@ -146,7 +162,13 @@ describe("linkOrProvisionFromSso", () => {
     const email = `multi-${Math.random()}@example.com`;
     const sub = uniq("multi");
     const acc = await prisma.organizerAccount.create({
-      data: { name: "M", email, passwordHash: "h", oidcSubject: `google:${sub}`, memberships: { create: { orgId: orgA.id } } },
+      data: {
+        name: "M",
+        email,
+        passwordHash: "h",
+        oidcSubject: `google:${sub}`,
+        memberships: { create: { orgId: orgA.id } },
+      },
     });
     const invite = await prisma.organizerInvite.create({
       data: {
@@ -161,7 +183,10 @@ describe("linkOrProvisionFromSso", () => {
     const res = await linkOrProvisionFromSso("google", verified({ subject: sub, email }), "https://app.example");
     expect(res).toEqual({ status: "ok", organizerId: acc.id, authVersion: acc.authVersion, landOrgId: orgB.id });
 
-    const memberships = await prisma.organizerMembership.findMany({ where: { accountId: acc.id }, select: { orgId: true } });
+    const memberships = await prisma.organizerMembership.findMany({
+      where: { accountId: acc.id },
+      select: { orgId: true },
+    });
     expect(memberships.map((m) => m.orgId).sort()).toEqual([orgA.id, orgB.id].sort());
     expect((await prisma.organizerInvite.findUniqueOrThrow({ where: { id: invite.id } })).usedAt).not.toBeNull();
   });

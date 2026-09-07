@@ -223,8 +223,24 @@ describe("generatePairings", () => {
     const r1 = await prisma.round.create({ data: { podId: pod.id, roundNumber: 1, status: "ACTIVE" } });
     await prisma.match.createMany({
       data: [
-        { roundId: r1.id, tableNumber: 1, entrantAId: e1!.id, entrantBId: e2!.id, result: "A_WINS", gamesWonA: 2, reportedAt: new Date() },
-        { roundId: r1.id, tableNumber: 2, entrantAId: e3!.id, entrantBId: e4!.id, result: "A_WINS", gamesWonA: 2, reportedAt: new Date() },
+        {
+          roundId: r1.id,
+          tableNumber: 1,
+          entrantAId: e1!.id,
+          entrantBId: e2!.id,
+          result: "A_WINS",
+          gamesWonA: 2,
+          reportedAt: new Date(),
+        },
+        {
+          roundId: r1.id,
+          tableNumber: 2,
+          entrantAId: e3!.id,
+          entrantBId: e4!.id,
+          result: "A_WINS",
+          gamesWonA: 2,
+          reportedAt: new Date(),
+        },
       ],
     });
     await prisma.round.update({ where: { id: r1.id }, data: { status: "COMPLETED" } });

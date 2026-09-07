@@ -31,21 +31,11 @@ export function OrganizersSection() {
 
   const errorCode = inviteOrganizer.isError ? codeOf(inviteOrganizer.error) : null;
   const errorText =
-    errorCode === "email_taken"
-      ? "That email already has an account."
-      : errorCode
-        ? "Something went wrong."
-        : null;
+    errorCode === "email_taken" ? "That email already has an account." : errorCode ? "Something went wrong." : null;
 
   return (
     <div>
-      {shareLink && (
-        <SharePopup
-          url={shareLink}
-          title="Co-organizer invite link"
-          onClose={() => setShareLink(null)}
-        />
-      )}
+      {shareLink && <SharePopup url={shareLink} title="Co-organizer invite link" onClose={() => setShareLink(null)} />}
 
       <Card className="mb-6 p-5">
         <form
@@ -128,11 +118,7 @@ export function OrganizersSection() {
                     >
                       Copy link
                     </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => cancelInvite.mutate(i.id)}
-                      disabled={cancelInvite.isPending}
-                    >
+                    <Button variant="ghost" onClick={() => cancelInvite.mutate(i.id)} disabled={cancelInvite.isPending}>
                       Cancel
                     </Button>
                   </div>

@@ -171,9 +171,7 @@ app.setNotFoundHandler((request, reply) => {
   reply.sendFile("index.html");
 });
 
-app
-  .listen({ port: config.port, host: config.host })
-  .catch((err) => {
-    app.log.error(err);
-    process.exit(1);
-  });
+app.listen({ port: config.port, host: config.host }).catch((err) => {
+  app.log.error(err);
+  process.exit(1);
+});

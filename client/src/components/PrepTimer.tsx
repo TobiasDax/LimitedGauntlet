@@ -33,7 +33,9 @@ export function PrepTimerDisplay({
       >
         {countdown.expired ? "0:00" : countdown.formatted}
       </div>
-      {countdown.expired && <div className="text-[12px] font-semibold tracking-wide text-accent uppercase">Time's up</div>}
+      {countdown.expired && (
+        <div className="text-[12px] font-semibold tracking-wide text-accent uppercase">Time's up</div>
+      )}
     </div>
   );
 }
@@ -93,11 +95,7 @@ export function PrepTimer({ pod }: { pod: Pod }) {
         </label>
         <label className="flex flex-1 flex-col gap-1">
           <span className="text-[11px] tracking-wide text-ink-muted uppercase">Label (optional)</span>
-          <TextField
-            placeholder="Draft, Deck-building…"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
+          <TextField placeholder="Draft, Deck-building…" value={label} onChange={(e) => setLabel(e.target.value)} />
         </label>
         <Button type="submit" variant="primary" disabled={setTimer.isPending}>
           {setTimer.isPending ? "Starting…" : "Start timer"}

@@ -40,7 +40,11 @@ function ownNonLoopbackAddress(): string {
 
 async function withTestServer(
   handler: (req: IncomingMessage, body: string) => { status: number; body?: string },
-): Promise<{ url: string; close: () => Promise<void>; requests: { headers: Record<string, string | string[] | undefined>; body: string }[] }> {
+): Promise<{
+  url: string;
+  close: () => Promise<void>;
+  requests: { headers: Record<string, string | string[] | undefined>; body: string }[];
+}> {
   const requests: { headers: Record<string, string | string[] | undefined>; body: string }[] = [];
   const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -145,7 +149,10 @@ describe("deliverWebhook", () => {
 });
 
 describe("sendWebhookEvent", () => {
-  async function makeOrgTournamentPod(webhooks: { url: string; secret: string; label?: string }[] = [], webhookEnabled = true) {
+  async function makeOrgTournamentPod(
+    webhooks: { url: string; secret: string; label?: string }[] = [],
+    webhookEnabled = true,
+  ) {
     const unique = `${Date.now()}-${Math.random()}`;
     const org = await prisma.organization.create({
       data: {
@@ -158,7 +165,13 @@ describe("sendWebhookEvent", () => {
       data: { orgId: org.id, name: "Webhook Test Tournament", startDate: new Date(), endDate: new Date() },
     });
     const pod = await prisma.pod.create({
-      data: { tournamentId: tournament.id, name: "Webhook Test Pod", format: "DRAFT", sequenceOrder: 0, webhookEnabled },
+      data: {
+        tournamentId: tournament.id,
+        name: "Webhook Test Pod",
+        format: "DRAFT",
+        sequenceOrder: 0,
+        webhookEnabled,
+      },
     });
     return { org, tournament, pod };
   }
@@ -336,7 +349,9 @@ describe("parseAdminWebhookConfig", () => {
   });
 
   it("accepts a valid http:// or https:// URL with a long-enough secret", () => {
-    expect(parseAdminWebhookConfig({ url: "http://192.168.1.231:8123/api/webhook/abc", secret: "a".repeat(16) })).toEqual({
+    expect(
+      parseAdminWebhookConfig({ url: "http://192.168.1.231:8123/api/webhook/abc", secret: "a".repeat(16) }),
+    ).toEqual({
       url: "http://192.168.1.231:8123/api/webhook/abc",
       secret: "a".repeat(16),
     });

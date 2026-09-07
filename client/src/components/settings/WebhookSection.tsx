@@ -27,9 +27,10 @@ export function WebhookSection() {
     <div>
       <Card className="mb-6 p-5">
         <p className="mb-3 text-[12.5px] text-ink-secondary">
-          Each POST carries a JSON body and an <code className="text-[12px]">X-LimitedGauntlet-Signature:
-          sha256=…</code> header — an HMAC-SHA256 of the raw body using that webhook's own secret — so your receiving
-          automation can verify it really came from this deployment.
+          Each POST carries a JSON body and an{" "}
+          <code className="text-[12px]">X-LimitedGauntlet-Signature: sha256=…</code> header — an HMAC-SHA256 of the raw
+          body using that webhook's own secret — so your receiving automation can verify it really came from this
+          deployment.
         </p>
         <form
           className="flex flex-wrap items-end gap-2"
@@ -38,7 +39,12 @@ export function WebhookSection() {
             if (!url.trim()) return;
             createWebhook.mutate(
               { url: url.trim(), label: label.trim() || undefined },
-              { onSuccess: () => { setUrl(""); setLabel(""); } },
+              {
+                onSuccess: () => {
+                  setUrl("");
+                  setLabel("");
+                },
+              },
             );
           }}
         >
@@ -61,9 +67,7 @@ export function WebhookSection() {
             {createWebhook.isPending ? "Adding…" : "+ Add webhook"}
           </Button>
         </form>
-        {createWebhook.isError && (
-          <FormError>Couldn't save that URL — check it's a valid http(s) address.</FormError>
-        )}
+        {createWebhook.isError && <FormError>Couldn't save that URL — check it's a valid http(s) address.</FormError>}
       </Card>
 
       {isLoading ? (
@@ -148,7 +152,12 @@ function WebhookRow({ webhook }: { webhook: OrgWebhook }) {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="ghost" disabled={testWebhook.isPending} onClick={() => testWebhook.mutate(webhook.id)}>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={testWebhook.isPending}
+          onClick={() => testWebhook.mutate(webhook.id)}
+        >
           {testWebhook.isPending ? "Sending…" : "Send test event"}
         </Button>
         <Button
@@ -156,7 +165,11 @@ function WebhookRow({ webhook }: { webhook: OrgWebhook }) {
           variant="ghost"
           disabled={regenerateSecret.isPending}
           onClick={() => {
-            if (confirm("Regenerate this webhook's signing secret? Any automation using the old secret will stop verifying.")) {
+            if (
+              confirm(
+                "Regenerate this webhook's signing secret? Any automation using the old secret will stop verifying.",
+              )
+            ) {
               regenerateSecret.mutate(webhook.id);
             }
           }}

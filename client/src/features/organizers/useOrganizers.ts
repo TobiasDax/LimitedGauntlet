@@ -22,14 +22,16 @@ export interface OrganizerInviteSummary {
 export function useOrganizers() {
   return useQuery({
     queryKey: ["organizers"],
-    queryFn: () => api.get<{ organizers: OrganizerSummary[]; invites: OrganizerInviteSummary[] }>("/settings/organizers"),
+    queryFn: () =>
+      api.get<{ organizers: OrganizerSummary[]; invites: OrganizerInviteSummary[] }>("/settings/organizers"),
   });
 }
 
 export function useInviteOrganizer() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (email: string) => api.post<{ link: string; emailSent: boolean }>("/settings/organizers/invite", { email }),
+    mutationFn: (email: string) =>
+      api.post<{ link: string; emailSent: boolean }>("/settings/organizers/invite", { email }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["organizers"] }),
   });
 }

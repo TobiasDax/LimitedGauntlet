@@ -2,7 +2,8 @@
 // audio file — no asset to ship, no CSP concerns, works offline.
 // Played as the 10-minutes-remaining warning.
 export function playChime(): void {
-  const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const AudioCtx =
+    window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const ctx = new AudioCtx();
 
   const tone = (freq: number, startAt: number, duration: number) => {

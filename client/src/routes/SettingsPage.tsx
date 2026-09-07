@@ -25,9 +25,9 @@ export function SettingsPage() {
         title="Public page access"
         description={
           <>
-            Your public pages (<code className="text-[12px]">/o/{me?.organization.slug ?? "…"}</code>) are open to anyone
-            with the link by default. Set a password to require it before anyone can view them — visitors enter it once
-            per browser.
+            Your public pages (<code className="text-[12px]">/o/{me?.organization.slug ?? "…"}</code>) are open to
+            anyone with the link by default. Set a password to require it before anyone can view them — visitors enter
+            it once per browser.
           </>
         }
       >
@@ -38,9 +38,9 @@ export function SettingsPage() {
         title="API Tokens"
         description={
           <>
-            Bearer tokens for non-browser clients (e.g. the MCP server) — a token acts as you, with the same access
-            your login has. Keep it as secret as your password; anyone in this browser session can mint or revoke
-            tokens, but the token itself only ever works over the API, never to log into the app directly.
+            Bearer tokens for non-browser clients (e.g. the MCP server) — a token acts as you, with the same access your
+            login has. Keep it as secret as your password; anyone in this browser session can mint or revoke tokens, but
+            the token itself only ever works over the API, never to log into the app directly.
           </>
         }
       >

@@ -11,7 +11,9 @@ describe("parseTrustedProxies", () => {
 
   it("accepts exact IPs and bounded CIDRs", () => {
     expect(parseTrustedProxies("172.30.0.2, 2001:db8::1,10.0.0.0/24")).toEqual([
-      "172.30.0.2", "2001:db8::1", "10.0.0.0/24",
+      "172.30.0.2",
+      "2001:db8::1",
+      "10.0.0.0/24",
     ]);
   });
 
@@ -48,11 +50,12 @@ describe("rate-limit request identity", () => {
 
   it("ignores forwarding headers from a peer outside the allowlist", async () => {
     const app = await limitedApp(["10.0.0.2"]);
-    const request = (forwardedFor: string) => app.inject({
-      url: "/",
-      remoteAddress: "192.0.2.10",
-      headers: { "x-forwarded-for": forwardedFor },
-    });
+    const request = (forwardedFor: string) =>
+      app.inject({
+        url: "/",
+        remoteAddress: "192.0.2.10",
+        headers: { "x-forwarded-for": forwardedFor },
+      });
     expect((await request("1.1.1.1")).json()).toEqual({ ip: "192.0.2.10" });
     expect((await request("2.2.2.2")).statusCode).toBe(200);
     expect((await request("3.3.3.3")).statusCode).toBe(429);

@@ -147,7 +147,9 @@ export function useToggleTokens() {
   return useMutation({
     mutationFn: (enabled: boolean) => api.put<{ tokensEnabled: boolean }>("/settings/tokens", { enabled }),
     onSuccess: (_data, enabled) => {
-      queryClient.setQueryData<MeResponse | null>(["me"], (prev) => (prev ? { ...prev, tokensEnabled: enabled } : prev));
+      queryClient.setQueryData<MeResponse | null>(["me"], (prev) =>
+        prev ? { ...prev, tokensEnabled: enabled } : prev,
+      );
       queryClient.invalidateQueries({ queryKey: ["hall-of-fame"] });
       queryClient.invalidateQueries({ queryKey: ["tokens"] });
     },
@@ -178,7 +180,11 @@ export function useChangePassword() {
       // flag (both places it lives) so Profile switches to password mode.
       queryClient.setQueryData<MeResponse | null>(["me"], (prev) =>
         prev
-          ? { ...prev, hasPassword: true, identity: prev.identity ? { ...prev.identity, hasPassword: true } : prev.identity }
+          ? {
+              ...prev,
+              hasPassword: true,
+              identity: prev.identity ? { ...prev.identity, hasPassword: true } : prev.identity,
+            }
           : prev,
       );
     },
@@ -233,7 +239,8 @@ export function useDeleteAccount() {
 export function useInviteInfo(token: string) {
   return useQuery({
     queryKey: ["invite", token],
-    queryFn: () => api.get<{ email: string; organizationName: string; accountExists: boolean }>(`/auth/invite/${token}`),
+    queryFn: () =>
+      api.get<{ email: string; organizationName: string; accountExists: boolean }>(`/auth/invite/${token}`),
     enabled: !!token,
     retry: false,
   });

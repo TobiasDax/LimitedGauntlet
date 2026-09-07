@@ -17,10 +17,7 @@ export function ProfilePage() {
       <ScreenTitle>Profile</ScreenTitle>
       <ScreenDek>Your login — the same across every organization you belong to.</ScreenDek>
 
-      <SettingsSection
-        title="Sign-in"
-        description="Change the email you sign in with, or set / change your password."
-      >
+      <SettingsSection title="Sign-in" description="Change the email you sign in with, or set / change your password.">
         <ProfileSection />
       </SettingsSection>
 

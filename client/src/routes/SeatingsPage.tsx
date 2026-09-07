@@ -82,7 +82,11 @@ export function SeatingsPage() {
         )
       ) : seatByEntrantId && seatByEntrantId.size > 0 ? (
         <>
-          <SeatingChart seatByEntrantId={seatByEntrantId} entrantById={entrantById} entrantCount={pod.entrants.length} />
+          <SeatingChart
+            seatByEntrantId={seatByEntrantId}
+            entrantById={entrantById}
+            entrantCount={pod.entrants.length}
+          />
           <p className="text-[13px] text-ink-secondary">
             Seatings are generated. Head to the{" "}
             <Link to={`/pods/${id}/rounds`} className="text-link underline hover:text-link-strong">

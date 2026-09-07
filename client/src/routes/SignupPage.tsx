@@ -38,91 +38,90 @@ export function SignupPage() {
         // with SSO, which drops the first-time user into the org-setup screen.
         <Card className="p-6 text-center">
           <p className="mb-4 text-[14px] text-ink-secondary">
-            This instance uses single sign-on — if you don't have an organization yet, you'll be prompted to
-            create one after signing in.
+            This instance uses single sign-on — if you don't have an organization yet, you'll be prompted to create one
+            after signing in.
           </p>
           <SsoButtons providers={appConfig.ssoProviders ?? []} />
         </Card>
       ) : statusLoading ? null : !signupStatus?.allowSignup ? (
         <Card className="p-6 text-center">
           <p className="text-[14px] text-ink-secondary">
-            Signups are closed right now. Ask whoever's running this instance for an invite, or to open signups
-            briefly.
+            Signups are closed right now. Ask whoever's running this instance for an invite, or to open signups briefly.
           </p>
         </Card>
       ) : (
         <Card className="p-6">
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            signup.mutate(
-              { orgName, orgSlug, organizerName, organizerEmail, organizerPassword },
-              { onSuccess: () => navigate("/") },
-            );
-          }}
-        >
-          <Field label="Organization name" hint="e.g. your playgroup's name">
-            <TextField
-              required
-              value={orgName}
-              onChange={(e) => {
-                setOrgName(e.target.value);
-                if (!slugTouched) setOrgSlug(slugify(e.target.value));
-              }}
-            />
-          </Field>
-          <Field label="URL slug" hint="Used in shareable links — lowercase, numbers, hyphens">
-            <TextField
-              required
-              pattern="[a-z0-9]+(-[a-z0-9]+)*"
-              minLength={3}
-              value={orgSlug}
-              onChange={(e) => {
-                setSlugTouched(true);
-                setOrgSlug(slugify(e.target.value));
-              }}
-            />
-          </Field>
-          <Field label="Your name">
-            <TextField required value={organizerName} onChange={(e) => setOrganizerName(e.target.value)} />
-          </Field>
-          <Field label="Email">
-            <TextField
-              type="email"
-              autoComplete="email"
-              required
-              value={organizerEmail}
-              onChange={(e) => setOrganizerEmail(e.target.value)}
-            />
-          </Field>
-          <Field label="Password" hint="At least 8 characters">
-            <TextField
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={organizerPassword}
-              onChange={(e) => setOrganizerPassword(e.target.value)}
-            />
-          </Field>
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              signup.mutate(
+                { orgName, orgSlug, organizerName, organizerEmail, organizerPassword },
+                { onSuccess: () => navigate("/") },
+              );
+            }}
+          >
+            <Field label="Organization name" hint="e.g. your playgroup's name">
+              <TextField
+                required
+                value={orgName}
+                onChange={(e) => {
+                  setOrgName(e.target.value);
+                  if (!slugTouched) setOrgSlug(slugify(e.target.value));
+                }}
+              />
+            </Field>
+            <Field label="URL slug" hint="Used in shareable links — lowercase, numbers, hyphens">
+              <TextField
+                required
+                pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                minLength={3}
+                value={orgSlug}
+                onChange={(e) => {
+                  setSlugTouched(true);
+                  setOrgSlug(slugify(e.target.value));
+                }}
+              />
+            </Field>
+            <Field label="Your name">
+              <TextField required value={organizerName} onChange={(e) => setOrganizerName(e.target.value)} />
+            </Field>
+            <Field label="Email">
+              <TextField
+                type="email"
+                autoComplete="email"
+                required
+                value={organizerEmail}
+                onChange={(e) => setOrganizerEmail(e.target.value)}
+              />
+            </Field>
+            <Field label="Password" hint="At least 8 characters">
+              <TextField
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={8}
+                value={organizerPassword}
+                onChange={(e) => setOrganizerPassword(e.target.value)}
+              />
+            </Field>
 
-          {signup.isError && (
-            <FormError>
-              {signup.error instanceof ApiError && signup.error.status === 409
-                ? signup.error.message === "slug_taken"
-                  ? "That URL slug is already taken — try a different one."
-                  : "That email already has an account. Log in, then add another organization from the organization menu in the top bar."
-                : signup.error instanceof ApiError && signup.error.status === 403
-                  ? "Signups just closed — ask whoever's running this instance."
-                  : "Something went wrong. Try again."}
-            </FormError>
-          )}
+            {signup.isError && (
+              <FormError>
+                {signup.error instanceof ApiError && signup.error.status === 409
+                  ? signup.error.message === "slug_taken"
+                    ? "That URL slug is already taken — try a different one."
+                    : "That email already has an account. Log in, then add another organization from the organization menu in the top bar."
+                  : signup.error instanceof ApiError && signup.error.status === 403
+                    ? "Signups just closed — ask whoever's running this instance."
+                    : "Something went wrong. Try again."}
+              </FormError>
+            )}
 
-          <Button type="submit" variant="primary" disabled={signup.isPending}>
-            {signup.isPending ? "Creating…" : "Create organization"}
-          </Button>
-        </form>
+            <Button type="submit" variant="primary" disabled={signup.isPending}>
+              {signup.isPending ? "Creating…" : "Create organization"}
+            </Button>
+          </form>
         </Card>
       )}
 

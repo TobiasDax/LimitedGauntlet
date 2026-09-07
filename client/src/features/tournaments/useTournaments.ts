@@ -54,8 +54,7 @@ export function useUpdateTournament(id: string) {
 export function useReorderPods(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (podIds: string[]) =>
-      api.patch<{ ok: true }>(`/tournaments/${tournamentId}/pod-order`, { podIds }),
+    mutationFn: (podIds: string[]) => api.patch<{ ok: true }>(`/tournaments/${tournamentId}/pod-order`, { podIds }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId] });
     },

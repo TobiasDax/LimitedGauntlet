@@ -41,13 +41,7 @@ function AccountControls({ player, orgSlug }: { player: Player; orgSlug: string 
   }
 
   if (link) {
-    return (
-      <SharePopup
-        url={link}
-        title="Player invite link"
-        onClose={() => setLink(null)}
-      />
-    );
+    return <SharePopup url={link} title="Player invite link" onClose={() => setLink(null)} />;
   }
 
   if (player.pendingInvite || showForm) {
@@ -57,10 +51,7 @@ function AccountControls({ player, orgSlug }: { player: Player; orgSlug: string 
         onSubmit={(e) => {
           e.preventDefault();
           if (!email.trim()) return;
-          invite.mutate(
-            { id: player.id, email: email.trim() },
-            { onSuccess: (res) => setLink(res.acceptUrl) },
-          );
+          invite.mutate({ id: player.id, email: email.trim() }, { onSuccess: (res) => setLink(res.acceptUrl) });
         }}
       >
         <TextField
@@ -220,8 +211,8 @@ export function RosterPage() {
       <Eyebrow>Your organization</Eyebrow>
       <ScreenTitle>Roster</ScreenTitle>
       <ScreenDek>
-        Players persist across every tournament your group runs — add them once here. Invite a player to
-        a login and they can check themselves in and report their own results at{" "}
+        Players persist across every tournament your group runs — add them once here. Invite a player to a login and
+        they can check themselves in and report their own results at{" "}
         <code className="text-[13px]">/o/{me?.organization.slug ?? "…"}/player</code>.
       </ScreenDek>
 

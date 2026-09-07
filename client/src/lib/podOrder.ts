@@ -4,7 +4,10 @@ import type { Pod } from "./types";
 // sort/partition/group rules so TournamentPage (organizer) and
 // PublicTournamentPage (read-only) render the identical order.
 
-type OrderablePod = Pick<Pod, "id" | "sequenceOrder" | "date" | "startTime" | "isOnDemand" | "completedAt" | "canceledAt">;
+type OrderablePod = Pick<
+  Pod,
+  "id" | "sequenceOrder" | "date" | "startTime" | "isOnDemand" | "completedAt" | "canceledAt"
+>;
 
 // Before PI-76's reorder has ever been used (Tournament.podsManuallyReordered
 // === false), the unfinished list auto-sorts by scheduled date, then time —
@@ -76,7 +79,12 @@ export function distinctDateCount<T extends OrderablePod>(pods: T[]): number {
 // preserves every other pod's relative order untouched, even though the two
 // swapped pods may not be adjacent in the full array (they're only adjacent
 // within whatever filtered/sorted subset the arrows were clicked in).
-export function swapPodOrder<T extends OrderablePod>(allPods: T[], manuallyReordered: boolean, aId: string, bId: string): string[] {
+export function swapPodOrder<T extends OrderablePod>(
+  allPods: T[],
+  manuallyReordered: boolean,
+  aId: string,
+  bId: string,
+): string[] {
   const ordered = sortForDisplay(allPods, manuallyReordered).map((p) => p.id);
   const i = ordered.indexOf(aId);
   const j = ordered.indexOf(bId);

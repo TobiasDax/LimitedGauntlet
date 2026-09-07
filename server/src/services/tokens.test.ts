@@ -43,11 +43,22 @@ async function setup(opts?: { tokensEnabled?: boolean }) {
 // results set so standings order matches `names` order (name[0] wins).
 async function completedPod(tournamentId: string, names: string[], podOverrides?: object) {
   const org = (await prisma.tournament.findUniqueOrThrow({ where: { id: tournamentId } })).orgId;
-  const players = await Promise.all(names.map((n) => prisma.player.create({ data: { orgId: org, displayName: `${n}-${Math.random()}` } })));
+  const players = await Promise.all(
+    names.map((n) => prisma.player.create({ data: { orgId: org, displayName: `${n}-${Math.random()}` } })),
+  );
   const pod = await prisma.pod.create({
-    data: { tournamentId, name: `Pod-${Math.random()}`, format: "DRAFT", sequenceOrder: 0, roundCount: 1, ...podOverrides },
+    data: {
+      tournamentId,
+      name: `Pod-${Math.random()}`,
+      format: "DRAFT",
+      sequenceOrder: 0,
+      roundCount: 1,
+      ...podOverrides,
+    },
   });
-  const entrants = await Promise.all(players.map((p) => prisma.entrant.create({ data: { podId: pod.id, playerId: p.id } })));
+  const entrants = await Promise.all(
+    players.map((p) => prisma.entrant.create({ data: { podId: pod.id, playerId: p.id } })),
+  );
   const round = await prisma.round.create({ data: { podId: pod.id, roundNumber: 1, status: "ACTIVE" } });
   // pair 0v1, 2v3, ... ; earlier index wins → higher standing
   for (let i = 0; i + 1 < entrants.length; i += 2) {
@@ -114,7 +125,15 @@ describe("syncPodTokenAwards", () => {
     const p2 = await prisma.player.create({ data: { orgId: org.id, displayName: `m2-${Math.random()}` } });
     const opp = await prisma.player.create({ data: { orgId: org.id, displayName: `opp-${Math.random()}` } });
     const pod = await prisma.pod.create({
-      data: { tournamentId: tournament.id, name: `TP-${Math.random()}`, format: "DRAFT", sequenceOrder: 0, roundCount: 1, isTeamEvent: true, teamSize: 2 },
+      data: {
+        tournamentId: tournament.id,
+        name: `TP-${Math.random()}`,
+        format: "DRAFT",
+        sequenceOrder: 0,
+        roundCount: 1,
+        isTeamEvent: true,
+        teamSize: 2,
+      },
     });
     const team = await prisma.team.create({
       data: { podId: pod.id, name: "Team", members: { create: [{ playerId: p1.id }, { playerId: p2.id }] } },
@@ -123,7 +142,15 @@ describe("syncPodTokenAwards", () => {
     const eOpp = await prisma.entrant.create({ data: { podId: pod.id, playerId: opp.id } });
     const round = await prisma.round.create({ data: { podId: pod.id, roundNumber: 1, status: "ACTIVE" } });
     await prisma.match.create({
-      data: { roundId: round.id, tableNumber: 1, entrantAId: eTeam.id, entrantBId: eOpp.id, result: "A_WINS", gamesWonA: 2, reportedAt: new Date() },
+      data: {
+        roundId: round.id,
+        tableNumber: 1,
+        entrantAId: eTeam.id,
+        entrantBId: eOpp.id,
+        result: "A_WINS",
+        gamesWonA: 2,
+        reportedAt: new Date(),
+      },
     });
     await prisma.round.update({ where: { id: round.id }, data: { status: "COMPLETED" } });
 
@@ -234,6 +261,8 @@ describe("recordManualTokenTxn", () => {
   it("rejects when tokens are disabled", async () => {
     const { org, organizer } = await setup({ tokensEnabled: false });
     const player = await prisma.player.create({ data: { orgId: org.id, displayName: `p-${Math.random()}` } });
-    await expect(recordManualTokenTxn(org.id, player.id, organizer.id, { delta: 10 })).rejects.toThrow("tokens_disabled");
+    await expect(recordManualTokenTxn(org.id, player.id, organizer.id, { delta: 10 })).rejects.toThrow(
+      "tokens_disabled",
+    );
   });
 });

@@ -3,7 +3,11 @@ import type { UseMutationResult } from "@tanstack/react-query";
 import type { TokenLedger, TokenLedgerEntry } from "../lib/types";
 import { Button, Card, FormError, TextField } from "./ui";
 
-type AdjustMutation = UseMutationResult<{ balance: number }, unknown, { delta?: number; setTo?: number; note?: string }>;
+type AdjustMutation = UseMutationResult<
+  { balance: number },
+  unknown,
+  { delta?: number; setTo?: number; note?: string }
+>;
 
 function reasonLabel(t: TokenLedgerEntry): string {
   switch (t.reason) {
@@ -83,7 +87,11 @@ export function PlayerTokenLedger({ ledger, adjust }: { ledger: TokenLedger; adj
             </label>
             <label className="flex flex-1 flex-col gap-1">
               <span className="text-[11px] tracking-wide text-ink-muted uppercase">Note (optional)</span>
-              <TextField value={note} onChange={(e) => setNote(e.target.value)} placeholder="Booster box, correction…" />
+              <TextField
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Booster box, correction…"
+              />
             </label>
             <Button type="submit" variant="primary" disabled={adjust.isPending}>
               {adjust.isPending ? "Saving…" : "Apply"}

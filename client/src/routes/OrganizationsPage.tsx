@@ -5,7 +5,12 @@ import { Button, Card, Field, FormError, TextField } from "../components/ui";
 
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const slugify = (s: string) =>
-  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+  s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
 
 // PI-86 — the org chooser. Shown when a login has no active org (several
 // memberships, nothing to resume, or a membership-less account) and as the
@@ -35,9 +40,7 @@ export function OrganizationsPage() {
     <div className="mx-auto max-w-[520px]">
       <h1 className="font-display mb-1 text-[26px] font-bold">Your organizations</h1>
       <p className="mb-6 text-[14px] text-ink-secondary">
-        {orgs.length === 0
-          ? "You're not a member of any organization yet."
-          : "Pick which organization to work in."}
+        {orgs.length === 0 ? "You're not a member of any organization yet." : "Pick which organization to work in."}
       </p>
 
       {orgs.length > 0 && (

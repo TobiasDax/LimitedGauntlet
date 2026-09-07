@@ -54,8 +54,8 @@ export function PodStandingsPage() {
       </Eyebrow>
       <ScreenTitle>Standings</ScreenTitle>
       <ScreenDek>
-        Points, then the standard tiebreakers — opponents' match-win %, game-win %, opponents' game-win %. Tied rows
-        can be manually reordered with the arrows (e.g. when a final-round draw was agreed to lock in placement).
+        Points, then the standard tiebreakers — opponents' match-win %, game-win %, opponents' game-win %. Tied rows can
+        be manually reordered with the arrows (e.g. when a final-round draw was agreed to lock in placement).
       </ScreenDek>
 
       <PodTabs podId={id!} />
@@ -95,7 +95,10 @@ export function PodStandingsPage() {
                 const tiedAbove = isTiedWith(row, rows[i - 1]);
                 const tiedBelow = isTiedWith(row, rows[i + 1]);
                 return (
-                  <tr key={row.entrantId} className={i === 0 ? "bg-accent-wash shadow-[inset_3px_0_0_var(--color-accent)]" : ""}>
+                  <tr
+                    key={row.entrantId}
+                    className={i === 0 ? "bg-accent-wash shadow-[inset_3px_0_0_var(--color-accent)]" : ""}
+                  >
                     <td className="border-t border-border px-4 py-3.5 text-right text-[13px] font-semibold tabular-nums text-ink-muted">
                       {i + 1}
                     </td>

@@ -63,7 +63,10 @@ function registerDestructiveTool<Shape extends z.ZodRawShape>(
 
   (server.registerTool as (...args: unknown[]) => unknown)(
     name,
-    { description: `${description} DESTRUCTIVE — requires confirmation (see tool description).`, inputSchema: fullShape },
+    {
+      description: `${description} DESTRUCTIVE — requires confirmation (see tool description).`,
+      inputSchema: fullShape,
+    },
     async (raw: Record<string, unknown>) => {
       try {
         if (raw.confirmationToken) {
@@ -350,9 +353,14 @@ registerReadWriteTool(
   ({ roundId, ...body }) => api.post(`/rounds/${roundId}/swap`, body),
 );
 
-registerReadWriteTool("start_round", "Start a pending round, locking further pairing edits and starting its timer.", {
-  roundId: z.string(),
-}, ({ roundId }) => api.post(`/rounds/${roundId}/start`));
+registerReadWriteTool(
+  "start_round",
+  "Start a pending round, locking further pairing edits and starting its timer.",
+  {
+    roundId: z.string(),
+  },
+  ({ roundId }) => api.post(`/rounds/${roundId}/start`),
+);
 
 registerReadWriteTool(
   "extend_round",
@@ -389,7 +397,9 @@ registerReadWriteTool(
     cardName: z.string().optional(),
     collectorNumber: z
       .string()
-      .describe("Scryfall collector number, e.g. '243' — requires setCode, pins the exact printing instead of matching by name")
+      .describe(
+        "Scryfall collector number, e.g. '243' — requires setCode, pins the exact printing instead of matching by name",
+      )
       .optional(),
     playerId: z.string().optional(),
     setCode: z.string().describe("Scryfall set code, e.g. 'eoe' — pins the printing instead of guessing").optional(),
@@ -404,10 +414,15 @@ registerReadWriteTool(
   {
     cardPullId: z.string(),
     playerId: z.string().nullable().optional(),
-    setCode: z.string().describe("Scryfall set code, e.g. 'eoe' — re-resolves the same card name in this set").optional(),
+    setCode: z
+      .string()
+      .describe("Scryfall set code, e.g. 'eoe' — re-resolves the same card name in this set")
+      .optional(),
     collectorNumber: z
       .string()
-      .describe("Scryfall collector number, e.g. '243' — pins an exact printing when the pull matched the wrong one of two cards sharing a name+set")
+      .describe(
+        "Scryfall collector number, e.g. '243' — pins an exact printing when the pull matched the wrong one of two cards sharing a name+set",
+      )
       .optional(),
     foil: z.boolean().optional(),
   },

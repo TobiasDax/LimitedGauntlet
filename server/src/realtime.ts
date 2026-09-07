@@ -18,7 +18,10 @@ interface RealtimeSessionCodec {
 }
 
 interface RealtimeAuthorizationStore {
-  findRoomOrganization(kind: RoomKind, resourceId: string): Promise<{ id: string; publicPasswordHash: string | null } | null>;
+  findRoomOrganization(
+    kind: RoomKind,
+    resourceId: string,
+  ): Promise<{ id: string; publicPasswordHash: string | null } | null>;
   // Also checks the session's authVersion against the account's current one —
   // the same invalidation `requireAuth`/`requireSessionAuth` (auth/middleware.ts)
   // apply to HTTP requests, so an OIDC subject relink (PI-49) or any other
@@ -100,7 +103,13 @@ export function createRealtimeRoomAuthorizer(
     const organizerId = session.get<unknown>("organizerId");
     if (typeof organizerId === "string") {
       const authVersion = session.get<unknown>("authVersion");
-      if (await store.organizerSessionValid(organizerId, organization.id, typeof authVersion === "number" ? authVersion : 0)) {
+      if (
+        await store.organizerSessionValid(
+          organizerId,
+          organization.id,
+          typeof authVersion === "number" ? authVersion : 0,
+        )
+      ) {
         return true;
       }
     }

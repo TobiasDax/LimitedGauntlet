@@ -49,9 +49,7 @@ async function resolveActiveOrg(
   }
 
   const resolved =
-    account.lastActiveOrgId && orgIds.has(account.lastActiveOrgId)
-      ? account.lastActiveOrgId
-      : memberships[0]!.orgId;
+    account.lastActiveOrgId && orgIds.has(account.lastActiveOrgId) ? account.lastActiveOrgId : memberships[0]!.orgId;
   request.session.set("activeOrgId", resolved);
   return resolved;
 }

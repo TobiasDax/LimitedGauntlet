@@ -33,7 +33,16 @@ function syncTournamentAttendance(tx: Prisma.TransactionClient, tournamentId: st
 }
 
 const podFormats = ["DRAFT", "SEALED", "CHAOS_DRAFT", "CONSTRUCTED", "CUSTOM"] as const;
-const constructedFormats = ["STANDARD", "MODERN", "LEGACY", "VINTAGE", "PIONEER", "PRE_MODERN", "PAUPER", "CUSTOM"] as const;
+const constructedFormats = [
+  "STANDARD",
+  "MODERN",
+  "LEGACY",
+  "VINTAGE",
+  "PIONEER",
+  "PRE_MODERN",
+  "PAUPER",
+  "CUSTOM",
+] as const;
 const matchFormats = ["BO1", "BO3"] as const;
 const podStatuses = ["SETUP", "PAIRING", "IN_PROGRESS", "COMPLETED"] as const;
 
@@ -106,13 +115,18 @@ const podUpdateSchema = z.object({
 // constructedFormatCustom only pairs with the CUSTOM option — enforced
 // here (not via Zod .refine) to match the existing isTeamEvent/teamSize
 // check below, which needs the same "read body + 400" shape.
-function constructedFormatError(format: string | undefined, data: {
-  constructedFormat?: string | null;
-  constructedFormatCustom?: string | null;
-}): string | null {
+function constructedFormatError(
+  format: string | undefined,
+  data: {
+    constructedFormat?: string | null;
+    constructedFormatCustom?: string | null;
+  },
+): string | null {
   if (data.constructedFormat && format !== "CONSTRUCTED") return "constructed_format_requires_constructed_pod";
-  if (data.constructedFormatCustom && data.constructedFormat !== "CUSTOM") return "constructed_format_custom_requires_custom";
-  if (data.constructedFormat === "CUSTOM" && !data.constructedFormatCustom) return "constructed_format_custom_name_required";
+  if (data.constructedFormatCustom && data.constructedFormat !== "CUSTOM")
+    return "constructed_format_custom_requires_custom";
+  if (data.constructedFormat === "CUSTOM" && !data.constructedFormatCustom)
+    return "constructed_format_custom_name_required";
   return null;
 }
 
@@ -209,7 +223,10 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
     const { tokenStandingBonuses: _createBonuses, ...createData } = body.data;
     const pod = await prisma.$transaction(async (tx) => {
       if (body.data.isMainEvent) {
-        await tx.pod.updateMany({ where: { tournamentId: tournament.id, isMainEvent: true }, data: { isMainEvent: false } });
+        await tx.pod.updateMany({
+          where: { tournamentId: tournament.id, isMainEvent: true },
+          data: { isMainEvent: false },
+        });
       }
       return tx.pod.create({
         data: { ...createData, ...tokenBonusesData(_createBonuses), tournamentId: tournament.id },
@@ -422,7 +439,11 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       reply.code(404).send({ error: "not_found" });
       return;
     }
-    emitPodEvent(params.data.id, "prep-timer-updated", { podId: params.data.id, prepTimerEndsAt: null, prepTimerLabel: null });
+    emitPodEvent(params.data.id, "prep-timer-updated", {
+      podId: params.data.id,
+      prepTimerEndsAt: null,
+      prepTimerLabel: null,
+    });
     reply.code(204).send();
   });
 
@@ -495,7 +516,10 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       const newNames = (bulk.data.newPlayerNames ?? []).map((n) => n.trim());
 
       if (requestedIds.length > 0) {
-        const found = await prisma.player.findMany({ where: { id: { in: requestedIds }, orgId }, select: { id: true } });
+        const found = await prisma.player.findMany({
+          where: { id: { in: requestedIds }, orgId },
+          select: { id: true },
+        });
         if (found.length !== requestedIds.length) {
           reply.code(400).send({ error: "unknown_player" });
           return;
@@ -515,7 +539,10 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       }
       if (newNames.length > 0) {
         const clash = await prisma.player.findFirst({
-          where: { orgId, OR: newNames.map((name) => ({ displayName: { equals: name, mode: "insensitive" as const } })) },
+          where: {
+            orgId,
+            OR: newNames.map((name) => ({ displayName: { equals: name, mode: "insensitive" as const } })),
+          },
           select: { displayName: true },
         });
         if (clash) {

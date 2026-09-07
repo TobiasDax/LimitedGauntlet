@@ -56,19 +56,45 @@ function ChangePasswordForm({ hasPassword }: { hasPassword: boolean }) {
         }}
       >
         {hasPassword && (
-          <TextField type="password" autoComplete="current-password" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          <TextField
+            type="password"
+            autoComplete="current-password"
+            placeholder="Current password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+          />
         )}
-        <TextField type="password" autoComplete="new-password" placeholder="New password (min 8)" value={next} onChange={(e) => setNext(e.target.value)} />
-        <TextField type="password" autoComplete="new-password" placeholder="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        <TextField
+          type="password"
+          autoComplete="new-password"
+          placeholder="New password (min 8)"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+        />
+        <TextField
+          type="password"
+          autoComplete="new-password"
+          placeholder="Confirm new password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+        />
         <div>
-          <Button type="submit" variant="primary" disabled={(hasPassword && !current) || !next || changePassword.isPending}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={(hasPassword && !current) || !next || changePassword.isPending}
+          >
             {changePassword.isPending ? "Saving…" : hasPassword ? "Change password" : "Set password"}
           </Button>
         </div>
       </form>
       {localError && <FormError>{localError}</FormError>}
       {changePassword.isError && (
-        <FormError>{codeOf(changePassword.error) === "invalid_password" ? "Current password is incorrect." : "Something went wrong."}</FormError>
+        <FormError>
+          {codeOf(changePassword.error) === "invalid_password"
+            ? "Current password is incorrect."
+            : "Something went wrong."}
+        </FormError>
       )}
       {done && <p className="mt-2 text-[13px] text-good">{hasPassword ? "Password changed." : "Password set."}</p>}
     </Card>
@@ -120,17 +146,34 @@ function ChangeEmailForm({ currentEmail, hasPassword }: { currentEmail: string; 
         }}
       >
         {hasPassword && (
-          <TextField type="password" autoComplete="current-password" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          <TextField
+            type="password"
+            autoComplete="current-password"
+            placeholder="Current password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+          />
         )}
-        <TextField type="email" placeholder="New email address" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+        <TextField
+          type="email"
+          placeholder="New email address"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+        />
         <div>
-          <Button type="submit" variant="primary" disabled={(hasPassword && !current) || !newEmail || requestChange.isPending}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={(hasPassword && !current) || !newEmail || requestChange.isPending}
+          >
             {requestChange.isPending ? "Sending…" : "Send confirmation link"}
           </Button>
         </div>
       </form>
       {errorText && <FormError>{errorText}</FormError>}
-      {sent && <p className="mt-2 text-[13px] text-good">Check your new inbox for a confirmation link (expires in 1 hour).</p>}
+      {sent && (
+        <p className="mt-2 text-[13px] text-good">Check your new inbox for a confirmation link (expires in 1 hour).</p>
+      )}
     </Card>
   );
 }

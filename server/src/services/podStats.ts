@@ -94,7 +94,10 @@ export async function computePodStats(podId: string, beforeRoundNumber: number):
     where: { podId, roundNumber: { lt: beforeRoundNumber } },
     include: { matches: true },
   });
-  return tallyMatches(rounds.flatMap((r) => r.matches), pod);
+  return tallyMatches(
+    rounds.flatMap((r) => r.matches),
+    pod,
+  );
 }
 
 // Every round of the pod, as of right now — used for standings, which may
@@ -102,5 +105,8 @@ export async function computePodStats(podId: string, beforeRoundNumber: number):
 export async function computeAllPodStats(podId: string): Promise<PodStats> {
   const pod = await prisma.pod.findUniqueOrThrow({ where: { id: podId } });
   const rounds = await prisma.round.findMany({ where: { podId }, include: { matches: true } });
-  return tallyMatches(rounds.flatMap((r) => r.matches), pod);
+  return tallyMatches(
+    rounds.flatMap((r) => r.matches),
+    pod,
+  );
 }

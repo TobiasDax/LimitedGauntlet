@@ -45,9 +45,7 @@ function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDeta
               endDate,
               location: location.trim() || null,
               status,
-              ...(me?.tokensEnabled
-                ? { tokenParticipation, tokenStandingBonuses: tokenBonuses }
-                : {}),
+              ...(me?.tokensEnabled ? { tokenParticipation, tokenStandingBonuses: tokenBonuses } : {}),
             },
             { onSuccess: onDone },
           );
@@ -165,7 +163,9 @@ function DescriptionSection({ tournament }: { tournament: TournamentDetail }) {
         rows={6}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={"Venue notes, format explainer, schedule…\n\nMarkdown supported: # headings, - lists, **bold**, *italic*, tables, [links](https://…)."}
+        placeholder={
+          "Venue notes, format explainer, schedule…\n\nMarkdown supported: # headings, - lists, **bold**, *italic*, tables, [links](https://…)."
+        }
       />
       <p className="text-[12px] text-ink-muted">
         Supports Markdown — headings, lists, <strong>bold</strong>/<em>italic</em>/<u>underline</u>, tables, and links.
@@ -174,9 +174,7 @@ function DescriptionSection({ tournament }: { tournament: TournamentDetail }) {
         <Button
           variant="primary"
           disabled={update.isPending}
-          onClick={() =>
-            update.mutate({ description: text.trim() || null }, { onSuccess: () => setEditing(false) })
-          }
+          onClick={() => update.mutate({ description: text.trim() || null }, { onSuccess: () => setEditing(false) })}
         >
           {update.isPending ? "Saving…" : "Save"}
         </Button>
@@ -231,33 +229,38 @@ function NewPodForm({
         className="flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();
-          createPod.mutate({
-            name,
-            format,
-            sequenceOrder: nextSequenceOrder,
-            date: date || undefined,
-            startTime: date && startTime ? startTime : undefined,
-            isOnDemand,
-            isTeamEvent,
-            teamSize: isTeamEvent ? teamSize : undefined,
-            roundCount,
-            matchFormat,
-            pointsWin,
-            pointsDraw,
-            pointsLoss,
-            roundLengthMinutes,
-            excludeFromStats,
-            rarePicksEnabled,
-            webhookEnabled,
-            isMainEvent,
-            setCode: setCode || undefined,
-            constructedFormat: format === "CONSTRUCTED" && constructedFormat ? constructedFormat : undefined,
-            constructedFormatCustom:
-              format === "CONSTRUCTED" && constructedFormat === "CUSTOM" ? constructedFormatCustom || undefined : undefined,
-            ...(me?.tokensEnabled && tokenOverride
-              ? { tokenParticipation: podTokenParticipation, tokenStandingBonuses: podTokenBonuses }
-              : {}),
-          }, { onSuccess: onCreated });
+          createPod.mutate(
+            {
+              name,
+              format,
+              sequenceOrder: nextSequenceOrder,
+              date: date || undefined,
+              startTime: date && startTime ? startTime : undefined,
+              isOnDemand,
+              isTeamEvent,
+              teamSize: isTeamEvent ? teamSize : undefined,
+              roundCount,
+              matchFormat,
+              pointsWin,
+              pointsDraw,
+              pointsLoss,
+              roundLengthMinutes,
+              excludeFromStats,
+              rarePicksEnabled,
+              webhookEnabled,
+              isMainEvent,
+              setCode: setCode || undefined,
+              constructedFormat: format === "CONSTRUCTED" && constructedFormat ? constructedFormat : undefined,
+              constructedFormatCustom:
+                format === "CONSTRUCTED" && constructedFormat === "CUSTOM"
+                  ? constructedFormatCustom || undefined
+                  : undefined,
+              ...(me?.tokensEnabled && tokenOverride
+                ? { tokenParticipation: podTokenParticipation, tokenStandingBonuses: podTokenBonuses }
+                : {}),
+            },
+            { onSuccess: onCreated },
+          );
         }}
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -350,13 +353,28 @@ function NewPodForm({
               </select>
             </Field>
             <Field label="Points — win">
-              <TextField type="number" min={0} value={pointsWin} onChange={(e) => setPointsWin(Number(e.target.value))} />
+              <TextField
+                type="number"
+                min={0}
+                value={pointsWin}
+                onChange={(e) => setPointsWin(Number(e.target.value))}
+              />
             </Field>
             <Field label="Points — draw">
-              <TextField type="number" min={0} value={pointsDraw} onChange={(e) => setPointsDraw(Number(e.target.value))} />
+              <TextField
+                type="number"
+                min={0}
+                value={pointsDraw}
+                onChange={(e) => setPointsDraw(Number(e.target.value))}
+              />
             </Field>
             <Field label="Points — loss">
-              <TextField type="number" min={0} value={pointsLoss} onChange={(e) => setPointsLoss(Number(e.target.value))} />
+              <TextField
+                type="number"
+                min={0}
+                value={pointsLoss}
+                onChange={(e) => setPointsLoss(Number(e.target.value))}
+              />
             </Field>
             <Field label="Round length (minutes)">
               <TextField
@@ -386,11 +404,7 @@ function NewPodForm({
               Exclude from org-wide stats (Hall of Fame, Treasure Chest) — for one-off, joke, or test pods
             </label>
             <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
-              <input
-                type="checkbox"
-                checked={webhookEnabled}
-                onChange={(e) => setWebhookEnabled(e.target.checked)}
-              />
+              <input type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
               Send events to the org's configured webhook for this pod (Settings → Webhook)
             </label>
 
@@ -466,9 +480,7 @@ export function TournamentPage() {
         )}
         <DeleteTournamentButton tournament={tournament} />
       </div>
-      {editingTournament && (
-        <EditTournamentForm tournament={tournament} onDone={() => setEditingTournament(false)} />
-      )}
+      {editingTournament && <EditTournamentForm tournament={tournament} onDone={() => setEditingTournament(false)} />}
 
       <DescriptionSection tournament={tournament} />
 

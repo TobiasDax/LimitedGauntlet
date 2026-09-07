@@ -61,7 +61,9 @@ export async function computeHallOfFame(orgId: string): Promise<HallOfFameRow[]>
     if (pod.isMainEvent && standings.length > 0) {
       const winnerEntrant = pod.entrants.find((e) => e.id === standings[0]!.entrantId);
       const winnerPlayerIds = winnerEntrant
-        ? (winnerEntrant.playerId ? [winnerEntrant.playerId] : (winnerEntrant.team?.members.map((m) => m.playerId) ?? []))
+        ? winnerEntrant.playerId
+          ? [winnerEntrant.playerId]
+          : (winnerEntrant.team?.members.map((m) => m.playerId) ?? [])
         : [];
       for (const playerId of winnerPlayerIds) {
         if (!mainEventWins.has(playerId)) mainEventWins.set(playerId, []);

@@ -16,8 +16,8 @@ export function HallOfFamePage() {
       <Eyebrow>Your organization</Eyebrow>
       <ScreenTitle>Hall of Fame</ScreenTitle>
       <ScreenDek>
-        All-time player standings across every tournament this group has ever run — ranked by average points per pod,
-        so attending fewer events isn't penalized. Click a player for the deep dive.
+        All-time player standings across every tournament this group has ever run — ranked by average points per pod, so
+        attending fewer events isn't penalized. Click a player for the deep dive.
       </ScreenDek>
 
       {me && (

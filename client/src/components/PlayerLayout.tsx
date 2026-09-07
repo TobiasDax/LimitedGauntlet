@@ -11,7 +11,11 @@ function PlayerOrgSwitcher() {
   const switchOrg = usePlayerSwitchOrg();
   const orgs = me?.organizations ?? [];
   if (!me || orgs.length <= 1) {
-    return <span className="text-[13px] text-ink-secondary">{me ? `${me.organization.name} · Player` : "Player sign-in"}</span>;
+    return (
+      <span className="text-[13px] text-ink-secondary">
+        {me ? `${me.organization.name} · Player` : "Player sign-in"}
+      </span>
+    );
   }
   return (
     <select
@@ -45,10 +49,7 @@ export function PlayerLayout() {
   if (isLoading) return <div className="min-h-screen" />;
 
   const rightSlot = me ? (
-    <Button
-      variant="ghost"
-      onClick={() => logout.mutate(undefined, { onSuccess: () => navigate(`${base}/login`) })}
-    >
+    <Button variant="ghost" onClick={() => logout.mutate(undefined, { onSuccess: () => navigate(`${base}/login`) })}>
       Log out
     </Button>
   ) : (

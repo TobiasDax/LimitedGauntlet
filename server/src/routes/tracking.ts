@@ -20,7 +20,11 @@ export async function trackingRoutes(app: FastifyInstance): Promise<void> {
     // for the full hour, keeping the tracker broken long after upstream
     // recovers.
     const cacheControl = status >= 200 && status < 300 ? "public, max-age=3600" : "no-store";
-    reply.code(status).header("content-type", contentType).header("cache-control", cacheControl).send(Buffer.from(body));
+    reply
+      .code(status)
+      .header("content-type", contentType)
+      .header("cache-control", cacheControl)
+      .send(Buffer.from(body));
   });
 
   app.post("/api/send", async (request, reply) => {

@@ -14,26 +14,30 @@ const envelope = (data: unknown) => ({
 
 describe("parseOrgExport import budgets", () => {
   it("accepts a small valid export", () => {
-    expect(parseOrgExport({
-      ...envelope({ players: ["Alice"], tournaments: [] }),
-      hallOfFame: [],
-      treasureVault: [],
-    })).toMatchObject({ ok: true });
+    expect(
+      parseOrgExport({
+        ...envelope({ players: ["Alice"], tournaments: [] }),
+        hallOfFame: [],
+        treasureVault: [],
+      }),
+    ).toMatchObject({ ok: true });
   });
 
   it("rejects malformed dates before any database work", () => {
     const data = {
       players: [],
-      tournaments: [{
-        name: "Bad date",
-        startDate: "not-a-date",
-        endDate: "2026-01-02T00:00:00.000Z",
-        location: null,
-        description: null,
-        status: "PLANNING",
-        players: [],
-        pods: [],
-      }],
+      tournaments: [
+        {
+          name: "Bad date",
+          startDate: "not-a-date",
+          endDate: "2026-01-02T00:00:00.000Z",
+          location: null,
+          description: null,
+          status: "PLANNING",
+          players: [],
+          pods: [],
+        },
+      ],
     };
     expect(parseOrgExport(envelope(data))).toEqual({ ok: false, error: "invalid_shape" });
   });
@@ -101,7 +105,15 @@ describe("token export → import round-trip (PI-72)", () => {
     const eB = await prisma.entrant.create({ data: { podId: pod.id, playerId: bob.id } });
     const round = await prisma.round.create({ data: { podId: pod.id, roundNumber: 1, status: "ACTIVE" } });
     await prisma.match.create({
-      data: { roundId: round.id, tableNumber: 1, entrantAId: eA.id, entrantBId: eB.id, result: "A_WINS", gamesWonA: 2, reportedAt: new Date() },
+      data: {
+        roundId: round.id,
+        tableNumber: 1,
+        entrantAId: eA.id,
+        entrantBId: eB.id,
+        result: "A_WINS",
+        gamesWonA: 2,
+        reportedAt: new Date(),
+      },
     });
     await prisma.round.update({ where: { id: round.id }, data: { status: "COMPLETED" } });
     await syncPodTokenAwards(pod.id); // Alice +15 auto, Bob +5 auto

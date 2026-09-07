@@ -14,7 +14,11 @@ const pctCell = (fraction: number): Cell => ({ type: Number, value: fraction, fo
 
 // Excel sheet names: max 31 chars, no []:*?/\ and can't be blank or a dupe.
 function sheetName(base: string, used: Set<string>): string {
-  let name = base.replace(/[[\]:*?/\\]/g, " ").trim().slice(0, 31) || "Sheet";
+  let name =
+    base
+      .replace(/[[\]:*?/\\]/g, " ")
+      .trim()
+      .slice(0, 31) || "Sheet";
   if (used.has(name.toLowerCase())) {
     for (let i = 2; ; i++) {
       const candidate = `${name.slice(0, 31 - String(i).length - 1)} ${i}`;
@@ -67,9 +71,7 @@ function recordsFromMatches(rounds: { matches: MatchRow[] }[]): Map<string, { w:
   return rec;
 }
 
-export async function buildTournamentWorkbook(
-  tournamentId: string,
-): Promise<{ buffer: Buffer; filename: string }> {
+export async function buildTournamentWorkbook(tournamentId: string): Promise<{ buffer: Buffer; filename: string }> {
   const tournament = await prisma.tournament.findUniqueOrThrow({
     where: { id: tournamentId },
     include: { organization: { select: { tokensEnabled: true } } },
@@ -100,7 +102,14 @@ export async function buildTournamentWorkbook(
   {
     const podHeaders = gPods.map((p) => header(p.name));
     const data: Row[] = [
-      [header("Rank"), header("Player"), header("Pods played"), header("Total points"), header("Avg / pod"), ...podHeaders],
+      [
+        header("Rank"),
+        header("Player"),
+        header("Pods played"),
+        header("Total points"),
+        header("Avg / pod"),
+        ...podHeaders,
+      ],
     ];
     let rank = 0;
     let prevAvg: number | null = null;
@@ -192,17 +201,7 @@ export async function buildTournamentWorkbook(
                 : m.result === "A_WINS"
                   ? `${a} won`
                   : `${b} won`;
-          data.push([
-            pod.name,
-            round.roundNumber,
-            m.tableNumber,
-            a,
-            b,
-            m.gamesWonA,
-            m.gamesWonB,
-            m.gamesDrawn,
-            result,
-          ]);
+          data.push([pod.name, round.roundNumber, m.tableNumber, a, b, m.gamesWonA, m.gamesWonB, m.gamesDrawn, result]);
         }
       }
     }
@@ -226,12 +225,19 @@ export async function buildTournamentWorkbook(
     ]);
     const balanceByPlayer = new Map(balances.map((b) => [b.playerId, b._sum.delta ?? 0]));
     const names = new Map(
-      (await prisma.player.findMany({ where: { id: { in: earned.map((e) => e.playerId) } }, select: { id: true, displayName: true } })).map(
-        (p) => [p.id, p.displayName],
-      ),
+      (
+        await prisma.player.findMany({
+          where: { id: { in: earned.map((e) => e.playerId) } },
+          select: { id: true, displayName: true },
+        })
+      ).map((p) => [p.id, p.displayName]),
     );
     const rows = earned
-      .map((e) => ({ name: names.get(e.playerId) ?? "—", here: e._sum.delta ?? 0, balance: balanceByPlayer.get(e.playerId) ?? 0 }))
+      .map((e) => ({
+        name: names.get(e.playerId) ?? "—",
+        here: e._sum.delta ?? 0,
+        balance: balanceByPlayer.get(e.playerId) ?? 0,
+      }))
       .sort((a, b) => b.here - a.here || a.name.localeCompare(b.name));
 
     const data: Row[] = [[header("Player"), header("Tokens earned here"), header("Current balance")]];

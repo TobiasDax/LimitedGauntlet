@@ -66,10 +66,7 @@ export function PlayerAcceptInvitePage() {
                   setLocalError("Passwords don't match.");
                   return;
                 }
-                accept.mutate(
-                  { token, password },
-                  { onSuccess: () => navigate(`/o/${invite.orgSlug}/player`) },
-                );
+                accept.mutate({ token, password }, { onSuccess: () => navigate(`/o/${invite.orgSlug}/player`) });
               }}
             >
               <Field label="Password" hint="At least 8 characters">

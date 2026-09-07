@@ -40,52 +40,66 @@ const playerName = z.string().trim().min(1).max(100);
 const teamName = z.string().trim().min(1).max(100);
 const isoDate = z.string().datetime({ offset: true }).max(40);
 
-const matchSchema = z.object({
-  tableNumber: z.number().int().min(1).max(10_000),
-  a: z.string().trim().min(1).max(100),
-  b: z.string().trim().min(1).max(100).nullable(),
-  result: z.nativeEnum(MatchResult),
-  gamesWonA: z.number().int().min(0).max(1_000),
-  gamesWonB: z.number().int().min(0).max(1_000),
-  gamesDrawn: z.number().int().min(0).max(1_000),
-}).strict();
+const matchSchema = z
+  .object({
+    tableNumber: z.number().int().min(1).max(10_000),
+    a: z.string().trim().min(1).max(100),
+    b: z.string().trim().min(1).max(100).nullable(),
+    result: z.nativeEnum(MatchResult),
+    gamesWonA: z.number().int().min(0).max(1_000),
+    gamesWonB: z.number().int().min(0).max(1_000),
+    gamesDrawn: z.number().int().min(0).max(1_000),
+  })
+  .strict();
 
-const roundSchema = z.object({
-  roundNumber: z.number().int().min(1).max(IMPORT_LIMITS.rounds),
-  status: z.nativeEnum(RoundStatus),
-  startedAt: isoDate.nullable().optional(),
-  endsAt: isoDate.nullable().optional(),
-  // Optional so exports predating PI-80 still import. Whatever comes in
-  // here is ignored on import anyway (see importPod) — a restored pod's
-  // round 1 always comes back already revealed, since the reveal gate is
-  // about a live event unfolding, not data restoration.
-  pairingsRevealedAt: isoDate.nullable().optional(),
-  matches: z.array(matchSchema).max(IMPORT_LIMITS.matches),
-}).strict();
+const roundSchema = z
+  .object({
+    roundNumber: z.number().int().min(1).max(IMPORT_LIMITS.rounds),
+    status: z.nativeEnum(RoundStatus),
+    startedAt: isoDate.nullable().optional(),
+    endsAt: isoDate.nullable().optional(),
+    // Optional so exports predating PI-80 still import. Whatever comes in
+    // here is ignored on import anyway (see importPod) — a restored pod's
+    // round 1 always comes back already revealed, since the reveal gate is
+    // about a live event unfolding, not data restoration.
+    pairingsRevealedAt: isoDate.nullable().optional(),
+    matches: z.array(matchSchema).max(IMPORT_LIMITS.matches),
+  })
+  .strict();
 
-const entrantSchema = z.object({
-  player: playerName.nullable(),
-  team: teamName.nullable(),
-  droppedAfterRound: z.number().int().min(0).max(IMPORT_LIMITS.rounds).nullable().optional(),
-  finalPointsOverride: z.number().int().min(-10_000).max(10_000).nullable().optional(),
-  manualTiebreak: z.number().int().min(0).max(IMPORT_LIMITS.entrants).nullable().optional(),
-}).strict().refine((entrant) => (entrant.player === null) !== (entrant.team === null), "entrant must reference exactly one player or team");
+const entrantSchema = z
+  .object({
+    player: playerName.nullable(),
+    team: teamName.nullable(),
+    droppedAfterRound: z.number().int().min(0).max(IMPORT_LIMITS.rounds).nullable().optional(),
+    finalPointsOverride: z.number().int().min(-10_000).max(10_000).nullable().optional(),
+    manualTiebreak: z.number().int().min(0).max(IMPORT_LIMITS.entrants).nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (entrant) => (entrant.player === null) !== (entrant.team === null),
+    "entrant must reference exactly one player or team",
+  );
 
-const teamSchema = z.object({
-  name: teamName,
-  members: z.array(playerName).min(1).max(IMPORT_LIMITS.teamMembers),
-}).strict();
+const teamSchema = z
+  .object({
+    name: teamName,
+    members: z.array(playerName).min(1).max(IMPORT_LIMITS.teamMembers),
+  })
+  .strict();
 
-const cardPullSchema = z.object({
-  cardName: z.string().trim().min(1).max(200),
-  player: playerName.nullable().optional(),
-  playerIdInferred: z.boolean().optional(),
-  scryfallId: z.string().max(64).nullable().optional(),
-  setCode: z.string().max(10).nullable().optional(),
-  foil: z.boolean().optional(),
-  priceEur: z.number().finite().min(0).max(1_000_000).nullable().optional(),
-  imageUri: z.string().max(2_048).nullable().optional(),
-}).strict();
+const cardPullSchema = z
+  .object({
+    cardName: z.string().trim().min(1).max(200),
+    player: playerName.nullable().optional(),
+    playerIdInferred: z.boolean().optional(),
+    scryfallId: z.string().max(64).nullable().optional(),
+    setCode: z.string().max(10).nullable().optional(),
+    foil: z.boolean().optional(),
+    priceEur: z.number().finite().min(0).max(1_000_000).nullable().optional(),
+    imageUri: z.string().max(2_048).nullable().optional(),
+  })
+  .strict();
 
 // PI-72 token config — all optional so pre-PI-72 exports still import. The
 // tournament participation value is a plain int; the pod's is nullable (null =
@@ -99,132 +113,168 @@ const podTokenFields = {
   tokenStandingBonuses: zStandingBonuses.nullable().optional(),
 };
 
-const tokenTxnSchema = z.object({
-  player: playerName,
-  delta: z.number().int().min(-1_000_000).max(1_000_000),
-  reason: z.enum(["MANUAL", "INITIAL"]),
-  note: z.string().max(300).nullable().optional(),
-  createdAt: isoDate,
-}).strict();
+const tokenTxnSchema = z
+  .object({
+    player: playerName,
+    delta: z.number().int().min(-1_000_000).max(1_000_000),
+    reason: z.enum(["MANUAL", "INITIAL"]),
+    note: z.string().max(300).nullable().optional(),
+    createdAt: isoDate,
+  })
+  .strict();
 
-const podSchema = z.object({
-  name: z.string().trim().min(1).max(150),
-  date: isoDate.nullable().optional(),
-  format: z.nativeEnum(PodFormat),
-  setCode: z.string().max(10).nullable().optional(),
-  constructedFormat: z.nativeEnum(ConstructedFormat).nullable().optional(),
-  constructedFormatCustom: z.string().max(60).nullable().optional(),
-  sequenceOrder: z.number().int().min(0).max(10_000),
-  isTeamEvent: z.boolean(),
-  teamSize: z.number().int().min(2).max(8).nullable().optional(),
-  roundCount: z.number().int().min(1).max(IMPORT_LIMITS.rounds),
-  matchFormat: z.nativeEnum(MatchFormat),
-  pointsWin: z.number().int().min(-1_000).max(1_000),
-  pointsDraw: z.number().int().min(-1_000).max(1_000),
-  pointsLoss: z.number().int().min(-1_000).max(1_000),
-  roundLengthMinutes: z.number().int().min(1).max(1_440),
-  status: z.nativeEnum(PodStatus),
-  excludeFromStats: z.boolean(),
-  // Optional so exports predating PI-66 still import — defaults to on.
-  rarePicksEnabled: z.boolean().default(true),
-  ...podTokenFields,
-  isMainEvent: z.boolean(),
-  // Optional so exports predating PI-77/81/82/84 still import.
-  completedAt: isoDate.nullable().optional().default(null),
-  canceledAt: isoDate.nullable().optional().default(null),
-  isOnDemand: z.boolean().optional().default(false),
-  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional().default(null),
-  actualStartedAt: isoDate.nullable().optional().default(null),
-  teams: z.array(teamSchema).max(IMPORT_LIMITS.teams),
-  entrants: z.array(entrantSchema).max(IMPORT_LIMITS.entrants),
-  rounds: z.array(roundSchema).max(IMPORT_LIMITS.rounds),
-  cardPulls: z.array(cardPullSchema).max(IMPORT_LIMITS.cardPulls),
-}).strict();
+const podSchema = z
+  .object({
+    name: z.string().trim().min(1).max(150),
+    date: isoDate.nullable().optional(),
+    format: z.nativeEnum(PodFormat),
+    setCode: z.string().max(10).nullable().optional(),
+    constructedFormat: z.nativeEnum(ConstructedFormat).nullable().optional(),
+    constructedFormatCustom: z.string().max(60).nullable().optional(),
+    sequenceOrder: z.number().int().min(0).max(10_000),
+    isTeamEvent: z.boolean(),
+    teamSize: z.number().int().min(2).max(8).nullable().optional(),
+    roundCount: z.number().int().min(1).max(IMPORT_LIMITS.rounds),
+    matchFormat: z.nativeEnum(MatchFormat),
+    pointsWin: z.number().int().min(-1_000).max(1_000),
+    pointsDraw: z.number().int().min(-1_000).max(1_000),
+    pointsLoss: z.number().int().min(-1_000).max(1_000),
+    roundLengthMinutes: z.number().int().min(1).max(1_440),
+    status: z.nativeEnum(PodStatus),
+    excludeFromStats: z.boolean(),
+    // Optional so exports predating PI-66 still import — defaults to on.
+    rarePicksEnabled: z.boolean().default(true),
+    ...podTokenFields,
+    isMainEvent: z.boolean(),
+    // Optional so exports predating PI-77/81/82/84 still import.
+    completedAt: isoDate.nullable().optional().default(null),
+    canceledAt: isoDate.nullable().optional().default(null),
+    isOnDemand: z.boolean().optional().default(false),
+    startTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+      .nullable()
+      .optional()
+      .default(null),
+    actualStartedAt: isoDate.nullable().optional().default(null),
+    teams: z.array(teamSchema).max(IMPORT_LIMITS.teams),
+    entrants: z.array(entrantSchema).max(IMPORT_LIMITS.entrants),
+    rounds: z.array(roundSchema).max(IMPORT_LIMITS.rounds),
+    cardPulls: z.array(cardPullSchema).max(IMPORT_LIMITS.cardPulls),
+  })
+  .strict();
 
-const tournamentSchema = z.object({
-  name: z.string().trim().min(1).max(150),
-  startDate: isoDate,
-  endDate: isoDate,
-  location: z.string().max(200).nullable().optional(),
-  description: z.string().max(10_000).nullable().optional(),
-  status: z.nativeEnum(TournamentStatus),
-  ...tournamentTokenFields,
-  // Optional so exports predating PI-82 still import.
-  podsManuallyReordered: z.boolean().optional().default(false),
-  players: z.array(playerName).max(IMPORT_LIMITS.rosterPlayers),
-  pods: z.array(podSchema).max(IMPORT_LIMITS.pods),
-}).strict();
+const tournamentSchema = z
+  .object({
+    name: z.string().trim().min(1).max(150),
+    startDate: isoDate,
+    endDate: isoDate,
+    location: z.string().max(200).nullable().optional(),
+    description: z.string().max(10_000).nullable().optional(),
+    status: z.nativeEnum(TournamentStatus),
+    ...tournamentTokenFields,
+    // Optional so exports predating PI-82 still import.
+    podsManuallyReordered: z.boolean().optional().default(false),
+    players: z.array(playerName).max(IMPORT_LIMITS.rosterPlayers),
+    pods: z.array(podSchema).max(IMPORT_LIMITS.pods),
+  })
+  .strict();
 
-const dataSchema = z.object({
-  players: z.array(playerName).max(IMPORT_LIMITS.players),
-  tokensEnabled: z.boolean().optional().default(false),
-  tokenLedger: z.array(tokenTxnSchema).max(IMPORT_LIMITS.tokenLedger).optional().default([]),
-  tournaments: z.array(tournamentSchema).max(IMPORT_LIMITS.tournaments),
-}).strict().superRefine((data, ctx) => {
-  const tournamentNames = new Set<string>();
-  for (const [tournamentIndex, tournament] of data.tournaments.entries()) {
-    if (tournamentNames.has(tournament.name)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tournaments", tournamentIndex, "name"], message: "duplicate tournament name" });
+const dataSchema = z
+  .object({
+    players: z.array(playerName).max(IMPORT_LIMITS.players),
+    tokensEnabled: z.boolean().optional().default(false),
+    tokenLedger: z.array(tokenTxnSchema).max(IMPORT_LIMITS.tokenLedger).optional().default([]),
+    tournaments: z.array(tournamentSchema).max(IMPORT_LIMITS.tournaments),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    const tournamentNames = new Set<string>();
+    for (const [tournamentIndex, tournament] of data.tournaments.entries()) {
+      if (tournamentNames.has(tournament.name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["tournaments", tournamentIndex, "name"],
+          message: "duplicate tournament name",
+        });
+      }
+      tournamentNames.add(tournament.name);
+      for (const [podIndex, pod] of tournament.pods.entries()) {
+        const teamNames = new Set<string>();
+        for (const [teamIndex, team] of pod.teams.entries()) {
+          if (teamNames.has(team.name)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["tournaments", tournamentIndex, "pods", podIndex, "teams", teamIndex, "name"],
+              message: "duplicate team name",
+            });
+          }
+          teamNames.add(team.name);
+        }
+        const entrantRefs = new Set<string>();
+        for (const [entrantIndex, entrant] of pod.entrants.entries()) {
+          const ref = entrant.player ?? entrant.team!;
+          if (entrantRefs.has(ref)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["tournaments", tournamentIndex, "pods", podIndex, "entrants", entrantIndex],
+              message: "duplicate entrant reference",
+            });
+          }
+          entrantRefs.add(ref);
+        }
+        const roundNumbers = new Set<number>();
+        for (const [roundIndex, round] of pod.rounds.entries()) {
+          if (roundNumbers.has(round.roundNumber)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["tournaments", tournamentIndex, "pods", podIndex, "rounds", roundIndex, "roundNumber"],
+              message: "duplicate round number",
+            });
+          }
+          roundNumbers.add(round.roundNumber);
+        }
+      }
     }
-    tournamentNames.add(tournament.name);
-    for (const [podIndex, pod] of tournament.pods.entries()) {
-      const teamNames = new Set<string>();
-      for (const [teamIndex, team] of pod.teams.entries()) {
-        if (teamNames.has(team.name)) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tournaments", tournamentIndex, "pods", podIndex, "teams", teamIndex, "name"], message: "duplicate team name" });
-        }
-        teamNames.add(team.name);
-      }
-      const entrantRefs = new Set<string>();
-      for (const [entrantIndex, entrant] of pod.entrants.entries()) {
-        const ref = entrant.player ?? entrant.team!;
-        if (entrantRefs.has(ref)) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tournaments", tournamentIndex, "pods", podIndex, "entrants", entrantIndex], message: "duplicate entrant reference" });
-        }
-        entrantRefs.add(ref);
-      }
-      const roundNumbers = new Set<number>();
-      for (const [roundIndex, round] of pod.rounds.entries()) {
-        if (roundNumbers.has(round.roundNumber)) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tournaments", tournamentIndex, "pods", podIndex, "rounds", roundIndex, "roundNumber"], message: "duplicate round number" });
-        }
-        roundNumbers.add(round.roundNumber);
-      }
-    }
-  }
-});
+  });
 
 const snapshotString = z.string().max(200);
-const hallOfFameRowSchema = z.object({
-  player: playerName,
-  tournamentsPlayed: z.number().int().min(0),
-  podsPlayed: z.number().int().min(0),
-  totalPoints: z.number().finite(),
-  average: z.number().finite(),
-  mainEventWins: z.number().int().min(0),
-}).strict();
-const treasureVaultRowSchema = z.object({
-  cardName: snapshotString,
-  priceEur: z.number().finite().nullable(),
-  player: playerName.nullable(),
-  setCode: z.string().max(10).nullable(),
-  foil: z.boolean(),
-  podName: z.string().max(150),
-  tournamentName: z.string().max(150),
-}).strict();
+const hallOfFameRowSchema = z
+  .object({
+    player: playerName,
+    tournamentsPlayed: z.number().int().min(0),
+    podsPlayed: z.number().int().min(0),
+    totalPoints: z.number().finite(),
+    average: z.number().finite(),
+    mainEventWins: z.number().int().min(0),
+  })
+  .strict();
+const treasureVaultRowSchema = z
+  .object({
+    cardName: snapshotString,
+    priceEur: z.number().finite().nullable(),
+    player: playerName.nullable(),
+    setCode: z.string().max(10).nullable(),
+    foil: z.boolean(),
+    podName: z.string().max(150),
+    tournamentName: z.string().max(150),
+  })
+  .strict();
 
 // The full uploaded envelope. Only `data` is consumed on import — hallOfFame /
 // treasureVault are derived snapshots that recompute from `data`, so they're
 // accepted-and-ignored (an export that omitted `data` has nothing to import).
-export const orgExportEnvelopeSchema = z.object({
-  application: z.literal("limited-gauntlet"),
-  formatVersion: z.number().int(),
-  exportedAt: isoDate,
-  organization: z.object({ slug: z.string().max(100), name: z.string().max(150) }).strict(),
-  data: dataSchema.optional(),
-  hallOfFame: z.array(hallOfFameRowSchema).max(IMPORT_LIMITS.totalRecords).optional(),
-  treasureVault: z.array(treasureVaultRowSchema).max(IMPORT_LIMITS.totalRecords).optional(),
-}).strict();
+export const orgExportEnvelopeSchema = z
+  .object({
+    application: z.literal("limited-gauntlet"),
+    formatVersion: z.number().int(),
+    exportedAt: isoDate,
+    organization: z.object({ slug: z.string().max(100), name: z.string().max(150) }).strict(),
+    data: dataSchema.optional(),
+    hallOfFame: z.array(hallOfFameRowSchema).max(IMPORT_LIMITS.totalRecords).optional(),
+    treasureVault: z.array(treasureVaultRowSchema).max(IMPORT_LIMITS.totalRecords).optional(),
+  })
+  .strict();
 
 export type ParsedExportData = z.infer<typeof dataSchema>;
 
@@ -314,7 +364,11 @@ export async function importOrgData(orgId: string, data: ParsedExportData): Prom
   }
 }
 
-async function importOrgDataInTransaction(db: Prisma.TransactionClient, orgId: string, data: ParsedExportData): Promise<ImportSummary> {
+async function importOrgDataInTransaction(
+  db: Prisma.TransactionClient,
+  orgId: string,
+  data: ParsedExportData,
+): Promise<ImportSummary> {
   const summary: ImportSummary = { tournamentsCreated: 0, tournamentsSkipped: 0, podsCreated: 0, playersCreated: 0 };
 
   // Upsert every referenced player once, up front (org-scoped, keyed on

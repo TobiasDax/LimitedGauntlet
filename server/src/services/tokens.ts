@@ -93,10 +93,7 @@ export async function syncPodTokenAwards(podId: string): Promise<void> {
   const standings = await computePodStandings(podId);
   const playersByEntrant = new Map<string, string[]>();
   for (const e of pod.entrants) {
-    playersByEntrant.set(
-      e.id,
-      e.playerId ? [e.playerId] : (e.team?.members.map((m) => m.playerId) ?? []),
-    );
+    playersByEntrant.set(e.id, e.playerId ? [e.playerId] : (e.team?.members.map((m) => m.playerId) ?? []));
   }
 
   const rows: { orgId: string; playerId: string; delta: number; reason: (typeof AUTO)[number]; podId: string }[] = [];

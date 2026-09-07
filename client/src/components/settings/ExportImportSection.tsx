@@ -40,7 +40,8 @@ const EXPORT_OPTIONS: { key: keyof ExportSelection; label: string; description: 
   {
     key: "data",
     label: "Tournaments, pods & matches",
-    description: "The full structural data — players, tournaments, pods, entrants, rounds, matches, and card pulls. This is what an import reads back in.",
+    description:
+      "The full structural data — players, tournaments, pods, entrants, rounds, matches, and card pulls. This is what an import reads back in.",
   },
   { key: "hallOfFame", label: "Hall of Fame", description: "The all-time player leaderboard snapshot." },
   { key: "treasureVault", label: "Treasure Vault", description: "The ranked card-pull value list snapshot." },

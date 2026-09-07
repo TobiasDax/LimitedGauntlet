@@ -64,7 +64,10 @@ describe("oidcRelink", () => {
     await expect(confirmOidcRelink("not-a-real-token")).rejects.toThrow("invalid_oidc_relink");
 
     const { request, token } = await createOidcRelinkRequest(organizer.id, subj("new-subject"), organizer.email);
-    await prisma.oidcSubjectRelinkRequest.update({ where: { id: request.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    await prisma.oidcSubjectRelinkRequest.update({
+      where: { id: request.id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
     await expect(confirmOidcRelink(token)).rejects.toThrow("invalid_oidc_relink");
 
     const { token: freshToken } = await createOidcRelinkRequest(organizer.id, subj("new-subject-2"), organizer.email);
@@ -75,7 +78,10 @@ describe("oidcRelink", () => {
   it("rejects a token whose request email no longer matches the account's current email", async () => {
     const { organizer } = await makeOrganizer();
     const { token } = await createOidcRelinkRequest(organizer.id, subj("new-subject"), organizer.email);
-    await prisma.organizerAccount.update({ where: { id: organizer.id }, data: { email: `changed-${organizer.email}` } });
+    await prisma.organizerAccount.update({
+      where: { id: organizer.id },
+      data: { email: `changed-${organizer.email}` },
+    });
     await expect(confirmOidcRelink(token)).rejects.toThrow("invalid_oidc_relink");
   });
 

@@ -76,14 +76,19 @@ export function useSetManualTiebreak(podId: string) {
 export function entrantErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.message === "round_in_progress") return "Finish the current round before changing who's dropped.";
-    if (err.message === "already_dropped" || err.message === "not_dropped") return "That entrant's drop status just changed — reload and try again.";
+    if (err.message === "already_dropped" || err.message === "not_dropped")
+      return "That entrant's drop status just changed — reload and try again.";
     if (err.message === "name_taken") {
-      const name = typeof err.body === "object" && err.body && "name" in err.body ? String((err.body as { name: unknown }).name) : null;
+      const name =
+        typeof err.body === "object" && err.body && "name" in err.body
+          ? String((err.body as { name: unknown }).name)
+          : null;
       return name
         ? `A player named "${name}" already exists — tick them in the list instead of adding a new one.`
         : "That name is already on the roster.";
     }
-    if (err.message === "unknown_player" || err.message === "player_not_found") return "Unknown player — reload and try again.";
+    if (err.message === "unknown_player" || err.message === "player_not_found")
+      return "Unknown player — reload and try again.";
     if (err.status === 409) return "Already entered in this pod.";
   }
   return "Something went wrong.";

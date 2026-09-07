@@ -192,14 +192,16 @@ export function PodValuePage() {
         {pod && ` · ${podFormatDisplay(pod)}`}
       </Eyebrow>
       <ScreenTitle>Value</ScreenTitle>
-      <ScreenDek>Live Scryfall lookups, snapshotted at add-time — prices reflect the market when the card was logged.</ScreenDek>
+      <ScreenDek>
+        Live Scryfall lookups, snapshotted at add-time — prices reflect the market when the card was logged.
+      </ScreenDek>
 
       <PodTabs podId={id ?? ""} />
 
       {pod && !pod.rarePicksEnabled ? (
         <p className="rounded-md border border-border bg-surface-sunken px-4 py-3 text-[13.5px] text-ink-muted">
-          Rare-picks tracking is turned off for this pod. Turn it back on from the pod's edit form to add or view
-          card pulls.
+          Rare-picks tracking is turned off for this pod. Turn it back on from the pod's edit form to add or view card
+          pulls.
         </p>
       ) : (
         <>

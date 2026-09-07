@@ -102,7 +102,12 @@ function ResultEntry({
         const result = a > b ? "A_WINS" : b > a ? "B_WINS" : "DRAW";
         submitResult.mutate(
           { matchId: match.id, result, gamesWonA: a, gamesWonB: b, gamesDrawn: d, dropped },
-          { onSuccess: () => { setEditing(false); setDropped("NONE"); } },
+          {
+            onSuccess: () => {
+              setEditing(false);
+              setDropped("NONE");
+            },
+          },
         );
       }}
     >
@@ -123,12 +128,7 @@ function ResultEntry({
         ))}
       </select>
       <div className="flex items-center gap-3">
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={!resultsOpen || submitResult.isPending}
-          className="flex-1"
-        >
+        <Button type="submit" variant="primary" disabled={!resultsOpen || submitResult.isPending} className="flex-1">
           Submit
         </Button>
         {editing && (
@@ -238,11 +238,7 @@ function RoundTimer({ round, displayMode }: { round: Round; displayMode: boolean
 
   useEffect(() => {
     if (!displayMode || !round.endsAt) return;
-    if (
-      countdown.remainingMs > 0 &&
-      countdown.remainingMs <= TEN_MINUTES_MS &&
-      warnedForRef.current !== round.endsAt
-    ) {
+    if (countdown.remainingMs > 0 && countdown.remainingMs <= TEN_MINUTES_MS && warnedForRef.current !== round.endsAt) {
       warnedForRef.current = round.endsAt;
       playChime();
     }
@@ -307,7 +303,13 @@ function RoundCard({
       return;
     }
     swapPairing.mutate(
-      { roundId: round.id, matchAId: selectedSlot.matchId, sideA: selectedSlot.side, matchBId: slot.matchId, sideB: slot.side },
+      {
+        roundId: round.id,
+        matchAId: selectedSlot.matchId,
+        sideA: selectedSlot.side,
+        matchBId: slot.matchId,
+        sideB: slot.side,
+      },
       { onSettled: () => setSelectedSlot(null) },
     );
   };
@@ -368,8 +370,8 @@ function RoundCard({
 
       {!revealed ? (
         <p className="text-[13px] text-ink-muted">
-          Pairings are generated but hidden — find seatings on the Seatings tab, then reveal here once everyone's
-          ready to see their opponent.
+          Pairings are generated but hidden — find seatings on the Seatings tab, then reveal here once everyone's ready
+          to see their opponent.
         </p>
       ) : (
         <>
@@ -459,7 +461,11 @@ export function PairingsPage() {
 
       <PodTabs podId={pod.id} />
 
-      <PrepTimerDisplay endsAt={pod.prepTimerEndsAt} label={pod.prepTimerLabel} size={displayMode ? "large" : "normal"} />
+      <PrepTimerDisplay
+        endsAt={pod.prepTimerEndsAt}
+        label={pod.prepTimerLabel}
+        size={displayMode ? "large" : "normal"}
+      />
 
       {pod.entrants.length < 2 && <p className="text-ink-muted">Add at least 2 entrants before pairing round 1.</p>}
 

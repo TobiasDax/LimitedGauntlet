@@ -44,8 +44,8 @@ export function OidcRelinkPage() {
         {status === "done" && (
           <>
             <p className="mb-4 text-good">
-              Your account's SSO sign-in has been relinked. For safety, every existing session and API token was
-              revoked — sign in again to continue.
+              Your account's SSO sign-in has been relinked. For safety, every existing session and API token was revoked
+              — sign in again to continue.
             </p>
             <Link to="/login">
               <Button variant="primary">Go to login</Button>

@@ -29,7 +29,9 @@ export function GesamtwertungList({ pods, rows }: { pods: GesamtwertungPod[]; ro
             <div
               key={row.playerId}
               className={`flex flex-col gap-2.5 rounded-md border px-4 py-3.5 ${
-                rank === 1 ? "border-accent/35 bg-gradient-to-r from-accent-wash to-surface" : "border-border bg-surface"
+                rank === 1
+                  ? "border-accent/35 bg-gradient-to-r from-accent-wash to-surface"
+                  : "border-border bg-surface"
               }`}
             >
               <div className="grid grid-cols-[44px_1fr_auto] items-center gap-5">

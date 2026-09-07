@@ -1,11 +1,6 @@
 import { useState } from "react";
 import { ApiError } from "../lib/api";
-import {
-  useCheckIn,
-  usePlayerMe,
-  usePlayerPortal,
-  useSubmitPlayerResult,
-} from "../features/player/usePlayer";
+import { useCheckIn, usePlayerMe, usePlayerPortal, useSubmitPlayerResult } from "../features/player/usePlayer";
 import { usePlayerPortalRealtime } from "../features/player/usePlayerPortalRealtime";
 import { usePlayerPortalTokens } from "../features/tokens/useTokens";
 import { Stepper } from "../components/Stepper";
@@ -42,15 +37,21 @@ function MyMatchCard({ match }: { match: PlayerPortalMatch }) {
         <div className="flex items-center gap-1.5">
           <Stepper value={mine} onChange={setMine} max={maxGames} ariaLabel="Your games won" className="flex-1" />
           <span className="text-ink-muted">–</span>
-          <Stepper value={theirs} onChange={setTheirs} max={maxGames} ariaLabel="Opponent games won" className="flex-1" />
+          <Stepper
+            value={theirs}
+            onChange={setTheirs}
+            max={maxGames}
+            ariaLabel="Opponent games won"
+            className="flex-1"
+          />
         </div>
         <Button type="submit" variant="primary" disabled={submit.isPending} className="w-full">
           {reported ? "Update result" : "Submit result"}
         </Button>
         {reported && !submit.isPending && (
           <p className="text-[11px] text-ink-muted">
-            Reported {match.gamesWonA}–{match.gamesWonB}. You or your opponent can still fix it until the
-            organizer closes the round.
+            Reported {match.gamesWonA}–{match.gamesWonB}. You or your opponent can still fix it until the organizer
+            closes the round.
           </p>
         )}
         {submit.isError && (
@@ -93,7 +94,9 @@ export function PlayerPortalPage() {
       <section>
         <h2 className="mb-3 font-display text-[16px] font-bold">Your matches</h2>
         {data.matches.length === 0 ? (
-          <p className="text-[13px] text-ink-muted">No match to report right now — check back when your round starts.</p>
+          <p className="text-[13px] text-ink-muted">
+            No match to report right now — check back when your round starts.
+          </p>
         ) : (
           <div className="flex flex-col gap-3">
             {data.matches.map((m) => (

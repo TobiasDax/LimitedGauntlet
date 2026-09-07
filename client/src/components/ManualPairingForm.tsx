@@ -30,8 +30,7 @@ export function ManualPairingForm({
   );
 
   const usedIds = new Set(pairs.flatMap((p) => [p.a, p.b]).filter(Boolean));
-  const optionsFor = (current: string) =>
-    activeEntrants.filter((e) => e.id === current || !usedIds.has(e.id));
+  const optionsFor = (current: string) => activeEntrants.filter((e) => e.id === current || !usedIds.has(e.id));
 
   const update = (i: number, side: "a" | "b", value: string) =>
     setPairs((prev) => prev.map((p, idx) => (idx === i ? { ...p, [side]: value } : p)));

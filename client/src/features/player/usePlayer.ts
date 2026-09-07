@@ -66,8 +66,7 @@ export function usePlayerInviteInfo(token: string) {
 export function useAcceptPlayerInvite() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { token: string; password: string }) =>
-      api.post<PlayerSession>("/player/accept-invite", input),
+    mutationFn: (input: { token: string; password: string }) => api.post<PlayerSession>("/player/accept-invite", input),
     onSuccess: (data) => queryClient.setQueryData<PlayerSession>(["player", "me"], data),
   });
 }

@@ -2,7 +2,13 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getSocket } from "../../lib/socket";
 
-const EVENTS = ["round-started", "round-completed", "round-unpaired", "result-submitted", "pairings-published"] as const;
+const EVENTS = [
+  "round-started",
+  "round-completed",
+  "round-unpaired",
+  "result-submitted",
+  "pairings-published",
+] as const;
 
 // Keeps the player portal's "Your matches" list live (PI-52): joins each pod
 // room the player currently has an open match in, and refetches the portal

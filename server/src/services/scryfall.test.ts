@@ -38,9 +38,7 @@ describe("lookupCardByName", () => {
   });
 
   it("does not cache a transient 5xx failure — the next call retries against Scryfall again", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse(500, { error: "internal error" }));
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(500, { error: "internal error" }));
     vi.stubGlobal("fetch", fetchMock);
 
     const first = await lookupCardByName("Test Card 500");

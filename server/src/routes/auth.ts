@@ -99,14 +99,15 @@ async function resolveLoginOrg(account: { id: string; lastActiveOrgId: string | 
   });
   if (memberships.length === 0) return null;
   const orgIds = new Set(memberships.map((m) => m.orgId));
-  return account.lastActiveOrgId && orgIds.has(account.lastActiveOrgId) ? account.lastActiveOrgId : memberships[0]!.orgId;
+  return account.lastActiveOrgId && orgIds.has(account.lastActiveOrgId)
+    ? account.lastActiveOrgId
+    : memberships[0]!.orgId;
 }
 
 function requestOrigin(request: { protocol: string; headers: Record<string, unknown> }): string {
   const host = request.headers.host;
   return host ? `${request.protocol}://${String(host)}` : "";
 }
-
 
 function isUniqueConstraintError(err: unknown, target: string): boolean {
   return (
@@ -516,7 +517,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       if (result.status === "recovery_required") {
-        reply.redirect(`/login?error=${result.emailSent ? "oidc_recovery_required" : "oidc_recovery_required_no_email"}`);
+        reply.redirect(
+          `/login?error=${result.emailSent ? "oidc_recovery_required" : "oidc_recovery_required_no_email"}`,
+        );
         return;
       }
       establishSession(request, { id: result.organizerId, authVersion: result.authVersion });
@@ -676,7 +679,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   // PI-86 — the account's orgs, for the switcher / chooser.
   app.get("/api/auth/organizations", { preHandler: requireOrganizerIdentity }, async (request, reply) => {
-    reply.send({ organizations: await listMemberships(request.identity!.id), activeOrgId: request.session.get("activeOrgId") ?? null });
+    reply.send({
+      organizations: await listMemberships(request.identity!.id),
+      activeOrgId: request.session.get("activeOrgId") ?? null,
+    });
   });
 
   // PI-86 — an existing organizer creates another org for themselves (a new
@@ -721,7 +727,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         identity: request.identity,
         organizations,
         activeOrgId: organization.id,
-        organizer: { id: accountId, orgId: organization.id, name: request.identity!.name, email: request.identity!.email },
+        organizer: {
+          id: accountId,
+          orgId: organization.id,
+          name: request.identity!.name,
+          email: request.identity!.email,
+        },
         organization: entered.organization,
         publicLockEnabled: false,
         tokensEnabled: false,

@@ -128,7 +128,8 @@ export function roundErrorMessage(err: unknown): string {
     if (err.message === "round_locked") return "This round has already started — swaps only work before it starts.";
     if (err.message === "cannot_swap_bye") return "Can't swap into or out of a bye slot.";
     if (err.message === "no_op") return "Pick two different seats to swap.";
-    if (err.message === "round_already_started") return "This round has already started — it can't be un-paired anymore.";
+    if (err.message === "round_already_started")
+      return "This round has already started — it can't be un-paired anymore.";
   }
   return "Something went wrong.";
 }

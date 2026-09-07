@@ -293,7 +293,9 @@ export function parseAdminWebhookConfig(env: { url?: string; secret?: string }):
 
   const secret = env.secret?.trim() ?? "";
   if (secret.length < 16) {
-    throw new Error("ADMIN_WEBHOOK_SECRET must be set and at least 16 characters long when ADMIN_WEBHOOK_URL is configured");
+    throw new Error(
+      "ADMIN_WEBHOOK_SECRET must be set and at least 16 characters long when ADMIN_WEBHOOK_URL is configured",
+    );
   }
 
   return { url: parsedUrl.toString(), secret };

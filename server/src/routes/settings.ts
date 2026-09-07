@@ -481,7 +481,10 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     await prisma.$transaction([
       prisma.organizerMembership.delete({ where: { id: membership.id } }),
       prisma.apiToken.deleteMany({ where: { organizerId: params.data.id, orgId } }),
-      prisma.organizerAccount.updateMany({ where: { id: params.data.id, lastActiveOrgId: orgId }, data: { lastActiveOrgId: null } }),
+      prisma.organizerAccount.updateMany({
+        where: { id: params.data.id, lastActiveOrgId: orgId },
+        data: { lastActiveOrgId: null },
+      }),
     ]);
     reply.code(204).send();
   });

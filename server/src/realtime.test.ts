@@ -30,7 +30,14 @@ function fixture(options?: {
     { parseCookie, decodeSecureSession },
     { findRoomOrganization, organizerSessionValid, playerSessionValid },
   );
-  return { authorize, parseCookie, decodeSecureSession, findRoomOrganization, organizerSessionValid, playerSessionValid };
+  return {
+    authorize,
+    parseCookie,
+    decodeSecureSession,
+    findRoomOrganization,
+    organizerSessionValid,
+    playerSessionValid,
+  };
 }
 
 describe("realtime room authorization", () => {
@@ -90,9 +97,14 @@ describe("realtime room authorization", () => {
     const store = { id: "org-1", publicPasswordHash: "hash" };
     const findRoomOrganization = vi.fn(async () => store);
     // Simulates the DB check in the default store: only authVersion 3 is current.
-    const organizerSessionValid = vi.fn(async (_organizerId: string, _orgId: string, authVersion: number) => authVersion === 3);
+    const organizerSessionValid = vi.fn(
+      async (_organizerId: string, _orgId: string, authVersion: number) => authVersion === 3,
+    );
     const authorize = createRealtimeRoomAuthorizer(
-      { parseCookie: () => ({ session: "encoded" }), decodeSecureSession: () => session({ organizerId: "organizer-1", authVersion: 1 }) },
+      {
+        parseCookie: () => ({ session: "encoded" }),
+        decodeSecureSession: () => session({ organizerId: "organizer-1", authVersion: 1 }),
+      },
       { findRoomOrganization, organizerSessionValid, playerSessionValid: async () => false },
     );
     await expect(authorize("pod:pod-1", "session=stale")).resolves.toBe(false);
@@ -104,12 +116,17 @@ describe("realtime room authorization", () => {
     await expect(f.authorize("pod:pod-1", "session=good")).resolves.toBe(true);
     expect(f.playerSessionValid).toHaveBeenCalledWith("player-1", "org-1", 4);
 
-    const revoked = fixture({ sessionValues: { playerIdentityId: "player-1", playerAuthVersion: 1 }, playerMatches: false });
+    const revoked = fixture({
+      sessionValues: { playerIdentityId: "player-1", playerAuthVersion: 1 },
+      playerMatches: false,
+    });
     await expect(revoked.authorize("pod:pod-1", "session=good")).resolves.toBe(false);
   });
 
   it("denies malformed and nonexistent rooms without decoding a session", async () => {
-    const { authorize, decodeSecureSession, findRoomOrganization } = fixture({ sessionValues: { publicUnlocked: ["org-1"] } });
+    const { authorize, decodeSecureSession, findRoomOrganization } = fixture({
+      sessionValues: { publicUnlocked: ["org-1"] },
+    });
     for (const room of [undefined, "", "pod:", "pod:a:b", "other:pod-1"]) {
       await expect(authorize(room, "session=good")).resolves.toBe(false);
     }

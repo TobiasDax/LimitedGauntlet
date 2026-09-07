@@ -32,9 +32,7 @@ export async function inferCardPullAttribution(podId: string): Promise<void> {
   if (!pod || pod.isTeamEvent || pod.entrants.length === 0) return;
 
   const roundsDecided =
-    pod.rounds.length > 0 &&
-    pod.rounds.length >= pod.roundCount &&
-    pod.rounds.every((r) => r.status === "COMPLETED");
+    pod.rounds.length > 0 && pod.rounds.length >= pod.roundCount && pod.rounds.every((r) => r.status === "COMPLETED");
   const standingsOnlyDecided = pod.entrants.every((e) => e.finalPointsOverride !== null);
   if (!roundsDecided && !standingsOnlyDecided) return;
 

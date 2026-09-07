@@ -47,8 +47,7 @@
   --color-critical-wash: rgba(208, 59, 59, 0.14);
 
   --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, serif;
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
@@ -88,10 +87,18 @@ body {
   line-height: 1.25;
   margin: 1.2em 0 0.5em;
 }
-.markdown h1 { font-size: 1.4em; }
-.markdown h2 { font-size: 1.2em; }
-.markdown h3 { font-size: 1.05em; }
-.markdown h4 { font-size: 1em; }
+.markdown h1 {
+  font-size: 1.4em;
+}
+.markdown h2 {
+  font-size: 1.2em;
+}
+.markdown h3 {
+  font-size: 1.05em;
+}
+.markdown h4 {
+  font-size: 1em;
+}
 .markdown p {
   margin: 0 0 0.75em;
 }
@@ -100,11 +107,19 @@ body {
   margin: 0 0 0.75em;
   padding-left: 1.5em;
 }
-.markdown ul { list-style: disc; }
-.markdown ol { list-style: decimal; }
-.markdown li { margin: 0.15em 0; }
+.markdown ul {
+  list-style: disc;
+}
+.markdown ol {
+  list-style: decimal;
+}
+.markdown li {
+  margin: 0.15em 0;
+}
 .markdown li > ul,
-.markdown li > ol { margin-bottom: 0; }
+.markdown li > ol {
+  margin-bottom: 0;
+}
 .markdown a {
   color: var(--color-accent);
   text-decoration: underline;
@@ -112,10 +127,19 @@ body {
 .markdown a:hover {
   color: var(--color-accent-strong);
 }
-.markdown strong { font-weight: 600; color: var(--color-ink); }
-.markdown em { font-style: italic; }
-.markdown u { text-decoration: underline; }
-.markdown del { text-decoration: line-through; }
+.markdown strong {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.markdown em {
+  font-style: italic;
+}
+.markdown u {
+  text-decoration: underline;
+}
+.markdown del {
+  text-decoration: line-through;
+}
 .markdown code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.9em;

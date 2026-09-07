@@ -13,7 +13,13 @@
 // (or set LEGACY_DATA_PATH instead of passing an argument)
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { PrismaClient, type PodFormat, type ConstructedFormat, type MatchResult, type TournamentStatus } from "@prisma/client";
+import {
+  PrismaClient,
+  type PodFormat,
+  type ConstructedFormat,
+  type MatchResult,
+  type TournamentStatus,
+} from "@prisma/client";
 import { hashPassword } from "../auth/password.js";
 import { lookupCardByName } from "../services/scryfall.js";
 
@@ -246,7 +252,9 @@ async function importStandingsPod(
     };
 
     for (const [i, roundMatches] of pod.rounds!.entries()) {
-      const round = await prisma.round.create({ data: { podId: record.id, roundNumber: i + 1, status: "COMPLETED", pairingsRevealedAt: new Date() } });
+      const round = await prisma.round.create({
+        data: { podId: record.id, roundNumber: i + 1, status: "COMPLETED", pairingsRevealedAt: new Date() },
+      });
       for (const [tableIndex, m] of roundMatches.entries()) {
         const entrantAId = await entrantFor(m.a);
         const entrantBId = m.b === null ? null : await entrantFor(m.b);
@@ -324,7 +332,9 @@ async function importTeamPod(
   }
 
   for (const [i, roundMatches] of (pod.rounds ?? []).entries()) {
-    const round = await prisma.round.create({ data: { podId: record.id, roundNumber: i + 1, status: "COMPLETED", pairingsRevealedAt: new Date() } });
+    const round = await prisma.round.create({
+      data: { podId: record.id, roundNumber: i + 1, status: "COMPLETED", pairingsRevealedAt: new Date() },
+    });
     await prisma.match.createMany({
       data: roundMatches.map((m, tableIndex) => {
         const entrantAId = entrantByTeamName.get(m.a);

@@ -18,8 +18,7 @@ export function useApiTokens() {
 export function useCreateApiToken() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) =>
-      api.post<{ token: string; apiToken: ApiTokenSummary }>("/api-tokens", { name }),
+    mutationFn: (name: string) => api.post<{ token: string; apiToken: ApiTokenSummary }>("/api-tokens", { name }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["api-tokens"] }),
   });
 }

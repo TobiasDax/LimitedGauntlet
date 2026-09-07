@@ -120,7 +120,9 @@ export function CardGallery({
           <div className="p-2.5">
             <div className="font-display mb-1 text-[13px] leading-tight font-bold">{pull.cardName}</div>
             <div className="flex items-center justify-between">
-              <span className="text-[12.5px] font-bold text-accent-strong tabular-nums">{formatEur(pull.priceEur)}</span>
+              <span className="text-[12.5px] font-bold text-accent-strong tabular-nums">
+                {formatEur(pull.priceEur)}
+              </span>
               {pull.setCode && (
                 <span className="text-[10px] tracking-wide text-ink-muted uppercase">
                   {pull.setCode}
@@ -128,7 +130,10 @@ export function CardGallery({
                 </span>
               )}
             </div>
-            {editableAttribution && (pull.playerIdInferred || !pull.player) && attributionPlayers && onSetAttribution ? (
+            {editableAttribution &&
+            (pull.playerIdInferred || !pull.player) &&
+            attributionPlayers &&
+            onSetAttribution ? (
               <AttributionEditor
                 pull={pull}
                 players={attributionPlayers}
@@ -137,7 +142,9 @@ export function CardGallery({
             ) : (
               pull.player && (
                 <div className="mt-1 truncate text-[10.5px] text-ink-muted">
-                  {pull.playerIdInferred && <span title="Guessed from finish + card value — not yet confirmed">🔮 </span>}
+                  {pull.playerIdInferred && (
+                    <span title="Guessed from finish + card value — not yet confirmed">🔮 </span>
+                  )}
                   {pull.player.displayName}
                 </div>
               )

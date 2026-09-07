@@ -3,7 +3,11 @@ export class ApiError extends Error {
     public status: number,
     public body: unknown,
   ) {
-    super(typeof body === "object" && body && "error" in body ? String((body as { error: unknown }).error) : "request_failed");
+    super(
+      typeof body === "object" && body && "error" in body
+        ? String((body as { error: unknown }).error)
+        : "request_failed",
+    );
   }
 }
 

@@ -18,7 +18,18 @@ import { EntrantDropControl } from "../components/EntrantDropControl";
 import { useRounds } from "../features/pods/useRounds";
 import { useTournament } from "../features/tournaments/useTournament";
 import { useMe } from "../features/auth/useAuth";
-import { Button, Card, Eyebrow, Field, FormError, Modal, ScreenDek, ScreenTitle, StatusPill, TextField } from "../components/ui";
+import {
+  Button,
+  Card,
+  Eyebrow,
+  Field,
+  FormError,
+  Modal,
+  ScreenDek,
+  ScreenTitle,
+  StatusPill,
+  TextField,
+} from "../components/ui";
 import { PodTabs } from "../components/PodTabs";
 import { PrepTimer } from "../components/PrepTimer";
 import { StandingBonusEditor } from "../components/StandingBonusEditor";
@@ -162,10 +173,20 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
             <TextField type="number" min={0} value={pointsWin} onChange={(e) => setPointsWin(Number(e.target.value))} />
           </Field>
           <Field label="Points — draw">
-            <TextField type="number" min={0} value={pointsDraw} onChange={(e) => setPointsDraw(Number(e.target.value))} />
+            <TextField
+              type="number"
+              min={0}
+              value={pointsDraw}
+              onChange={(e) => setPointsDraw(Number(e.target.value))}
+            />
           </Field>
           <Field label="Points — loss">
-            <TextField type="number" min={0} value={pointsLoss} onChange={(e) => setPointsLoss(Number(e.target.value))} />
+            <TextField
+              type="number"
+              min={0}
+              value={pointsLoss}
+              onChange={(e) => setPointsLoss(Number(e.target.value))}
+            />
           </Field>
           <Field label="Round length (minutes)">
             <TextField
@@ -178,30 +199,18 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
         </div>
 
         <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
-          <input
-            type="checkbox"
-            checked={excludeFromStats}
-            onChange={(e) => setExcludeFromStats(e.target.checked)}
-          />
+          <input type="checkbox" checked={excludeFromStats} onChange={(e) => setExcludeFromStats(e.target.checked)} />
           Exclude from org-wide stats (Hall of Fame, Treasure Chest) — for one-off, joke, or test pods
         </label>
 
         <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
-          <input
-            type="checkbox"
-            checked={rarePicksEnabled}
-            onChange={(e) => setRarePicksEnabled(e.target.checked)}
-          />
-          Track rare picks (card values) for this pod — off hides the Value tab and blocks adding pulls; existing
-          pulls are kept and reappear if you turn it back on
+          <input type="checkbox" checked={rarePicksEnabled} onChange={(e) => setRarePicksEnabled(e.target.checked)} />
+          Track rare picks (card values) for this pod — off hides the Value tab and blocks adding pulls; existing pulls
+          are kept and reappear if you turn it back on
         </label>
 
         <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
-          <input
-            type="checkbox"
-            checked={webhookEnabled}
-            onChange={(e) => setWebhookEnabled(e.target.checked)}
-          />
+          <input type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
           Send events to the org's configured webhook for this pod (Settings → Webhook)
         </label>
 
@@ -299,8 +308,8 @@ function CancelPodControl({ pod }: { pod: PodDetail }) {
       {confirming && (
         <Modal title="Cancel this pod?" onClose={() => setConfirming(false)}>
           <p className="mb-4 text-[13px] text-ink-secondary">
-            "{pod.name}" will be marked canceled — excluded from stats and token awards, and moved into the
-            finished area of the pod list. Nothing is deleted, and this can be undone.
+            "{pod.name}" will be marked canceled — excluded from stats and token awards, and moved into the finished
+            area of the pod list. Nothing is deleted, and this can be undone.
           </p>
           <div className="flex gap-2">
             <Button
@@ -407,7 +416,9 @@ function TeamEntrants({
           <div key={e.id} className="flex items-center justify-between px-5 py-3">
             <div>
               <div className="font-display text-[15px] font-bold">{entrantDisplayName(e)}</div>
-              <div className="text-[12px] text-ink-muted">{e.team?.members.map((m) => m.player.displayName).join(", ")}</div>
+              <div className="text-[12px] text-ink-muted">
+                {e.team?.members.map((m) => m.player.displayName).join(", ")}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <EntrantDropControl podId={podId} entrant={e} canModifyRoster={canModifyRoster} />
@@ -428,7 +439,12 @@ function TeamEntrants({
               if (!teamName.trim() || memberIds.length === 0 || wrongSize) return;
               addTeam.mutate(
                 { teamName: teamName.trim(), playerIds: memberIds },
-                { onSuccess: () => { setTeamName(""); setMemberIds([]); } },
+                {
+                  onSuccess: () => {
+                    setTeamName("");
+                    setMemberIds([]);
+                  },
+                },
               );
             }}
           >
@@ -559,9 +575,19 @@ export function PodPage() {
       <PodTabs podId={pod.id} />
 
       {pod.isTeamEvent ? (
-        <TeamEntrants podId={pod.id} entrants={pod.entrants} teamSize={pod.teamSize} canModifyRoster={canModifyRoster} />
+        <TeamEntrants
+          podId={pod.id}
+          entrants={pod.entrants}
+          teamSize={pod.teamSize}
+          canModifyRoster={canModifyRoster}
+        />
       ) : (
-        <IndividualEntrants podId={pod.id} podName={pod.name} entrants={pod.entrants} canModifyRoster={canModifyRoster} />
+        <IndividualEntrants
+          podId={pod.id}
+          podName={pod.name}
+          entrants={pod.entrants}
+          canModifyRoster={canModifyRoster}
+        />
       )}
     </div>
   );

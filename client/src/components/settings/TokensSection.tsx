@@ -16,14 +16,12 @@ export function TokensSection() {
           className={`inline-block h-2 w-2 rounded-full ${enabled ? "bg-good" : "bg-ink-muted"}`}
           aria-hidden="true"
         />
-        <span className="text-[14px] font-semibold">
-          {enabled ? "Tokens are on" : "Tokens are off"}
-        </span>
+        <span className="text-[14px] font-semibold">{enabled ? "Tokens are on" : "Tokens are off"}</span>
       </div>
       <p className="mb-4 max-w-lg text-[13px] text-ink-secondary">
-        Players earn <strong>tokens</strong> for playing in pods and for their finishing place — a running,
-        org-wide balance you can hand-adjust and players can spend on your prize wall (which lives outside
-        this app). Set the default reward values in each tournament's settings, overridable per pod.
+        Players earn <strong>tokens</strong> for playing in pods and for their finishing place — a running, org-wide
+        balance you can hand-adjust and players can spend on your prize wall (which lives outside this app). Set the
+        default reward values in each tournament's settings, overridable per pod.
         {enabled ? "" : " Turning this on backfills tokens for every completed pod using the current reward config."}
       </p>
       <Button

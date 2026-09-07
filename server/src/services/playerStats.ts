@@ -154,7 +154,11 @@ async function buildLedger(orgId: string): Promise<Ledger> {
     const entrantPlayers = new Map<string, string[]>();
     for (const entrant of pod.entrants) {
       if (entrant.playerId) entrantPlayers.set(entrant.id, [entrant.playerId]);
-      else if (entrant.team) entrantPlayers.set(entrant.id, entrant.team.members.map((m) => m.playerId));
+      else if (entrant.team)
+        entrantPlayers.set(
+          entrant.id,
+          entrant.team.members.map((m) => m.playerId),
+        );
     }
 
     for (const round of pod.rounds) {

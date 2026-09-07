@@ -25,7 +25,13 @@ declare module "@fastify/secure-session" {
     // stashed between the redirect to the provider and the callback. Cleared
     // once the callback runs. `oidc` is the pre-PI-43 shape, still read for one
     // release so a login in flight across a deploy doesn't break.
-    sso?: { provider: "oidc" | "google" | "discord"; state: string; nonce: string; codeVerifier: string; origin: string };
+    sso?: {
+      provider: "oidc" | "google" | "discord";
+      state: string;
+      nonce: string;
+      codeVerifier: string;
+      origin: string;
+    };
     oidc?: { state: string; nonce: string; codeVerifier: string; origin: string };
     // A verified SSO identity that has no account yet, awaiting the org-setup
     // screen to finish registration (PI-42). Set by the callback, consumed by

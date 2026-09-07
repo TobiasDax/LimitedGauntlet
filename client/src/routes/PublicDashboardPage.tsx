@@ -10,7 +10,8 @@ const statusLabel: Record<TournamentStatus, string> = {
 };
 
 function formatDateRange(start: string, end: string): string {
-  const fmt = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
@@ -42,7 +43,9 @@ export function PublicDashboardPage() {
                     {t.location && ` · ${t.location}`}
                   </div>
                 </div>
-                <span className="text-[11.5px] tracking-wide text-ink-secondary uppercase">{statusLabel[t.status]}</span>
+                <span className="text-[11.5px] tracking-wide text-ink-secondary uppercase">
+                  {statusLabel[t.status]}
+                </span>
               </Card>
             </Link>
           ))}

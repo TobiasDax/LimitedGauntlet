@@ -22,18 +22,15 @@ export function PlayerLoginPage() {
       <Eyebrow>Players</Eyebrow>
       <ScreenTitle>Sign in</ScreenTitle>
       <p className="mb-6 max-w-[52ch] text-[14px] text-ink-secondary">
-        Check yourself into tournaments and report your own match results. Ask an organizer for an
-        invite link if you don't have a login yet.
+        Check yourself into tournaments and report your own match results. Ask an organizer for an invite link if you
+        don't have a login yet.
       </p>
       <Card className="p-6">
         <form
           className="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
-            login.mutate(
-              { orgSlug: slug ?? "", email, password },
-              { onSuccess: () => navigate(`/o/${slug}/player`) },
-            );
+            login.mutate({ orgSlug: slug ?? "", email, password }, { onSuccess: () => navigate(`/o/${slug}/player`) });
           }}
         >
           <Field label="Email">

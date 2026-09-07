@@ -60,8 +60,8 @@ export function AcceptInvitePage() {
           <>
             <p className="mb-4 text-[14px] text-ink-secondary">
               This invite is for <strong>{invite.email}</strong>, but you're signed in as{" "}
-              <strong>{me.identity.email}</strong>. Log out and accept as {invite.email} (or via SSO with
-              that identity).
+              <strong>{me.identity.email}</strong>. Log out and accept as {invite.email} (or via SSO with that
+              identity).
             </p>
             <Link to="/login">
               <Button variant="ghost">Go to login</Button>
@@ -97,13 +97,13 @@ export function AcceptInvitePage() {
             <p className="mb-4 text-[14px] text-ink-secondary">
               {invite.accountExists ? (
                 <>
-                  <strong>{invite.email}</strong> already has a LimitedGauntlet account. Log in as that
-                  identity to accept this invite to <strong>{invite.organizationName}</strong>.
+                  <strong>{invite.email}</strong> already has a LimitedGauntlet account. Log in as that identity to
+                  accept this invite to <strong>{invite.organizationName}</strong>.
                 </>
               ) : (
                 <>
-                  You've been invited to co-organize <strong>{invite.organizationName}</strong>. Sign in
-                  with the SSO account for <strong>{invite.email}</strong> to accept.
+                  You've been invited to co-organize <strong>{invite.organizationName}</strong>. Sign in with the SSO
+                  account for <strong>{invite.email}</strong> to accept.
                 </>
               )}
             </p>
@@ -115,69 +115,69 @@ export function AcceptInvitePage() {
               </Link>
             )}
           </>
-        ) : invite && !me?.identity && (
-          <>
-            <p className="mb-4 text-[14px] text-ink-secondary">
-              You've been invited to co-organize <strong>{invite.organizationName}</strong> as {invite.email}.
-            </p>
-            <form
-              className="flex flex-col gap-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                setLocalError(null);
-                if (password.length < 8) {
-                  setLocalError("Password must be at least 8 characters.");
-                  return;
-                }
-                if (password !== confirmPassword) {
-                  setLocalError("Passwords don't match.");
-                  return;
-                }
-                acceptInvite.mutate(
-                  { token, name, password },
-                  { onSuccess: () => navigate("/") },
-                );
-              }}
-            >
-              <Field label="Your name">
-                <TextField required value={name} onChange={(e) => setName(e.target.value)} />
-              </Field>
-              <Field label="Password" hint="At least 8 characters">
-                <TextField
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </Field>
-              <Field label="Confirm password">
-                <TextField
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
-              </Field>
+        ) : (
+          invite &&
+          !me?.identity && (
+            <>
+              <p className="mb-4 text-[14px] text-ink-secondary">
+                You've been invited to co-organize <strong>{invite.organizationName}</strong> as {invite.email}.
+              </p>
+              <form
+                className="flex flex-col gap-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setLocalError(null);
+                  if (password.length < 8) {
+                    setLocalError("Password must be at least 8 characters.");
+                    return;
+                  }
+                  if (password !== confirmPassword) {
+                    setLocalError("Passwords don't match.");
+                    return;
+                  }
+                  acceptInvite.mutate({ token, name, password }, { onSuccess: () => navigate("/") });
+                }}
+              >
+                <Field label="Your name">
+                  <TextField required value={name} onChange={(e) => setName(e.target.value)} />
+                </Field>
+                <Field label="Password" hint="At least 8 characters">
+                  <TextField
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </Field>
+                <Field label="Confirm password">
+                  <TextField
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </Field>
 
-              {localError && <FormError>{localError}</FormError>}
-              {acceptInvite.isError && (
-                <FormError>
-                  {acceptInvite.error instanceof ApiError && acceptInvite.error.message === "account_exists"
-                    ? "That email now has an account — log in instead."
-                    : acceptInvite.error instanceof ApiError && acceptInvite.error.message === "invalid_or_expired"
-                      ? "This invite is invalid or has expired."
-                      : "Something went wrong."}
-                </FormError>
-              )}
+                {localError && <FormError>{localError}</FormError>}
+                {acceptInvite.isError && (
+                  <FormError>
+                    {acceptInvite.error instanceof ApiError && acceptInvite.error.message === "account_exists"
+                      ? "That email now has an account — log in instead."
+                      : acceptInvite.error instanceof ApiError && acceptInvite.error.message === "invalid_or_expired"
+                        ? "This invite is invalid or has expired."
+                        : "Something went wrong."}
+                  </FormError>
+                )}
 
-              <Button type="submit" variant="primary" disabled={!name || !password || acceptInvite.isPending}>
-                {acceptInvite.isPending ? "Joining…" : "Accept invite"}
-              </Button>
-            </form>
-          </>
+                <Button type="submit" variant="primary" disabled={!name || !password || acceptInvite.isPending}>
+                  {acceptInvite.isPending ? "Joining…" : "Accept invite"}
+                </Button>
+              </form>
+            </>
+          )
         )}
       </Card>
     </div>

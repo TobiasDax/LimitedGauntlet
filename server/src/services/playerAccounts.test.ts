@@ -19,7 +19,12 @@ async function setup() {
   const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const org = await prisma.organization.create({ data: { slug: `pa-${unique}`, name: "PA Org" } });
   const organizer = await prisma.organizerAccount.create({
-    data: { name: "Org", email: `org-${unique}@example.com`, passwordHash: "x", memberships: { create: { orgId: org.id } } },
+    data: {
+      name: "Org",
+      email: `org-${unique}@example.com`,
+      passwordHash: "x",
+      memberships: { create: { orgId: org.id } },
+    },
   });
   const tournament = await prisma.tournament.create({
     data: { orgId: org.id, name: "T", startDate: new Date(), endDate: new Date() },

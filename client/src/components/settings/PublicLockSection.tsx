@@ -51,12 +51,7 @@ export function PublicLockSection() {
       {setLock.isError && <FormError>Something went wrong.</FormError>}
 
       {enabled && (
-        <Button
-          variant="ghost"
-          className="mt-3"
-          disabled={clearLock.isPending}
-          onClick={() => clearLock.mutate()}
-        >
+        <Button variant="ghost" className="mt-3" disabled={clearLock.isPending} onClick={() => clearLock.mutate()}>
           {clearLock.isPending ? "Disabling…" : "Disable lock (make public pages open)"}
         </Button>
       )}

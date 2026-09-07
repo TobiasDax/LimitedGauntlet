@@ -73,12 +73,28 @@ function DeleteAccountForm({
           }}
         >
           {hasPassword && (
-            <TextField type="password" autoComplete="current-password" placeholder="Current password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <TextField
+              type="password"
+              autoComplete="current-password"
+              placeholder="Current password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           )}
-          <TextField placeholder={`Type "${expected}" to confirm`} value={confirmName} onChange={(e) => setConfirmName(e.target.value)} />
+          <TextField
+            placeholder={`Type "${expected}" to confirm`}
+            value={confirmName}
+            onChange={(e) => setConfirmName(e.target.value)}
+          />
           <div className="flex gap-2">
             <Button type="submit" variant="primary" disabled={!canSubmit}>
-              {deleteAccount.isPending ? (leaving ? "Leaving…" : "Deleting…") : leaving ? "Leave organization" : "Permanently delete"}
+              {deleteAccount.isPending
+                ? leaving
+                  ? "Leaving…"
+                  : "Deleting…"
+                : leaving
+                  ? "Leave organization"
+                  : "Permanently delete"}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
@@ -87,7 +103,11 @@ function DeleteAccountForm({
         </form>
       )}
       {deleteAccount.isError && (
-        <FormError>{codeOf(deleteAccount.error) === "invalid_password" ? "Current password is incorrect." : "Something went wrong."}</FormError>
+        <FormError>
+          {codeOf(deleteAccount.error) === "invalid_password"
+            ? "Current password is incorrect."
+            : "Something went wrong."}
+        </FormError>
       )}
     </Card>
   );
@@ -129,9 +149,19 @@ function DeleteOrganizationForm({ orgName, hasPassword }: { orgName: string; has
           }}
         >
           {hasPassword && (
-            <TextField type="password" autoComplete="current-password" placeholder="Current password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <TextField
+              type="password"
+              autoComplete="current-password"
+              placeholder="Current password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           )}
-          <TextField placeholder={`Type "${orgName}" to confirm`} value={confirmName} onChange={(e) => setConfirmName(e.target.value)} />
+          <TextField
+            placeholder={`Type "${orgName}" to confirm`}
+            value={confirmName}
+            onChange={(e) => setConfirmName(e.target.value)}
+          />
           <div className="flex gap-2">
             <Button type="submit" variant="primary" disabled={!canSubmit}>
               {deleteOrganization.isPending ? "Deleting…" : "Permanently delete"}
@@ -143,7 +173,11 @@ function DeleteOrganizationForm({ orgName, hasPassword }: { orgName: string; has
         </form>
       )}
       {deleteOrganization.isError && (
-        <FormError>{codeOf(deleteOrganization.error) === "invalid_password" ? "Current password is incorrect." : "Something went wrong."}</FormError>
+        <FormError>
+          {codeOf(deleteOrganization.error) === "invalid_password"
+            ? "Current password is incorrect."
+            : "Something went wrong."}
+        </FormError>
       )}
     </Card>
   );

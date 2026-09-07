@@ -7,7 +7,17 @@ import { Button, Modal } from "./ui";
 // loaded). Pass either `path` (app-relative, combined with the current origin)
 // or `url` (already absolute, used as-is). The pod public link is the primary
 // caller; organizer/player invite links pass `url` directly.
-export function SharePopup({ path, url: urlProp, title, onClose }: { path?: string; url?: string; title: string; onClose: () => void }) {
+export function SharePopup({
+  path,
+  url: urlProp,
+  title,
+  onClose,
+}: {
+  path?: string;
+  url?: string;
+  title: string;
+  onClose: () => void;
+}) {
   const url = urlProp ?? `${window.location.origin}${path}`;
   const inputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);

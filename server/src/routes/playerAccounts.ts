@@ -56,7 +56,9 @@ function requestOrigin(request: FastifyRequest): string {
   return host ? `${request.protocol}://${String(host)}` : "";
 }
 
-function entrantName(entrant: { player: { displayName: string } | null; team: { name: string } | null } | null): string {
+function entrantName(
+  entrant: { player: { displayName: string } | null; team: { name: string } | null } | null,
+): string {
   if (!entrant) return "Bye";
   return entrant.player?.displayName ?? entrant.team?.name ?? "—";
 }
@@ -203,16 +205,25 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
       reply.code(400).send({ error: "invalid_input" });
       return;
     }
-    const org = await prisma.organization.findUnique({ where: { slug: parsed.data.orgSlug }, select: { id: true, slug: true, name: true } });
+    const org = await prisma.organization.findUnique({
+      where: { slug: parsed.data.orgSlug },
+      select: { id: true, slug: true, name: true },
+    });
     const player = org
-      ? await prisma.player.findFirst({ where: { identityId: request.player!.identityId, orgId: org.id }, select: { id: true } })
+      ? await prisma.player.findFirst({
+          where: { identityId: request.player!.identityId, orgId: org.id },
+          select: { id: true },
+        })
       : null;
     if (!org || !player) {
       reply.code(404).send({ error: "not_a_member" });
       return;
     }
     request.session.set("playerOrgId", org.id);
-    await prisma.playerIdentity.update({ where: { id: request.player!.identityId }, data: { lastActiveOrgId: org.id } });
+    await prisma.playerIdentity.update({
+      where: { id: request.player!.identityId },
+      data: { lastActiveOrgId: org.id },
+    });
     reply.send({ ok: true, organization: { slug: org.slug, name: org.name } });
   });
 

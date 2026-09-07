@@ -76,14 +76,7 @@ export interface Tournament {
 
 export type PodFormat = "DRAFT" | "SEALED" | "CHAOS_DRAFT" | "CONSTRUCTED" | "CUSTOM";
 export type ConstructedFormat =
-  | "STANDARD"
-  | "MODERN"
-  | "LEGACY"
-  | "VINTAGE"
-  | "PIONEER"
-  | "PRE_MODERN"
-  | "PAUPER"
-  | "CUSTOM";
+  "STANDARD" | "MODERN" | "LEGACY" | "VINTAGE" | "PIONEER" | "PRE_MODERN" | "PAUPER" | "CUSTOM";
 export type MatchFormat = "BO1" | "BO3";
 export type PodStatus = "SETUP" | "PAIRING" | "IN_PROGRESS" | "COMPLETED";
 

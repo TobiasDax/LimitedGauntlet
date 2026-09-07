@@ -45,9 +45,10 @@ const resultSchema = z.object({
   dropped: z.enum(["NONE", "A", "B", "BOTH"]).default("NONE"),
 });
 
-async function checkNextRoundAllowed(
-  pod: { id: string; roundCount: number },
-): Promise<{ nextRoundNumber: number } | { error: string }> {
+async function checkNextRoundAllowed(pod: {
+  id: string;
+  roundCount: number;
+}): Promise<{ nextRoundNumber: number } | { error: string }> {
   const last = await getLatestRound(pod.id);
   const nextRoundNumber = (last?.roundNumber ?? 0) + 1;
   if (nextRoundNumber > pod.roundCount) return { error: "round_count_exceeded" };
@@ -136,7 +137,11 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       const orgId = request.organizer!.orgId;
       fireAndForget(async () => {
         const matches = await buildMatchesPayload(pod.id, round.id);
-        await sendWebhookEvent(orgId, pod.id, "pairings.posted", { roundId: round.id, roundNumber: round.roundNumber, matches });
+        await sendWebhookEvent(orgId, pod.id, "pairings.posted", {
+          roundId: round.id,
+          roundNumber: round.roundNumber,
+          matches,
+        });
       });
     }
     reply.code(201).send({ round });
@@ -208,7 +213,11 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       const orgId = request.organizer!.orgId;
       fireAndForget(async () => {
         const matches = await buildMatchesPayload(pod.id, round.id);
-        await sendWebhookEvent(orgId, pod.id, "pairings.posted", { roundId: round.id, roundNumber: round.roundNumber, matches });
+        await sendWebhookEvent(orgId, pod.id, "pairings.posted", {
+          roundId: round.id,
+          roundNumber: round.roundNumber,
+          matches,
+        });
       });
     }
     reply.code(201).send({ round });
@@ -341,7 +350,11 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       const podId = round.podId;
       fireAndForget(async () => {
         const matches = await buildMatchesPayload(podId, round.id);
-        await sendWebhookEvent(orgId, podId, "pairings.posted", { roundId: round.id, roundNumber: round.roundNumber, matches });
+        await sendWebhookEvent(orgId, podId, "pairings.posted", {
+          roundId: round.id,
+          roundNumber: round.roundNumber,
+          matches,
+        });
       });
     }
     reply.send({ round: updated });
@@ -379,7 +392,11 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     // the round timer.
     if (round.roundNumber === 1 && pod.prepTimerEndsAt !== null) {
       await prisma.pod.update({ where: { id: pod.id }, data: { prepTimerEndsAt: null, prepTimerLabel: null } });
-      emitPodEvent(round.podId, "prep-timer-updated", { podId: round.podId, prepTimerEndsAt: null, prepTimerLabel: null });
+      emitPodEvent(round.podId, "prep-timer-updated", {
+        podId: round.podId,
+        prepTimerEndsAt: null,
+        prepTimerLabel: null,
+      });
     }
 
     emitPodEvent(round.podId, "round-started", { roundId: round.id, startedAt, endsAt });
@@ -537,7 +554,10 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
         : []),
     ]);
     emitPodEvent(round.podId, "result-submitted", { match: updated });
-    const resultPod = await prisma.pod.findUniqueOrThrow({ where: { id: round.podId }, select: { tournamentId: true } });
+    const resultPod = await prisma.pod.findUniqueOrThrow({
+      where: { id: round.podId },
+      select: { tournamentId: true },
+    });
     emitTournamentEvent(resultPod.tournamentId, "standings-changed", { podId: round.podId });
     // A correction on a completed round can change who finished top-3 —
     // refresh any not-yet-confirmed inferred attributions to match.

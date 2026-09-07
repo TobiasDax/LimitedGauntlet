@@ -48,9 +48,7 @@ function HeadToHeadChart({ entries }: { entries: HeadToHeadEntry[] }) {
             <div className="w-24 shrink-0 truncate text-right text-[13px]">{e.displayName}</div>
             <div className="flex h-2.5 flex-1 overflow-hidden rounded-full bg-surface-sunken">
               {e.wins > 0 && <div className="h-full bg-good" style={{ width: `${(e.wins / max) * 100}%` }} />}
-              {e.draws > 0 && (
-                <div className="h-full bg-ink-muted/50" style={{ width: `${(e.draws / max) * 100}%` }} />
-              )}
+              {e.draws > 0 && <div className="h-full bg-ink-muted/50" style={{ width: `${(e.draws / max) * 100}%` }} />}
               {e.losses > 0 && <div className="h-full bg-critical" style={{ width: `${(e.losses / max) * 100}%` }} />}
             </div>
             <div className="w-16 shrink-0 text-[12px] tabular-nums text-ink-muted">
@@ -96,7 +94,9 @@ export function PlayerStatsBody({
         <StatTile
           label="Best format"
           value={s.bestFormat ? podFormatLabel[s.bestFormat.format] : "—"}
-          sub={s.bestFormat ? `${pct(s.bestFormat.winPct)} over ${s.bestFormat.matches} matches` : "Not enough data yet"}
+          sub={
+            s.bestFormat ? `${pct(s.bestFormat.winPct)} over ${s.bestFormat.matches} matches` : "Not enough data yet"
+          }
         />
         <StatTile label="Avg. finish" value={s.averageFinish !== null ? s.averageFinish.toFixed(1) : "—"} />
         <StatTile label="Undefeated pods" value={String(s.undefeatedPods)} />

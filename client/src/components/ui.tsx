@@ -80,15 +80,7 @@ export function ScreenDek({ children }: { children: ReactNode }) {
 // Lightweight modal dialog. Closes on Escape, backdrop click, or the ✕.
 // Sits above the sticky top bar (which is z-30). Shared by the export popup
 // (PI-38) and the pod share popup (PI-45).
-export function Modal({
-  title,
-  onClose,
-  children,
-}: {
-  title: ReactNode;
-  onClose: () => void;
-  children: ReactNode;
-}) {
+export function Modal({ title, onClose, children }: { title: ReactNode; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();

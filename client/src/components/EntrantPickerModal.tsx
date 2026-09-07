@@ -103,7 +103,10 @@ export function EntrantPickerModal({
           {newNames.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {newNames.map((n) => (
-                <span key={n} className="inline-flex items-center gap-1.5 rounded-full bg-accent-wash px-2.5 py-1 text-[12px]">
+                <span
+                  key={n}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-accent-wash px-2.5 py-1 text-[12px]"
+                >
                   {n}
                   <button
                     type="button"
@@ -150,12 +153,7 @@ export function EntrantPickerModal({
             type="button"
             variant="primary"
             disabled={total === 0 || add.isPending}
-            onClick={() =>
-              add.mutate(
-                { playerIds: [...checked], newPlayerNames: newNames },
-                { onSuccess: onClose },
-              )
-            }
+            onClick={() => add.mutate({ playerIds: [...checked], newPlayerNames: newNames }, { onSuccess: onClose })}
           >
             {add.isPending ? "Adding…" : total === 0 ? "Add players" : `Add ${total} player${total === 1 ? "" : "s"}`}
           </Button>

@@ -22,7 +22,9 @@ export function GesamtwertungPage() {
         </Link>
       </Eyebrow>
       <ScreenTitle>Tournament Standings</ScreenTitle>
-      <ScreenDek>Ranked by average points per pod played, not raw total — nobody's penalized for missing an event.</ScreenDek>
+      <ScreenDek>
+        Ranked by average points per pod played, not raw total — nobody's penalized for missing an event.
+      </ScreenDek>
 
       <GesamtwertungList pods={data.pods} rows={data.gesamtwertung} />
     </div>
