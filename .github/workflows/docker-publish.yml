@@ -1,22 +1,27 @@
 name: Publish Docker image
 
-# Builds the single runtime image (see Dockerfile) and pushes it to GHCR
-# whenever a GitHub Release is published, so "deploy this" can pull a
-# tagged image instead of building locally. workflow_dispatch is there
-# for a manual re-push (e.g. after editing this file) without cutting a
-# new release.
+# On a version tag (vX.Y.Z), build the single runtime image (see Dockerfile),
+# push it to GHCR, and open the matching GitHub Release as a draft. Tags are
+# authored on Forgejo (`origin`) and reach GitHub via the push-mirror, which
+# syncs on every push (sync_on_commit) — so `git push origin vX.Y.Z` is the
+# whole trigger. The mirrored tag arriving *is* the event; there is no race,
+# since this workflow cannot run before the tag exists on GitHub.
 #
-# GitHub-only. `origin` is a Forgejo instance and Forgejo Actions also reads
-# .github/workflows/, so the job is guarded to no-op there (GHCR auth and
-# github.repository are GitHub concepts). CI on Forgejo is .forgejo/workflows/ci.yml.
+# workflow_dispatch rebuilds and repushes `:latest` from the default branch
+# (e.g. after a base-image CVE) without cutting a new version.
+#
+# GitHub-only. Forgejo Actions also reads .github/workflows/, so the job is
+# guarded to no-op there (GHCR auth, github.repository, and the Release API
+# are GitHub concepts). CI on Forgejo is .forgejo/workflows/ci.yml.
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
 
 permissions:
-  contents: read
-  packages: write
+  contents: write # create the GitHub Release
+  packages: write # push to GHCR
 
 jobs:
   build-and-push:
@@ -37,10 +42,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
+          # Default flavor is latest=auto: `:latest` is applied for a non-prerelease
+          # semver tag. The raw line adds `:latest` for a manual rebuild too.
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - uses: docker/build-push-action@v6
         with:
@@ -50,3 +57,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Draft: the image is live in GHCR immediately, but the public release
+      # notes wait for a human to review / swap in curated notes and publish.
+      - name: Open draft GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

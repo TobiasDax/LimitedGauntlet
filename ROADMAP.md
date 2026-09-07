@@ -13,7 +13,8 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-39** — organizer data import: v1 shipped, the `legacy-data.json` import step is still open.
 - **PI-62** — deck photos: scoped via interview, not started.
 - **PI-89 – PI-90** — project-health items from the 2026-09-06 code audit: pairing-size guard, dependency automation. (PI-88 CI and PI-91 ESLint + Prettier are done.)
-- **PI-92 – PI-93** — CI follow-ups now that Forgejo runners work: expand the checks (migration drift, image build on PRs, boot smoke test); move the GHCR image publish off the GitHub mirror.
+- **PI-92** — expand CI: migration-drift check, image build on PRs, boot smoke test.
+- **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions; ✅ set up, first real release on the new path still to run.
 
 ## New improvements (backlog)
 
@@ -319,14 +320,14 @@ PI-88 shipped `.forgejo/workflows/ci.yml` (typecheck + builds + server suite). T
 - [ ] **Boot smoke test.** Bring up the freshly-built image + a Postgres container, poll `/api/healthz` until 200, tear down. Proves the container starts, Prisma `migrate deploy` runs clean on an empty DB, and the server binds — none of which the vitest suite exercises (it imports modules, never boots the HTTP server via `entrypoint.sh`). Reuse `docker-compose.yml` with an override pointing `app.image` at the built tag, or a plain `docker run`.
 - [ ] **Lint** — once **PI-91** lands, add `npm run lint` as a CI step. Gated on that; listed here so it isn't forgotten.
 
-### PI-93 — Move the GHCR image publish to Forgejo Actions
-`.github/workflows/docker-publish.yml` builds + pushes `ghcr.io/tobiasdax/limitedgauntlet` on `release: published`, and only on the GitHub mirror. So every release depends on the chain: tag → Forgejo → push-mirror propagation → GitHub sees the tag → `gh release create` → the GitHub Action fires. The `release` skill documents a past release that broke by not waiting for the mirror sync. Publishing on the Forgejo runner removes the mirror from the release critical path. **Likely the highest-value CI item — and the most config work.**
+### PI-93 — Tag-triggered GHCR build + release (kept on GitHub Actions) ✅ (2026-09-08, first real release still pending)
+The old `docker-publish.yml` triggered on `release: published` — meaning a human had to create the GitHub Release *first*, after the Forgejo→GitHub push-mirror had synced the tag. The mirror was on an **8h interval with `sync_on_commit` off**, so a release meant: push tag → wait (or hit "Synchronize Now") → verify SHAs → `gh release create`. That gap burned a past release (stale commit).
 
-- [ ] New `.forgejo/workflows/publish.yml`, triggered on a Forgejo **release published** (or a `v*` tag push). Build with buildx on the runner, push to `ghcr.io`.
-- [ ] **The config work, in order of risk:**
-  - **GHCR PAT** — mint a GitHub PAT with `write:packages`, scope it to this package if possible, store as a Forgejo Actions secret (repo or org level), `docker login ghcr.io` with it (or the `docker/login-action` mirror).
-  - **Do the `docker/*` marketplace actions resolve on this Forgejo instance?** `setup-buildx-action` / `build-push-action` / `metadata-action` — Forgejo's action mirror is narrower than GitHub Marketplace. If they don't resolve, either set `DEFAULT_ACTIONS_URL = github` on the instance, or (simpler, fewer moving parts) just call `docker buildx build --push --tag …` directly in a `run:` step and compute the tags in shell.
-  - Tag scheme unchanged: `:X.Y.Z`, `:X.Y`, `:latest` (non-prerelease only).
-- [ ] **Transition:** run both the Forgejo and GitHub publish paths for one release, confirm the Forgejo one produces an identical image + tags, then delete `docker-publish.yml`. (It's already guarded to no-op on Forgejo, so leaving it as a fallback is also fine.)
-- [ ] **Multi-arch** (`linux/amd64,linux/arm64`) is a natural add once buildx is wired — decide based on whether an ARM deploy target is real (RPi, etc.), otherwise skip.
-- [ ] Update the `release` skill: the mirror-sync-pause step is no longer needed for the image once this lands (still needed if GitHub *Releases* themselves stay GitHub-side).
+**Decision (2026-09-08): keep it on GitHub, don't move to Forgejo.** GHCR and GitHub Releases are both GitHub infrastructure — GitHub Actions gets `GITHUB_TOKEN` for free (GHCR push *and* Release API), the build runs on GitHub's runners (not the DaxLite N100 that's juggling ~44 services), and the whole public artifact chain stays where it's consumed from. Moving to Forgejo would have meant a long-lived GH PAT in Forgejo secrets, homelab build load, and *still* touching the GitHub API for a public Release page. Forgejo Actions stays CI-only.
+
+- [x] **Mirror:** `sync_on_commit` turned on (was 8h interval) — tags now reach GitHub in seconds.
+- [x] **Mirror PAT:** replaced with one carrying **Contents: RW + Workflows: RW** (fine-grained) — the `workflow` bit is mandatory for any push touching `.github/workflows/`, which every workflow edit since would otherwise have silently failed the whole mirror push.
+- [x] **`docker-publish.yml` rewritten:** trigger `release: published` → `push: tags: ['v*.*.*']`. The mirrored tag arriving *is* the trigger — no race, the workflow can't run before the tag exists on GitHub. Adds a `softprops/action-gh-release@v2` step that opens the release as a **draft** with auto-generated notes (image + GHCR tags publish immediately; the public notes wait for a human to curate + publish). `permissions: contents: write`. `workflow_dispatch` kept (rebuilds `:latest` from `main`). Guard `if: github.server_url == 'https://github.com'` unchanged.
+- [x] **`release` skill rewritten** (v0.2.0) — the mirror-pause dance (old steps 6/8) collapses to: push tag → Action auto-fires → `gh release edit --notes-file … --draft=false`. `workflow`-scope troubleshooting note kept.
+- [ ] **First real release on the new path** — cut the next `vX.Y.Z` and confirm end to end: tag → mirror → Action builds → GHCR `:X.Y.Z`/`:X.Y`/`:latest` → draft release created → publish. Until then this is committed but unexercised.
+- [ ] **Multi-arch** (`linux/amd64,linux/arm64`) — natural add via buildx, decide when an ARM deploy target is real (RPi etc.); skip otherwise.

@@ -81,10 +81,6 @@ It needs a runner:
   on the runner service, `container.options: "--dns ... --add-host ..."` in
   the runner's `config.yml` for the job containers.
 
-The GHCR image publish (`.github/workflows/docker-publish.yml`) stays
-GitHub-only — it's guarded with `if: github.server_url == 'https://github.com'`
-so a Forgejo runner picking it up is a no-op.
-
 ### Requiring CI before merge
 
 In the Forgejo repo: **Settings → Branches → Add rule** for `main` →
@@ -92,3 +88,24 @@ enable **Enable Status Check** and select the `check` job → save. With
 "Block merge without successful status checks" on, a PR can't be merged
 until CI is green. (Direct pushes to `main` by an admin still bypass this
 unless **Block pushes** is also enabled.)
+
+## Releases
+
+`.github/workflows/docker-publish.yml` runs on **GitHub Actions** (not
+Forgejo): on a `vX.Y.Z` tag it builds the runtime image, pushes it to
+`ghcr.io/tobiasdax/limitedgauntlet` (`:X.Y.Z`, `:X.Y`, `:latest`), and opens
+a **draft** GitHub Release with auto-generated notes.
+
+Tags are authored on Forgejo; the push-mirror carries them to GitHub on every
+push (`sync_on_commit`), so `git push origin vX.Y.Z` is the whole trigger.
+GHCR auth and the Release API use GitHub Actions' built-in `GITHUB_TOKEN` — no
+PAT in the workflow. The job is guarded with
+`if: github.server_url == 'https://github.com'` so a Forgejo runner reading
+`.github/workflows/` is a no-op.
+
+The mirror's PAT (Forgejo → GitHub) needs **Contents: RW + Workflows: RW**
+(fine-grained) or `repo` + `workflow` (classic) — the `workflow` bit is
+required for any push that touches `.github/workflows/`.
+
+The full release procedure (version bump, notes, publishing the draft) is the
+`release` skill.
