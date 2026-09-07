@@ -12,7 +12,8 @@ The app is **feature-complete and running in production** — tagged releases (l
 
 - **PI-39** — organizer data import: v1 shipped, the `legacy-data.json` import step is still open.
 - **PI-62** — deck photos: scoped via interview, not started.
-- **PI-88 – PI-91** — project-health items from the 2026-09-06 code audit: CI test runs, a pairing-size guard, dependency automation, ESLint + Prettier.
+- **PI-89 – PI-91** — project-health items from the 2026-09-06 code audit: pairing-size guard, dependency automation, ESLint + Prettier. (PI-88, CI on Forgejo Actions, is done.)
+- **PI-92 – PI-93** — CI follow-ups now that Forgejo runners work: expand the checks (migration drift, image build on PRs, boot smoke test); move the GHCR image publish off the GitHub mirror.
 
 ## New improvements (backlog)
 
@@ -305,3 +306,23 @@ There is **no linter or formatter config in the repo** — `eslint` / `prettier`
 - [ ] **Start lenient.** Get to zero errors on the current tree without a mass reformat, then tighten rule by rule. Decide whether to take the one-time repo-wide `prettier --write` commit (noisy but clean) or format-on-touch.
 - [ ] **`@typescript-eslint/no-floating-promises` needs deliberate handling** — this codebase intentionally fires-and-forgets (the `fireAndForget` helper, webhook delivery, realtime emits). Either the helper's signature makes that explicit to the rule, or those call sites get an explicit `void`. Don't let the rule force `await` where non-blocking is the point.
 - [ ] Add `npm run lint` at the root and wire it into **PI-88**'s CI.
+
+### PI-92 — Expand CI: migration drift, image build on PRs, boot smoke test
+PI-88 shipped `.forgejo/workflows/ci.yml` (typecheck + builds + server suite). Three cheap additions catch classes of breakage that suite doesn't touch. Keep it one workflow file; if the image steps drag on the N100 runner, split them into a job that only runs on `pull_request` + pushes to `main`, not every branch.
+
+- [ ] **Migration-drift check.** `prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma --exit-code` (run from `server/`) — fails CI when `schema.prisma` has been edited without a matching migration. This is the single most common self-inflicted break in this repo's workflow: edit the schema → `prisma generate` picks it up locally → tests pass → migration never written → prod `migrate deploy` silently doesn't apply the change. No DB needed for the `--from-migrations`/`--to-schema-datamodel` form.
+- [ ] **Docker image build on PRs.** `docker build .` (no push) as a CI step — Dockerfile / multi-stage / `npm ci` breakage surfaces on the PR instead of at release time (today the image is only ever built by `docker-publish.yml` on `release: published`). The Forgejo runner has the socket, so `docker build` works; add `--cache-from` if slow.
+- [ ] **Boot smoke test.** Bring up the freshly-built image + a Postgres container, poll `/api/healthz` until 200, tear down. Proves the container starts, Prisma `migrate deploy` runs clean on an empty DB, and the server binds — none of which the vitest suite exercises (it imports modules, never boots the HTTP server via `entrypoint.sh`). Reuse `docker-compose.yml` with an override pointing `app.image` at the built tag, or a plain `docker run`.
+- [ ] **Lint** — once **PI-91** lands, add `npm run lint` as a CI step. Gated on that; listed here so it isn't forgotten.
+
+### PI-93 — Move the GHCR image publish to Forgejo Actions
+`.github/workflows/docker-publish.yml` builds + pushes `ghcr.io/tobiasdax/limitedgauntlet` on `release: published`, and only on the GitHub mirror. So every release depends on the chain: tag → Forgejo → push-mirror propagation → GitHub sees the tag → `gh release create` → the GitHub Action fires. The `release` skill documents a past release that broke by not waiting for the mirror sync. Publishing on the Forgejo runner removes the mirror from the release critical path. **Likely the highest-value CI item — and the most config work.**
+
+- [ ] New `.forgejo/workflows/publish.yml`, triggered on a Forgejo **release published** (or a `v*` tag push). Build with buildx on the runner, push to `ghcr.io`.
+- [ ] **The config work, in order of risk:**
+  - **GHCR PAT** — mint a GitHub PAT with `write:packages`, scope it to this package if possible, store as a Forgejo Actions secret (repo or org level), `docker login ghcr.io` with it (or the `docker/login-action` mirror).
+  - **Do the `docker/*` marketplace actions resolve on this Forgejo instance?** `setup-buildx-action` / `build-push-action` / `metadata-action` — Forgejo's action mirror is narrower than GitHub Marketplace. If they don't resolve, either set `DEFAULT_ACTIONS_URL = github` on the instance, or (simpler, fewer moving parts) just call `docker buildx build --push --tag …` directly in a `run:` step and compute the tags in shell.
+  - Tag scheme unchanged: `:X.Y.Z`, `:X.Y`, `:latest` (non-prerelease only).
+- [ ] **Transition:** run both the Forgejo and GitHub publish paths for one release, confirm the Forgejo one produces an identical image + tags, then delete `docker-publish.yml`. (It's already guarded to no-op on Forgejo, so leaving it as a fallback is also fine.)
+- [ ] **Multi-arch** (`linux/amd64,linux/arm64`) is a natural add once buildx is wired — decide based on whether an ARM deploy target is real (RPi, etc.), otherwise skip.
+- [ ] Update the `release` skill: the mirror-sync-pause step is no longer needed for the image once this lands (still needed if GitHub *Releases* themselves stay GitHub-side).
