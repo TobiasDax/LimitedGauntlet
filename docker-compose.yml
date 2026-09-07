@@ -43,6 +43,28 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    # Hardening: unprivileged (the image runs as the `node` user), no way to
+    # regain privileges, no Linux capabilities, read-only root filesystem
+    # (the app writes nothing but logs-to-stdout; /tmp is the one writable
+    # spot), and a PID ceiling. See docs/deployment.md § 4b.
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    pids_limit: 200
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:8080/api/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     networks:
       backend:
       egress:
@@ -68,6 +90,11 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    # The postgres image drops to its own `postgres` user internally and
+    # needs a writable rootfs + a few caps for the data-dir setup, so this
+    # is the one hardening flag that's safe to apply here.
+    security_opt:
+      - "no-new-privileges:true"
     networks:
       - backend
 

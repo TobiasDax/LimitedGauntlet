@@ -14,7 +14,8 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-62** — deck photos: scoped via interview, not started.
 - **PI-89 – PI-90** — project-health items from the 2026-09-06 code audit: pairing-size guard, dependency automation. (PI-88 CI and PI-91 ESLint + Prettier are done.)
 - **PI-92** — expand CI: migration-drift check, image build on PRs, boot smoke test.
-- **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions; ✅ set up, first real release on the new path still to run.
+- **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions; ✅ done (first release: v0.7.0).
+- **PI-94** — container hardening: non-root image + `no-new-privileges` / `cap_drop` / `read_only` compose. ✅ built, needs a build+boot test.
 
 ## New improvements (backlog)
 
@@ -331,3 +332,12 @@ The old `docker-publish.yml` triggered on `release: published` — meaning a hum
 - [x] **`release` skill rewritten** (v0.2.0) — the mirror-pause dance (old steps 6/8) collapses to: push tag → Action auto-fires → `gh release edit --notes-file … --draft=false`. `workflow`-scope troubleshooting note kept.
 - [x] **First release on the new path: v0.7.0** — exercised the pipeline end to end: tag → mirror → GitHub Action builds → GHCR `:0.7.0`/`:0.7`/`:latest` → draft release → published.
 - [ ] **Multi-arch** (`linux/amd64,linux/arm64`) — natural add via buildx, decide when an ARM deploy target is real (RPi etc.); skip otherwise.
+
+### PI-94 — Container hardening (non-root + locked-down compose) ✅ (2026-09-08, needs a build+boot test)
+Prompted by moving the public instance off a throwaway 1 GB VPS onto DaxLite (the infra hub). Audit found the container ran as **root** (`Dockerfile` had no `USER`) — the one real gap; the compose was otherwise clean (no `privileged`, no `docker.sock`, no host net, DB on an `internal` network).
+
+- [x] **Dockerfile:** runtime stage runs as the image's built-in unprivileged `node` user. `COPY --chown=node:node` on every layer (sets ownership inline, no size cost). `ENV CHECKPOINT_DISABLE=1` (no Prisma CLI phone-home on boot) + `XDG_CACHE_HOME=/tmp/.cache` (so a read-only rootfs works). Binds `:8080` (>1024, no `NET_BIND_SERVICE` needed).
+- [x] **Both compose files** (`docker-compose.yml` + `docker-compose.image.yml`): `app` gets `security_opt: [no-new-privileges:true]`, `cap_drop: [ALL]`, `read_only: true` + `tmpfs: [/tmp]`, `pids_limit: 200`, and a `node -e` healthcheck hitting `/api/healthz` (which also verifies DB connectivity). `db` gets `no-new-privileges` only — the postgres image manages its own privilege drop and needs a writable rootfs + a few caps.
+- [x] **`docs/deployment.md` § 4b** — new "Container hardening" section: what the compose already does, plus what the deployer must still get right (dedicated network, no shared bridge, tunnel over published port, keep the image current, optional `mem_limit` / Postgres tuning for a small host).
+- [ ] **Build + boot test** — `docker compose up -d --build` from a clean checkout; confirm the non-root image builds, `prisma migrate deploy` runs against an empty DB under `read_only`, the app serves, and the healthcheck goes healthy. The `read_only` + non-root combo is the bit that could surprise on first boot (fallback: add a `/home/node/.cache` tmpfs or drop `read_only`). Then cut the release.
+- [ ] **`cap_drop` on `db`** left off deliberately — revisit with an explicit `cap_add` allowlist (`CHOWN SETUID SETGID DAC_OVERRIDE FOWNER`) if worth it.

@@ -74,6 +74,22 @@ The shipped Compose files deliberately define no ingress at all — no published
 
 Socket.IO (used for live pairings/standings/timer updates) shares the same port and path prefix as the rest of the API — no separate WebSocket configuration is needed beyond whatever your proxy needs to pass `Upgrade`/`Connection` headers through for WebSocket traffic (most reverse proxies do this by default for HTTP/1.1 upstreams; check your proxy's docs if realtime updates aren't arriving).
 
+## 4b. Container hardening
+
+The shipped Compose files already:
+
+- run the app as the unprivileged `node` user (uid 1000) — the image has no root process;
+- set `no-new-privileges`, `cap_drop: ALL`, `read_only: true` + a `/tmp` tmpfs, and a PID ceiling on the `app` container (it writes nothing at runtime but logs to stdout);
+- set `no-new-privileges` on `db` (the postgres image manages its own privilege drop and needs a writable rootfs, so the stricter flags don't apply there);
+- keep the database on an `internal: true` network with no host port — it is only reachable from the `app` container.
+
+What the deployment still needs to get right:
+
+- **Don't co-locate it on a Docker network shared with unrelated services.** A compromise of any container can reach every other container on the same bridge that listens on `0.0.0.0`. Give this stack its own project/network; the only thing that should join it from outside is your reverse proxy or tunnel (attached to the `egress` network, or a dedicated external network — not a catch-all one your whole host shares).
+- **No inbound host port.** Prefer a tunnel (Cloudflare Tunnel, `cloudflared`) or a reverse proxy that connects *out*, over publishing `8080` on the host. Section 4 covers wiring `TRUSTED_PROXIES` to the proxy's exact container IP.
+- **Keep the image current.** Pin a released tag and `docker compose pull && up -d` on new releases; rebuild `:latest` after a base-image CVE. `npm audit` advisories in transitive deps are addressed release-to-release.
+- **Optional RAM guards** for a small host: add `mem_limit` (e.g. `app: 512m`, `db: 768m`) and tune Postgres for the box (`command: ["postgres", "-c", "shared_buffers=96MB", "-c", "work_mem=4MB", "-c", "max_connections=25"]`) in your `docker-compose.override.yml`.
+
 ## 5. Optional: import past tournament history
 
 If you're migrating from spreadsheets, a pairing site, or manually-kept docs and want your past results pre-loaded rather than starting from an empty roster, see the README's **History import** section — it covers the data file format, the idempotent import script, and the env vars that control the created organization/login. Turning your actual records into that file's exact JSON shape is the tedious part; if you're running this via Claude Code, the [`import-history`](../.claude/skills/import-history/SKILL.md) skill (`/import-history`) does that conversion interactively instead of you hand-writing it against the TypeScript interfaces.
