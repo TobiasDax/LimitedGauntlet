@@ -1,17 +1,20 @@
 name: CI
 
-# Typecheck + server test suite on every push and PR, plus a migration-drift
-# check, an image build, and a boot smoke test.
+# Lint/format, migration-drift check, typecheck + build of all three
+# workspaces, and the server test suite — on every push to main and every PR.
 #
 # Runs on Forgejo Actions: `origin` is the Forgejo instance, GitHub is only a
 # downstream push-mirror, so this is where pushes and PRs actually land. Needs
 # a registered runner with a Docker backend advertising the `ubuntu-latest`
-# label — see docs/development.md "Continuous integration". The `image` job
-# additionally needs the runner to expose a working `docker` CLI (build +
-# run) to its job containers.
+# label — see docs/development.md "Continuous integration".
 #
-# The GHCR image publish (.github/workflows/docker-publish.yml) stays
-# GitHub-only and is guarded to no-op if a Forgejo runner picks it up.
+# A PR-time `docker build` + boot smoke test (PI-92) is NOT here: the runner
+# executes job steps inside a plain container with no `docker` CLI or host
+# socket, so it can't build an image. Add it back once the runner is set up
+# for that (config.yml `container.options` to mount the socket, or DinD). The
+# release image is still built + smoke-covered on GitHub for every tag via
+# .github/workflows/docker-publish.yml, which stays GitHub-only and is
+# guarded to no-op if a Forgejo runner picks it up.
 
 on:
   push:
@@ -88,60 +91,3 @@ jobs:
 
       - name: Server test suite
         run: npm run test --workspace server
-
-  image:
-    # Separate from `check` so the fast typecheck/test feedback isn't gated
-    # behind a full image build. Same triggers (push to main + PRs), so it
-    # never runs on throwaway feature branches. If the single N100 runner
-    # serialises the two jobs and CI feels slow, gate this on `needs: check`
-    # or move it to a nightly schedule.
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build the runtime image
-        # Surfaces Dockerfile / multi-stage / `npm ci` breakage on the PR
-        # instead of at release time (docker-publish.yml only builds on a
-        # tag). No push — the image is thrown away after the smoke test.
-        run: docker build -t limitedgauntlet:ci .
-
-      - name: Boot smoke test
-        # Proves the container starts, `prisma migrate deploy` runs clean on
-        # an empty DB (entrypoint.sh), and the server binds and answers —
-        # none of which the vitest suite exercises (it imports modules, it
-        # never boots the HTTP server).
-        run: |
-          set -euo pipefail
-          docker network create lgci
-          docker run -d --name lgci-db --network lgci \
-            -e POSTGRES_PASSWORD=test -e POSTGRES_DB=lg \
-            postgres:16-alpine
-          for _ in $(seq 1 30); do
-            docker exec lgci-db pg_isready -U postgres -d lg && break
-            sleep 2
-          done
-          docker run -d --name lgci-app --network lgci \
-            -e DATABASE_URL=postgresql://postgres:test@lgci-db:5432/lg \
-            -e SESSION_SECRET=0000000000000000000000000000000000000000000000000000000000000000 \
-            limitedgauntlet:ci
-          ok=""
-          for _ in $(seq 1 30); do
-            if docker run --rm --network lgci curlimages/curl:8.11.1 \
-                 -fsS http://lgci-app:8080/api/healthz; then
-              ok=1; break
-            fi
-            sleep 2
-          done
-          if [ -z "$ok" ]; then
-            echo "::error::app did not become healthy"
-            docker logs lgci-app
-            exit 1
-          fi
-          echo "app healthy"
-
-      - name: Tear down
-        if: always()
-        run: |
-          docker rm -f lgci-app lgci-db 2>/dev/null || true
-          docker network rm lgci 2>/dev/null || true

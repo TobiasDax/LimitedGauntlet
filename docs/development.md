@@ -57,19 +57,19 @@ The client has no separate test framework; UI changes are verified by hand again
 
 ## Continuous integration
 
-`.forgejo/workflows/ci.yml` runs on every push to `main` and every pull
-request. Two jobs:
+`.forgejo/workflows/ci.yml` runs one `check` job on every push to `main` and
+every pull request: lint + format check, a **migration-drift check** (fails
+if `schema.prisma` was edited without a matching migration), the
+typecheck/build of all three workspaces, and the server test suite (against a
+throwaway Postgres 16 service container).
 
-- **`check`** — lint + format check, a **migration-drift check** (fails if
-  `schema.prisma` was edited without a matching migration), the
-  typecheck/build of all three workspaces, and the server test suite (against
-  a throwaway Postgres 16 service container).
-- **`image`** — `docker build` of the runtime image (catches Dockerfile /
-  `npm ci` breakage on the PR instead of at release time) followed by a
-  **boot smoke test**: start the built image + a Postgres container, poll
-  `/api/healthz` until it answers, tear down. Proves the container starts,
-  `prisma migrate deploy` runs clean on an empty DB, and the server binds.
-  Needs the runner to give its job containers a working `docker` CLI.
+A PR-time `docker build` + boot smoke test (ROADMAP PI-92) is deliberately
+**not** in the workflow: the runner executes job steps inside a plain
+container with no `docker` CLI or host socket, so it can't build an image.
+Re-add that job once the runner can (mount `/var/run/docker.sock` via the
+runner's `config.yml` `container.options`, or run a DinD service). The
+release image is still built and boot-covered on GitHub for every tag via
+`docker-publish.yml`.
 
 It runs on **Forgejo Actions**, not GitHub Actions — `origin` is the Forgejo
 instance and GitHub is only a downstream push-mirror, so Forgejo is where
@@ -94,11 +94,10 @@ It needs a runner:
 ### Requiring CI before merge
 
 In the Forgejo repo: **Settings → Branches → Add rule** for `main` →
-enable **Enable Status Check** and select the `check` job (and `image`, if
-the runner is set up for it) → save. With "Block merge without successful
-status checks" on, a PR can't be merged until CI is green. (Direct pushes to
-`main` by an admin still bypass this unless **Block pushes** is also
-enabled.)
+enable **Enable Status Check** and select the `check` job → save. With
+"Block merge without successful status checks" on, a PR can't be merged
+until CI is green. (Direct pushes to `main` by an admin still bypass this
+unless **Block pushes** is also enabled.)
 
 ## Releases
 
