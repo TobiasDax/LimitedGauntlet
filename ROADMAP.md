@@ -22,6 +22,7 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-97** — entrant count per pod in the tournament overview pod list. ✅ shipped (v0.7.2); browser-verify pending.
 - **PI-98** — v0.8.1 hotfix: `@fastify/compress` blanked the live tournament pages. ✅ done (v0.8.1).
 - **PI-99** — not-yet-started pods counted as "played" everywhere (participation counts, Gesamtwertung columns, Hall of Fame incl. a phantom main-event champion). ✅ done (v0.8.2); browser-verify pending.
+- **PI-100** — on-demand side events: the TO signs a player up for every on-demand pod they'd play, and starting one pod auto-withdraws its entrants from all other not-yet-started on-demand pods. Raised by another organizer, refined with Tobias. Not started — ready for a build-scoping pass.
 
 ## New improvements (backlog)
 
@@ -397,3 +398,35 @@ Reported on the live instance: a tournament with 27 pods, none started, showing 
 
 **Tests:** `gesamtwertung.test.ts` — SETUP pod contributes nothing / points-only import still counts / `countTournamentParticipants` unit cases (started vs SETUP vs team). New `hallOfFame.test.ts` — no phantom champion for a SETUP main event, crown appears once it's played. `npm run build` clean, 145 server tests green.
 - [ ] Browser-verify on the live instance after deploy: the reported tournament should read "27 pods scheduled · not started yet", HoF should drop the 3 phantom players + the crown.
+
+### PI-100 — On-demand side events: multi-signup + auto-withdraw on pod start
+Raised by another organizer describing how a real on-demand side-event system needs to work at small-event scale, then refined with Tobias.
+
+**The scenario:** at a GP you register for one 8-player on-demand event, get a buzzer, and wander off until it fills — with >1000 players on site, an 8-seat pod fills on its own even if it's niche (20–30 min wait). At a ~10-player weekend that model can't work: there aren't enough people for any single pod to fill from its own dedicated signups. So instead **a player signs up for *every* on-demand pod they'd be happy to play** — "Draft X, Draft Y, and 2HG Sealed Z". When one of those pods reaches capacity it runs — and then the player's *other* signups have to be undone, because they're now busy playing and no longer available to fill anything else.
+
+**Tobias's answer (the mechanic to build):** the organizer should not have to "roll back" the extra signups by hand. When an on-demand pod **starts**, every entrant in it is **automatically withdrawn from all other on-demand pods in the same tournament that have not started yet**. Started/finished pods are untouched; scheduled (non-on-demand) pods are untouched; a player who was only ever in the one pod is unaffected. This is the "everyone signs up broadly, the system resolves the conflicts" model that makes on-demand pods usable below GP attendance numbers.
+
+**Clarified with Tobias (2026-09-09):**
+- **No player-facing signup surface.** A player "signs up" for an on-demand pod by asking the TO, who adds them as an entrant — the existing organizer flow (`POST /api/pods/:id/entrants`). "Multi-signup" is just the TO adding the same player to several on-demand pods. The PI-52 player portal is *not* touched by this item.
+- **Pods do not auto-fire.** Reaching capacity is a signal to the TO, not a trigger — the TO decides when a full pod starts. So: a capacity/target per on-demand pod and a "ready" indicator, but no automatic round-1 generation.
+- **Player notification is out of scope here** — split into its own future item (likely Discord DMs, since Discord OAuth is the main login method). This item only does the withdraw; whether/how the withdrawn players get told is that other item's problem.
+
+**Audit / how it fits what exists:**
+- **On-demand pods already exist** — `Pod.isOnDemand Boolean @default(false)` + the Scheduled/On demand tabs shipped in PI-81. This feature is the behaviour layer on top of that flag.
+- **Entrants are already organizer-managed** — `POST /api/pods/:id/entrants` (`pods.ts:450`) adds, `DELETE /api/entrants/:id` (`pods.ts:692`) removes. Adding one player to several on-demand pods already works today; nothing new is needed on the signup side.
+- **"A pod has started" already has a canonical predicate** — PI-99 added `podIsPlayed(pod) = pod.rounds.length > 0 || pod.status === "COMPLETED"` (`services/standings.ts`), mirroring the frontend's `podProgressStatus()` "Setup" test. The auto-withdraw triggers on the "first round generated" moment: `POST /api/pods/:id/rounds` with `nextRoundNumber === 1` (`server/src/routes/rounds.ts:81`, and the manual variant at `:150`). That's the one place a pod transitions from "collecting entrants" to "running", and it's already a `prisma.$transaction`.
+- **The withdraw** runs inside that same round-1 transaction: for the pod's individual entrants, `deleteMany` on `Entrant` rows where `pod.isOnDemand && pod.tournamentId === <this tournament> && !podIsPlayed(pod) && pod.id !== <starting pod>` and the entrant is the same player (or a team containing them). Emits the existing `emitPodEvent` / `emitTournamentEvent` for each affected pod so open pod pages and the tournament pod list (PI-97 entrant counts) update live.
+- **Capacity** — new nullable `Pod.capacity Int?` (null = no cap, today's behaviour). Only meaningful for on-demand pods. Drives a "6 / 8" style indicator and a "ready to start" badge in the On demand tab when `entrantCount >= capacity`. Round-trips through export/import like PI-81's `isOnDemand` did. **No auto-fire** — the badge is a cue for the TO, who still clicks "generate round 1".
+- **Withdraw is a hard `DELETE`**, not the `Entrant.dropped` soft-drop (that's for someone who started a pod and left). The player was never really in the pod. PI-99 already made un-started pods contribute nothing to standings/HoF/Gesamtwertung, so an entrant vanishing from a SETUP pod is clean — but re-verify tokens + card-pull inference don't choke.
+
+**Decided (2026-09-09):**
+- **The withdraw is a choice at start time, via a modal.** Generating round 1 of an on-demand pod that has entrants who are also in *other* not-yet-started on-demand pods pops a small modal listing those players and the pods, with three actions: **Withdraw them from the other on-demand pods** (the default / expected path), **Keep them on the other pods** (start this pod, touch nothing else), and an **X to cancel** (don't start round 1 at all). If no entrant is in another on-demand pod, no modal — round 1 generates as it does today.
+- **Restore path — yes, when feasible.** Deleting round 1 of a still-PENDING on-demand pod should offer to re-add the entrants that *that start* auto-withdrew. Feasible only if the withdraw is recorded — persist the set (which entrants, from which pods, by which starting pod, when); a small table or a JSON column on the starting `Round`/`Pod`. If recording it cleanly turns out to be disproportionate, ship without restore and document "TO re-adds manually" — don't build a heavy mechanism for it.
+- **Team pods:** withdrawing a player who's on a `Team` entrant in another on-demand pod removes the **whole team entrant** (a partial team can't play). Name it explicitly in the modal.
+- **Over-fill is allowed but warned.** Adding an entrant beyond `capacity` (e.g. a 9th to an 8-cap pod) shows a warning and proceeds — the TO may know one of the eight is flaky. No hard block.
+- **Capacity default:** prefill `Pod.capacity = 8` when `format` is `DRAFT` or `CHAOS_DRAFT`; leave it blank for `SEALED` / `CONSTRUCTED` / `CUSTOM` — the TO sets a number if they want one.
+- **Cross-tournament:** the withdraw is scoped to the *same* tournament only.
+
+**Split out into its own future item:** player notification when their pod fires / they're withdrawn — likely Discord DMs via the existing Discord OAuth identity. Not part of this item.
+
+- [ ] Not started — request captured and clarified 2026-09-09; ready for a build-scoping pass.
