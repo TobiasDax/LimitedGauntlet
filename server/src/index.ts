@@ -6,7 +6,6 @@ import fastifyStatic from "@fastify/static";
 import fastifySecureSession from "@fastify/secure-session";
 import fastifyHelmet from "@fastify/helmet";
 import fastifyRateLimit from "@fastify/rate-limit";
-import fastifyCompress from "@fastify/compress";
 import "./auth/types.js";
 import { config } from "./config.js";
 import { prisma } from "./prisma.js";
@@ -96,14 +95,6 @@ await app.register(fastifyHelmet, {
   // avoids a console warning) once the origin is actually HTTPS.
   crossOriginOpenerPolicy: config.sessionCookieSecure ? { policy: "same-origin" } : false,
 });
-
-// Compress API JSON and the static SPA bundle (~870 KB JS) on the fly. The
-// live deploy sits behind Cloudflare, which already Brotli's responses for
-// free — but a LAN or non-CF self-hoster gets nothing without this, and it's
-// the read-heavy venue scenario (many phones on pod/standings pages) that
-// benefits most. See ROADMAP PI-95. Defaults: 1 KB threshold, skips
-// already-compressed content, negotiates br/gzip/deflate from Accept-Encoding.
-await app.register(fastifyCompress, { global: true });
 
 // A generous default across the whole app (catches generic scraping/abuse)
 // — auth.ts sets much tighter per-route limits on login/signup specifically,
