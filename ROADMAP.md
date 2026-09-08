@@ -17,8 +17,8 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions. ✅ done (v0.7.0).
 - **PI-94** — container hardening (non-root image + locked-down compose). ✅ done (v0.7.1); live instance moved to DaxLite 2026-09-08.
 - **PI-95** — read-path performance (QueryClient defaults, standings cache, load test) before the 40–60 player event.
-- **PI-96** — clickable player names → detail page; detail page gains a pod history list (upcoming vs finished, linked). ✅ code-complete, browser-verify pending.
-- **PI-97** — entrant count per pod in the tournament overview pod list. ✅ code-complete, browser-verify pending.
+- **PI-96** — clickable player names → detail page; detail page gains a pod history list (upcoming vs finished, linked). ✅ shipped (v0.7.2); browser-verify pending.
+- **PI-97** — entrant count per pod in the tournament overview pod list. ✅ shipped (v0.7.2); browser-verify pending.
 
 ## New improvements (backlog)
 
@@ -269,7 +269,7 @@ Idea from Tobias: he's standing up his own Umami instance and wants its tracking
 - [x] **Open point resolved:** `/profile` shows a one-line "you belong to N organizations · Manage them" pointer to `/organizations`, not the full list.
 - [ ] Browser-verified.
 
-### PI-96 — Clickable players open a detail page; detail page lists their pods ✅ code-complete, browser-verify pending
+### PI-96 — Clickable players open a detail page; detail page lists their pods ✅ shipped (v0.7.2), browser-verify pending
 Idea from Tobias: clicking a player name in the org roster or in a pod's entrant list should navigate to that player's detail page rather than doing nothing. The page already exists (`PlayerStatsPage`, PI-37/72) with stat tabs — add an event list to it showing every pod the player participated in, divided into upcoming and finished pods, each entry linking directly to the pod page.
 
 - [x] **Navigation:** make player names in the org roster (`RosterPage.tsx`) and in `PodPage.tsx`'s entrant lists into links pointing at the existing player stats route (`/hall-of-fame/players/:id`). Public pod/tournament pages should also link through (confirmed by Tobias) — they go to the existing public player stats route (`/o/:slug/hall-of-fame/players/:id`), which already exists.
@@ -278,7 +278,7 @@ Idea from Tobias: clicking a player name in the org roster or in a pod's entrant
 - [x] **Public vs authed:** both the authed `PlayerStatsPage` and the public `PublicPlayerStatsPage` show the event list. Links from the event list: authed → `/tournaments/:tid/pods/:pid`; public → `/o/:slug/tournaments/:tid/pods/:pid`. The public player stats endpoint (`GET /api/public/o/:slug/hall-of-fame/players/:playerId`) already calls `computePlayerStats`, so extending it server-side covers both surfaces.
 - [x] **Interaction with PI-86 (multi-org):** the player stats page is org-scoped (`orgId` from the active org). The event list follows the same scope — only pods within the active org, not cross-org.
 
-### PI-97 — Show entrant count per pod in the tournament overview ✅ code-complete, browser-verify pending
+### PI-97 — Show entrant count per pod in the tournament overview ✅ shipped (v0.7.2), browser-verify pending
 Idea from Tobias: the pod list on the tournament page (organizer and public) currently shows pod name, format, status, and schedule — but not how many players are in each pod, even though that's one of the first things you'd want to see at a glance.
 
 - [x] **Data:** both tournament detail endpoints (`GET /api/tournaments/:id` and `GET /api/public/o/:slug/tournaments/:id`) already query `entrants` per pod in minimal form and then strip them before sending. Instead of stripping, compute and include `entrantCount` in each pod object — for individual pods this is `entrants.length`; for team pods use `entrants.length` too but label it "N teams" on the client. No schema change, no extra Prisma query.
