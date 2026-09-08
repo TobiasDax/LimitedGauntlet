@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — tagged releases (latest **v0.7.0**), a public demo at [limited-gauntlet.com](https://limited-gauntlet.com), and the full numbered build (Steps 0–12) plus the PI-1…PI-74 backlog all shipped and browser-verified. That whole history is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) — the roadmap below is only what's still open or awaiting a live browser-verify.
+The app is **feature-complete and running in production** — tagged releases (latest **v0.8.0**), a public demo at [limited-gauntlet.com](https://limited-gauntlet.com), and the full numbered build (Steps 0–12) plus the PI-1…PI-74 backlog all shipped and browser-verified. That whole history is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) — the roadmap below is only what's still open or awaiting a live browser-verify.
 
 **Shipped, browser-verify on a live deploy still pending:** PI-75 (operator signup webhook), PI-76–PI-84 (the pod-list cluster — organizer reorder, finished-pods sink, Scheduled/On-demand tabs, scheduled + actual timestamps, date dividers, pod cancel; first live pass 2026-09-05 found PI-77's sink broken on pre-existing data — needs the `20260905140000` backfill migration applied first), PI-85 (deployer analytics), PI-87 (Settings/Profile split). **PI-86** (one login across multiple orgs) is merged and verified on the demo — **the live rollout still needs a DB backup first** (see PI-86's deployment note).
 
@@ -12,11 +12,12 @@ The app is **feature-complete and running in production** — tagged releases (l
 
 - **PI-39** — organizer data import: v1 shipped, the `legacy-data.json` import step is still open.
 - **PI-62** — deck photos: scoped via interview, not started.
-- Project-health backlog: all done (PI-88 CI, PI-89 pairing-size guard, PI-90 Dependabot, PI-91 ESLint + Prettier, PI-92 expanded CI). PI-92's `image` job still needs one live Forgejo-runner check.
-- **PI-92** — expand CI: migration-drift check, image build on PRs, boot smoke test.
+- **PI-89** — guard the pairing search against pathological pod sizes. ✅ done (v0.8.0).
+- **PI-90** — dependency update automation (Dependabot). ✅ done (v0.8.0).
+- **PI-92** — expand CI: migration-drift check, image build on PRs, boot smoke test. ✅ done (v0.8.0); `image` job still needs one live Forgejo-runner check.
 - **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions. ✅ done (v0.7.0).
 - **PI-94** — container hardening (non-root image + locked-down compose). ✅ done (v0.7.1); live instance moved to DaxLite 2026-09-08.
-- **PI-95** — read-path performance before the 40–60 player event. Client-side + query-shape parts done (QueryClient defaults, parallel Gesamtwertung, compression); the in-process standings cache and the real-deploy load test are still open.
+- **PI-95** — read-path performance before the 40–60 player event. Client-side + query-shape parts done in v0.8.0 (QueryClient defaults, parallel Gesamtwertung, compression); the in-process standings cache and the real-deploy load test are still open.
 - **PI-96** — clickable player names → detail page; detail page gains a pod history list (upcoming vs finished, linked). ✅ shipped (v0.7.2; pod-link fix v0.7.3); browser-verify pending.
 - **PI-97** — entrant count per pod in the tournament overview pod list. ✅ shipped (v0.7.2); browser-verify pending.
 
@@ -302,7 +303,7 @@ Was: `.github/workflows/` had one workflow — `docker-publish.yml`, GHCR image 
 - [x] **Runner live.** `forgejo-runner` v6 container on DaxLite (`/opt/docker/arcane-projects/forgejo-runner/`), Docker backend, `ubuntu-latest` label. First green run 2026-09-07. DNS was the whole fight: the runner container and the job containers both sit on Docker networks where the only resolver reachable was tailnet MagicDNS (`100.100.100.100`), which SERVFAILs public names (tailnet has no override-local-DNS). Fix: public resolvers (`9.9.9.9`/`1.1.1.1`) for both, plus a static `git.shire-census.ts.net → 100.90.42.72` host entry (the Forgejo tailnet sidecar) — set via `extra_hosts` on the runner service and `container.options` in the runner's `data/config.yml` for job containers.
 - [x] Follow-up resolved: **no README badge** — the Forgejo instance isn't reachable off the tailnet and the GitHub mirror runs no CI, so a badge would just be a broken image publicly; `docs/development.md` points at the Actions tab instead. Branch-protection steps (require the `check` job on `main`) written up in `docs/development.md` — the toggle itself is Tobias's to flip in the Forgejo repo settings.
 
-### PI-89 — Guard the pairing search against pathological pod sizes ✅ (2026-09-08, unreleased)
+### PI-89 — Guard the pairing search against pathological pod sizes ✅ (v0.8.0)
 `generatePairings` (`server/src/services/pairing.ts`) solves an **exact minimum-cost perfect matching** via recursive branch-and-bound (`solvePool` → `bestMatching`). The `candidate.cost >= best.cost` prune keeps it fast at real pod sizes (PLAN.md's stated ceiling is ≤16 entrants), but the worst case is **exponential**: a large pod where the cost function produces many near-equal options — dense repeat-elsewhere-this-weekend history (round 1) plus everyone bunched on similar points — defeats the prune, and an odd pool multiplies it by re-solving for each bye candidate in `byeOrder`. A 30-plus-entrant pod with adversarial history could pin the event loop for a very long time. Not a live bug (real events are ~10 players) — but "someone makes a 40-person pod" shouldn't be able to wedge a shared instance.
 
 - [x] **Both guards, belt-and-braces.** `EXACT_MATCHING_POOL_LIMIT = 18` — above it, skip the exact solver entirely. `MATCHING_CALL_BUDGET = 300_000` — a recursion-call counter threaded through `bestMatching` (now `solveExact`); exceeding it throws `MatchingBudgetExceeded`, which unwinds out of the bye loop and restarts the whole pairing greedy (so an exact bye choice never gets mixed with a greedy remainder). Numbers picked from a timing sweep: realistic costs stay <30 ms to n=18 and the exact solve blows past 300 k calls around n≥20; a repeat-dense n=16 round 1 (near-equal costs, the real pathology) hit ~760 ms / ~5 M calls unguarded and now bails at ~30–40 ms.
@@ -310,7 +311,7 @@ Was: `.github/workflows/` had one workflow — `docker-publish.yml`, GHCR image 
 - [x] **Surfaced** via a `console.warn` (`[pairing] pod <id> round <n>: N active entrants — used greedy score-group pairing…`) whenever the fallback runs. No change to the pairing response shape — `suggestion` never reaches the client, only the created `Round`/`Match` rows do.
 - [x] **Test:** `pairing.test.ts` gains a 32-entrant / 4-round pod — asserts each round generates in <1 s, 16 pairs, all 32 covered, and no repeat opponent across all four rounds (greedy still honours the hard-avoid). Server suite 139/139.
 
-### PI-90 — Dependency update automation (Dependabot / Renovate) ✅ (2026-09-08, unreleased)
+### PI-90 — Dependency update automation (Dependabot / Renovate) ✅ (v0.8.0)
 ~383 packages resolve into `node_modules`; the direct deps are lean and current, but nothing watches for security advisories or drift. `npm audit` was run by hand during the Step 1 bootstrap and again when PI-68 picked `write-excel-file` — never automatically since. Prisma 6.x, Fastify 5, React 19, Vite 6 all keep moving.
 
 - [x] **`.github/dependabot.yml`** added (built into GitHub — the mirror runs it, zero extra infra):
@@ -331,7 +332,7 @@ Was: **no linter or formatter config in the repo**. `tsc` strict + `noUncheckedI
 - [x] `npm run lint` / `format` / `format:check` scripts; `format:check` + `lint` wired into `.forgejo/workflows/ci.yml` after `prisma generate`.
 - [ ] **2 warnings left, deliberately:** `react-refresh/only-export-components` on `CardGallery.tsx` / `GesamtwertungList.tsx` (each colocates one small helper with its component). Splitting them into new files is pure churn for a dev-only HMR nicety — left as warnings, CI doesn't fail on warnings. Revisit if the list grows.
 
-### PI-92 — Expand CI: migration drift, image build on PRs, boot smoke test ✅ (2026-09-08, unreleased — `image` job unverified against the live runner)
+### PI-92 — Expand CI: migration drift, image build on PRs, boot smoke test ✅ (v0.8.0 — `image` job unverified against the live runner)
 PI-88 shipped `.forgejo/workflows/ci.yml` (typecheck + builds + server suite). Three cheap additions catch classes of breakage that suite doesn't touch. Keep it one workflow file; if the image steps drag on the N100 runner, split them into a job that only runs on `pull_request` + pushes to `main`, not every branch.
 
 - [x] **Migration-drift check** — a step in the `check` job. `prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma --shadow-database-url … --exit-code`, run from `server/`. The `--from-migrations` form **does** need a shadow DB (Prisma 6.19 errors without `--shadow-database-url`) — so the step first `CREATE DATABASE lgshadow` on the existing Postgres service via `prisma db execute`, then diffs into it. Verified locally: exit 0 in sync, exit 2 when `schema.prisma` gains an un-migrated column.
@@ -361,7 +362,7 @@ Prompted by moving the public instance off a throwaway 1 GB VPS onto DaxLite (th
 - [x] **Boot-tested via `v0.7.1-rc1`** (prerelease, so `:latest` stayed put): `:0.7.1-rc1` came up healthy in a throwaway stack — `prisma migrate deploy` ran under `read_only` + non-root, a signup returned `201`. No `read_only` fallback needed. `v0.7.1` cut, and the live public instance now runs it on DaxLite (migrated off the 1 GB VPS 2026-09-08).
 - [ ] **`cap_drop` on `db`** left off deliberately — revisit with an explicit `cap_add` allowlist (`CHOWN SETUID SETGID DAC_OVERRIDE FOWNER`) if worth it.
 
-### PI-95 — Read-path performance for a 40–60 player event ⏳ (client + query-shape parts done 2026-09-08, unreleased; cache + load test still open)
+### PI-95 — Read-path performance for a 40–60 player event ⏳ (client + query-shape parts shipped v0.8.0; in-process cache + load test still open)
 Moving the live instance to a 14 GB box (PI-94) took memory pressure off the table, but the app still recomputes everything from Postgres on every request and the client refetches aggressively. Under ~50 phones at a venue this is a real load pattern — cheap to fix, worth doing before the event.
 
 - [x] **`QueryClient` defaults.** `main.tsx` now sets `staleTime: 30_000` + `refetchOnWindowFocus: false` (was a bare `new QueryClient()` → TanStack's `staleTime: 0` + focus-refetch, so every phone-unlock refetched every query on screen). Realtime Socket.IO invalidation still keeps watched data fresh where it matters. Biggest lever.
