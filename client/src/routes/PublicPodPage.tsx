@@ -19,7 +19,24 @@ import type { Entrant, Match, Round } from "../lib/types";
 // PI-79 — same list PodTabs/SeatingsPage gate the Seatings tab on.
 const seatingFormats = new Set(["DRAFT", "CHAOS_DRAFT", "SEALED"]);
 
-function PublicMatchRow({ match, entrantById }: { match: Match; entrantById: Map<string, Entrant> }) {
+function entrantLink(entrant: Entrant, slug: string, name: string) {
+  if (!entrant.playerId) return <span>{name}</span>;
+  return (
+    <Link to={`/o/${slug}/hall-of-fame/players/${entrant.playerId}`} className="hover:text-accent-strong">
+      {name}
+    </Link>
+  );
+}
+
+function PublicMatchRow({
+  match,
+  entrantById,
+  slug,
+}: {
+  match: Match;
+  entrantById: Map<string, Entrant>;
+  slug: string;
+}) {
   const a = entrantById.get(match.entrantAId);
   const b = match.entrantBId ? entrantById.get(match.entrantBId) : null;
 
@@ -28,11 +45,11 @@ function PublicMatchRow({ match, entrantById }: { match: Match; entrantById: Map
       <div>
         <div className="mb-1 text-[11px] tracking-wide text-ink-muted uppercase">Table {match.tableNumber}</div>
         <div className="font-display text-[15px] font-bold">
-          {a ? entrantDisplayName(a) : "—"}
+          {a ? entrantLink(a, slug, entrantDisplayName(a)) : "—"}
           {b ? (
             <>
               <span className="mx-2 text-[11px] font-normal text-ink-muted">vs</span>
-              {entrantDisplayName(b)}
+              {entrantLink(b, slug, entrantDisplayName(b))}
             </>
           ) : (
             <span className="ml-2 text-[11px] font-normal text-ink-muted uppercase">Bye</span>
@@ -49,7 +66,15 @@ function PublicMatchRow({ match, entrantById }: { match: Match; entrantById: Map
   );
 }
 
-function PublicRoundSection({ round, entrantById }: { round: Round; entrantById: Map<string, Entrant> }) {
+function PublicRoundSection({
+  round,
+  entrantById,
+  slug,
+}: {
+  round: Round;
+  entrantById: Map<string, Entrant>;
+  slug: string;
+}) {
   const countdown = useCountdown(round.status === "ACTIVE" ? round.endsAt : null);
   // PI-80 — round 1 only; the server already strips `matches` in this state,
   // this just picks the right copy instead of rendering an empty list.
@@ -77,7 +102,7 @@ function PublicRoundSection({ round, entrantById }: { round: Round; entrantById:
       ) : (
         <div className="flex flex-col gap-2">
           {round.matches.map((m) => (
-            <PublicMatchRow key={m.id} match={m} entrantById={entrantById} />
+            <PublicMatchRow key={m.id} match={m} entrantById={entrantById} slug={slug} />
           ))}
         </div>
       )}
@@ -142,7 +167,7 @@ export function PublicPodPage() {
         ) : (
           <div className="flex flex-col gap-5">
             {rounds.map((round) => (
-              <PublicRoundSection key={round.id} round={round} entrantById={entrantById} />
+              <PublicRoundSection key={round.id} round={round} entrantById={entrantById} slug={slug!} />
             ))}
           </div>
         )}
@@ -185,7 +210,7 @@ export function PublicPodPage() {
                       {i + 1}
                     </td>
                     <td className="border-t border-border px-4 py-3.5 font-semibold">
-                      {entrantDisplayName(row.entrant)}
+                      {entrantLink(row.entrant, slug!, entrantDisplayName(row.entrant))}
                     </td>
                     <td className="border-t border-border px-4 py-3.5 text-right text-[15px] font-bold tabular-nums">
                       {row.points}

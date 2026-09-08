@@ -86,7 +86,7 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
     const playersPlayed = countTournamentParticipants(tournament.pods);
-    const pods = tournament.pods.map(({ entrants: _entrants, ...pod }) => pod);
+    const pods = tournament.pods.map(({ entrants, ...pod }) => ({ ...pod, entrantCount: entrants.length }));
     reply.send({ tournament: { ...tournament, pods, playersPlayed } });
   });
 

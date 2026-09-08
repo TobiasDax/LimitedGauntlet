@@ -359,7 +359,16 @@ function IndividualEntrants({
         {entrants.length === 0 && <p className="px-5 py-4 text-[13.5px] text-ink-muted">No entrants yet.</p>}
         {entrants.map((e) => (
           <div key={e.id} className="flex items-center justify-between px-5 py-3">
-            <span className="font-display text-[15px] font-bold">{entrantDisplayName(e)}</span>
+            {e.player ? (
+              <Link
+                to={`/hall-of-fame/players/${e.player.id}`}
+                className="font-display text-[15px] font-bold hover:text-accent-strong"
+              >
+                {entrantDisplayName(e)}
+              </Link>
+            ) : (
+              <span className="font-display text-[15px] font-bold">{entrantDisplayName(e)}</span>
+            )}
             <div className="flex items-center gap-2">
               <EntrantDropControl podId={podId} entrant={e} canModifyRoster={canModifyRoster} />
               <Button variant="ghost" onClick={() => removeEntrant.mutate(e.id)}>
@@ -416,8 +425,18 @@ function TeamEntrants({
           <div key={e.id} className="flex items-center justify-between px-5 py-3">
             <div>
               <div className="font-display text-[15px] font-bold">{entrantDisplayName(e)}</div>
-              <div className="text-[12px] text-ink-muted">
-                {e.team?.members.map((m) => m.player.displayName).join(", ")}
+              <div className="flex flex-wrap gap-x-1 text-[12px] text-ink-muted">
+                {e.team?.members.map((m, mi) => (
+                  <span key={m.playerId}>
+                    <Link
+                      to={`/hall-of-fame/players/${m.playerId}`}
+                      className="hover:text-accent-strong"
+                    >
+                      {m.player.displayName}
+                    </Link>
+                    {mi < (e.team?.members.length ?? 0) - 1 && ", "}
+                  </span>
+                ))}
               </div>
             </div>
             <div className="flex items-center gap-2">

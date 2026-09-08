@@ -180,7 +180,7 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     ]);
 
     const playersPlayed = countTournamentParticipants(podsWithEntrants);
-    const pods = podsWithEntrants.map(({ entrants: _entrants, ...pod }) => pod);
+    const pods = podsWithEntrants.map(({ entrants, ...pod }) => ({ ...pod, entrantCount: entrants.length }));
 
     reply.send({
       organization: { id: organization.id, slug: organization.slug, name: organization.name },

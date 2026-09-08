@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { usePlayerStats } from "../features/hallOfFame/useHallOfFame";
 import { useAdjustTokens, useTokenLedger } from "../features/tokens/useTokens";
 import { PlayerStatsBody } from "../components/PlayerStatsBody";
+import { PlayerPodHistory } from "../components/PlayerPodHistory";
 import { PlayerTokenLedger } from "../components/PlayerTokenLedger";
 import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 
@@ -57,7 +58,13 @@ export function PlayerStatsPage() {
       {tokensOn && tab === "tokens" ? (
         <TokensTab playerId={playerId!} />
       ) : (
-        <PlayerStatsBody stats={s} tournamentLinkTo={(id) => `/tournaments/${id}`} />
+        <>
+          <PlayerStatsBody stats={s} tournamentLinkTo={(id) => `/tournaments/${id}`} />
+          <PlayerPodHistory
+            pods={s.podHistory}
+            podLinkTo={(e) => `/tournaments/${e.tournamentId}/pods/${e.podId}`}
+          />
+        </>
       )}
     </div>
   );

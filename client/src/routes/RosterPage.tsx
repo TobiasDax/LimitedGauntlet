@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   useCreatePlayer,
   useDeletePlayer,
@@ -152,7 +153,12 @@ function RosterRow({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-      <span className="font-display text-[15.5px] font-bold">{player.displayName}</span>
+      <Link
+        to={`/hall-of-fame/players/${player.id}`}
+        className="font-display text-[15.5px] font-bold hover:text-accent-strong"
+      >
+        {player.displayName}
+      </Link>
       <div className="flex flex-wrap items-center gap-1">
         <AccountControls player={player} orgSlug={orgSlug} />
         <Button variant="ghost" onClick={() => setEditing(true)}>

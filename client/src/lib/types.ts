@@ -120,6 +120,8 @@ export interface Pod {
   // format); null before that happens. No dedicated UI yet — data capture only.
   actualStartedAt: string | null;
   createdAt: string;
+  // PI-97 — only present in tournament-detail responses, not standalone pod fetches.
+  entrantCount?: number;
   // Present only on pods nested in a tournament-detail response (PI-58) —
   // just enough to derive a progress label client-side, not the full
   // Round/Match payload the pairings page needs.
@@ -288,6 +290,8 @@ export interface PlayerStatsDetail {
   headToHead: HeadToHeadEntry[];
   // PI-72 — null when the org has tokens off (hides every token surface).
   tokenBalance: number | null;
+  // PI-96 — every pod this player participated in, ordered oldest-first.
+  podHistory: PlayerPodEntry[];
 }
 
 // PI-72 — tokens (an opt-in per-org player currency).
@@ -328,6 +332,22 @@ export interface CardPull {
   addedAt: string;
   player?: Player | null;
   pod?: { id: string; name: string; tournament?: { id: string; name: string } };
+}
+
+// PI-96 — one entry per pod the player participated in, for the event history list.
+export interface PlayerPodEntry {
+  podId: string;
+  podName: string;
+  tournamentId: string;
+  tournamentName: string;
+  format: PodFormatCode;
+  date: string | null;
+  startTime: string | null;
+  roundCount: number;
+  rounds: { roundNumber: number; status: RoundStatus }[];
+  completedAt: string | null;
+  canceledAt: string | null;
+  finish: number | null;
 }
 
 export interface ScryfallSet {

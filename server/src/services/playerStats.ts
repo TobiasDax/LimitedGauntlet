@@ -67,6 +67,8 @@ export interface PlayerStatsDetail {
   // PI-72 — the player's token balance, or null when the org has tokens off
   // (the client's single signal to hide every token surface, public included).
   tokenBalance: number | null;
+  // PI-96 — every pod this player participated in, ordered oldest-first.
+  podHistory: PlayerPodEntry[];
 }
 
 export interface PlayerCardPull {
@@ -81,6 +83,21 @@ export interface PlayerCardPull {
   imageUri: string | null;
   addedAt: Date;
   pod: { id: string; name: string; tournament: { id: string; name: string } };
+}
+
+export interface PlayerPodEntry {
+  podId: string;
+  podName: string;
+  tournamentId: string;
+  tournamentName: string;
+  format: PodFormat;
+  date: Date | null;
+  startTime: string | null;
+  roundCount: number;
+  rounds: { roundNumber: number; status: string }[];
+  completedAt: Date | null;
+  canceledAt: Date | null;
+  finish: number | null;
 }
 
 interface PersonalMatch {
@@ -322,7 +339,7 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
   const player = await prisma.player.findFirst({ where: { id: playerId, orgId } });
   if (!player) return null;
 
-  const [ledger, hallOfFame, valueAgg, playerCardPulls, pods, tournaments] = await Promise.all([
+  const [ledger, hallOfFame, valueAgg, playerCardPulls, playerPods, tournaments] = await Promise.all([
     buildLedger(orgId),
     computeHallOfFame(orgId),
     prisma.cardPull.aggregate({
@@ -334,9 +351,22 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
       include: { pod: { select: { id: true, name: true, tournament: { select: { id: true, name: true } } } } },
       orderBy: { priceEur: "desc" },
     }),
+    // PI-96 — all pods this player was an entrant in (any excludeFromStats), ordered
+    // oldest-first, with just enough data for the pod history list + finish computation.
     prisma.pod.findMany({
-      where: { tournament: { orgId }, excludeFromStats: false },
-      include: { entrants: { include: { team: { include: { members: true } } } } },
+      where: {
+        tournament: { orgId },
+        entrants: { some: { OR: [{ playerId }, { team: { members: { some: { playerId } } } }] } },
+      },
+      orderBy: [{ tournament: { startDate: "asc" } }, { sequenceOrder: "asc" }],
+      include: {
+        tournament: { select: { id: true, name: true } },
+        rounds: { select: { roundNumber: true, status: true }, orderBy: { roundNumber: "asc" } },
+        entrants: {
+          where: { OR: [{ playerId }, { team: { members: { some: { playerId } } } }] },
+          select: { id: true },
+        },
+      },
     }),
     prisma.tournament.findMany({ where: { orgId } }),
   ]);
@@ -370,22 +400,25 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
   }
   const undefeatedPods = [...byPod.values()].filter((p) => p.losses === 0).length;
 
-  // Pod wins + average finish: resolve entrant->player for every pod this
-  // player was actually in, then find their rank in that pod's standings.
+  // Pod wins + average finish. playerPods is already filtered to pods this
+  // player was in, so entrants[0] is their entrant row. Also builds
+  // finishByPodId for the pod history (PI-96).
   let podWins = 0;
   let finishSum = 0;
   let finishCount = 0;
-  for (const pod of pods) {
-    const entrant = pod.entrants.find(
-      (e) => e.playerId === playerId || e.team?.members.some((m) => m.playerId === playerId),
-    );
-    if (!entrant) continue;
+  const finishByPodId = new Map<string, number>();
+  for (const pod of playerPods) {
+    const entrantId = pod.entrants[0]?.id;
+    if (!entrantId) continue;
     const standings = await computePodStandings(pod.id);
-    const rank = standings.findIndex((s) => s.entrantId === entrant.id);
+    const rank = standings.findIndex((s) => s.entrantId === entrantId);
     if (rank === -1) continue;
-    finishSum += rank + 1;
-    finishCount++;
-    if (rank === 0) podWins++;
+    finishByPodId.set(pod.id, rank + 1);
+    if (!pod.excludeFromStats) {
+      finishSum += rank + 1;
+      finishCount++;
+      if (rank === 0) podWins++;
+    }
   }
 
   let weekendWins = 0;
@@ -413,6 +446,21 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
   const matchesPlayed = wins + losses + draws;
   const priceSum = valueAgg._sum.priceEur;
   const tokenBalance = (await isTokensEnabled(orgId)) ? await getPlayerTokenBalance(orgId, playerId) : null;
+
+  const podHistory: PlayerPodEntry[] = playerPods.map((pod) => ({
+    podId: pod.id,
+    podName: pod.name,
+    tournamentId: pod.tournament.id,
+    tournamentName: pod.tournament.name,
+    format: pod.format,
+    date: pod.date,
+    startTime: pod.startTime,
+    roundCount: pod.roundCount,
+    rounds: pod.rounds,
+    completedAt: pod.completedAt,
+    canceledAt: pod.canceledAt,
+    finish: finishByPodId.get(pod.id) ?? null,
+  }));
 
   return {
     playerId,
@@ -445,5 +493,6 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
     victim,
     headToHead: h2h,
     tokenBalance,
+    podHistory,
   };
 }

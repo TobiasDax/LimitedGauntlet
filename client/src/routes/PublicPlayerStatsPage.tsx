@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { usePublicPlayerStats } from "../features/public/usePublic";
 import { PlayerStatsBody } from "../components/PlayerStatsBody";
+import { PlayerPodHistory } from "../components/PlayerPodHistory";
 import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 
 export function PublicPlayerStatsPage() {
@@ -26,6 +27,10 @@ export function PublicPlayerStatsPage() {
       </ScreenDek>
 
       <PlayerStatsBody stats={s} tournamentLinkTo={(id) => `/o/${slug}/tournaments/${id}`} />
+      <PlayerPodHistory
+        pods={s.podHistory}
+        podLinkTo={(e) => `/o/${slug}/tournaments/${e.tournamentId}/pods/${e.podId}`}
+      />
     </div>
   );
 }
