@@ -17,7 +17,7 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions. ✅ done (v0.7.0).
 - **PI-94** — container hardening (non-root image + locked-down compose). ✅ done (v0.7.1); live instance moved to DaxLite 2026-09-08.
 - **PI-95** — read-path performance (QueryClient defaults, standings cache, load test) before the 40–60 player event.
-- **PI-96** — clickable player names → detail page; detail page gains a pod history list (upcoming vs finished, linked). ✅ shipped (v0.7.2); browser-verify pending.
+- **PI-96** — clickable player names → detail page; detail page gains a pod history list (upcoming vs finished, linked). ✅ shipped (v0.7.2; pod-link fix v0.7.3); browser-verify pending.
 - **PI-97** — entrant count per pod in the tournament overview pod list. ✅ shipped (v0.7.2); browser-verify pending.
 
 ## New improvements (backlog)
