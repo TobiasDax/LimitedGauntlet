@@ -41,7 +41,17 @@ import { PublicPlayerStatsPage } from "./routes/PublicPlayerStatsPage.tsx";
 import { PublicTreasureChestPage } from "./routes/PublicTreasureChestPage.tsx";
 import "./index.css";
 
-const queryClient = new QueryClient();
+// Realtime (Socket.IO) invalidation keeps watched data fresh where it matters, so
+// aggressive default refetching just multiplies load at a venue — every phone-unlock
+// / tab-refocus would refetch every query on screen. See ROADMAP PI-95.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

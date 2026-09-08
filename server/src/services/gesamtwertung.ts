@@ -68,8 +68,16 @@ export async function computeGesamtwertung(tournamentId: string): Promise<Gesamt
     perPod.set(tp.playerId, {});
   }
 
+  // Pod standings are independent of each other — compute them in parallel
+  // rather than a serial round-trip per pod (~50 sequential queries for a
+  // 10-pod tournament). The point-accumulation loop below stays sequential so
+  // the result is deterministic. See ROADMAP PI-95.
+  const standingsByPod = new Map(
+    await Promise.all(pods.map(async (pod) => [pod.id, await computePodStandings(pod.id)] as const)),
+  );
+
   for (const pod of pods) {
-    const standings = await computePodStandings(pod.id);
+    const standings = standingsByPod.get(pod.id) ?? [];
     const pointsByEntrant = new Map(standings.map((s) => [s.entrantId, s.points]));
 
     for (const entrant of pod.entrants) {
