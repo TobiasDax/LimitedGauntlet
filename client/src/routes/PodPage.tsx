@@ -428,10 +428,7 @@ function TeamEntrants({
               <div className="flex flex-wrap gap-x-1 text-[12px] text-ink-muted">
                 {e.team?.members.map((m, mi) => (
                   <span key={m.playerId}>
-                    <Link
-                      to={`/hall-of-fame/players/${m.playerId}`}
-                      className="hover:text-accent-strong"
-                    >
+                    <Link to={`/hall-of-fame/players/${m.playerId}`} className="hover:text-accent-strong">
                       {m.player.displayName}
                     </Link>
                     {mi < (e.team?.members.length ?? 0) - 1 && ", "}

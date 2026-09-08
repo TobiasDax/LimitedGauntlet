@@ -51,8 +51,7 @@ function PodRow({ pod, href, reorder }: PodRowProps) {
           <div className="text-[12.5px] text-ink-muted">
             {podFormatDisplay(pod)}
             {pod.isTeamEvent && ` · teams of ${pod.teamSize}`} · {pod.roundCount} rounds
-            {pod.entrantCount !== undefined &&
-              ` · ${pod.entrantCount} ${pod.isTeamEvent ? "teams" : "players"}`}
+            {pod.entrantCount !== undefined && ` · ${pod.entrantCount} ${pod.isTeamEvent ? "teams" : "players"}`}
             {pod.date && ` · ${pod.date.slice(0, 10)}${pod.startTime ? ` ${pod.startTime}` : ""}`}
           </div>
         </div>
