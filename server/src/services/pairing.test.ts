@@ -257,4 +257,71 @@ describe("generatePairings", () => {
     expect(met.has(`${realPair.entrantAId}:${realPair.entrantBId}`)).toBe(false);
     expect([realPair.entrantAId, realPair.entrantBId]).toContain(e4!.id);
   });
+
+  // PI-89 — a pod far larger than PLAN.md's ≤16 ceiling must not be able to
+  // wedge the event loop on the exponential exact-matching search. Above the
+  // pool-size limit the pairing falls back to greedy score-group pairing,
+  // which keeps the within-pod hard-avoid but drops the global optimum.
+  it("pairs a 32-entrant pod fast and still never repeats an opponent (greedy fallback)", async () => {
+    const { org, tournament } = await createOrgAndTournament();
+    const players = await createPlayers(
+      org.id,
+      Array.from({ length: 32 }, (_, i) => `Big${i + 1}`),
+    );
+    const pod = await createPod(tournament.id, { name: "Oversized Pod", roundCount: 4 });
+    const entrants = await Promise.all(
+      players.map((p) => prisma.entrant.create({ data: { podId: pod.id, playerId: p.id } })),
+    );
+
+    const opponentsSeen = new Map<string, Set<string>>();
+    for (const e of entrants) opponentsSeen.set(e.id, new Set());
+
+    for (let round = 1; round <= 4; round++) {
+      const started = performance.now();
+      const suggestion = await generatePairings(pod.id, round);
+      const elapsed = performance.now() - started;
+
+      // Exact solve on 32 near-equal-cost entrants would run for seconds or
+      // never finish; greedy is effectively instant. Generous ceiling so a
+      // slow CI box doesn't flake.
+      expect(elapsed).toBeLessThan(1000);
+      expect(suggestion.pairs).toHaveLength(16); // 32 entrants, no bye
+
+      const covered = suggestion.pairs.flatMap((p) => [p.entrantAId, p.entrantBId]);
+      expect(new Set(covered).size).toBe(32);
+
+      for (const pair of suggestion.pairs) {
+        if (!pair.entrantBId) continue;
+        expect(opponentsSeen.get(pair.entrantAId)!.has(pair.entrantBId)).toBe(false);
+        expect(opponentsSeen.get(pair.entrantBId)!.has(pair.entrantAId)).toBe(false);
+      }
+
+      // Persist the round as completed so the next round sees real history.
+      const created = await prisma.round.create({ data: { podId: pod.id, roundNumber: round, status: "ACTIVE" } });
+      await prisma.match.createMany({
+        data: suggestion.pairs.map((pair, index) => ({
+          roundId: created.id,
+          tableNumber: index + 1,
+          entrantAId: pair.entrantAId,
+          entrantBId: pair.entrantBId,
+          result: pair.entrantBId ? ("A_WINS" as const) : ("PENDING" as const),
+          gamesWonA: pair.entrantBId ? 2 : 0,
+          reportedAt: pair.entrantBId ? new Date() : null,
+        })),
+      });
+      await prisma.round.update({ where: { id: created.id }, data: { status: "COMPLETED" } });
+
+      for (const pair of suggestion.pairs) {
+        if (!pair.entrantBId) continue;
+        opponentsSeen.get(pair.entrantAId)!.add(pair.entrantBId);
+        opponentsSeen.get(pair.entrantBId)!.add(pair.entrantAId);
+      }
+    }
+
+    // Four repeat-free rounds in a 32-player pod: everyone has exactly four
+    // distinct opponents.
+    for (const e of entrants) {
+      expect(opponentsSeen.get(e.id)!.size).toBe(4);
+    }
+  });
 });
