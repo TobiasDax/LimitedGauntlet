@@ -62,7 +62,7 @@ export function PlayerStatsPage() {
           <PlayerStatsBody stats={s} tournamentLinkTo={(id) => `/tournaments/${id}`} />
           <PlayerPodHistory
             pods={s.podHistory}
-            podLinkTo={(e) => `/tournaments/${e.tournamentId}/pods/${e.podId}`}
+            podLinkTo={(e) => `/pods/${e.podId}`}
           />
         </>
       )}
