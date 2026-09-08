@@ -12,7 +12,7 @@ The app is **feature-complete and running in production** — tagged releases (l
 
 - **PI-39** — organizer data import: v1 shipped, the `legacy-data.json` import step is still open.
 - **PI-62** — deck photos: scoped via interview, not started.
-- Project-health backlog: PI-92 (expand CI) still open. (PI-88 CI, PI-89 pairing-size guard, PI-90 Dependabot, PI-91 ESLint + Prettier are done.)
+- Project-health backlog: all done (PI-88 CI, PI-89 pairing-size guard, PI-90 Dependabot, PI-91 ESLint + Prettier, PI-92 expanded CI). PI-92's `image` job still needs one live Forgejo-runner check.
 - **PI-92** — expand CI: migration-drift check, image build on PRs, boot smoke test.
 - **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions. ✅ done (v0.7.0).
 - **PI-94** — container hardening (non-root image + locked-down compose). ✅ done (v0.7.1); live instance moved to DaxLite 2026-09-08.
@@ -331,13 +331,14 @@ Was: **no linter or formatter config in the repo**. `tsc` strict + `noUncheckedI
 - [x] `npm run lint` / `format` / `format:check` scripts; `format:check` + `lint` wired into `.forgejo/workflows/ci.yml` after `prisma generate`.
 - [ ] **2 warnings left, deliberately:** `react-refresh/only-export-components` on `CardGallery.tsx` / `GesamtwertungList.tsx` (each colocates one small helper with its component). Splitting them into new files is pure churn for a dev-only HMR nicety — left as warnings, CI doesn't fail on warnings. Revisit if the list grows.
 
-### PI-92 — Expand CI: migration drift, image build on PRs, boot smoke test
+### PI-92 — Expand CI: migration drift, image build on PRs, boot smoke test ✅ (2026-09-08, unreleased — `image` job unverified against the live runner)
 PI-88 shipped `.forgejo/workflows/ci.yml` (typecheck + builds + server suite). Three cheap additions catch classes of breakage that suite doesn't touch. Keep it one workflow file; if the image steps drag on the N100 runner, split them into a job that only runs on `pull_request` + pushes to `main`, not every branch.
 
-- [ ] **Migration-drift check.** `prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma --exit-code` (run from `server/`) — fails CI when `schema.prisma` has been edited without a matching migration. This is the single most common self-inflicted break in this repo's workflow: edit the schema → `prisma generate` picks it up locally → tests pass → migration never written → prod `migrate deploy` silently doesn't apply the change. No DB needed for the `--from-migrations`/`--to-schema-datamodel` form.
-- [ ] **Docker image build on PRs.** `docker build .` (no push) as a CI step — Dockerfile / multi-stage / `npm ci` breakage surfaces on the PR instead of at release time (today the image is only ever built by `docker-publish.yml` on `release: published`). The Forgejo runner has the socket, so `docker build` works; add `--cache-from` if slow.
-- [ ] **Boot smoke test.** Bring up the freshly-built image + a Postgres container, poll `/api/healthz` until 200, tear down. Proves the container starts, Prisma `migrate deploy` runs clean on an empty DB, and the server binds — none of which the vitest suite exercises (it imports modules, never boots the HTTP server via `entrypoint.sh`). Reuse `docker-compose.yml` with an override pointing `app.image` at the built tag, or a plain `docker run`.
-- [ ] **Lint** — once **PI-91** lands, add `npm run lint` as a CI step. Gated on that; listed here so it isn't forgotten.
+- [x] **Migration-drift check** — a step in the `check` job. `prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma --shadow-database-url … --exit-code`, run from `server/`. The `--from-migrations` form **does** need a shadow DB (Prisma 6.19 errors without `--shadow-database-url`) — so the step first `CREATE DATABASE lgshadow` on the existing Postgres service via `prisma db execute`, then diffs into it. Verified locally: exit 0 in sync, exit 2 when `schema.prisma` gains an un-migrated column.
+- [x] **Docker image build** — new **`image` job** (separate so the fast typecheck/test feedback isn't gated behind it; same `push: main` + `pull_request` triggers so it never runs on feature branches). `docker build -t limitedgauntlet:ci .`, no push.
+- [x] **Boot smoke test** — in the `image` job: `docker network`, a `postgres:16-alpine` container, the freshly-built image (only `DATABASE_URL` + `SESSION_SECRET`), then poll `http://lgci-app:8080/api/healthz` from a throwaway `curlimages/curl` container on the same network (avoids host/job-container port ambiguity). `if: always()` teardown.
+- [x] **Lint** — already added when PI-91 landed (the `Lint + format check` step); left here as a checkbox only.
+- [ ] **Live-runner check still pending:** the `image` job assumes the Forgejo runner exposes a working `docker` CLI (build + run + `docker exec`) to its job containers. If it doesn't, the job needs the runner's `config.yml` `container.options` to mount the host socket (or DinD). `check` is unaffected. Documented in `docs/development.md`.
 
 ### PI-93 — Tag-triggered GHCR build + release (kept on GitHub Actions) ✅ (2026-09-08, v0.7.0 — first release on the new path)
 The old `docker-publish.yml` triggered on `release: published` — meaning a human had to create the GitHub Release *first*, after the Forgejo→GitHub push-mirror had synced the tag. The mirror was on an **8h interval with `sync_on_commit` off**, so a release meant: push tag → wait (or hit "Synchronize Now") → verify SHAs → `gh release create`. That gap burned a past release (stale commit).
