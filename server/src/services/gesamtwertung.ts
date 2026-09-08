@@ -1,5 +1,6 @@
+import type { PodStatus } from "@prisma/client";
 import { prisma } from "../prisma.js";
-import { computePodStandings } from "./standings.js";
+import { computePodStandings, podIsPlayed } from "./standings.js";
 
 export interface GesamtwertungPod {
   id: string;
@@ -28,13 +29,21 @@ interface EntrantForParticipation {
   team: { members: { playerId: string }[] } | null;
 }
 
-// Distinct players who actually appear as an entrant in at least one of
-// these pods — the same "did they actually play" concept computeGesamtwertung
-// filters on below (PI-60), reused wherever a tournament needs a real
-// participation count instead of its raw TournamentPlayer registration count.
-export function countTournamentParticipants(pods: { entrants: EntrantForParticipation[] }[]): number {
+interface PodForParticipation {
+  status: PodStatus;
+  rounds: readonly unknown[];
+  entrants: EntrantForParticipation[];
+}
+
+// Distinct players who actually played at least one pod that has started —
+// the same "did they actually play" concept computeGesamtwertung filters on
+// below (PI-60), reused wherever a tournament needs a real participation
+// count instead of its raw TournamentPlayer registration count. Pods still
+// in SETUP (entrants pre-assigned, no rounds) don't count (PI-99).
+export function countTournamentParticipants(pods: PodForParticipation[]): number {
   const ids = new Set<string>();
   for (const pod of pods) {
+    if (!podIsPlayed(pod)) continue;
     for (const entrant of pod.entrants) {
       if (entrant.playerId) ids.add(entrant.playerId);
       else for (const m of entrant.team?.members ?? []) ids.add(m.playerId);
@@ -55,9 +64,16 @@ export async function computeGesamtwertung(tournamentId: string): Promise<Gesamt
     prisma.pod.findMany({
       where: { tournamentId },
       orderBy: { sequenceOrder: "asc" },
-      include: { entrants: { include: { team: { include: { members: true } } } } },
+      include: {
+        rounds: { select: { id: true } },
+        entrants: { include: { team: { include: { members: true } } } },
+      },
     }),
   ]);
+
+  // A pod that hasn't started (SETUP, no rounds) contributes nothing — no
+  // eventsPlayed credit, and it doesn't get a column in the table (PI-99).
+  const playedPods = pods.filter(podIsPlayed);
 
   const totals = new Map<string, number>();
   const eventsPlayed = new Map<string, number>();
@@ -73,10 +89,10 @@ export async function computeGesamtwertung(tournamentId: string): Promise<Gesamt
   // 10-pod tournament). The point-accumulation loop below stays sequential so
   // the result is deterministic. See ROADMAP PI-95.
   const standingsByPod = new Map(
-    await Promise.all(pods.map(async (pod) => [pod.id, await computePodStandings(pod.id)] as const)),
+    await Promise.all(playedPods.map(async (pod) => [pod.id, await computePodStandings(pod.id)] as const)),
   );
 
-  for (const pod of pods) {
+  for (const pod of playedPods) {
     const standings = standingsByPod.get(pod.id) ?? [];
     const pointsByEntrant = new Map(standings.map((s) => [s.entrantId, s.points]));
 
@@ -120,7 +136,7 @@ export async function computeGesamtwertung(tournamentId: string): Promise<Gesamt
   );
 
   return {
-    pods: pods.map((p) => ({ id: p.id, name: p.name, sequenceOrder: p.sequenceOrder })),
+    pods: playedPods.map((p) => ({ id: p.id, name: p.name, sequenceOrder: p.sequenceOrder })),
     rows,
   };
 }

@@ -45,8 +45,11 @@ export function PublicTournamentPage() {
       <Eyebrow>{organization.name}</Eyebrow>
       <ScreenTitle>{tournament.name}</ScreenTitle>
       <ScreenDek>
-        {tournament.pods.length} pod{tournament.pods.length === 1 ? "" : "s"} · {tournament.playersPlayed} player
-        {tournament.playersPlayed === 1 ? "" : "s"} played
+        {tournament.pods.length === 0
+          ? "No pods yet."
+          : tournament.playersPlayed === 0
+            ? `${tournament.pods.length} pod${tournament.pods.length === 1 ? "" : "s"} scheduled · not started yet`
+            : `${tournament.pods.length} pod${tournament.pods.length === 1 ? "" : "s"} · ${tournament.playersPlayed} player${tournament.playersPlayed === 1 ? "" : "s"} played`}
       </ScreenDek>
 
       {tournament.description && <RichText text={tournament.description} className="mb-8" />}

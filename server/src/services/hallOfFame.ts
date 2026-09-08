@@ -1,5 +1,5 @@
 import { prisma } from "../prisma.js";
-import { computePodStandings } from "./standings.js";
+import { computePodStandings, podIsPlayed } from "./standings.js";
 
 export interface MainEventWin {
   podId: string;
@@ -27,6 +27,7 @@ export async function computeHallOfFame(orgId: string): Promise<HallOfFameRow[]>
   const pods = await prisma.pod.findMany({
     where: { tournament: { orgId }, excludeFromStats: false },
     include: {
+      rounds: { select: { id: true } },
       entrants: { include: { team: { include: { members: true } } } },
       tournament: { select: { id: true, name: true } },
     },
@@ -38,7 +39,9 @@ export async function computeHallOfFame(orgId: string): Promise<HallOfFameRow[]>
   const mainEventWins = new Map<string, MainEventWin[]>();
 
   for (const pod of pods) {
-    if (pod.entrants.length === 0) continue; // unplayed/empty pod — nothing to credit
+    // Nothing to credit until the pod has started (PI-99) and has entrants —
+    // a SETUP pod's standings are all-zero and would mint a phantom champion.
+    if (!podIsPlayed(pod) || pod.entrants.length === 0) continue;
     const standings = await computePodStandings(pod.id);
     const pointsByEntrant = new Map(standings.map((s) => [s.entrantId, s.points]));
 

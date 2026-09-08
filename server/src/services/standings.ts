@@ -1,5 +1,21 @@
+import type { PodStatus } from "@prisma/client";
 import { prisma } from "../prisma.js";
 import { computeAllPodStats } from "./podStats.js";
+
+// "Has this pod actually been played?" — the shared gate for every stat that
+// means participation or performance rather than roster assignment. A pod
+// counts once it's underway (at least one round has been generated — you
+// can't pair a pod without starting it) or finished (`status === COMPLETED`,
+// which also covers points-only imported historical pods that never had
+// Round rows). A pod still in SETUP with entrants pre-assigned but no rounds
+// does NOT count — treating "has an entrant row" as "played" was PI-99's
+// bug: not-yet-started pods reading as "N players played", a SETUP main
+// event minting a phantom champion, and empty Gesamtwertung columns.
+// Mirrors the frontend's `podProgressStatus()` "Setup" test. Canceled pods
+// are already excluded upstream via `excludeFromStats` (PI-84).
+export function podIsPlayed(pod: { status: PodStatus; rounds: readonly unknown[] }): boolean {
+  return pod.rounds.length > 0 || pod.status === "COMPLETED";
+}
 
 export interface StandingsRow {
   entrantId: string;

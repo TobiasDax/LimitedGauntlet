@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — tagged releases (latest **v0.8.1**), a public demo at [limited-gauntlet.com](https://limited-gauntlet.com), and the full numbered build (Steps 0–12) plus the PI-1…PI-74 backlog all shipped and browser-verified. That whole history is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) — the roadmap below is only what's still open or awaiting a live browser-verify.
+The app is **feature-complete and running in production** — tagged releases (latest **v0.8.2**), a public demo at [limited-gauntlet.com](https://limited-gauntlet.com), and the full numbered build (Steps 0–12) plus the PI-1…PI-74 backlog all shipped and browser-verified. That whole history is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) — the roadmap below is only what's still open or awaiting a live browser-verify.
 
 **Shipped, browser-verify on a live deploy still pending:** PI-75 (operator signup webhook), PI-76–PI-84 (the pod-list cluster — organizer reorder, finished-pods sink, Scheduled/On-demand tabs, scheduled + actual timestamps, date dividers, pod cancel; first live pass 2026-09-05 found PI-77's sink broken on pre-existing data — needs the `20260905140000` backfill migration applied first), PI-85 (deployer analytics), PI-87 (Settings/Profile split). **PI-86** (one login across multiple orgs) is merged and verified on the demo — **the live rollout still needs a DB backup first** (see PI-86's deployment note).
 
@@ -20,6 +20,8 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-95** — read-path performance before the 40–60 player event. Client-side + query-shape parts done in v0.8.0 (QueryClient defaults, parallel Gesamtwertung); **response compression was reverted in v0.8.1** — `@fastify/compress` shipped empty-body 200s for the larger nested responses on the live (Node 22 + Cloudflare) deploy, blanking the tournament/pod pages (see PI-98). The in-process standings cache and the real-deploy load test are still open.
 - **PI-96** — clickable player names → detail page; detail page gains a pod history list (upcoming vs finished, linked). ✅ shipped (v0.7.2; pod-link fix v0.7.3); browser-verify pending.
 - **PI-97** — entrant count per pod in the tournament overview pod list. ✅ shipped (v0.7.2); browser-verify pending.
+- **PI-98** — v0.8.1 hotfix: `@fastify/compress` blanked the live tournament pages. ✅ done (v0.8.1).
+- **PI-99** — not-yet-started pods counted as "played" everywhere (participation counts, Gesamtwertung columns, Hall of Fame incl. a phantom main-event champion). ✅ done (v0.8.2); browser-verify pending.
 
 ## New improvements (backlog)
 
@@ -379,3 +381,19 @@ Right after the v0.8.0 deploy, `https://app.limited-gauntlet.com/` showed an emp
 - **Not reproducible** in the dev sandbox (Node 20) with the full middleware stack (helmet + compress + rate-limit + secure-session + the `X-Robots-Tag` onSend hook + `serverFactory`/Socket.IO) — the live box is Node 22 behind Cloudflare. Root cause unconfirmed.
 
 **Fix (v0.8.1):** reverted the PI-95 compression hunk entirely — removed `@fastify/compress`, its registration in `server/src/index.ts`, and the dependency. No schema change, no other behaviour change. Rebuilt clean (`npm run build`), 139 server tests green. Compression stays deferred under PI-95's checklist above — behind Cloudflare it was a no-op for the live deploy anyway. (`docker-compose.image.yml` tracks `:latest`, nothing pins `0.8.0`, so no compose/doc bump needed.)
+
+### PI-99 — Not-yet-started pods counted as "played" ✅ (2026-09-08, v0.8.2, browser-verify pending)
+Reported on the live instance: a tournament with 27 pods, none started, showing **"27 pods · 3 players played"** in the header, and those 3 players on the Hall of Fame — one of them holding a 👑 for a main-event pod that had never been paired.
+
+**Cause:** every aggregation that means *participation* treated "has an `Entrant` row in a pod" as "played that pod", with no check that the pod had actually started. `computePodStandings` returns an all-zero row per entrant even with zero rounds, so `standings[0]` of a SETUP pod is a phantom winner. `pod.status` is not a reliable gate on its own — the app never sets it automatically (`rounds.ts` comment: "the app doesn't manage pod.status automatically"), and points-only imported historical pods have **no Round rows at all** (`status` is stamped `COMPLETED`, entrants carry `finalPointsOverride`).
+
+**Fix:** one shared predicate `podIsPlayed(pod) = pod.rounds.length > 0 || pod.status === "COMPLETED"` in `services/standings.ts` (mirrors the frontend's existing `podProgressStatus()` "Setup" test; canceled pods already excluded upstream via `excludeFromStats`). Applied in:
+- `countTournamentParticipants` (`services/gesamtwertung.ts`) — the tournament header count, organizer + public. No query change (both callers already fetch `rounds` + `status`).
+- `computeGesamtwertung` — un-started pods no longer earn `eventsPlayed`, no longer appear as table columns; a player only ever in a SETUP pod drops out of the table. Added `rounds: { select: { id: true } }` to the pod include.
+- `computeHallOfFame` — `podsPlayed` and `mainEventWins` skip un-started pods (kills the phantom champion). Added `rounds` to the include.
+- `computePlayerStats` — `podWins` / `averageFinish` skip un-started pods (`podsPlayed` inherits the HoF fix); the pod still shows in `podHistory` with `finish: null`. Headline "Pods played" count (`computeHallOfFameOverview`) now filters `OR: [{ status: COMPLETED }, { rounds: { some: {} } }]`.
+
+**UI:** tournament header (organizer + public) reads **"27 pods scheduled · not started yet"** when nothing has started, instead of "… · 0 players played". The Gesamtwertung list already had a "No one has played a pod yet." empty state that now actually shows.
+
+**Tests:** `gesamtwertung.test.ts` — SETUP pod contributes nothing / points-only import still counts / `countTournamentParticipants` unit cases (started vs SETUP vs team). New `hallOfFame.test.ts` — no phantom champion for a SETUP main event, crown appears once it's played. `npm run build` clean, 145 server tests green.
+- [ ] Browser-verify on the live instance after deploy: the reported tournament should read "27 pods scheduled · not started yet", HoF should drop the 3 phantom players + the crown.

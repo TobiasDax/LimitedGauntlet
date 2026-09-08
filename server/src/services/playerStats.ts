@@ -1,6 +1,6 @@
 import type { PodFormat } from "@prisma/client";
 import { prisma } from "../prisma.js";
-import { computePodStandings } from "./standings.js";
+import { computePodStandings, podIsPlayed } from "./standings.js";
 import { computeGesamtwertung } from "./gesamtwertung.js";
 import { computeHallOfFame } from "./hallOfFame.js";
 import { getPlayerTokenBalance, isTokensEnabled } from "./tokens.js";
@@ -286,7 +286,15 @@ export async function computeHallOfFameOverview(orgId: string): Promise<HallOfFa
     computeHallOfFame(orgId),
     buildLedger(orgId),
     prisma.tournament.count({ where: { orgId } }),
-    prisma.pod.count({ where: { tournament: { orgId }, excludeFromStats: false } }),
+    // "Pods played" — only pods that have started (≥1 round) or finished
+    // (COMPLETED, incl. points-only imports with no Round rows). PI-99.
+    prisma.pod.count({
+      where: {
+        tournament: { orgId },
+        excludeFromStats: false,
+        OR: [{ status: "COMPLETED" }, { rounds: { some: {} } }],
+      },
+    }),
     prisma.cardPull.findMany({
       // rarePicksEnabled: PI-66 — pods with value tracking off don't feed the rollups.
       where: { pod: { excludeFromStats: false, rarePicksEnabled: true, tournament: { orgId } } },
@@ -410,6 +418,10 @@ export async function computePlayerStats(orgId: string, playerId: string): Promi
   for (const pod of playerPods) {
     const entrantId = pod.entrants[0]?.id;
     if (!entrantId) continue;
+    // A not-yet-started pod has no finish — its all-zero standings would
+    // otherwise hand out a phantom "1st place" and pull the average down
+    // (PI-99). It still appears in `podHistory` below, just without a finish.
+    if (!podIsPlayed(pod)) continue;
     const standings = await computePodStandings(pod.id);
     const rank = standings.findIndex((s) => s.entrantId === entrantId);
     if (rank === -1) continue;

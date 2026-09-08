@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
-import { computeGesamtwertung } from "./gesamtwertung.js";
+import { computeGesamtwertung, countTournamentParticipants } from "./gesamtwertung.js";
 
 const prisma = new PrismaClient();
 
@@ -156,5 +156,116 @@ describe("computeGesamtwertung", () => {
     expect(byPlayer.get(p1.id)?.totalPoints).toBe(3);
     expect(byPlayer.get(p2.id)?.totalPoints).toBe(3);
     expect(byPlayer.get(p3.id)?.totalPoints).toBe(0);
+  });
+
+  // PI-99: a pod still in SETUP (entrants pre-assigned, no rounds paired)
+  // must contribute nothing — no eventsPlayed credit, no column, and a
+  // player who's only in such a pod shouldn't appear in the table at all.
+  // A points-only imported pod (status COMPLETED, no Round rows, entrants
+  // carry finalPointsOverride) must still count — that's real history.
+  it("ignores not-yet-started pods but still counts points-only imported pods", async () => {
+    const org = await prisma.organization.create({ data: { slug: `gw-setup-${Date.now()}`, name: "Test Org" } });
+    const tournament = await prisma.tournament.create({
+      data: { orgId: org.id, name: "Test Weekend", startDate: new Date(), endDate: new Date() },
+    });
+    const [played, pending, importedOnly] = await Promise.all([
+      prisma.player.create({ data: { orgId: org.id, displayName: "Played" } }),
+      prisma.player.create({ data: { orgId: org.id, displayName: "OnlyPending" } }),
+      prisma.player.create({ data: { orgId: org.id, displayName: "ImportedOnly" } }),
+    ]);
+    await prisma.tournamentPlayer.createMany({
+      data: [played, pending, importedOnly].map((p) => ({ tournamentId: tournament.id, playerId: p.id })),
+    });
+
+    // A real, started+completed pod: `played` beats nobody special, just scores.
+    const livePod = await prisma.pod.create({
+      data: { tournamentId: tournament.id, name: "Live Pod", format: "DRAFT", sequenceOrder: 0, roundCount: 1 },
+    });
+    const eLive1 = await prisma.entrant.create({ data: { podId: livePod.id, playerId: played.id } });
+    const eLive2 = await prisma.entrant.create({ data: { podId: livePod.id, playerId: importedOnly.id } });
+    const liveRound = await prisma.round.create({
+      data: { podId: livePod.id, roundNumber: 1, status: "COMPLETED" },
+    });
+    await prisma.match.create({
+      data: {
+        roundId: liveRound.id,
+        tableNumber: 1,
+        entrantAId: eLive1.id,
+        entrantBId: eLive2.id,
+        result: "A_WINS",
+        reportedAt: new Date(),
+      },
+    });
+
+    // A points-only imported pod: COMPLETED, no rounds, finalPointsOverride.
+    const importedPod = await prisma.pod.create({
+      data: {
+        tournamentId: tournament.id,
+        name: "Imported Pod",
+        format: "DRAFT",
+        sequenceOrder: 1,
+        roundCount: 3,
+        status: "COMPLETED",
+      },
+    });
+    await prisma.entrant.create({
+      data: { podId: importedPod.id, playerId: importedOnly.id, finalPointsOverride: 6 },
+    });
+    await prisma.entrant.create({ data: { podId: importedPod.id, playerId: played.id, finalPointsOverride: 3 } });
+
+    // A SETUP pod: entrants assigned, never paired. `pending` is ONLY here.
+    const setupPod = await prisma.pod.create({
+      data: { tournamentId: tournament.id, name: "Setup Pod", format: "DRAFT", sequenceOrder: 2, roundCount: 3 },
+    });
+    await prisma.entrant.create({ data: { podId: setupPod.id, playerId: pending.id } });
+    await prisma.entrant.create({ data: { podId: setupPod.id, playerId: played.id } });
+
+    const gw = await computeGesamtwertung(tournament.id);
+    const byPlayer = new Map(gw.rows.map((r) => [r.playerId, r]));
+
+    // The SETUP pod is not a column; the two real pods are.
+    expect(gw.pods.map((p) => p.name)).toEqual(["Live Pod", "Imported Pod"]);
+
+    // `pending` only ever sat in the SETUP pod -> absent entirely.
+    expect(byPlayer.has(pending.id)).toBe(false);
+
+    // `played`: Live Pod (win, 3) + Imported Pod (override 3) = 2 events, 6 pts.
+    // The SETUP pod does NOT add a third event.
+    expect(byPlayer.get(played.id)).toMatchObject({ eventsPlayed: 2, totalPoints: 6 });
+
+    // `importedOnly`: Live Pod (loss, 0) + Imported Pod (override 6) = 2 events, 6 pts.
+    expect(byPlayer.get(importedOnly.id)).toMatchObject({ eventsPlayed: 2, totalPoints: 6 });
+  });
+});
+
+describe("countTournamentParticipants", () => {
+  const entrant = (playerId: string) => ({ playerId, team: null });
+
+  it("counts distinct players only in pods that have started or finished (PI-99)", () => {
+    const pods = [
+      // started (has a round) — counts
+      { status: "IN_PROGRESS" as const, rounds: [{ id: "r1" }], entrants: [entrant("alice"), entrant("bob")] },
+      // points-only import (COMPLETED, no rounds) — counts
+      { status: "COMPLETED" as const, rounds: [], entrants: [entrant("bob"), entrant("carol")] },
+      // SETUP, no rounds — ignored, so `dave` is never counted
+      { status: "SETUP" as const, rounds: [], entrants: [entrant("dave"), entrant("alice")] },
+    ];
+    expect(countTournamentParticipants(pods)).toBe(3); // alice, bob, carol — not dave
+  });
+
+  it("returns 0 when every pod is still in SETUP", () => {
+    const pods = [{ status: "SETUP" as const, rounds: [], entrants: [entrant("alice"), entrant("bob")] }];
+    expect(countTournamentParticipants(pods)).toBe(0);
+  });
+
+  it("credits every member of a team entrant", () => {
+    const pods = [
+      {
+        status: "COMPLETED" as const,
+        rounds: [],
+        entrants: [{ playerId: null, team: { members: [{ playerId: "x" }, { playerId: "y" }] } }],
+      },
+    ];
+    expect(countTournamentParticipants(pods)).toBe(2);
   });
 });

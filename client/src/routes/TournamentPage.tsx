@@ -466,7 +466,9 @@ export function TournamentPage() {
       <ScreenDek>
         {tournament.pods.length === 0
           ? "No pods yet — add one to start pairing."
-          : `${tournament.pods.length} pod${tournament.pods.length === 1 ? "" : "s"} · ${tournament.playersPlayed} player${tournament.playersPlayed === 1 ? "" : "s"} played`}
+          : tournament.playersPlayed === 0
+            ? `${tournament.pods.length} pod${tournament.pods.length === 1 ? "" : "s"} scheduled · not started yet`
+            : `${tournament.pods.length} pod${tournament.pods.length === 1 ? "" : "s"} · ${tournament.playersPlayed} player${tournament.playersPlayed === 1 ? "" : "s"} played`}
       </ScreenDek>
 
       <div className="mb-6 flex flex-wrap items-center gap-5">
