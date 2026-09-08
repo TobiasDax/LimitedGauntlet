@@ -1,0 +1,34 @@
+# Dependabot runs on the GitHub push-mirror (github.com/TobiasDax/LimitedGauntlet).
+# The real CI gate is Forgejo-side (.forgejo/workflows/ci.yml), so the main value
+# here is security-advisory visibility, not fast auto-merge — vet a bump by pulling
+# the branch to Forgejo. See ROADMAP PI-90.
+#
+# github-actions only scans .github/workflows/ (docker-publish.yml). The Forgejo CI
+# workflow lives in .forgejo/workflows/ and Dependabot can't see it — its action
+# pins are bumped by hand.
+version: 2
+updates:
+  # npm workspaces (server, client, mcp) all resolve from the repo root.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      # One PR for all minor/patch bumps to keep the noise down. Security updates
+      # are not grouped (Dependabot groups only cover version-updates by default),
+      # so an advisory-driven bump lands as its own PR and stands out.
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        update-types:
+          - "minor"
+          - "patch"

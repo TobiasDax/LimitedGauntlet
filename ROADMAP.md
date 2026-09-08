@@ -12,7 +12,7 @@ The app is **feature-complete and running in production** — tagged releases (l
 
 - **PI-39** — organizer data import: v1 shipped, the `legacy-data.json` import step is still open.
 - **PI-62** — deck photos: scoped via interview, not started.
-- **PI-89 – PI-90** — project-health items from the 2026-09-06 code audit: pairing-size guard, dependency automation. (PI-88 CI and PI-91 ESLint + Prettier are done.)
+- **PI-89** — project-health item from the 2026-09-06 code audit: pairing-size guard. (PI-88 CI, PI-90 Dependabot, PI-91 ESLint + Prettier are done.)
 - **PI-92** — expand CI: migration-drift check, image build on PRs, boot smoke test.
 - **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions. ✅ done (v0.7.0).
 - **PI-94** — container hardening (non-root image + locked-down compose). ✅ done (v0.7.1); live instance moved to DaxLite 2026-09-08.
@@ -310,15 +310,14 @@ Was: `.github/workflows/` had one workflow — `docker-publish.yml`, GHCR image 
 - [ ] Surface which path ran (a log line, maybe a note on the pairing response) so an organizer of a huge pod knows the pairing was greedy, not optimal.
 - [ ] **Test:** a synthetic 32-entrant pod with adversarial repeat history completes within a fixed time / node budget and still avoids every within-pod repeat. Fits the existing `pairing.test.ts` real-Postgres style.
 
-### PI-90 — Dependency update automation (Dependabot / Renovate)
+### PI-90 — Dependency update automation (Dependabot / Renovate) ✅ (2026-09-08, unreleased)
 ~383 packages resolve into `node_modules`; the direct deps are lean and current, but nothing watches for security advisories or drift. `npm audit` was run by hand during the Step 1 bootstrap and again when PI-68 picked `write-excel-file` — never automatically since. Prisma 6.x, Fastify 5, React 19, Vite 6 all keep moving.
 
-- [ ] Add **`.github/dependabot.yml`** (built into GitHub — the mirror runs it, zero extra infra) covering:
-  - the `npm` ecosystem at the repo root (npm workspaces are picked up from there)
-  - the `github-actions` ecosystem for the workflow files
-- [ ] Weekly schedule; **group** minor/patch bumps into one PR to keep the noise down; leave security updates ungrouped so they stand out.
-- [ ] **Depends on PI-88** — a dependency-bump PR is only safe to merge quickly when CI actually exercises it. (Dependabot PRs land on GitHub, where the mirror + `docker-publish` live; the Forgejo-side CI is the real gate, so a bump is easiest to vet by pulling it to Forgejo as a branch. Acceptable — security-advisory visibility is the main win, the auto-merge convenience is secondary.)
-- [ ] Decide Dependabot vs Renovate: Renovate groups better and self-hosts on Forgejo, but it's a whole service to run. Lean **Dependabot** for the "minimal moving parts" reason unless the Forgejo-side story pushes toward Renovate.
+- [x] **`.github/dependabot.yml`** added (built into GitHub — the mirror runs it, zero extra infra):
+  - `npm` ecosystem at the repo root (workspaces resolve from there)
+  - `github-actions` ecosystem — scans `.github/workflows/` only, i.e. `docker-publish.yml`; the Forgejo CI workflow in `.forgejo/workflows/` is invisible to Dependabot and its action pins stay hand-maintained.
+- [x] Weekly schedule; minor/patch bumps **grouped** into one PR (`minor-and-patch` / `actions` groups). Security updates aren't grouped (Dependabot groups only cover version-updates by default) so an advisory-driven bump lands as its own PR and stands out.
+- [x] **Chose Dependabot over Renovate** — "minimal moving parts"; Renovate would be a whole service to self-host. Security-advisory visibility is the main win; the Forgejo-side CI stays the real merge gate (vet a bump by pulling the branch to Forgejo).
 
 ### PI-91 — ESLint + Prettier ✅ (2026-09-07, v0.7.0)
 Was: **no linter or formatter config in the repo**. `tsc` strict + `noUncheckedIndexedAccess` was the only static gate.
