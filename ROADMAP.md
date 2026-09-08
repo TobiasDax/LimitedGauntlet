@@ -14,8 +14,9 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-62** — deck photos: scoped via interview, not started.
 - **PI-89 – PI-90** — project-health items from the 2026-09-06 code audit: pairing-size guard, dependency automation. (PI-88 CI and PI-91 ESLint + Prettier are done.)
 - **PI-92** — expand CI: migration-drift check, image build on PRs, boot smoke test.
-- **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions; ✅ done (first release: v0.7.0).
-- **PI-94** — container hardening: non-root image + `no-new-privileges` / `cap_drop` / `read_only` compose. ✅ built, needs a build+boot test.
+- **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions. ✅ done (v0.7.0).
+- **PI-94** — container hardening (non-root image + locked-down compose). ✅ done (v0.7.1); live instance moved to DaxLite 2026-09-08.
+- **PI-95** — read-path performance (QueryClient defaults, standings cache, load test) before the 40–60 player event.
 
 ## New improvements (backlog)
 
@@ -333,11 +334,20 @@ The old `docker-publish.yml` triggered on `release: published` — meaning a hum
 - [x] **First release on the new path: v0.7.0** — exercised the pipeline end to end: tag → mirror → GitHub Action builds → GHCR `:0.7.0`/`:0.7`/`:latest` → draft release → published.
 - [ ] **Multi-arch** (`linux/amd64,linux/arm64`) — natural add via buildx, decide when an ARM deploy target is real (RPi etc.); skip otherwise.
 
-### PI-94 — Container hardening (non-root + locked-down compose) ✅ (2026-09-08, needs a build+boot test)
+### PI-94 — Container hardening (non-root + locked-down compose) ✅ (2026-09-08, v0.7.1)
 Prompted by moving the public instance off a throwaway 1 GB VPS onto DaxLite (the infra hub). Audit found the container ran as **root** (`Dockerfile` had no `USER`) — the one real gap; the compose was otherwise clean (no `privileged`, no `docker.sock`, no host net, DB on an `internal` network).
 
-- [x] **Dockerfile:** runtime stage runs as the image's built-in unprivileged `node` user. `COPY --chown=node:node` on every layer (sets ownership inline, no size cost). `ENV CHECKPOINT_DISABLE=1` (no Prisma CLI phone-home on boot) + `XDG_CACHE_HOME=/tmp/.cache` (so a read-only rootfs works). Binds `:8080` (>1024, no `NET_BIND_SERVICE` needed).
+- [x] **Dockerfile:** runtime stage runs as the image's built-in unprivileged `node` user. `COPY --chown=node:node` on every layer (sets ownership inline, no size cost). `ENV CHECKPOINT_DISABLE=1` (no Prisma CLI phone-home on boot) + `XDG_CACHE_HOME=/tmp` (so a read-only rootfs works). Binds `:8080` (>1024, no `NET_BIND_SERVICE` needed).
 - [x] **Both compose files** (`docker-compose.yml` + `docker-compose.image.yml`): `app` gets `security_opt: [no-new-privileges:true]`, `cap_drop: [ALL]`, `read_only: true` + `tmpfs: [/tmp]`, `pids_limit: 200`, and a `node -e` healthcheck hitting `/api/healthz` (which also verifies DB connectivity). `db` gets `no-new-privileges` only — the postgres image manages its own privilege drop and needs a writable rootfs + a few caps.
 - [x] **`docs/deployment.md` § 4b** — new "Container hardening" section: what the compose already does, plus what the deployer must still get right (dedicated network, no shared bridge, tunnel over published port, keep the image current, optional `mem_limit` / Postgres tuning for a small host).
-- [ ] **Boot test via `v0.7.1-rc1`** — cut as a prerelease so `latest=auto` leaves `:latest` alone; boot the `:0.7.1-rc1` image in a throwaway stack (fresh volume) and confirm `prisma migrate deploy` runs under `read_only` + non-root, the app serves, healthcheck goes healthy, and a signup (argon2 + insert) works. Then cut `v0.7.1` proper. Fallback if `read_only` breaks: a `/home/node/.cache` tmpfs, or drop `read_only`.
+- [x] **Boot-tested via `v0.7.1-rc1`** (prerelease, so `:latest` stayed put): `:0.7.1-rc1` came up healthy in a throwaway stack — `prisma migrate deploy` ran under `read_only` + non-root, a signup returned `201`. No `read_only` fallback needed. `v0.7.1` cut, and the live public instance now runs it on DaxLite (migrated off the 1 GB VPS 2026-09-08).
 - [ ] **`cap_drop` on `db`** left off deliberately — revisit with an explicit `cap_add` allowlist (`CHOWN SETUID SETGID DAC_OVERRIDE FOWNER`) if worth it.
+
+### PI-95 — Read-path performance for a 40–60 player event
+Moving the live instance to a 14 GB box (PI-94) took memory pressure off the table, but the app still recomputes everything from Postgres on every request and the client refetches aggressively. Under ~50 phones at a venue this is a real load pattern — cheap to fix, worth doing before the event.
+
+- [ ] **`QueryClient` defaults.** `main.tsx` uses a bare `new QueryClient()` → TanStack defaults `staleTime: 0` + `refetchOnWindowFocus: true`, so every phone-unlock / tab-refocus refetches every query on screen. Set `staleTime: 30_000` (or more) + `refetchOnWindowFocus: false`. Realtime invalidation still keeps watched data fresh where it matters. One-line change, biggest lever.
+- [ ] **In-process cache for `computeGesamtwertung` / `computePodStandings`** — a `Map` keyed by tournament/pod id with a short TTL, busted on the `standings-changed` / pod events. Turns "a result lands → 60 clients refetch → 60 recomputes" into 1 recompute + 60 cache hits. No Redis (fits the stack constraint).
+- [ ] **Parallelize `computeGesamtwertung`'s pod loop** — it's a serial `for (const pod of pods) { await computePodStandings(pod.id) }`, ~4–5 queries each, ~50 sequential round-trips for a 10-pod tournament. `Promise.all(pods.map(...))`. Confirm indexes exist on `Match.roundId`, `Round.podId`, `Entrant.podId`.
+- [ ] **Response compression** — `@fastify/compress`, or confirm the fronting proxy (Cloudflare, in the live deploy's case) Brotli's the ~870 KB JS bundle. CF does this for free; a LAN/non-CF deployer wouldn't get it.
+- [ ] **Load test** on the real deploy (k6 / artillery from off-box): ~60 viewer VUs on pod + tournament pages + 2–3 organizer VUs submitting results to drive the broadcast fan-out; watch p95, error rate, `docker stats` mem, `pg_stat_activity`. Include an end-of-round burst (10 results in 5 s).
