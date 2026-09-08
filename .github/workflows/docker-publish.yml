@@ -62,7 +62,7 @@ jobs:
       # notes wait for a human to review / swap in curated notes and publish.
       - name: Open draft GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           draft: true
           generate_release_notes: true
