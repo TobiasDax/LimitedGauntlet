@@ -13,7 +13,7 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-39** — organizer data import: v1 shipped, the `legacy-data.json` import step is still open.
 - **PI-62** — deck photos: scoped via interview, not started.
 - **PI-89** — guard the pairing search against pathological pod sizes. ✅ done (v0.8.0).
-- **PI-90** — dependency update automation (Dependabot). ✅ done (v0.8.0).
+- **PI-90** — dependency update automation (Dependabot). ✅ config shipped (v0.8.0) — but see PI-101: Dependabot is still switched off in repo settings so no PRs are being generated.
 - **PI-92** — expand CI. Migration-drift check + lint shipped (v0.8.0, green on the runner); the PR-time image build + boot smoke test is blocked — the Forgejo runner gives job steps no `docker` CLI (re-add once that's fixed).
 - **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions. ✅ done (v0.7.0).
 - **PI-94** — container hardening (non-root image + locked-down compose). ✅ done (v0.7.1); live instance moved to DaxLite 2026-09-08.
@@ -22,7 +22,8 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-97** — entrant count per pod in the tournament overview pod list. ✅ shipped (v0.7.2); browser-verify pending.
 - **PI-98** — v0.8.1 hotfix: `@fastify/compress` blanked the live tournament pages. ✅ done (v0.8.1).
 - **PI-99** — not-yet-started pods counted as "played" everywhere (participation counts, Gesamtwertung columns, Hall of Fame incl. a phantom main-event champion). ✅ done (v0.8.2); browser-verify pending.
-- **PI-100** — on-demand side events: the TO signs a player up for every on-demand pod they'd play, and starting one pod auto-withdraws its entrants from all other not-yet-started on-demand pods. Raised by another organizer, refined with Tobias. Not started — ready for a build-scoping pass.
+- **PI-100** — on-demand side events: the TO signs a player up for every on-demand pod they'd play, and starting one pod auto-withdraws its entrants from all other not-yet-started on-demand pods. Raised by another organizer, refined with Tobias. ✅ code-complete (capacity + withdraw-on-start modal + un-pair restore); browser-verify pending.
+- **PI-101** — dependency security pass. Dependabot enabled 2026-09-09; nodemailer (high) + hono + qs fixed on `fix/v0.8.2-unstarted-pod-stats` (`npm audit` 5→2). Deferred: vitest 3→4 (dev-only), pending-majors batch.
 
 ## New improvements (backlog)
 
@@ -399,7 +400,7 @@ Reported on the live instance: a tournament with 27 pods, none started, showing 
 **Tests:** `gesamtwertung.test.ts` — SETUP pod contributes nothing / points-only import still counts / `countTournamentParticipants` unit cases (started vs SETUP vs team). New `hallOfFame.test.ts` — no phantom champion for a SETUP main event, crown appears once it's played. `npm run build` clean, 145 server tests green.
 - [ ] Browser-verify on the live instance after deploy: the reported tournament should read "27 pods scheduled · not started yet", HoF should drop the 3 phantom players + the crown.
 
-### PI-100 — On-demand side events: multi-signup + auto-withdraw on pod start
+### PI-100 — On-demand side events: multi-signup + auto-withdraw on pod start ✅ (code-complete, browser-verify pending)
 Raised by another organizer describing how a real on-demand side-event system needs to work at small-event scale, then refined with Tobias.
 
 **The scenario:** at a GP you register for one 8-player on-demand event, get a buzzer, and wander off until it fills — with >1000 players on site, an 8-seat pod fills on its own even if it's niche (20–30 min wait). At a ~10-player weekend that model can't work: there aren't enough people for any single pod to fill from its own dedicated signups. So instead **a player signs up for *every* on-demand pod they'd be happy to play** — "Draft X, Draft Y, and 2HG Sealed Z". When one of those pods reaches capacity it runs — and then the player's *other* signups have to be undone, because they're now busy playing and no longer available to fill anything else.
@@ -429,4 +430,29 @@ Raised by another organizer describing how a real on-demand side-event system ne
 
 **Split out into its own future item:** player notification when their pod fires / they're withdrawn — likely Discord DMs via the existing Discord OAuth identity. Not part of this item.
 
-- [ ] Not started — request captured and clarified 2026-09-09; ready for a build-scoping pass.
+- [x] **Schema:** `Pod.capacity Int?` + `Round.onDemandWithdrawals Json?` (migration `20260909120000_on_demand_capacity_and_withdrawals`, plain additive — no backfill). Both round-trip through export/import (`capacity` only; the withdrawal record is transient live-event state, like PI-80's reveal flag).
+- [x] **Server — `services/onDemandWithdrawal.ts` (new):** `findOnDemandConflicts` (read-only, drives the modal — reuses `podIsPlayed` from `services/standings.ts` to skip started pods, and is scoped to `isOnDemand` siblings in the same tournament); `withdrawFromOtherOnDemandPods` (runs inside the round-1 `$transaction`, re-derives conflicts against `tx`, hard-`DELETE`s the conflicting entrants — team entrants go whole via the `Team` row, exactly like `DELETE /api/entrants/:id` — and stamps the JSON record onto the new round); `restoreOnDemandWithdrawals` (best-effort re-add on un-pair; never throws, skips a pod that's since started or a player already back in).
+- [x] **Server — `routes/rounds.ts`:** both `POST /api/pods/:id/rounds` and `.../rounds/manual` take an optional `onDemandResolution: "withdraw" | "keep"`. Round 1 of an on-demand pod with conflicts + no resolution → `409 { error: "on_demand_conflicts", conflicts }`; `"withdraw"` runs the withdrawal in-transaction; post-commit emits `entrants-changed` per affected pod + one `standings-changed` on the tournament and re-runs `syncPodTokenAwards` per affected pod. `DELETE /api/rounds/:id` (un-pair) restores from `round.onDemandWithdrawals` when undoing round 1.
+- [x] **Server — `routes/pods.ts`:** `capacity` in `podCreateSchema`/`podUpdateSchema` (1–64, nullable). No server-side over-fill block (warned client-side only, per the decision above).
+- [x] **Client:** `OnDemandConflictModal` (shared `Modal`, three actions) + `useOnDemandStartGuard` hook wiring the 409→modal→retry flow into all three round-1 generation entry points (`PairingsPage`, `SeatingsPage`, `ManualPairingForm`). `PodList` shows "N / M" + a "Ready" pill for capped pods; `NewPodForm`/`EditPodForm` gain a capacity input (prefilled `8` for on-demand DRAFT/CHAOS_DRAFT); `PodPage` entrant lists get a soft "at / over capacity" note; the un-pair confirm warns when it'll re-add withdrawn players; `usePodRealtime` listens for `entrants-changed`.
+- [x] **Tests:** `services/onDemandWithdrawal.test.ts` — conflict detection (excludes scheduled / started / other-tournament / self), team conflicts, the hard-delete withdrawal, restore (skips started pods + already-present players), and the round-1-generation integration path.
+- [ ] **Not done — MCP:** the MCP `generate_round` tool sends no `onDemandResolution`, so generating round 1 of an on-demand pod with conflicts through MCP 409s `on_demand_conflicts` rather than resolving it. Deferred exactly like PI-78/80's MCP coverage — the modal is an organizer-at-the-table UI action, not a scriptable one.
+- [ ] **Not done — `docs/deployment.md`:** no note added — PI-100 has no config knob and doesn't change any webhook/pairing-visibility contract a deployer configures, so there's nothing for that file (unlike PI-80's §9).
+- [ ] Browser-verified on a live/demo deploy.
+
+### PI-101 — Dependency security pass + turn Dependabot on
+Audit of what PI-90's `.github/dependabot.yml` is actually producing (checked 2026-09-09).
+
+- [x] **Dependabot turned on (2026-09-09).** The config was in place but the repo-settings feature was off (`dependabot_security_updates: disabled`, `/automated-security-fixes` → `enabled: false`, alerts off). Tobias enabled Dependabot alerts + security updates + grouped security updates + version updates in repo Settings → Code security. Verified: `security_and_analysis.dependabot_security_updates: enabled`, `/automated-security-fixes` → `{enabled: true, paused: false}`, `/vulnerability-alerts` → 204.
+
+- **Applied directly on this branch (2026-09-09) rather than merging the GitHub PRs** — `origin` is Forgejo, so the fixes land as normal commits and go through Forgejo CI like anything else. `npm audit` went 5 (1 high + 4 moderate) → 2 moderate. `npm run build` / `lint` / `format:check` all green afterwards.
+  - [x] **`nodemailer` `^9.0.5` → `^9.1.1`** (`server/package.json`) — the one *high* (Dependabot #23). In-range, non-breaking. 4 advisories (`resolveContent()` file-access bypass, IDN allow-list bypass, `addressparser` ReDoS, RFC 5322 comment mis-parse). Verified safe for this app: `services/mailer.ts` only ever passes `to`/`subject`/`text`/`html` — no attachments, no `path:`/`content:`, so the tightened `resolveContent` access policy is a no-op here.
+  - [x] **`hono` 4.13.4 → 4.13.7** + **`qs` 6.15.3 → 6.16.0** — both moderate, both transitive under `@modelcontextprotocol/sdk` (`@hono/node-server`; `express@5`). Pinned via root `package.json` `overrides` (needed `npm update hono qs` after adding the overrides — npm 9 doesn't re-resolve already-locked transitives on a plain `npm install`). Low real exposure (the MCP HTTP surface is a trusted-local tool), clean bumps.
+  - [ ] **`vitest` + `@vitest/mocker` 3.2.7 → moderate — DEFERRED.** Dev/test-only, not shipped (path-traversal via a mock redirect — needs a malicious test in-repo). The advisory is fixed in `4.1.11`, but 3→4 is a major bump, and bumping it here wedged npm 9's arborist (`Cannot read properties of null (reading 'edgesOut')`) on this machine. A fresh `npm ci` in CI won't hit that — do it as its own change: set `server/package.json` `"vitest": "^4.1.11"`, `npm install` on a clean checkout, run the full server suite, eyeball `server/vitest.config.ts` (`globalSetup` + `test.env` are stable across 3→4, so it should be quiet). Or fold it into the Vite 8 / Vitest 5 frontend-tooling bump below.
+
+- **Pending major upgrades** (each needs its own build + full server-suite pass; Forgejo CI is the gate — pull the branch there to vet):
+  - [ ] Prisma `6.19 → 7`, Vite `6 → 8` + Vitest `3 → 5` + `@vitejs/plugin-react` `4 → 6` (one frontend-tooling PR), `zod` `3.25 → 4` (server + mcp), `openid-client` `5.7 → 6` (SSO — check the API surface `services/sso.ts` uses), `nodemailer` `9 → 10` (after the `9.1.1` security bump), TypeScript `5.9 → 7`, `@types/node` `22 → 26`, `argon2` `0.41 → 0.45`.
+
+- **In-range patch/minor bumps sitting available** (safe, land as one PR — the `minor-and-patch` group in `dependabot.yml` will open this on its weekly cron; trigger it now via Insights → Dependency graph → Dependabot → "Check for updates" if you don't want to wait): `fastify` 5.12.1→5.12.3, `@tanstack/react-query` 5.102.2→5.102.8, `react-router-dom` 7.18.2→7.18.3, `tsx` 4.23.12→4.23.13, `@types/react-dom` 19.2.5→19.2.7.
+
+- [ ] In progress — Dependabot enabled 2026-09-09; nodemailer/hono/qs fixed on this branch (audit 5→2); vitest bump + the major-upgrade batch still to do. Close Dependabot PRs #23/#24 once these commits reach `main` via the mirror; #25 stays until the vitest bump lands.
