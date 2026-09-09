@@ -8,6 +8,8 @@ The app is **feature-complete and running in production** — tagged releases (l
 
 **Shipped, browser-verify on a live deploy still pending:** PI-75 (operator signup webhook), PI-76–PI-84 (the pod-list cluster — organizer reorder, finished-pods sink, Scheduled/On-demand tabs, scheduled + actual timestamps, date dividers, pod cancel; first live pass 2026-09-05 found PI-77's sink broken on pre-existing data — needs the `20260905140000` backfill migration applied first), PI-85 (deployer analytics), PI-87 (Settings/Profile split), PI-99 (not-yet-started pods counted as played), PI-100 (on-demand side events — needs migration `20260909120000`). **PI-86** (one login across multiple orgs) is merged and verified on the demo — **the live rollout still needs a DB backup first** (see PI-86's deployment note).
 
+**GDPR pass (new):** PI-103 (compliance docs + Datenschutzerklärung template) shipped. PI-104–107 (anonymise a player, per-player data export, player self-service name edit + removal request, hide-from-public switch) are code-complete + server-tested — browser-verify pending; they add migration `20260909130000_gdpr_player_privacy_fields`. PI-108 (log/analytics IP posture + retention) not started.
+
 ## Open items
 
 - **PI-39** — organizer data import: v1 shipped, the `legacy-data.json` import step is still open.
@@ -290,6 +292,69 @@ Idea from Tobias: the pod list on the tournament page (organizer and public) cur
 - [x] **Data:** both tournament detail endpoints (`GET /api/tournaments/:id` and `GET /api/public/o/:slug/tournaments/:id`) already query `entrants` per pod in minimal form and then strip them before sending. Instead of stripping, compute and include `entrantCount` in each pod object — for individual pods this is `entrants.length`; for team pods use `entrants.length` too but label it "N teams" on the client. No schema change, no extra Prisma query.
 - [x] **UI:** render the count in each pod row in `PodList.tsx` (the shared `PodRow` component's metadata line, alongside format / round count / date). Add `entrantCount?: number` to the `Pod` type in `client/src/lib/types.ts` (optional — it's only present in the tournament-detail response, not in standalone pod fetches). Label: "N players" for individual pods (`!pod.isTeamEvent`), "N teams" for team pods.
 - [x] **Edge cases:** show the count even when it's 0 (no one signed up yet is useful information for an organizer). Covers both authed (`TournamentPage`) and public (`PublicTournamentPage`) automatically through the shared `PodList` component.
+
+---
+
+## GDPR / DSGVO backlog
+
+The app stores personal data (player names + full competitive history on public URLs, organizer emails, and — optionally — visitor IPs) and ships almost nothing to help a deployer be compliant. Full analysis in [`docs/gdpr.md`](docs/gdpr.md). PI-103 is documentation only and is the keystone (it's what a deployer needs *first*); PI-104 is the biggest functional gap; PI-105–108 round out data-subject rights and the logging/retention posture.
+
+### PI-103 — GDPR compliance baseline (docs + `LEGAL_LINK` expectations) ✅ (docs shipped 2026-09-09; browser-verify N/A — no code)
+The controller for any deployment is the org running it, not the project — but there was no document saying so, no privacy-notice template, and the README frames `LEGAL_LINK_URL` as "optional" when it's effectively mandatory in the EU.
+- [x] **`docs/gdpr.md`** — controller framing; a full inventory of personal data the app processes (from `schema.prisma` + `index.ts`'s request logging + `routes/tracking.ts` + `services/mailer.ts` + webhook payloads); the known clash points cross-referenced to PI-104…108; a deployer compliance checklist; an Art. 30 record-of-processing template; an Art. 33/34 breach process.
+- [x] **`docs/privacy-policy-template.md`** — an adaptable Datenschutzerklärung, EN + DE, pre-filled with the app's real processing activities and `{{PLACEHOLDER}}`s for the deployer's specifics, with per-feature sections (SSO / analytics / webhooks / player accounts / SMTP) to delete when unused.
+- [x] **README** — linked both docs from "Further Reading".
+- [ ] **Follow-ups not done here (small, do when touching the relevant area):**
+  - `docs/deployment.md` §2 / README "Legal Link": state plainly that EU deployments must set `LEGAL_LINK_URL`, not "optional".
+  - `docs/deployment.md`: a short "your GDPR responsibilities as the operator" pointer to `docs/gdpr.md` near the SMTP / analytics / webhook sections (those are the ones that add a processor / recipient).
+  - When an organizer adds a roster player, surface a one-line reminder that they must inform that person (links to the org's `LEGAL_LINK_URL` if set).
+  - Organizer signup: show the `LEGAL_LINK` as a "by signing up you acknowledge the privacy notice" link when it's configured.
+
+### PI-104 — Anonymise a player (erasure without destroying the competitive record) ✅ (code-complete, browser-verify pending)
+`DELETE /api/players/:id` (`routes/players.ts:112`) cascades through `Entrant` → `Match` (schema `onDelete: Cascade`), so honouring an Art. 17 erasure request today silently rewrites historical standings, Gesamtwertung and Hall of Fame. There's no pseudonymisation path. This is the single biggest functional GDPR gap.
+- [x] **Built — `services/playerPrivacy.ts#anonymisePlayer(orgId, playerId)`** (org-scoped, idempotent, returns `null` for a foreign player). One `$transaction`: `displayName` → `"Anonymised player <cuid-tail>"` (the tail keeps two anonymisations in one org from colliding the case-insensitive unique-name check), `email`/`identityId` → null, `playerInvite.deleteMany`, `tokenTransaction.updateMany` blanking `note` text. Every `Entrant`/`Match`/`CardPull`/`TokenTransaction` **amount** row is kept. `POST /api/players/:id/anonymise` (`routes/players.ts`).
+- [x] **Built — `Player.anonymisedAt DateTime?`** (migration `20260909130000_gdpr_player_privacy_fields`, additive, no backfill). Surfaced on the roster list as `player.anonymised` (boolean); `createPlayerInvite` now 409s (`anonymised`) on an anonymised row.
+- [x] **Round-trip:** `orgExport.ts` emits `data.anonymisedPlayers: string[]` (displayNames), `orgImport.ts` restores it set-only + idempotently. Optional on import so older files still load. `import-legacy.ts` unchanged — a fresh historical import has nothing anonymised.
+- [x] **Docs:** `docs/gdpr.md` §3.2 rewritten — anonymise is the recommended Art. 17 path; the cascade `DELETE` stays for mistakes/test data.
+- [x] **Frontend:** roster row → "Privacy ▾" → **Anonymise** (danger, behind the shared `Modal` confirm spelling out irreversibility). An anonymised row shows a `StatusPill` and drops its account controls. `useAnonymisePlayer` invalidates the whole query cache (the name is in standings / HoF / pod history everywhere).
+- [x] **Audit — denormalised names:** only `Team.name` / `Pod.name` / `Tournament.description` can embed a name, and they're shared across entrants — deliberately **not** auto-edited (documented as a known limitation; an organizer edits them by hand if needed). Past webhook deliveries can't be recalled — also documented, not solved.
+- [x] **Tests:** `services/playerPrivacy.test.ts` — proves `computePodStandings` + token balance are byte-identical before/after, entrant + match rows survive, identity row survives, invites gone, note blanked; idempotency; foreign-org `null`. Plus the export/import round-trip case in `orgImport.test.ts`.
+- [ ] Browser-verified.
+
+### PI-105 — Per-player data export (Art. 15 / 20) ✅ (code-complete, browser-verify pending)
+`Settings → Export` (PI-38) is whole-org and organizer-only. A single person exercising their right of access / portability has no self-contained export.
+- [x] **Built — `services/playerDataExport.ts#buildPlayerDataExport(orgId, playerId)`** → a readable (not re-importable) JSON doc: profile (incl. their own login email, anonymised/hidden flags), tournament check-ins, pods with finish + drop round, every match with opponent name + score, card-pull attributions, and the token ledger (null when the org has tokens off). `playerExportFilename()` shared helper.
+- [x] **Routes:** `GET /api/players/:id/export` (organizer, `routes/players.ts`) and `GET /api/player/export` (`requirePlayerAuth`, `routes/playerAccounts.ts`) — both send with a `content-disposition` attachment filename.
+- [x] **Frontend:** roster row → "Privacy ▾" → **Download data** (`useDownloadPlayerData`); portal → **Your account → Download my data** (`useDownloadOwnData`). Both bypass the JSON `api` client for the blob download, same pattern as the org export.
+- [x] **Docs:** `docs/gdpr.md` §3.3 rewritten.
+- [x] **Tests:** `services/playerDataExport.test.ts` — collects the player's matches/pods/finish/card-pulls, `null` ledger when tokens off, foreign-org `null`, filename sanitisation.
+- [ ] Browser-verified.
+
+### PI-106 — Player self-service: edit own name, request removal (Art. 16 / 17 / 21) ✅ (code-complete, browser-verify pending)
+A logged-in player (PI-52) can check in and report results but can't correct their own display name or ask to be removed through the app.
+- [x] **Rectification:** `PATCH /api/player/me` (`requirePlayerAuth`) → `renameOwnPlayer` (`services/playerAccounts.ts`), same case-insensitive uniqueness rule (shared `rosterNameTaken`), frozen on an anonymised entry. No organizer approval — it's their own name.
+- [x] **Erasure / objection request:** `POST /api/player/removal-request` (`requirePlayerAuth`, rate-limited 3/hour). Notifies **every organizer by email** when SMTP is configured and **always `request.log.warn`s** — so an instance without mail still surfaces it in `docker compose logs`. No self-executing erase (anonymisation is irreversible); a human actions it. Chose email+log over a webhook event (the per-org webhook system is pod-scoped) or a new in-app queue model.
+- [x] **Frontend:** portal gains a **"Your account"** section — inline name edit, "Download my data", and "Request removal" (optional message textarea, success confirmation).
+- [x] **Docs:** `docs/gdpr.md` §3.4 / §3.5.
+- [ ] Browser-verified.
+
+### PI-107 — Per-player "hide from public pages" (Art. 21 objection) ✅ (code-complete, browser-verify pending)
+If a player objects to appearing on the open public pages, the only levers today are the org-wide password lock (PI-27) or full anonymisation. Need a per-person switch.
+- [x] **Built — `Player.publicHiddenAt DateTime?`** (same migration as PI-104). `services/playerPrivacy.ts#setPlayerPublicHidden` (set/clear, no-op when already in state) + `getHiddenPlayerIds(orgId)`. `POST /api/players/:id/public-visibility` `{ hidden }`. Round-trips through export/import as `data.publicHiddenPlayers`.
+- [x] **Semantics — option (a), as leaned:** a hidden player still appears in public standings/pairings/Gesamtwertung/HoF but their name renders as **"Hidden player"** with no working link, and their public stats page 404s. The organizer's own views and every standings/pairing computation are untouched — this is a name redaction on the public read surface only.
+- [x] **Server:** pure `services/publicVisibility.ts#buildRedactor` (unit-tested like `pairingsVisibility.ts`), applied in **every** `routes/public.ts` handler that emits a player name — `/roster`, `/tournaments/:id`, `/gesamtwertung`, tournament + pod `/card-pulls`, `/pods/:id`, `/pods/:id/standings`, `/hall-of-fame` (incl. `mostPlayedPairings` / `longestWinStreak`), `/hall-of-fame/players/:id` (404 when the subject is hidden; opponent names in `headToHead`/`nemesis`/`victim` redacted), `/treasure-chest`. A local `shapePublicPlayer` also strips the login `email` / `identityId` / privacy timestamps a raw `include: { player: true }` was already shipping publicly — a pre-existing PI-52-era leak fixed in passing.
+- [x] **Organizer UI:** roster row → "Privacy ▾" → **Hide / Show on public pages**; a `StatusPill` marks a hidden row in the (unaffected) organizer view.
+- [x] **Not done — realtime:** the toggle doesn't push a live socket update to open public pages (a refresh picks it up; it isn't time-critical like a pairing reveal). Noted.
+- [x] **Docs:** `docs/gdpr.md` §3.5.
+- [ ] Browser-verified.
+
+### PI-108 — Request-log IP posture + analytics IP + retention config
+`Fastify({ logger: true })` (`index.ts`) writes the client IP for every request with no retention limit and no disclosure; `routes/tracking.ts` forwards `request.ip` to the deployer's Umami as `x-forwarded-for`. Both need a lawful basis (Art. 6(1)(f) is defensible) *and* disclosure *and*, for the logs, a retention limit.
+- [ ] **Configurable request logging:** an env knob (e.g. `REQUEST_LOG=full|minimal|off`, default `minimal`) that at `minimal` uses a Fastify `serializers.req` / `redact` config dropping `remoteAddress` and query strings from the logged request object. Keep error/stack logging untouched. Document what each level logs.
+- [ ] **Analytics IP minimisation:** in `proxyTrackingSend` (`services/tracking.ts`), send a truncated IP (zero the last octet / last 80 bits) or drop `x-forwarded-for` entirely behind an env flag (`TRACKING_FORWARD_IP=off|truncated|full`, default `truncated`) — Umami can still do coarse geo from a truncated IP or its own edge. Note the tradeoff in `docs/deployment.md` §10.
+- [ ] **Retention documentation, not code:** `docs/gdpr.md` already tells the deployer to set host-level log retention + an Umami retention/IP-hash setting + a data-retention period for tournaments — cross-link that from `docs/deployment.md`.
+- [ ] **Optional (bigger, defer):** an org setting to auto-anonymise or delete tournaments older than N years (uses PI-104's `anonymisePlayer` per participant, or a tournament-scoped purge). Scoped separately if it's wanted at all — most groups want the permanent record.
+- [ ] Update `docs/gdpr.md` §3.6 / §3.7.
 
 ---
 

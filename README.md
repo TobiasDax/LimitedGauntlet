@@ -353,4 +353,6 @@ See [`ROADMAP.md`](ROADMAP.md) for the full list, status, and design notes.
 
 **Pairings & Standings** — how Swiss pairing, cross-pod opponent avoidance, and standings tiebreakers work in detail. See [docs/pairings-and-standings.md](docs/pairings-and-standings.md).
 
+**GDPR / DSGVO** — what personal data the app stores, your responsibilities as the operator, and a fill-in privacy-policy template (EN + DE). See [docs/gdpr.md](docs/gdpr.md) and [docs/privacy-policy-template.md](docs/privacy-policy-template.md).
+
 **Development** — building from source and setting up a local dev environment for contributors. See [docs/development.md](docs/development.md).

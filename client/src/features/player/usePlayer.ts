@@ -111,3 +111,50 @@ export function useSubmitPlayerResult() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["player", "portal"] }),
   });
 }
+
+// PI-106 — a logged-in player corrects their own display name (GDPR Art. 16).
+export function useRenameSelf() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (displayName: string) =>
+      api.patch<{ player: { id: string; displayName: string } }>("/player/me", { displayName }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["player", "me"] });
+      void queryClient.invalidateQueries({ queryKey: ["player", "portal"] });
+    },
+  });
+}
+
+// PI-106 — ask the organizers to remove / anonymise this player (Art. 17 / 21).
+// There's no self-executing erase — a human confirms it.
+export function useRequestRemoval() {
+  return useMutation({
+    mutationFn: (message: string) =>
+      api.post<{ ok: true; organizers: number; emailed: number }>("/player/removal-request", {
+        message: message.trim() || undefined,
+      }),
+  });
+}
+
+// PI-105 — download the player's own data (Art. 15 / 20) as a JSON file.
+export function useDownloadOwnData() {
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/player/export", { credentials: "include" });
+      if (!res.ok) {
+        const body: unknown = await res.json().catch(() => undefined);
+        throw new ApiError(res.status, body);
+      }
+      const blob = await res.blob();
+      const match = /filename="?([^"]+)"?/.exec(res.headers.get("Content-Disposition") ?? "");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = match?.[1] ?? "limited-gauntlet-my-data.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
+  });
+}

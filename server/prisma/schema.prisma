@@ -225,6 +225,24 @@ model Player {
   email        String?
   identityId   String?
 
+  // PI-104 — set when an organizer anonymises this roster entry to honour an
+  // Art. 17 erasure request: displayName is scrubbed to a non-identifying
+  // label, email/identityId are cleared, pending invites and token-note text
+  // are removed, but every Entrant / Match / CardPull / TokenTransaction row
+  // stays intact so historical standings, Gesamtwertung and Hall of Fame are
+  // unchanged. Presence = anonymised; the row can't be re-invited to a login
+  // while set. Irreversible by design (there is nothing to restore the name
+  // from). Distinct from a plain cascade delete, which is kept only for
+  // genuine mistakes / test data.
+  anonymisedAt DateTime?
+  // PI-107 — set when a player (or an organizer on their behalf) objects to
+  // appearing on the open public pages (Art. 21). While set, every
+  // /api/public/... route renders this player's name as a generic
+  // placeholder and their public stats page 404s; the organizer's own views
+  // and all standings/pairing math are unaffected (they still count exactly
+  // as before — this only redacts the name on the public surface).
+  publicHiddenAt DateTime?
+
   organization      Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
   identity          PlayerIdentity?    @relation(fields: [identityId], references: [id], onDelete: SetNull)
   tournamentPlayers TournamentPlayer[]

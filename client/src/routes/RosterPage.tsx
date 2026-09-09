@@ -1,20 +1,107 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  useAnonymisePlayer,
   useCreatePlayer,
   useDeletePlayer,
+  useDownloadPlayerData,
   useInvitePlayer,
   usePlayers,
   useRevokePlayerAccount,
+  useSetPlayerPublicHidden,
   useUpdatePlayer,
 } from "../features/players/usePlayers";
 import { useMe } from "../features/auth/useAuth";
 import { ApiError } from "../lib/api";
-import { Button, Card, Eyebrow, FormError, ScreenDek, ScreenTitle, TextField } from "../components/ui";
+import {
+  Button,
+  Card,
+  Eyebrow,
+  FormError,
+  Modal,
+  ScreenDek,
+  ScreenTitle,
+  StatusPill,
+  TextField,
+} from "../components/ui";
 import { SharePopup } from "../components/SharePopup";
 import type { Player } from "../lib/types";
 
 const norm = (s: string) => s.trim().toLowerCase();
+
+// PI-104/105/107 — the GDPR data-subject-rights actions for one roster entry:
+// anonymise (Art. 17 erasure that keeps standings intact), hide/show on the
+// public pages (Art. 21 objection), and download the player's own data
+// (Art. 15 / 20). Tucked behind a "Privacy ▾" toggle so the common row stays
+// uncluttered. See docs/gdpr.md.
+function PrivacyControls({ player }: { player: Player }) {
+  const [open, setOpen] = useState(false);
+  const [confirmAnon, setConfirmAnon] = useState(false);
+  const anonymise = useAnonymisePlayer();
+  const setHidden = useSetPlayerPublicHidden();
+  const download = useDownloadPlayerData();
+
+  return (
+    <>
+      <Button variant="ghost" onClick={() => setOpen((v) => !v)}>
+        Privacy {open ? "▴" : "▾"}
+      </Button>
+      {open && (
+        <div className="mt-2 flex w-full flex-wrap items-center gap-2 rounded-md border border-border bg-surface-sunken px-3 py-2">
+          <Button variant="ghost" onClick={() => download.mutate({ id: player.id, name: player.displayName })}>
+            {download.isPending ? "Preparing…" : "Download data"}
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={setHidden.isPending}
+            onClick={() => setHidden.mutate({ id: player.id, hidden: !player.publicHidden })}
+          >
+            {player.publicHidden ? "Show on public pages" : "Hide from public pages"}
+          </Button>
+          {!player.anonymised && (
+            <Button variant="danger" onClick={() => setConfirmAnon(true)}>
+              Anonymise
+            </Button>
+          )}
+          {download.isError && <FormError>Couldn't prepare the download. Try again.</FormError>}
+        </div>
+      )}
+
+      {confirmAnon && (
+        <Modal title={`Anonymise ${player.displayName}?`} onClose={() => setConfirmAnon(false)}>
+          <div className="flex flex-col gap-3 text-[13px] text-ink-secondary">
+            <p>
+              This scrubs the name to a non-identifying label and removes their login, any pending invite, and
+              token-ledger notes. Their match results, standings, Gesamtwertung and Hall of Fame numbers stay exactly
+              the same.
+            </p>
+            <p className="text-critical">This can't be undone — there's nothing to restore the name from.</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setConfirmAnon(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                disabled={anonymise.isPending}
+                onClick={() =>
+                  anonymise.mutate(player.id, {
+                    onSuccess: () => {
+                      setConfirmAnon(false);
+                      setOpen(false);
+                    },
+                  })
+                }
+              >
+                {anonymise.isPending ? "Anonymising…" : "Anonymise player"}
+              </Button>
+            </div>
+            {anonymise.isError && <FormError>Couldn't anonymise that player. Try again.</FormError>}
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
 
 // PI-52 — the per-row "player account" affordance: invite by email, show a
 // pending state with a copyable link (works even with no SMTP), or revoke.
@@ -153,17 +240,22 @@ function RosterRow({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-      <Link
-        to={`/hall-of-fame/players/${player.id}`}
-        className="font-display text-[15.5px] font-bold hover:text-accent-strong"
-      >
-        {player.displayName}
-      </Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          to={`/hall-of-fame/players/${player.id}`}
+          className="font-display text-[15.5px] font-bold hover:text-accent-strong"
+        >
+          {player.displayName}
+        </Link>
+        {player.anonymised && <StatusPill tone="critical">Anonymised</StatusPill>}
+        {player.publicHidden && <StatusPill tone="warning">Hidden from public</StatusPill>}
+      </div>
       <div className="flex flex-wrap items-center gap-1">
-        <AccountControls player={player} orgSlug={orgSlug} />
+        {!player.anonymised && <AccountControls player={player} orgSlug={orgSlug} />}
         <Button variant="ghost" onClick={() => setEditing(true)}>
           Rename
         </Button>
+        <PrivacyControls player={player} />
         <Button
           variant="ghost"
           onClick={() => {

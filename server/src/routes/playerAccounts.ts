@@ -13,9 +13,11 @@ import {
   createPlayerInvite,
   getPlayerInvite,
   isPlayerAccountFailure,
+  renameOwnPlayer,
   revokePlayerAccount,
   submitPlayerResult,
 } from "../services/playerAccounts.js";
+import { buildPlayerDataExport, playerExportFilename } from "../services/playerDataExport.js";
 
 const emailSchema = z.object({ email: z.string().trim().toLowerCase().email() });
 const idParams = z.object({ id: z.string().min(1) });
@@ -249,6 +251,90 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
       organizations: await playerOrganizations(request.player!.identityId),
     });
   });
+
+  // PI-106 — a logged-in player corrects their own display name (GDPR Art. 16)
+  // in the org their portal is currently in.
+  app.patch("/api/player/me", { preHandler: requirePlayerAuth }, async (request, reply) => {
+    const body = z.object({ displayName: z.string().trim().min(1).max(100) }).safeParse(request.body);
+    if (!body.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    try {
+      const updated = await renameOwnPlayer(request.player!.orgId, request.player!.id, body.data.displayName);
+      reply.send({ player: { id: updated.id, displayName: updated.displayName } });
+    } catch (err) {
+      if (isPlayerAccountFailure(err)) {
+        reply
+          .code(err.code === "not_found" ? 404 : err.code === "name_taken" || err.code === "anonymised" ? 409 : 400)
+          .send({ error: err.code });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  // PI-105 — the logged-in player's own data (Art. 15 access / Art. 20
+  // portability), scoped to the org their portal is in.
+  app.get("/api/player/export", { preHandler: requirePlayerAuth }, async (request, reply) => {
+    const doc = await buildPlayerDataExport(request.player!.orgId, request.player!.id);
+    if (!doc) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    reply
+      .header("content-disposition", `attachment; filename="${playerExportFilename(doc.player.displayName)}"`)
+      .send(doc);
+  });
+
+  // PI-106 — a logged-in player asks the organizers to remove / anonymise them
+  // (Art. 17 erasure / Art. 21 objection). There is no self-executing erase —
+  // anonymisation is irreversible, so a human confirms it. Notifies every
+  // organizer by email when SMTP is configured, and always logs it so an
+  // instance without mail still surfaces the request in `docker compose logs`.
+  app.post(
+    "/api/player/removal-request",
+    { preHandler: requirePlayerAuth, config: { rateLimit: { max: 3, timeWindow: "1 hour" } } },
+    async (request, reply) => {
+      const body = z.object({ message: z.string().trim().max(2000).optional() }).safeParse(request.body);
+      if (!body.success) {
+        reply.code(400).send({ error: "invalid_input" });
+        return;
+      }
+      const player = request.player!;
+      const memberships = await prisma.organizerMembership.findMany({
+        where: { orgId: player.orgId },
+        include: {
+          account: { select: { email: true } },
+          organization: { select: { name: true } },
+        },
+      });
+      const orgName = memberships[0]?.organization.name ?? "your organization";
+      request.log.warn(
+        { orgId: player.orgId, playerId: player.id, playerName: player.displayName, message: body.data.message },
+        "Player requested removal / anonymisation (GDPR Art. 17/21)",
+      );
+      let emailed = 0;
+      if (isEmailConfigured()) {
+        for (const m of memberships) {
+          try {
+            await sendMail({
+              to: m.account.email,
+              subject: `LimitedGauntlet: ${player.displayName} requested removal`,
+              text:
+                `${player.displayName} (${orgName}) has asked to be removed from or anonymised on the public pages.` +
+                (body.data.message ? `\n\nTheir message:\n${body.data.message}` : "") +
+                `\n\nOpen the roster to anonymise the player or hide them from the public pages.`,
+            });
+            emailed += 1;
+          } catch {
+            // Logged above — one unreachable address shouldn't fail the request.
+          }
+        }
+      }
+      reply.send({ ok: true, organizers: memberships.length, emailed });
+    },
+  );
 
   // ---- Player portal: check in/out, report own results ----
 

@@ -2,6 +2,7 @@ import type { FastifyRequest } from "fastify";
 import { createHash, randomBytes } from "node:crypto";
 import { prisma } from "../prisma.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
+import { rosterNameTaken } from "./playerPrivacy.js";
 
 // Player self-service accounts (PI-52). The DB-touching logic lives here so it
 // can be tested directly against a real Postgres (same pattern as
@@ -18,6 +19,8 @@ export function hashInviteToken(token: string): string {
 export type PlayerAccountError =
   | "not_found"
   | "already_has_account"
+  | "anonymised"
+  | "name_taken"
   | "email_taken"
   | "invalid_or_expired"
   | "wrong_password"
@@ -45,6 +48,8 @@ export async function createPlayerInvite(
   const player = await prisma.player.findFirst({ where: { id: playerId, orgId } });
   if (!player) throw new PlayerAccountFailure("not_found");
   if (player.identityId) throw new PlayerAccountFailure("already_has_account");
+  // PI-104 — an anonymised roster entry can't be re-attached to a login.
+  if (player.anonymisedAt) throw new PlayerAccountFailure("anonymised");
 
   const emailTaken = await prisma.player.findFirst({
     where: { orgId, email, id: { not: playerId } },
@@ -111,6 +116,17 @@ export async function acceptPlayerInvite(token: string, password: string) {
   ]);
   const organization = await prisma.organization.findUniqueOrThrow({ where: { id: invite.orgId } });
   return { identity, player, organization };
+}
+
+// PI-106 — a logged-in player corrects their own display name (Art. 16) in
+// the org their portal session is in. Same case-insensitive uniqueness rule
+// as the organizer rename route; an anonymised entry is frozen.
+export async function renameOwnPlayer(orgId: string, playerId: string, displayName: string) {
+  const player = await prisma.player.findFirst({ where: { id: playerId, orgId } });
+  if (!player) throw new PlayerAccountFailure("not_found");
+  if (player.anonymisedAt) throw new PlayerAccountFailure("anonymised");
+  if (await rosterNameTaken(orgId, displayName, playerId)) throw new PlayerAccountFailure("name_taken");
+  return prisma.player.update({ where: { id: playerId }, data: { displayName } });
 }
 
 export async function authenticatePlayer(orgSlug: string, email: string, password: string) {

@@ -8,6 +8,8 @@ import {
   recordManualTokenTxn,
   TokensDisabledError,
 } from "../services/tokens.js";
+import { anonymisePlayer, rosterNameTaken, setPlayerPublicHidden } from "../services/playerPrivacy.js";
+import { buildPlayerDataExport, playerExportFilename } from "../services/playerDataExport.js";
 
 const playerSchema = z.object({
   displayName: z.string().trim().min(1).max(100),
@@ -15,30 +17,30 @@ const playerSchema = z.object({
 
 const paramsSchema = z.object({ id: z.string().min(1) });
 
-// Roster names must be unique within an org (case-insensitively) — two players
-// with the same name create confusing standings and mis-attributed results.
-// Enforced app-layer (Postgres has no portable case-insensitive unique index
-// without citext); the import paths already dedupe by name.
-async function nameTaken(orgId: string, displayName: string, exceptId?: string): Promise<boolean> {
-  const existing = await prisma.player.findFirst({
-    where: {
-      orgId,
-      displayName: { equals: displayName, mode: "insensitive" },
-      ...(exceptId ? { id: { not: exceptId } } : {}),
-    },
-    select: { id: true },
-  });
-  return existing !== null;
-}
+const nameTaken = rosterNameTaken;
 
 // Never send the login credentials (PI-52) back to the client — the roster
 // only cares whether an account exists, exposed as `hasAccount` on the list.
 // PI-86 — the login lives on the linked PlayerIdentity now; a linked
 // `identityId` means the roster entry has a self-service account.
-function publicPlayer<T extends { identityId: string | null; email: string | null }>(player: T) {
-  // email + identityId destructured out so neither reaches the public shape.
-  const { identityId, email: _email, ...rest } = player;
-  return { ...rest, hasAccount: identityId !== null };
+// PI-104/107 — the two privacy timestamps are surfaced as plain booleans so
+// the roster UI can badge an anonymised / publicly-hidden row.
+function publicPlayer<
+  T extends {
+    identityId: string | null;
+    email: string | null;
+    anonymisedAt: Date | null;
+    publicHiddenAt: Date | null;
+  },
+>(player: T) {
+  // Credentials + raw timestamps destructured out of the public shape.
+  const { identityId, email: _email, anonymisedAt, publicHiddenAt, ...rest } = player;
+  return {
+    ...rest,
+    hasAccount: identityId !== null,
+    anonymised: anonymisedAt !== null,
+    publicHidden: publicHiddenAt !== null,
+  };
 }
 
 export async function playerRoutes(app: FastifyInstance): Promise<void> {
@@ -126,6 +128,62 @@ export async function playerRoutes(app: FastifyInstance): Promise<void> {
     }
 
     reply.code(204).send();
+  });
+
+  // --- GDPR data-subject rights (PI-104 / PI-105 / PI-107) -----------------
+
+  // PI-104 — anonymise a roster entry (Art. 17 erasure that keeps the
+  // competitive record intact). Irreversible; the plain DELETE above stays for
+  // genuine mistakes. Idempotent — a second call is a no-op.
+  app.post("/api/players/:id/anonymise", async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const result = await anonymisePlayer(request.organizer!.orgId, params.data.id);
+    if (!result) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    const player = await prisma.player.findUniqueOrThrow({ where: { id: result.id } });
+    reply.send({ player: publicPlayer(player), alreadyAnonymised: result.alreadyAnonymised });
+  });
+
+  // PI-107 — set/clear the "hide from public pages" objection flag (Art. 21).
+  app.post("/api/players/:id/public-visibility", async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    const body = z.object({ hidden: z.boolean() }).safeParse(request.body);
+    if (!params.success || !body.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const updated = await setPlayerPublicHidden(request.organizer!.orgId, params.data.id, body.data.hidden);
+    if (!updated) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    const player = await prisma.player.findUniqueOrThrow({ where: { id: updated.id } });
+    reply.send({ player: publicPlayer(player) });
+  });
+
+  // PI-105 — a single player's own data (Art. 15 access / Art. 20
+  // portability), pulled by an organizer. The player-self version is
+  // GET /api/player/export in routes/playerAccounts.ts.
+  app.get("/api/players/:id/export", async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    const doc = await buildPlayerDataExport(request.organizer!.orgId, params.data.id);
+    if (!doc) {
+      reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    reply
+      .header("content-disposition", `attachment; filename="${playerExportFilename(doc.player.displayName)}"`)
+      .send(doc);
   });
 
   // --- Tokens (PI-72) — organizer view + manual adjustments -----------------

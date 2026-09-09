@@ -141,3 +141,43 @@ describe("token export → import round-trip (PI-72)", () => {
     expect(await getPlayerTokenBalance(dest.id, destAlice.id)).toBe(65);
   });
 });
+
+describe("privacy-flag export → import round-trip (PI-104/107)", () => {
+  it("carries anonymisedAt / publicHiddenAt across an import", async () => {
+    const u = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const src = await prisma.organization.create({ data: { slug: `pr-src-${u}`, name: "Src" } });
+    const anon = await prisma.player.create({
+      data: { orgId: src.id, displayName: "Anonymised player abc123", anonymisedAt: new Date() },
+    });
+    const hidden = await prisma.player.create({
+      data: { orgId: src.id, displayName: "Shy Player", publicHiddenAt: new Date() },
+    });
+    await prisma.player.create({ data: { orgId: src.id, displayName: "Normal Player" } });
+
+    const exported = await buildOrgExport(src.id, { data: true, hallOfFame: false, treasureVault: false });
+    expect(exported.data!.anonymisedPlayers).toEqual([anon.displayName]);
+    expect(exported.data!.publicHiddenPlayers).toEqual([hidden.displayName]);
+
+    const parsed = parseOrgExport(exported);
+    expect(parsed.ok).toBe(true);
+
+    const dest = await prisma.organization.create({ data: { slug: `pr-dst-${u}`, name: "Dst" } });
+    await importOrgData(dest.id, parsed.data!);
+
+    const destAnon = await prisma.player.findFirstOrThrow({ where: { orgId: dest.id, displayName: anon.displayName } });
+    const destHidden = await prisma.player.findFirstOrThrow({
+      where: { orgId: dest.id, displayName: hidden.displayName },
+    });
+    const destNormal = await prisma.player.findFirstOrThrow({
+      where: { orgId: dest.id, displayName: "Normal Player" },
+    });
+    expect(destAnon.anonymisedAt).not.toBeNull();
+    expect(destHidden.publicHiddenAt).not.toBeNull();
+    expect(destNormal.anonymisedAt).toBeNull();
+    expect(destNormal.publicHiddenAt).toBeNull();
+  });
+
+  it("accepts an export with no privacy arrays (older files)", () => {
+    expect(parseOrgExport(envelope({ players: ["Alice"], tournaments: [] }))).toMatchObject({ ok: true });
+  });
+});

@@ -185,6 +185,9 @@ const tournamentSchema = z
 const dataSchema = z
   .object({
     players: z.array(playerName).max(IMPORT_LIMITS.players),
+    // PI-104/107 — optional so pre-existing exports still import.
+    anonymisedPlayers: z.array(playerName).max(IMPORT_LIMITS.players).optional().default([]),
+    publicHiddenPlayers: z.array(playerName).max(IMPORT_LIMITS.players).optional().default([]),
     tokensEnabled: z.boolean().optional().default(false),
     tokenLedger: z.array(tokenTxnSchema).max(IMPORT_LIMITS.tokenLedger).optional().default([]),
     tournaments: z.array(tournamentSchema).max(IMPORT_LIMITS.tournaments),
@@ -376,7 +379,7 @@ async function importOrgDataInTransaction(
   // Upsert every referenced player once, up front (org-scoped, keyed on
   // displayName — the same identity the export used).
   const playerIdByName = new Map<string, string>();
-  const allNames = new Set<string>(data.players);
+  const allNames = new Set<string>([...data.players, ...data.anonymisedPlayers, ...data.publicHiddenPlayers]);
   for (const t of data.tournaments) {
     for (const n of t.players) allNames.add(n);
     for (const pod of t.pods) {
@@ -400,6 +403,21 @@ async function importOrgDataInTransaction(
     if (!id) throw new Error(`Import references unknown player "${name}"`);
     return id;
   };
+
+  // PI-104/107 — restore the privacy flags. Set-only (an import never clears a
+  // flag already set on the target), and idempotent.
+  for (const name of data.anonymisedPlayers) {
+    await db.player.updateMany({
+      where: { id: playerId(name), anonymisedAt: null },
+      data: { anonymisedAt: new Date() },
+    });
+  }
+  for (const name of data.publicHiddenPlayers) {
+    await db.player.updateMany({
+      where: { id: playerId(name), publicHiddenAt: null },
+      data: { publicHiddenAt: new Date() },
+    });
+  }
 
   // PI-72 — enable tokens on the target org if the file has them on (never
   // disable via import), and restore the hand-made ledger rows (deduped so a

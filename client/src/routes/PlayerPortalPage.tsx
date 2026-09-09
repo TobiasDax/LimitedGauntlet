@@ -1,11 +1,19 @@
 import { useState } from "react";
 import { ApiError } from "../lib/api";
-import { useCheckIn, usePlayerMe, usePlayerPortal, useSubmitPlayerResult } from "../features/player/usePlayer";
+import {
+  useCheckIn,
+  useDownloadOwnData,
+  usePlayerMe,
+  usePlayerPortal,
+  useRenameSelf,
+  useRequestRemoval,
+  useSubmitPlayerResult,
+} from "../features/player/usePlayer";
 import { usePlayerPortalRealtime } from "../features/player/usePlayerPortalRealtime";
 import { usePlayerPortalTokens } from "../features/tokens/useTokens";
 import { Stepper } from "../components/Stepper";
 import { PlayerTokenLedger } from "../components/PlayerTokenLedger";
-import { Button, Card, Eyebrow, FormError, ScreenTitle } from "../components/ui";
+import { Button, Card, Eyebrow, FormError, ScreenTitle, TextField, Textarea } from "../components/ui";
 import type { PlayerPortalMatch } from "../lib/types";
 
 function MyMatchCard({ match }: { match: PlayerPortalMatch }) {
@@ -65,6 +73,111 @@ function MyMatchCard({ match }: { match: PlayerPortalMatch }) {
         )}
       </form>
     </Card>
+  );
+}
+
+// PI-105/106 — the player's own data-subject-rights controls: correct your
+// name (Art. 16), download your data (Art. 15 / 20), or ask the organizers to
+// remove you (Art. 17 / 21). See docs/gdpr.md.
+function AccountSection({ currentName }: { currentName: string }) {
+  const [name, setName] = useState(currentName);
+  const [editing, setEditing] = useState(false);
+  const [showRemoval, setShowRemoval] = useState(false);
+  const [message, setMessage] = useState("");
+  const rename = useRenameSelf();
+  const download = useDownloadOwnData();
+  const removal = useRequestRemoval();
+
+  return (
+    <section>
+      <h2 className="mb-3 font-display text-[16px] font-bold">Your account</h2>
+      <Card className="flex flex-col gap-4 p-4">
+        <div>
+          <div className="mb-1 text-[11px] tracking-wide text-ink-muted uppercase">Display name</div>
+          {editing ? (
+            <form
+              className="flex flex-wrap items-center gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const next = name.trim();
+                if (!next) return;
+                rename.mutate(next, { onSuccess: () => setEditing(false) });
+              }}
+            >
+              <TextField value={name} onChange={(e) => setName(e.target.value)} autoFocus className="w-56" />
+              <Button type="submit" variant="primary" disabled={rename.isPending}>
+                Save
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setName(currentName);
+                  setEditing(false);
+                }}
+              >
+                Cancel
+              </Button>
+              {rename.isError && (
+                <FormError>
+                  {rename.error instanceof ApiError && rename.error.message === "name_taken"
+                    ? "Someone in this group already uses that name."
+                    : rename.error instanceof ApiError && rename.error.message === "anonymised"
+                      ? "This entry has been anonymised and can't be renamed."
+                      : "Couldn't save that. Try again."}
+                </FormError>
+              )}
+            </form>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="font-display text-[15px] font-bold">{currentName}</span>
+              <Button variant="ghost" onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <Button variant="ghost" onClick={() => download.mutate()} disabled={download.isPending}>
+            {download.isPending ? "Preparing…" : "Download my data"}
+          </Button>
+          <Button variant="ghost" onClick={() => setShowRemoval((v) => !v)}>
+            Request removal
+          </Button>
+          {download.isError && <FormError>Couldn't prepare the download. Try again.</FormError>}
+        </div>
+
+        {showRemoval && (
+          <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-sunken p-3">
+            {removal.isSuccess ? (
+              <p className="text-[13px] text-good">
+                Sent. The organizers have been notified and will remove or anonymise you.
+              </p>
+            ) : (
+              <>
+                <p className="text-[12.5px] text-ink-secondary">
+                  This asks the organizers to anonymise you or hide you from the public pages — they action it by hand.
+                  Add anything they should know:
+                </p>
+                <Textarea
+                  rows={3}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Optional message"
+                />
+                <div className="flex justify-end">
+                  <Button variant="danger" disabled={removal.isPending} onClick={() => removal.mutate(message)}>
+                    {removal.isPending ? "Sending…" : "Send request"}
+                  </Button>
+                </div>
+                {removal.isError && <FormError>Couldn't send that. Try again in a bit.</FormError>}
+              </>
+            )}
+          </div>
+        )}
+      </Card>
+    </section>
   );
 }
 
@@ -141,6 +254,8 @@ export function PlayerPortalPage() {
           </FormError>
         )}
       </section>
+
+      {me && <AccountSection currentName={me.player.displayName} />}
     </div>
   );
 }

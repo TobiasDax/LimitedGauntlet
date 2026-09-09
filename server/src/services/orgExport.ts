@@ -143,6 +143,11 @@ export interface ExportTournament {
 
 export interface ExportData {
   players: string[]; // every player displayName in the org
+  // PI-104/107 — displayNames of players carrying each privacy flag, so an
+  // anonymisation or a public-page objection survives an export/import
+  // round-trip. Both a subset of `players`.
+  anonymisedPlayers: string[];
+  publicHiddenPlayers: string[];
   tokensEnabled: boolean;
   tokenLedger: ExportTokenTxn[]; // MANUAL / INITIAL rows only
   tournaments: ExportTournament[];
@@ -207,7 +212,11 @@ function toStandingBonuses(raw: unknown): ExportStandingBonus[] | null {
 async function buildStructuralData(orgId: string): Promise<ExportData> {
   const [org, players, ledgerRows] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { tokensEnabled: true } }),
-    prisma.player.findMany({ where: { orgId }, orderBy: { displayName: "asc" }, select: { displayName: true } }),
+    prisma.player.findMany({
+      where: { orgId },
+      orderBy: { displayName: "asc" },
+      select: { displayName: true, anonymisedAt: true, publicHiddenAt: true },
+    }),
     // Only the hand-made rows — POD_* rows regenerate on import.
     prisma.tokenTransaction.findMany({
       where: { orgId, reason: { in: ["MANUAL", "INITIAL"] } },
@@ -240,6 +249,8 @@ async function buildStructuralData(orgId: string): Promise<ExportData> {
 
   return {
     players: players.map((p) => p.displayName),
+    anonymisedPlayers: players.filter((p) => p.anonymisedAt).map((p) => p.displayName),
+    publicHiddenPlayers: players.filter((p) => p.publicHiddenAt).map((p) => p.displayName),
     tokensEnabled: org.tokensEnabled,
     tokenLedger: ledgerRows.map((r) => ({
       player: r.player.displayName,
