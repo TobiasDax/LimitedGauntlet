@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — tagged releases (latest **v0.9.0**), a public demo at [limited-gauntlet.com](https://limited-gauntlet.com), and the full numbered build (Steps 0–12) plus the PI-1…PI-74 backlog all shipped and browser-verified. That whole history is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) — the roadmap below is only what's still open or awaiting a live browser-verify.
+The app is **feature-complete and running in production** — tagged releases (latest **v0.9.1**), a public demo at [limited-gauntlet.com](https://limited-gauntlet.com), and the full numbered build (Steps 0–12) plus the PI-1…PI-74 backlog all shipped and browser-verified. That whole history is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) — the roadmap below is only what's still open or awaiting a live browser-verify.
 
 **Shipped, browser-verify on a live deploy still pending:** PI-75 (operator signup webhook), PI-76–PI-84 (the pod-list cluster — organizer reorder, finished-pods sink, Scheduled/On-demand tabs, scheduled + actual timestamps, date dividers, pod cancel; first live pass 2026-09-05 found PI-77's sink broken on pre-existing data — needs the `20260905140000` backfill migration applied first), PI-85 (deployer analytics), PI-87 (Settings/Profile split), PI-99 (not-yet-started pods counted as played), PI-100 (on-demand side events — needs migration `20260909120000`). **PI-86** (one login across multiple orgs) is merged and verified on the demo — **the live rollout still needs a DB backup first** (see PI-86's deployment note).
 
@@ -13,7 +13,7 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-39** — organizer data import: v1 shipped, the `legacy-data.json` import step is still open.
 - **PI-62** — deck photos: scoped via interview, not started.
 - **PI-89** — guard the pairing search against pathological pod sizes. ✅ done (v0.8.0).
-- **PI-90** — dependency update automation (Dependabot). ✅ config shipped (v0.8.0) — but see PI-101: Dependabot is still switched off in repo settings so no PRs are being generated.
+- **PI-90** — dependency update automation (Dependabot). ✅ config shipped (v0.8.0); enabled in repo settings 2026-09-09 (PI-101) — now generating PRs.
 - **PI-92** — expand CI. Migration-drift check + lint shipped (v0.8.0, green on the runner); the PR-time image build + boot smoke test is blocked — the Forgejo runner gives job steps no `docker` CLI (re-add once that's fixed).
 - **PI-93** — tag-triggered GHCR build + draft release on GitHub Actions. ✅ done (v0.7.0).
 - **PI-94** — container hardening (non-root image + locked-down compose). ✅ done (v0.7.1); live instance moved to DaxLite 2026-09-08.
@@ -24,6 +24,7 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-99** — not-yet-started pods counted as "played" everywhere (participation counts, Gesamtwertung columns, Hall of Fame incl. a phantom main-event champion). ✅ shipped v0.9.0 (built as v0.8.2, never tagged separately); browser-verify pending.
 - **PI-100** — on-demand side events: the TO signs a player up for every on-demand pod they'd play, and starting one pod auto-withdraws its entrants from all other not-yet-started on-demand pods. Raised by another organizer, refined with Tobias. ✅ shipped v0.9.0 (capacity + withdraw-on-start modal + un-pair restore); browser-verify pending.
 - **PI-101** — dependency security pass. Dependabot enabled 2026-09-09; nodemailer (high) + hono + qs bumped (✅ shipped v0.9.0, `npm audit` 5→2). Deferred: vitest 3→4 (dev-only), pending-majors batch.
+- **PI-102** — v0.9.1 hotfix: v0.9.0 image crash-looped on boot (`nodemailer` not found — corrupt `package-lock.json` from an npm bug during PI-101). ✅ fixed (lockfile regenerated); DB was never affected.
 
 ## New improvements (backlog)
 
@@ -456,3 +457,11 @@ Audit of what PI-90's `.github/dependabot.yml` is actually producing (checked 20
 - **In-range patch/minor bumps sitting available** (safe, land as one PR — the `minor-and-patch` group in `dependabot.yml` will open this on its weekly cron; trigger it now via Insights → Dependency graph → Dependabot → "Check for updates" if you don't want to wait): `fastify` 5.12.1→5.12.3, `@tanstack/react-query` 5.102.2→5.102.8, `react-router-dom` 7.18.2→7.18.3, `tsx` 4.23.12→4.23.13, `@types/react-dom` 19.2.5→19.2.7.
 
 - [ ] In progress — Dependabot enabled 2026-09-09; nodemailer/hono/qs shipped in **v0.9.0** (audit 5→2). Dependabot PRs #23/#24 should auto-close now the fixes are on `main`; #25 stays until the vitest bump lands. vitest 3→4 + the major-upgrade batch still to do.
+
+### PI-102 — v0.9.1 hotfix: v0.9.0 image crash-looped on boot (`nodemailer` not found)
+The v0.9.0 image failed every boot with `ERR_MODULE_NOT_FOUND: Cannot find package 'nodemailer' imported from /app/server/dist/services/mailer.js`. Migrations applied cleanly (all 29, incl. PI-100's) — **the DB was never the problem**; the container just crash-looped after migrating.
+
+**Cause:** the `package-lock.json` committed in v0.9.0 was corrupt. During the PI-101 work, an `npm install` for the deferred `vitest` bump hit an npm 9.2.0 arborist bug (`Cannot read properties of null (reading 'edgesOut')`) and left the lockfile with **`nodemailer` de-hoisted to `server/node_modules/nodemailer`** instead of the root `node_modules/`. It resolved fine locally (Node finds `server/node_modules` walking up from `server/dist`), and `tsc`/`vite build` don't touch runtime resolution — but the `Dockerfile` runtime stage copies **only `/app/node_modules`** (`COPY --from=server-build /app/node_modules node_modules`), so the de-hoisted package never made it into the image. The GHCR build was green because nothing in the build path exercises the runtime `import`.
+
+**Fix (v0.9.1):** regenerated `package-lock.json` from scratch (`rm -rf **/node_modules package-lock.json && npm install && npm ci`) — `nodemailer` + every other server runtime dep now hoist to root, verified with `require.resolve`. The regen also pulled ~119 in-range transitive bumps (rollup 4.62→4.63, @tanstack/react-query 5.102.2→5.102.8, socket.io 4.8.1→4.8.3, etc.) — all within existing `^` ranges, the same set Dependabot's `minor-and-patch` group would land. No source changes, no schema changes. `npm run build` green.
+- [ ] **Follow-up (hardening, not blocking):** the `Dockerfile` runtime stage assumes every runtime dep hoists to root. Either also `COPY /app/server/node_modules` (costs ~20 MB of `typescript` from the dev install — needs a prod-only install in that stage first) or add a boot-time `require.resolve` smoke check for the critical modules. A recurrence of this npm bug would break boot again the same way.
