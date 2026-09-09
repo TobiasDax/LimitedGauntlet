@@ -8,7 +8,9 @@
     "mcp"
   ],
   "overrides": {
-    "deepmerge-ts": "^8.0.0"
+    "deepmerge-ts": "^8.0.0",
+    "hono": "^4.13.7",
+    "qs": "^6.16.0"
   },
   "scripts": {
     "dev:server": "npm run dev --workspace server",
