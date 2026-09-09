@@ -4,9 +4,9 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — tagged releases (latest **v0.8.2**), a public demo at [limited-gauntlet.com](https://limited-gauntlet.com), and the full numbered build (Steps 0–12) plus the PI-1…PI-74 backlog all shipped and browser-verified. That whole history is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) — the roadmap below is only what's still open or awaiting a live browser-verify.
+The app is **feature-complete and running in production** — tagged releases (latest **v0.9.0**), a public demo at [limited-gauntlet.com](https://limited-gauntlet.com), and the full numbered build (Steps 0–12) plus the PI-1…PI-74 backlog all shipped and browser-verified. That whole history is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) — the roadmap below is only what's still open or awaiting a live browser-verify.
 
-**Shipped, browser-verify on a live deploy still pending:** PI-75 (operator signup webhook), PI-76–PI-84 (the pod-list cluster — organizer reorder, finished-pods sink, Scheduled/On-demand tabs, scheduled + actual timestamps, date dividers, pod cancel; first live pass 2026-09-05 found PI-77's sink broken on pre-existing data — needs the `20260905140000` backfill migration applied first), PI-85 (deployer analytics), PI-87 (Settings/Profile split). **PI-86** (one login across multiple orgs) is merged and verified on the demo — **the live rollout still needs a DB backup first** (see PI-86's deployment note).
+**Shipped, browser-verify on a live deploy still pending:** PI-75 (operator signup webhook), PI-76–PI-84 (the pod-list cluster — organizer reorder, finished-pods sink, Scheduled/On-demand tabs, scheduled + actual timestamps, date dividers, pod cancel; first live pass 2026-09-05 found PI-77's sink broken on pre-existing data — needs the `20260905140000` backfill migration applied first), PI-85 (deployer analytics), PI-87 (Settings/Profile split), PI-99 (not-yet-started pods counted as played), PI-100 (on-demand side events — needs migration `20260909120000`). **PI-86** (one login across multiple orgs) is merged and verified on the demo — **the live rollout still needs a DB backup first** (see PI-86's deployment note).
 
 ## Open items
 
@@ -21,9 +21,9 @@ The app is **feature-complete and running in production** — tagged releases (l
 - **PI-96** — clickable player names → detail page; detail page gains a pod history list (upcoming vs finished, linked). ✅ shipped (v0.7.2; pod-link fix v0.7.3); browser-verify pending.
 - **PI-97** — entrant count per pod in the tournament overview pod list. ✅ shipped (v0.7.2); browser-verify pending.
 - **PI-98** — v0.8.1 hotfix: `@fastify/compress` blanked the live tournament pages. ✅ done (v0.8.1).
-- **PI-99** — not-yet-started pods counted as "played" everywhere (participation counts, Gesamtwertung columns, Hall of Fame incl. a phantom main-event champion). ✅ done (v0.8.2); browser-verify pending.
-- **PI-100** — on-demand side events: the TO signs a player up for every on-demand pod they'd play, and starting one pod auto-withdraws its entrants from all other not-yet-started on-demand pods. Raised by another organizer, refined with Tobias. ✅ code-complete (capacity + withdraw-on-start modal + un-pair restore); browser-verify pending.
-- **PI-101** — dependency security pass. Dependabot enabled 2026-09-09; nodemailer (high) + hono + qs fixed on `fix/v0.8.2-unstarted-pod-stats` (`npm audit` 5→2). Deferred: vitest 3→4 (dev-only), pending-majors batch.
+- **PI-99** — not-yet-started pods counted as "played" everywhere (participation counts, Gesamtwertung columns, Hall of Fame incl. a phantom main-event champion). ✅ shipped v0.9.0 (built as v0.8.2, never tagged separately); browser-verify pending.
+- **PI-100** — on-demand side events: the TO signs a player up for every on-demand pod they'd play, and starting one pod auto-withdraws its entrants from all other not-yet-started on-demand pods. Raised by another organizer, refined with Tobias. ✅ shipped v0.9.0 (capacity + withdraw-on-start modal + un-pair restore); browser-verify pending.
+- **PI-101** — dependency security pass. Dependabot enabled 2026-09-09; nodemailer (high) + hono + qs bumped (✅ shipped v0.9.0, `npm audit` 5→2). Deferred: vitest 3→4 (dev-only), pending-majors batch.
 
 ## New improvements (backlog)
 
@@ -400,7 +400,7 @@ Reported on the live instance: a tournament with 27 pods, none started, showing 
 **Tests:** `gesamtwertung.test.ts` — SETUP pod contributes nothing / points-only import still counts / `countTournamentParticipants` unit cases (started vs SETUP vs team). New `hallOfFame.test.ts` — no phantom champion for a SETUP main event, crown appears once it's played. `npm run build` clean, 145 server tests green.
 - [ ] Browser-verify on the live instance after deploy: the reported tournament should read "27 pods scheduled · not started yet", HoF should drop the 3 phantom players + the crown.
 
-### PI-100 — On-demand side events: multi-signup + auto-withdraw on pod start ✅ (code-complete, browser-verify pending)
+### PI-100 — On-demand side events: multi-signup + auto-withdraw on pod start ✅ (shipped v0.9.0, browser-verify pending)
 Raised by another organizer describing how a real on-demand side-event system needs to work at small-event scale, then refined with Tobias.
 
 **The scenario:** at a GP you register for one 8-player on-demand event, get a buzzer, and wander off until it fills — with >1000 players on site, an 8-seat pod fills on its own even if it's niche (20–30 min wait). At a ~10-player weekend that model can't work: there aren't enough people for any single pod to fill from its own dedicated signups. So instead **a player signs up for *every* on-demand pod they'd be happy to play** — "Draft X, Draft Y, and 2HG Sealed Z". When one of those pods reaches capacity it runs — and then the player's *other* signups have to be undone, because they're now busy playing and no longer available to fill anything else.
@@ -455,4 +455,4 @@ Audit of what PI-90's `.github/dependabot.yml` is actually producing (checked 20
 
 - **In-range patch/minor bumps sitting available** (safe, land as one PR — the `minor-and-patch` group in `dependabot.yml` will open this on its weekly cron; trigger it now via Insights → Dependency graph → Dependabot → "Check for updates" if you don't want to wait): `fastify` 5.12.1→5.12.3, `@tanstack/react-query` 5.102.2→5.102.8, `react-router-dom` 7.18.2→7.18.3, `tsx` 4.23.12→4.23.13, `@types/react-dom` 19.2.5→19.2.7.
 
-- [ ] In progress — Dependabot enabled 2026-09-09; nodemailer/hono/qs fixed on this branch (audit 5→2); vitest bump + the major-upgrade batch still to do. Close Dependabot PRs #23/#24 once these commits reach `main` via the mirror; #25 stays until the vitest bump lands.
+- [ ] In progress — Dependabot enabled 2026-09-09; nodemailer/hono/qs shipped in **v0.9.0** (audit 5→2). Dependabot PRs #23/#24 should auto-close now the fixes are on `main`; #25 stays until the vitest bump lands. vitest 3→4 + the major-upgrade batch still to do.
