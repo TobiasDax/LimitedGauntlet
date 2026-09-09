@@ -14,10 +14,17 @@ function invalidatePod(queryClient: ReturnType<typeof useQueryClient>, podId: st
   void queryClient.invalidateQueries({ queryKey: ["pods", podId] });
 }
 
+// PI-100 — round 1 of an on-demand pod: the organizer chooses at a confirm
+// modal whether to withdraw shared entrants from the tournament's other
+// not-yet-started on-demand pods. Passed only on the modal's retry; a plain
+// first click sends nothing and the server 409s if there's a conflict to resolve.
+export type OnDemandResolution = "withdraw" | "keep";
+
 export function useGenerateRound(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post<{ round: Round }>(`/pods/${podId}/rounds`),
+    mutationFn: (resolution: OnDemandResolution | void) =>
+      api.post<{ round: Round }>(`/pods/${podId}/rounds`, resolution ? { onDemandResolution: resolution } : undefined),
     onSuccess: () => invalidatePod(queryClient, podId),
   });
 }
@@ -36,10 +43,17 @@ export interface ManualPair {
   entrantBId: string | null;
 }
 
+export interface ManualPairInput {
+  pairs: ManualPair[];
+  // PI-100 — same on-demand round-1 resolution as useGenerateRound.
+  onDemandResolution?: OnDemandResolution;
+}
+
 export function useManualPairRound(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (pairs: ManualPair[]) => api.post<{ round: Round }>(`/pods/${podId}/rounds/manual`, { pairs }),
+    mutationFn: ({ pairs, onDemandResolution }: ManualPairInput) =>
+      api.post<{ round: Round }>(`/pods/${podId}/rounds/manual`, { pairs, onDemandResolution }),
     onSuccess: () => invalidatePod(queryClient, podId),
   });
 }

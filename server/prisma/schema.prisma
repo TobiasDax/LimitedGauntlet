@@ -464,6 +464,12 @@ model Pod {
   // *scheduled* date/startTime above; this is real, not planned. Cleared back
   // to null if round 1 is later undone (PI-56's "Undo pairing").
   actualStartedAt    DateTime?
+  // Optional target headcount for an on-demand pod (PI-100), null = no cap
+  // (today's behaviour, and the only sensible value for a scheduled pod). Only
+  // ever surfaced in the On-demand tab, as a "6 / 8" indicator + a "ready to
+  // start" cue — never an auto-fire trigger, and over-filling past it is warned
+  // but allowed.
+  capacity           Int?
   createdAt          DateTime    @default(now())
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
@@ -573,6 +579,15 @@ model Round {
   // every round for schema simplicity, but is only ever set/checked for
   // roundNumber === 1.
   pairingsRevealedAt DateTime?
+  // PI-100 — set only on a pod's round 1, and only when generating that round
+  // auto-withdrew entrants from other not-yet-started on-demand pods in the
+  // same tournament. Records enough (pod id/name + the withdrawn individuals
+  // and teams) to re-add them if this round 1 is later un-paired (PI-56).
+  // Null on every other round and whenever no withdrawal happened. Shape:
+  //   { version: 1, byPod: [ { podId, podName,
+  //       individuals: [{ playerId, displayName }],
+  //       teams: [{ teamName, displayName, memberPlayerIds: [] }] } ] }
+  onDemandWithdrawals Json?
 
   pod     Pod     @relation(fields: [podId], references: [id], onDelete: Cascade)
   matches Match[]

@@ -3,9 +3,11 @@ import { Link, useParams } from "react-router-dom";
 import { usePod } from "../features/pods/usePods";
 import { useGenerateRound, useRounds, roundErrorMessage } from "../features/pods/useRounds";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
+import { useOnDemandStartGuard } from "../features/pods/useOnDemandStartGuard";
 import { computeSeatings } from "../lib/seatings";
 import { SeatingChart } from "../components/SeatingChart";
 import { ManualPairingForm } from "../components/ManualPairingForm";
+import { OnDemandConflictModal } from "../components/OnDemandConflictModal";
 import { PodTabs } from "../components/PodTabs";
 import { Button, Eyebrow, FormError, ScreenDek, ScreenTitle } from "../components/ui";
 
@@ -24,8 +26,17 @@ export function SeatingsPage() {
   const { data: podData } = usePod(id);
   const { data: roundsData, isLoading } = useRounds(id);
   const generateRound = useGenerateRound(id ?? "");
+  const startGuard = useOnDemandStartGuard();
   usePodRealtime(id, podData?.pod.tournamentId);
   const [showManual, setShowManual] = useState(false);
+
+  const runGenerate = (resolution?: "withdraw" | "keep") =>
+    generateRound.mutate(resolution, {
+      onError: (e) => {
+        if (startGuard.catchConflicts(e)) generateRound.reset();
+      },
+      onSuccess: startGuard.clear,
+    });
 
   if (isLoading || !podData) return <p className="text-ink-muted">Loading…</p>;
 
@@ -52,6 +63,16 @@ export function SeatingsPage() {
 
       <PodTabs podId={pod.id} />
 
+      {startGuard.conflicts && (
+        <OnDemandConflictModal
+          conflicts={startGuard.conflicts}
+          pending={generateRound.isPending}
+          onWithdraw={() => runGenerate("withdraw")}
+          onKeep={() => runGenerate("keep")}
+          onClose={startGuard.clear}
+        />
+      )}
+
       {!usesSeating ? (
         <p className="text-ink-muted">Seatings only apply to Draft, Chaos Draft, and Sealed pods.</p>
       ) : !round1 ? (
@@ -59,7 +80,7 @@ export function SeatingsPage() {
           <p className="text-ink-muted">Add at least 2 entrants before generating seatings.</p>
         ) : !showManual ? (
           <div className="flex items-center gap-3">
-            <Button variant="primary" onClick={() => generateRound.mutate()} disabled={generateRound.isPending}>
+            <Button variant="primary" onClick={() => runGenerate()} disabled={generateRound.isPending}>
               {generateRound.isPending ? "Generating…" : "Generate seatings"}
             </Button>
             <button

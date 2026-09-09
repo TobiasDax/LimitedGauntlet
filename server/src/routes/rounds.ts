@@ -6,6 +6,11 @@ import { findOwnedPod, findOwnedRound, findOwnedMatch } from "../services/owners
 import { generatePairings, getActiveEntrants, getLatestRound, PairingError } from "../services/pairing.js";
 import { inferCardPullAttribution } from "../services/cardPullInference.js";
 import { syncPodTokenAwards } from "../services/tokens.js";
+import {
+  findOnDemandConflicts,
+  withdrawFromOtherOnDemandPods,
+  restoreOnDemandWithdrawals,
+} from "../services/onDemandWithdrawal.js";
 import { emitPodEvent, emitTournamentEvent } from "../realtime.js";
 import { sendWebhookEvent, buildMatchesPayload, buildStandingsPayload, fireAndForget } from "../services/webhooks.js";
 
@@ -15,6 +20,13 @@ const extendSchema = z.object({
   minutes: z.number().int().min(1).max(60),
 });
 
+// PI-100 — on generating round 1 of an on-demand pod, the organizer decides at
+// a confirm modal whether to withdraw its entrants from the tournament's other
+// not-yet-started on-demand pods. Absent + conflicts exist → the route 409s
+// with the conflict list so the client can show the modal; the retry carries
+// the choice. Irrelevant for every other round / non-on-demand pod.
+const onDemandResolution = z.enum(["withdraw", "keep"]).optional();
+const generateRoundSchema = z.object({ onDemandResolution });
 const manualPairSchema = z.object({
   pairs: z
     .array(
@@ -24,6 +36,7 @@ const manualPairSchema = z.object({
       }),
     )
     .min(1),
+  onDemandResolution,
 });
 
 const swapSchema = z.object({
@@ -56,6 +69,20 @@ async function checkNextRoundAllowed(pod: {
   return { nextRoundNumber };
 }
 
+// PI-100 — after a "withdraw" round-1 start pulled entrants out of other
+// on-demand pods, refresh everything that keyed off those pods' rosters.
+async function afterOnDemandWithdraw(
+  affectedPodIds: string[],
+  pod: { id: string; tournamentId: string },
+): Promise<void> {
+  if (affectedPodIds.length === 0) return;
+  for (const affectedId of affectedPodIds) {
+    emitPodEvent(affectedId, "entrants-changed", { podId: affectedId });
+    await syncPodTokenAwards(affectedId);
+  }
+  emitTournamentEvent(pod.tournamentId, "standings-changed", { podId: pod.id });
+}
+
 export async function roundRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
 
@@ -80,7 +107,8 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/api/pods/:id/rounds", async (request, reply) => {
     const params = idParams.safeParse(request.params);
-    if (!params.success) {
+    const body = generateRoundSchema.safeParse(request.body ?? {});
+    if (!params.success || !body.success) {
       reply.code(400).send({ error: "invalid_input" });
       return;
     }
@@ -98,6 +126,17 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     }
     const { nextRoundNumber } = precheck;
 
+    // PI-100 — starting an on-demand pod's round 1 may need the organizer to
+    // decide about entrants shared with other on-demand pods (see the schema).
+    const withdrawOnDemand = nextRoundNumber === 1 && pod.isOnDemand && body.data.onDemandResolution === "withdraw";
+    if (nextRoundNumber === 1 && pod.isOnDemand && !body.data.onDemandResolution) {
+      const conflicts = await findOnDemandConflicts(pod.id);
+      if (conflicts.length > 0) {
+        reply.code(409).send({ error: "on_demand_conflicts", conflicts });
+        return;
+      }
+    }
+
     let suggestion;
     try {
       suggestion = await generatePairings(pod.id, nextRoundNumber);
@@ -109,7 +148,7 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       throw err;
     }
 
-    const round = await prisma.$transaction(async (tx) => {
+    const { round, affectedPodIds } = await prisma.$transaction(async (tx) => {
       const created = await tx.round.create({ data: { podId: pod.id, roundNumber: nextRoundNumber } });
       await tx.match.createMany({
         data: suggestion.pairs.map((pair, index) => ({
@@ -125,9 +164,14 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       if (nextRoundNumber === 1) {
         await tx.pod.update({ where: { id: pod.id }, data: { actualStartedAt: new Date() } });
       }
-      return tx.round.findUniqueOrThrow({ where: { id: created.id }, include: { matches: true } });
+      const withdrawn = withdrawOnDemand
+        ? await withdrawFromOtherOnDemandPods(tx, pod.id, created.id)
+        : { affectedPodIds: [] };
+      const full = await tx.round.findUniqueOrThrow({ where: { id: created.id }, include: { matches: true } });
+      return { round: full, affectedPodIds: withdrawn.affectedPodIds };
     });
 
+    await afterOnDemandWithdraw(affectedPodIds, pod);
     emitPodEvent(pod.id, "pairings-published", { round });
     // PI-80 — round 1's pairings.posted webhook fires on reveal instead of
     // here (a webhook receiver, e.g. a Discord relay, is exactly the kind of
@@ -190,7 +234,17 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const round = await prisma.$transaction(async (tx) => {
+    // PI-100 — same on-demand withdraw decision as the auto-pairing route above.
+    const withdrawOnDemand = nextRoundNumber === 1 && pod.isOnDemand && body.data.onDemandResolution === "withdraw";
+    if (nextRoundNumber === 1 && pod.isOnDemand && !body.data.onDemandResolution) {
+      const conflicts = await findOnDemandConflicts(pod.id);
+      if (conflicts.length > 0) {
+        reply.code(409).send({ error: "on_demand_conflicts", conflicts });
+        return;
+      }
+    }
+
+    const { round, affectedPodIds } = await prisma.$transaction(async (tx) => {
       const created = await tx.round.create({ data: { podId: pod.id, roundNumber: nextRoundNumber } });
       await tx.match.createMany({
         data: body.data.pairs.map((pair, index) => ({
@@ -204,9 +258,14 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       if (nextRoundNumber === 1) {
         await tx.pod.update({ where: { id: pod.id }, data: { actualStartedAt: new Date() } });
       }
-      return tx.round.findUniqueOrThrow({ where: { id: created.id }, include: { matches: true } });
+      const withdrawn = withdrawOnDemand
+        ? await withdrawFromOtherOnDemandPods(tx, pod.id, created.id)
+        : { affectedPodIds: [] };
+      const full = await tx.round.findUniqueOrThrow({ where: { id: created.id }, include: { matches: true } });
+      return { round: full, affectedPodIds: withdrawn.affectedPodIds };
     });
 
+    await afterOnDemandWithdraw(affectedPodIds, pod);
     emitPodEvent(pod.id, "pairings-published", { round });
     // PI-80 — same round-1-defers-to-reveal rule as the auto-pairing route above.
     if (round.roundNumber !== 1) {
@@ -303,6 +362,24 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     // too, since generation was what set it.
     if (round.roundNumber === 1) {
       await prisma.pod.update({ where: { id: round.podId }, data: { actualStartedAt: null } });
+    }
+
+    // PI-100 — if starting this round auto-withdrew entrants from other
+    // on-demand pods, re-add them now that the start is undone (best-effort:
+    // skips a pod that's since started, or a player already back in it).
+    if (round.roundNumber === 1 && round.onDemandWithdrawals) {
+      const { restoredPodIds } = await restoreOnDemandWithdrawals(round.onDemandWithdrawals);
+      for (const restoredId of restoredPodIds) {
+        emitPodEvent(restoredId, "entrants-changed", { podId: restoredId });
+        await syncPodTokenAwards(restoredId);
+      }
+      if (restoredPodIds.length > 0) {
+        const podRow = await prisma.pod.findUnique({
+          where: { id: round.podId },
+          select: { tournamentId: true },
+        });
+        if (podRow) emitTournamentEvent(podRow.tournamentId, "standings-changed", { podId: round.podId });
+      }
     }
 
     emitPodEvent(round.podId, "round-unpaired", { roundId: round.id });

@@ -20,6 +20,17 @@ interface PodRowProps {
 }
 
 function PodRow({ pod, href, reorder }: PodRowProps) {
+  // PI-100 — on-demand capacity: show "N / M" instead of the plain count, plus
+  // a "Ready" cue once it's full. Only when a capacity is actually set.
+  const hasCapacity = pod.capacity != null && pod.entrantCount !== undefined;
+  const isFull = hasCapacity && pod.entrantCount! >= pod.capacity!;
+  const countLabel =
+    pod.entrantCount === undefined
+      ? null
+      : hasCapacity
+        ? `${pod.entrantCount} / ${pod.capacity} ${pod.isTeamEvent ? "teams" : "players"}`
+        : `${pod.entrantCount} ${pod.isTeamEvent ? "teams" : "players"}`;
+
   return (
     <Card className="flex items-center gap-3 px-5 py-4">
       {reorder && (
@@ -47,11 +58,16 @@ function PodRow({ pod, href, reorder }: PodRowProps) {
           <div className="font-display text-[16px] font-bold">
             {pod.isMainEvent && <span title="This tournament's main event">👑 </span>}
             {pod.name}
+            {isFull && (
+              <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-[10.5px] font-semibold tracking-wide text-accent uppercase">
+                Ready
+              </span>
+            )}
           </div>
           <div className="text-[12.5px] text-ink-muted">
             {podFormatDisplay(pod)}
             {pod.isTeamEvent && ` · teams of ${pod.teamSize}`} · {pod.roundCount} rounds
-            {pod.entrantCount !== undefined && ` · ${pod.entrantCount} ${pod.isTeamEvent ? "teams" : "players"}`}
+            {countLabel && ` · ${countLabel}`}
             {pod.date && ` · ${pod.date.slice(0, 10)}${pod.startTime ? ` ${pod.startTime}` : ""}`}
           </div>
         </div>

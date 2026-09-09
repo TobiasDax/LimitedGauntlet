@@ -21,6 +21,7 @@ export interface CreatePodInput {
   date?: string;
   startTime?: string;
   isOnDemand?: boolean;
+  capacity?: number | null;
   isTeamEvent: boolean;
   teamSize?: number;
   roundCount: number;
@@ -55,6 +56,7 @@ export interface UpdatePodInput {
   date?: string | null;
   startTime?: string | null;
   isOnDemand?: boolean;
+  capacity?: number | null;
   format?: PodFormat;
   isTeamEvent?: boolean;
   teamSize?: number;

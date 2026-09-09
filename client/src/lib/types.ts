@@ -114,6 +114,9 @@ export interface Pod {
   canceledAt: string | null;
   // PI-81 — explicit opt-in; every pod is "Scheduled" unless marked on-demand.
   isOnDemand: boolean;
+  // PI-100 — optional target headcount for an on-demand pod; null = no cap.
+  // Drives the "6 / 8" / "ready" cue in the On-demand tab.
+  capacity: number | null;
   // PI-82 — optional scheduled start time, "HH:MM" (24h), alongside `date`.
   startTime: string | null;
   // PI-82 — when round 1's pairings were actually generated (regardless of
@@ -179,7 +182,22 @@ export interface Round {
   // and the client is responsible for not rendering it). Only ever
   // meaningful when roundNumber === 1.
   pairingsRevealedAt: string | null;
+  // PI-100 — present (truthy) on a round 1 whose generation auto-withdrew
+  // entrants from other on-demand pods; used to warn before an un-pair.
+  onDemandWithdrawals?: unknown;
   matches: Match[];
+}
+
+// PI-100 — one entrant that starting an on-demand pod's round 1 would pull out
+// of another not-yet-started on-demand pod. Returned by the round-generate
+// route as a 409 body so the client can show the confirm modal.
+export interface OnDemandConflict {
+  podId: string;
+  podName: string;
+  entrantId: string;
+  kind: "individual" | "team";
+  displayName: string;
+  memberNames?: string[];
 }
 
 export interface StandingsRow {

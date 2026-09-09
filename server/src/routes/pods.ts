@@ -70,6 +70,8 @@ const podCreateSchema = z.object({
   isMainEvent: z.boolean().default(false),
   // PI-81 — explicit opt-in; every pod is "Scheduled" unless marked on-demand.
   isOnDemand: z.boolean().default(false),
+  // PI-100 — optional target headcount for an on-demand pod (null = no cap).
+  capacity: z.number().int().min(1).max(64).nullable().optional(),
   // PI-72 — per-pod override of the tournament's token rewards. null = inherit.
   tokenParticipation: z.number().int().min(0).nullable().optional(),
   tokenStandingBonuses: zStandingBonuses.nullable().optional(),
@@ -104,6 +106,7 @@ const podUpdateSchema = z.object({
   webhookEnabled: z.boolean().optional(),
   isMainEvent: z.boolean().optional(),
   isOnDemand: z.boolean().optional(),
+  capacity: z.number().int().min(1).max(64).nullable().optional(),
   tokenParticipation: z.number().int().min(0).nullable().optional(),
   tokenStandingBonuses: zStandingBonuses.nullable().optional(),
   setCode: z.string().trim().toLowerCase().min(2).max(10).nullable().optional(),

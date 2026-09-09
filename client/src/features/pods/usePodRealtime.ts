@@ -12,6 +12,9 @@ const POD_EVENTS = [
   "round-unpaired",
   "result-submitted",
   "prep-timer-updated",
+  // PI-100 — an on-demand pod's roster changed because another pod started
+  // (auto-withdraw) or was un-paired (restore).
+  "entrants-changed",
 ] as const;
 
 // Joins this pod's realtime room and invalidates the relevant query

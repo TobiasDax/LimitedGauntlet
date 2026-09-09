@@ -150,6 +150,8 @@ const podSchema = z
     completedAt: isoDate.nullable().optional().default(null),
     canceledAt: isoDate.nullable().optional().default(null),
     isOnDemand: z.boolean().optional().default(false),
+    // Optional so exports predating PI-100 still import.
+    capacity: z.number().int().min(1).max(64).nullable().optional().default(null),
     startTime: z
       .string()
       .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
@@ -488,6 +490,7 @@ async function importPod(
       completedAt: pod.completedAt ? new Date(pod.completedAt) : null,
       canceledAt: pod.canceledAt ? new Date(pod.canceledAt) : null,
       isOnDemand: pod.isOnDemand,
+      capacity: pod.capacity,
       startTime: pod.startTime,
       actualStartedAt: pod.actualStartedAt ? new Date(pod.actualStartedAt) : null,
     },

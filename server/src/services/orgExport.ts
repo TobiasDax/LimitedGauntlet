@@ -118,6 +118,8 @@ export interface ExportPod {
   isOnDemand: boolean;
   startTime: string | null;
   actualStartedAt: string | null;
+  // PI-100 — optional on-demand capacity target.
+  capacity: number | null;
   teams: ExportTeam[];
   entrants: ExportEntrant[];
   rounds: ExportRound[];
@@ -291,6 +293,7 @@ async function buildStructuralData(orgId: string): Promise<ExportData> {
           isOnDemand: pod.isOnDemand,
           startTime: pod.startTime,
           actualStartedAt: iso(pod.actualStartedAt),
+          capacity: pod.capacity,
           teams: pod.teams.map((team) => ({
             name: team.name,
             members: team.members.map((m) => m.player.displayName),

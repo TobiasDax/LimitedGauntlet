@@ -204,6 +204,7 @@ function NewPodForm({
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [isOnDemand, setIsOnDemand] = useState(false);
+  const [capacity, setCapacity] = useState("");
   const [isTeamEvent, setIsTeamEvent] = useState(false);
   const [tokenOverride, setTokenOverride] = useState(false);
   const [podTokenParticipation, setPodTokenParticipation] = useState(0);
@@ -237,6 +238,7 @@ function NewPodForm({
               date: date || undefined,
               startTime: date && startTime ? startTime : undefined,
               isOnDemand,
+              capacity: isOnDemand && capacity ? Number(capacity) : undefined,
               isTeamEvent,
               teamSize: isTeamEvent ? teamSize : undefined,
               roundCount,
@@ -292,9 +294,30 @@ function NewPodForm({
         </div>
 
         <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
-          <input type="checkbox" checked={isOnDemand} onChange={(e) => setIsOnDemand(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={isOnDemand}
+            onChange={(e) => {
+              const on = e.target.checked;
+              setIsOnDemand(on);
+              // PI-100 — a draft on-demand pod almost always seats 8; prefill it.
+              if (on && !capacity && (format === "DRAFT" || format === "CHAOS_DRAFT")) setCapacity("8");
+            }}
+          />
           On demand — not part of the planned schedule (a spontaneous pod, e.g. an impromptu Chaosdraft)
         </label>
+        {isOnDemand && (
+          <Field label="Capacity" hint="Optional — the target headcount for the “ready” cue">
+            <TextField
+              type="number"
+              min={1}
+              max={64}
+              value={capacity}
+              onChange={(e) => setCapacity(e.target.value)}
+              placeholder="e.g. 8"
+            />
+          </Field>
+        )}
 
         {(format === "DRAFT" || format === "SEALED") && <SetPicker value={setCode} onChange={setSetCode} />}
         {format === "CONSTRUCTED" && (

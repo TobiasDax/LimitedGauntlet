@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useManualPairRound, roundErrorMessage } from "../features/pods/useRounds";
+import { useOnDemandStartGuard } from "../features/pods/useOnDemandStartGuard";
 import { entrantDisplayName } from "../lib/entrant";
 import { Button, FormError } from "./ui";
+import { OnDemandConflictModal } from "./OnDemandConflictModal";
 import type { Entrant } from "../lib/types";
 
 // Manual pairing UI: one dropdown-pair row per expected table, each side
@@ -24,6 +26,7 @@ export function ManualPairingForm({
   onCancel: () => void;
 }) {
   const manualPair = useManualPairRound(podId);
+  const startGuard = useOnDemandStartGuard();
   const pairCount = Math.ceil(activeEntrants.length / 2);
   const [pairs, setPairs] = useState<Array<{ a: string; b: string }>>(() =>
     Array.from({ length: pairCount }, () => ({ a: "", b: "" })),
@@ -36,6 +39,22 @@ export function ManualPairingForm({
     setPairs((prev) => prev.map((p, idx) => (idx === i ? { ...p, [side]: value } : p)));
 
   const allFilled = pairs.every((p) => p.a);
+
+  // PI-100 — round 1 of an on-demand pod may 409 with shared-entrant conflicts;
+  // the modal retries with a resolution.
+  const submit = (resolution?: "withdraw" | "keep") =>
+    manualPair.mutate(
+      { pairs: pairs.map((p) => ({ entrantAId: p.a, entrantBId: p.b || null })), onDemandResolution: resolution },
+      {
+        onSuccess: () => {
+          startGuard.clear();
+          onDone();
+        },
+        onError: (e) => {
+          if (startGuard.catchConflicts(e)) manualPair.reset();
+        },
+      },
+    );
 
   return (
     <div className="mt-5 rounded-lg border border-border bg-surface-sunken p-5">
@@ -73,16 +92,7 @@ export function ManualPairingForm({
         ))}
       </div>
       <div className="mt-4 flex items-center gap-2">
-        <Button
-          variant="primary"
-          disabled={!allFilled || manualPair.isPending}
-          onClick={() =>
-            manualPair.mutate(
-              pairs.map((p) => ({ entrantAId: p.a, entrantBId: p.b || null })),
-              { onSuccess: onDone },
-            )
-          }
-        >
+        <Button variant="primary" disabled={!allFilled || manualPair.isPending} onClick={() => submit()}>
           {manualPair.isPending ? "Publishing…" : "Publish pairing"}
         </Button>
         <Button variant="ghost" onClick={onCancel}>
@@ -90,6 +100,15 @@ export function ManualPairingForm({
         </Button>
       </div>
       {manualPair.isError && <FormError>{roundErrorMessage(manualPair.error)}</FormError>}
+      {startGuard.conflicts && (
+        <OnDemandConflictModal
+          conflicts={startGuard.conflicts}
+          pending={manualPair.isPending}
+          onWithdraw={() => submit("withdraw")}
+          onKeep={() => submit("keep")}
+          onClose={startGuard.clear}
+        />
+      )}
     </div>
   );
 }

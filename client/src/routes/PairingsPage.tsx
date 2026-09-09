@@ -20,6 +20,8 @@ import { Button, Card, Eyebrow, FormError, ScreenDek, ScreenTitle } from "../com
 import { PodTabs } from "../components/PodTabs";
 import { EntrantDropControl } from "../components/EntrantDropControl";
 import { ManualPairingForm } from "../components/ManualPairingForm";
+import { OnDemandConflictModal } from "../components/OnDemandConflictModal";
+import { useOnDemandStartGuard } from "../features/pods/useOnDemandStartGuard";
 import { PrepTimerDisplay } from "../components/PrepTimer";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { useCountdown } from "../lib/useCountdown";
@@ -328,7 +330,14 @@ function RoundCard({
               <Button
                 variant="ghost"
                 onClick={() => {
-                  if (confirm(`Undo the pairing for round ${round.roundNumber} and go back to unpaired?`)) {
+                  // PI-100 — starting round 1 of an on-demand pod may have
+                  // auto-withdrawn players from other on-demand pods; undoing
+                  // the pairing re-adds them.
+                  const extra =
+                    round.roundNumber === 1 && round.onDemandWithdrawals
+                      ? " Players withdrawn from other on-demand pods when this started will be re-added."
+                      : "";
+                  if (confirm(`Undo the pairing for round ${round.roundNumber} and go back to unpaired?${extra}`)) {
                     unpairRound.mutate(round.id);
                   }
                 }}
@@ -412,6 +421,7 @@ export function PairingsPage() {
   const { data: podData } = usePod(id);
   const { data: roundsData, isLoading } = useRounds(id);
   const generateRound = useGenerateRound(id ?? "");
+  const startGuard = useOnDemandStartGuard();
   usePodRealtime(id, podData?.pod.tournamentId);
   const [displayMode, setDisplayMode] = useState(false);
   const [showManual, setShowManual] = useState(false);
@@ -433,6 +443,17 @@ export function PairingsPage() {
   const activeEntrants = pod.entrants.filter(
     (e) => e.droppedAfterRound === null || e.droppedAfterRound >= nextRoundNumber,
   );
+
+  // PI-100 — a plain click sends no resolution; the server 409s if round 1 of
+  // this on-demand pod shares entrants with other on-demand pods, and the modal
+  // retries with "withdraw" / "keep".
+  const runGenerate = (resolution?: "withdraw" | "keep") =>
+    generateRound.mutate(resolution, {
+      onError: (e) => {
+        if (startGuard.catchConflicts(e)) generateRound.reset();
+      },
+      onSuccess: startGuard.clear,
+    });
 
   return (
     <div>
@@ -492,9 +513,19 @@ export function PairingsPage() {
         </p>
       )}
 
+      {startGuard.conflicts && (
+        <OnDemandConflictModal
+          conflicts={startGuard.conflicts}
+          pending={generateRound.isPending}
+          onWithdraw={() => runGenerate("withdraw")}
+          onKeep={() => runGenerate("keep")}
+          onClose={startGuard.clear}
+        />
+      )}
+
       {canGenerateNext && !showManual && (
         <div className="mb-5 flex items-center gap-3">
-          <Button variant="primary" onClick={() => generateRound.mutate()} disabled={generateRound.isPending}>
+          <Button variant="primary" onClick={() => runGenerate()} disabled={generateRound.isPending}>
             {generateRound.isPending ? "Pairing…" : `Pair round ${nextRoundNumber}`}
           </Button>
           <button

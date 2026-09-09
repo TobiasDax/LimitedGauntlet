@@ -49,6 +49,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
   const [date, setDate] = useState(pod.date ? pod.date.slice(0, 10) : "");
   const [startTime, setStartTime] = useState(pod.startTime ?? "");
   const [isOnDemand, setIsOnDemand] = useState(pod.isOnDemand);
+  const [capacity, setCapacity] = useState(pod.capacity != null ? String(pod.capacity) : "");
   const [roundCount, setRoundCount] = useState(pod.roundCount);
   const [matchFormat, setMatchFormat] = useState<MatchFormat>(pod.matchFormat);
   const [pointsWin, setPointsWin] = useState(pod.pointsWin);
@@ -82,6 +83,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
               date: date || null,
               startTime: date && startTime ? startTime : null,
               isOnDemand,
+              capacity: isOnDemand && capacity ? Number(capacity) : null,
               roundCount,
               matchFormat,
               pointsWin,
@@ -138,6 +140,18 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
           <input type="checkbox" checked={isOnDemand} onChange={(e) => setIsOnDemand(e.target.checked)} />
           On demand — not part of the planned schedule (a spontaneous pod, e.g. an impromptu Chaosdraft)
         </label>
+        {isOnDemand && (
+          <Field label="Capacity" hint="Optional — the target headcount for the “ready” cue">
+            <TextField
+              type="number"
+              min={1}
+              max={64}
+              value={capacity}
+              onChange={(e) => setCapacity(e.target.value)}
+              placeholder="e.g. 8"
+            />
+          </Field>
+        )}
 
         {(format === "DRAFT" || format === "SEALED") && <SetPicker value={setCode} onChange={setSetCode} />}
         {format === "CONSTRUCTED" && (
@@ -339,15 +353,29 @@ function alreadyEnteredPlayerIds(entrants: Entrant[]): Set<string> {
   return ids;
 }
 
+// PI-100 — a soft "at / over capacity" note for on-demand pods. Never blocks
+// adding more (the TO may know one of the eight is flaky).
+function CapacityNote({ capacity, count }: { capacity: number | null; count: number }) {
+  if (capacity == null || count < capacity) return null;
+  return (
+    <p className="mb-3 text-[12.5px] text-ink-muted">
+      {count === capacity ? `At capacity (${capacity}).` : `Over capacity — ${count} of ${capacity}.`} You can still add
+      more.
+    </p>
+  );
+}
+
 function IndividualEntrants({
   podId,
   podName,
   entrants,
+  capacity,
   canModifyRoster,
 }: {
   podId: string;
   podName: string;
   entrants: Entrant[];
+  capacity: number | null;
   canModifyRoster: boolean;
 }) {
   const removeEntrant = useRemoveEntrant(podId);
@@ -355,6 +383,7 @@ function IndividualEntrants({
 
   return (
     <div>
+      <CapacityNote capacity={capacity} count={entrants.length} />
       <Card className="mb-4 divide-y divide-border">
         {entrants.length === 0 && <p className="px-5 py-4 text-[13.5px] text-ink-muted">No entrants yet.</p>}
         {entrants.map((e) => (
@@ -400,11 +429,13 @@ function TeamEntrants({
   podId,
   entrants,
   teamSize,
+  capacity,
   canModifyRoster,
 }: {
   podId: string;
   entrants: Entrant[];
   teamSize: number | null;
+  capacity: number | null;
   canModifyRoster: boolean;
 }) {
   const { data: playersData } = usePlayers();
@@ -419,6 +450,7 @@ function TeamEntrants({
 
   return (
     <div>
+      <CapacityNote capacity={capacity} count={entrants.length} />
       <Card className="mb-4 divide-y divide-border">
         {entrants.length === 0 && <p className="px-5 py-4 text-[13.5px] text-ink-muted">No teams yet.</p>}
         {entrants.map((e) => (
@@ -595,6 +627,7 @@ export function PodPage() {
           podId={pod.id}
           entrants={pod.entrants}
           teamSize={pod.teamSize}
+          capacity={pod.capacity}
           canModifyRoster={canModifyRoster}
         />
       ) : (
@@ -602,6 +635,7 @@ export function PodPage() {
           podId={pod.id}
           podName={pod.name}
           entrants={pod.entrants}
+          capacity={pod.capacity}
           canModifyRoster={canModifyRoster}
         />
       )}
