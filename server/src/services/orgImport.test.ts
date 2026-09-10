@@ -142,21 +142,26 @@ describe("token export → import round-trip (PI-72)", () => {
   });
 });
 
-describe("privacy-flag export → import round-trip (PI-104/107)", () => {
-  it("carries anonymisedAt / publicHiddenAt across an import", async () => {
+describe("privacy-flag export → import round-trip (PI-104/107/110)", () => {
+  it("carries anonymisedAt / publicHiddenAt / publicAlias across an import", async () => {
     const u = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const src = await prisma.organization.create({ data: { slug: `pr-src-${u}`, name: "Src" } });
     const anon = await prisma.player.create({
       data: { orgId: src.id, displayName: "Anonymised player abc123", anonymisedAt: new Date() },
     });
     const hidden = await prisma.player.create({
-      data: { orgId: src.id, displayName: "Shy Player", publicHiddenAt: new Date() },
+      data: { orgId: src.id, displayName: "Shy Player", publicHiddenAt: new Date(), publicAlias: "Player 7F2A" },
+    });
+    // A hidden player whose export somehow lacks a handle gets one on import.
+    const hiddenNoAlias = await prisma.player.create({
+      data: { orgId: src.id, displayName: "Also Shy", publicHiddenAt: new Date() },
     });
     await prisma.player.create({ data: { orgId: src.id, displayName: "Normal Player" } });
 
     const exported = await buildOrgExport(src.id, { data: true, hallOfFame: false, treasureVault: false });
     expect(exported.data!.anonymisedPlayers).toEqual([anon.displayName]);
-    expect(exported.data!.publicHiddenPlayers).toEqual([hidden.displayName]);
+    expect(exported.data!.publicHiddenPlayers.sort()).toEqual([hidden.displayName, hiddenNoAlias.displayName].sort());
+    expect(exported.data!.publicAliases).toEqual([{ player: hidden.displayName, alias: "Player 7F2A" }]);
 
     const parsed = parseOrgExport(exported);
     expect(parsed.ok).toBe(true);
@@ -168,13 +173,19 @@ describe("privacy-flag export → import round-trip (PI-104/107)", () => {
     const destHidden = await prisma.player.findFirstOrThrow({
       where: { orgId: dest.id, displayName: hidden.displayName },
     });
+    const destHiddenNoAlias = await prisma.player.findFirstOrThrow({
+      where: { orgId: dest.id, displayName: hiddenNoAlias.displayName },
+    });
     const destNormal = await prisma.player.findFirstOrThrow({
       where: { orgId: dest.id, displayName: "Normal Player" },
     });
     expect(destAnon.anonymisedAt).not.toBeNull();
     expect(destHidden.publicHiddenAt).not.toBeNull();
+    expect(destHidden.publicAlias).toBe("Player 7F2A");
+    expect(destHiddenNoAlias.publicAlias).toMatch(/^Player /);
     expect(destNormal.anonymisedAt).toBeNull();
     expect(destNormal.publicHiddenAt).toBeNull();
+    expect(destNormal.publicAlias).toBeNull();
   });
 
   it("accepts an export with no privacy arrays (older files)", () => {

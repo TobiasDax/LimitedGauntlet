@@ -140,14 +140,22 @@ card-pull attributions, and (when tokens are on) their token ledger.
 portal (**Your account → Edit**, `PATCH /api/player/me`), subject to the same
 name-uniqueness rule as the organizer.
 
-### 3.5 Acting on an objection — `PI-106` / `PI-107` ✅
+### 3.5 Acting on an objection / pseudonymising a minor — `PI-106` / `PI-107` / `PI-110` ✅
 
-**Art. 21.** A player can be hidden from the open public pages without touching
-the pod: roster row → **Privacy → Hide from public pages**
-(`POST /api/players/:id/public-visibility`). Their name then renders as
-"Hidden player" on every `/o/<slug>/...` route and their public stats page
-404s; the organizer's own views and all standings/pairing math are unchanged
-(they still count exactly as before).
+**Art. 21.** A player can be pseudonymised on the open public pages without
+touching the pod: roster row → **Privacy → Pseudonymise on public pages**
+(`POST /api/players/:id/public-visibility`). Their name then renders as a
+**stable handle** ("Player 7F2A") on every `/o/<slug>/...` route — the same
+handle every time, so their results are still followable, just not by name.
+Their public stats page works under that handle (opponent names on it are
+pseudonymised too). The organizer's own views and all standings/pairing maths
+are unchanged (they still count exactly as before).
+
+**This is also the tool for minors (§3.9).** A stable pseudonym is still
+*pseudonymised* personal data — GDPR still applies to it, because you hold the
+map from the handle to the child — but it keeps a child's real name off a page
+anyone can load or scrape, which is the proportionate protection Recital 38
+asks for. It does not remove your other duties (lawful basis, Art. 8, retention).
 
 A logged-in player can raise the request themselves from the portal (**Your
 account → Request removal**, `POST /api/player/removal-request`) — this notifies
@@ -190,10 +198,17 @@ some point that you keep and publish this history.
 
 ### 3.9 Minors
 
-Magic events often include people under 16. The app has no age handling. If you
-run youth events, **Art. 8** (consent of the holder of parental responsibility)
-is your problem to solve outside the app, and legitimate interest is a weaker
-basis for a child's data.
+Magic events often include people under 16. **Art. 8** (consent of the holder
+of parental responsibility) and Recital 38 (children's data merits specific
+protection) are yours to handle:
+
+- Get consent from a parent/guardian before entering a child on the roster, and
+  keep a record of it. Legitimate interest is a weak basis for a child's data.
+- **Tick Privacy → "Pseudonymise on public pages" (§3.5)** for every player
+  under 16. Their results stay followable under a handle; their name never
+  reaches the public pages. This is still pseudonymised personal data, not
+  anonymous — but it's the right default for a child.
+- The same retention limits (§3.7) apply; consider a shorter one for minors.
 
 ---
 
@@ -214,9 +229,10 @@ basis for a child's data.
   courtesy signal, not a legal control).
 - Container runs **non-root** with `cap_drop: ALL`, `read_only`, `no-new-privileges`.
 - Free-text fields render as **text + links, never raw HTML**.
-- **Data-subject-rights tooling** (`PI-104`–`PI-107`): anonymise a player without
-  breaking the record, per-player data export (organizer and self-service),
-  self-service name correction, and a per-player "hide from public pages" switch.
+- **Data-subject-rights tooling** (`PI-104`–`PI-107`, `PI-110`): anonymise a
+  player without breaking the record, per-player data export (organizer and
+  self-service), self-service name correction, and a per-player "pseudonymise on
+  public pages" switch (a stable handle — also the tool for minors).
 
 ---
 

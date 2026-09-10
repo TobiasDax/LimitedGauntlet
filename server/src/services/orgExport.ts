@@ -148,6 +148,10 @@ export interface ExportData {
   // round-trip. Both a subset of `players`.
   anonymisedPlayers: string[];
   publicHiddenPlayers: string[];
+  // PI-110 — the stable public handle for each hidden player that has one, so
+  // it survives the round-trip too (a hidden player missing here gets a fresh
+  // one generated on import).
+  publicAliases: Array<{ player: string; alias: string }>;
   tokensEnabled: boolean;
   tokenLedger: ExportTokenTxn[]; // MANUAL / INITIAL rows only
   tournaments: ExportTournament[];
@@ -215,7 +219,7 @@ async function buildStructuralData(orgId: string): Promise<ExportData> {
     prisma.player.findMany({
       where: { orgId },
       orderBy: { displayName: "asc" },
-      select: { displayName: true, anonymisedAt: true, publicHiddenAt: true },
+      select: { displayName: true, anonymisedAt: true, publicHiddenAt: true, publicAlias: true },
     }),
     // Only the hand-made rows — POD_* rows regenerate on import.
     prisma.tokenTransaction.findMany({
@@ -251,6 +255,7 @@ async function buildStructuralData(orgId: string): Promise<ExportData> {
     players: players.map((p) => p.displayName),
     anonymisedPlayers: players.filter((p) => p.anonymisedAt).map((p) => p.displayName),
     publicHiddenPlayers: players.filter((p) => p.publicHiddenAt).map((p) => p.displayName),
+    publicAliases: players.filter((p) => p.publicAlias).map((p) => ({ player: p.displayName, alias: p.publicAlias! })),
     tokensEnabled: org.tokensEnabled,
     tokenLedger: ledgerRows.map((r) => ({
       player: r.player.displayName,

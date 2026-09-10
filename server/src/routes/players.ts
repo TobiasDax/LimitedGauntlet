@@ -39,6 +39,8 @@ function publicPlayer<
     ...rest,
     hasAccount: identityId !== null,
     anonymised: anonymisedAt !== null,
+    // PI-110 — `publicHidden` is the switch state; `publicAlias` (kept on the
+    // row) is the handle shown publicly, surfaced so the roster can display it.
     publicHidden: publicHiddenAt !== null,
   };
 }

@@ -20,9 +20,11 @@ export interface Player {
   // is never sent to the client.
   hasAccount?: boolean;
   pendingInvite?: boolean;
-  // PI-104/107 — present on the organizer roster list.
+  // PI-104/107/110 — present on the organizer roster list.
   anonymised?: boolean;
   publicHidden?: boolean;
+  // The stable public handle shown in place of the name while publicHidden.
+  publicAlias?: string | null;
 }
 
 // PI-52 — the self-service player portal payload (GET /api/player/portal).

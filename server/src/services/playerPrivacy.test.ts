@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
-import { anonymisePlayer, getHiddenPlayerIds, rosterNameTaken, setPlayerPublicHidden } from "./playerPrivacy.js";
+import { anonymisePlayer, getHiddenPlayerAliases, rosterNameTaken, setPlayerPublicHidden } from "./playerPrivacy.js";
 import { computePodStandings } from "./standings.js";
 import { getPlayerTokenBalance } from "./tokens.js";
 
@@ -107,6 +107,16 @@ describe("anonymisePlayer (PI-104)", () => {
     expect(await prisma.match.count({ where: { entrantA: { playerId: alice.id } } })).toBe(1);
   });
 
+  it("collapses the PI-110 pseudonym state (hidden flag + alias cleared)", async () => {
+    const { org, alice } = await setup();
+    await setPlayerPublicHidden(org.id, alice.id, true);
+    await anonymisePlayer(org.id, alice.id);
+    const after = await prisma.player.findUniqueOrThrow({ where: { id: alice.id } });
+    expect(after.publicHiddenAt).toBeNull();
+    expect(after.publicAlias).toBeNull();
+    expect(await getHiddenPlayerAliases(org.id)).toEqual(new Map());
+  });
+
   it("is idempotent", async () => {
     const { org, alice } = await setup();
     const first = await anonymisePlayer(org.id, alice.id);
@@ -124,22 +134,38 @@ describe("anonymisePlayer (PI-104)", () => {
   });
 });
 
-describe("setPlayerPublicHidden / getHiddenPlayerIds (PI-107)", () => {
-  it("sets and clears the flag", async () => {
+describe("setPlayerPublicHidden / getHiddenPlayerAliases (PI-107/110)", () => {
+  it("sets the flag, generates a stable handle, and clears the flag", async () => {
     const { org, alice, bob } = await setup();
-    expect(await getHiddenPlayerIds(org.id)).toEqual(new Set());
+    expect(await getHiddenPlayerAliases(org.id)).toEqual(new Map());
 
     const hidden = await setPlayerPublicHidden(org.id, alice.id, true);
     expect(hidden!.publicHiddenAt).not.toBeNull();
-    expect(await getHiddenPlayerIds(org.id)).toEqual(new Set([alice.id]));
+    expect(hidden!.publicAlias).toMatch(/^Player [23456789BCDFGHJKMNPQRSTVWXYZ]{4}$/);
+    expect(await getHiddenPlayerAliases(org.id)).toEqual(new Map([[alice.id, hidden!.publicAlias]]));
 
-    // A repeat set is a no-op that keeps the original timestamp.
+    // A repeat set is a no-op that keeps the original timestamp + handle.
     const again = await setPlayerPublicHidden(org.id, alice.id, true);
     expect(again!.publicHiddenAt!.getTime()).toBe(hidden!.publicHiddenAt!.getTime());
+    expect(again!.publicAlias).toBe(hidden!.publicAlias);
 
-    await setPlayerPublicHidden(org.id, alice.id, false);
-    expect(await getHiddenPlayerIds(org.id)).toEqual(new Set());
+    // Un-hide keeps the handle so a later re-hide reuses it.
+    const unhidden = await setPlayerPublicHidden(org.id, alice.id, false);
+    expect(unhidden!.publicHiddenAt).toBeNull();
+    expect(unhidden!.publicAlias).toBe(hidden!.publicAlias);
+    expect(await getHiddenPlayerAliases(org.id)).toEqual(new Map());
+
+    const rehidden = await setPlayerPublicHidden(org.id, alice.id, true);
+    expect(rehidden!.publicAlias).toBe(hidden!.publicAlias);
+
     expect(await setPlayerPublicHidden(org.id, bob.id, false)).toMatchObject({ publicHiddenAt: null });
+  });
+
+  it("gives two hidden players distinct handles", async () => {
+    const { org, alice, bob } = await setup();
+    const a = await setPlayerPublicHidden(org.id, alice.id, true);
+    const b = await setPlayerPublicHidden(org.id, bob.id, true);
+    expect(a!.publicAlias).not.toBe(b!.publicAlias);
   });
 
   it("returns null for a player outside the org", async () => {
