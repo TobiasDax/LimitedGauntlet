@@ -18,6 +18,7 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 - **PI-62** — deck photos (the app's first user-uploaded file): scoped via interview, not started.
 - **PI-92** — expand CI: migration-drift + lint shipped (v0.8.0, green on the runner); the PR-time Docker image build + boot smoke test is blocked — the Forgejo runner gives job steps no `docker` CLI (re-add once that's fixed).
 - **PI-95** — read-path performance before the 40–60 player event: client + query-shape parts shipped (v0.8.0); the in-process standings cache and the real-deploy load test are still open. (Response compression stays reverted, see PI-98.)
+- **PI-112** — built-in `/legal` page (Impressum + privacy notice, English, personalised by `LEGAL_*` env), auto-linked from the footer — so every EU deployment is compliant-by-default without hosting its own. Spec'd, not started.
 - **PI-102** — v0.9.1 boot-crash hotfix shipped; the follow-up Dockerfile hardening (a boot-time `require.resolve` check for critical modules) is not done — and the `nodemailer` de-hoist that caused it is confirmed still reproducible under npm 10.
 - **PI-109** — Prisma 6→7: architecture migration, its own session. Not started; we stay on 6.19.3 until then.
 - **PI-111** — ESLint 10 + lint-plugin majors (`eslint` 9→10, `react-hooks` 5→7, `globals` 16→17): dev-tooling only, split out of PI-101, not started.
@@ -50,6 +51,47 @@ Idea from Tobias: on a pod's standings page, let each entrant have a photo of th
   - Accepted file types (JPEG/PNG/HEIC/WebP from phones — the preview generation step needs to handle re-encoding HEIC to something browsers can actually render, since the original stays HEIC for the "download original" action but the preview can't be).
   - Whether an MCP tool is warranted (leaning no, per PI-33's precedent — this is an organizer-at-the-table UI action, not a bulk/scriptable operation).
 - [ ] Not started — scoping/interview only.
+
+---
+
+## GDPR / DSGVO backlog
+
+The data-subject-rights tooling (PI-104–108, PI-110) shipped in v0.10.0–v0.11.0 and is in the build log. What's left is the "inform people up front" side — a privacy notice every deployment can actually rely on.
+
+### PI-112 — Built-in privacy / legal page, personalised by env (retire the "host your own" requirement)
+Idea from Tobias (2026-09-10): a privacy notice is effectively **mandatory for every EU deployment**, but today the app ships none — it only offers `LEGAL_LINK_URL` for a deployer to point at a page they wrote and hosted themselves (`docs/privacy-policy-template.md` is a 474-line fill-in template). That's fragile: a self-hoster who skips it is non-compliant and the app does nothing to stop or even warn them. Ship the notice **in** the app as a real sub-page, personalised through env vars, linked automatically from the footer — so a deployment is compliant-by-default once a few `LEGAL_*` vars are filled, with no external hosting step.
+
+**The lever the app has that a static hosted doc doesn't:** it already knows its own processing surface — `isEmailConfigured()`, `configuredSsoProviders()`, `config.tracking`, `config.adminWebhook`. So the SMTP / analytics / SSO / operator-webhook sections of the notice can **auto-include or omit themselves** to match what's actually turned on, instead of a deployer hand-editing a template and getting it wrong.
+
+**Decisions (Tobias, 2026-09-10):**
+- **One `/legal` page, English only.** The app UI is English-only, so all legal pages are too — no DE version on the page, no locale toggle, no `LEGAL_LOCALE`. (`docs/privacy-policy-template.md` keeps its DE half for deployers who want to translate + self-host instead.)
+- **Impressum + Datenschutzerklärung on the same page**, both env-driven from one set of `LEGAL_CONTROLLER_*` vars (name / address / email / phone are the shared fields). Covers the §5 DDG Impressum requirement German deployments have on top of the privacy notice.
+- **`LEGAL_LINK_URL` / `LEGAL_LINK_LABEL` stay, as an *additional* footer link** (not a replacement, not an override) — for a deployer with a lawyer-drafted policy or a corporate Impressum they must link. No breaking change for current deployers. New `LEGAL_PAGE_ENABLED=false` is the escape hatch to suppress the built-in page entirely and rely only on that link.
+- **Full personalisation surface, every var optional** with a graceful fallback or a visibly-flagged placeholder when unset.
+
+**Shape:**
+- **Route:** `<Route path="/legal" element={<LegalPage />} />` at the top level of `client/src/main.tsx`, outside both the `/o/:slug` public tree and the authed/protected tree — reachable from every footer regardless of auth or org context, and **not** behind the PI-27 org password lock (a locked deployment still needs its legal page public). Its own minimal chrome (logo → home, the shared `Footer`).
+- **Content:** baked into the client as an English Markdown document assembled from an ordered list of section objects in TS (`client/src/legal/`), each section optionally gated by a `when: (cfg) => boolean` predicate; concatenate the active sections, run `{{TOKEN}}` substitution from the widened app-config, render through the existing `RichText` (`react-markdown`) component. A pure `renderLegalDoc(config)` function is the whole engine — unit-testable, no server-side templating (keeps the "no new moving parts" posture).
+- **Unset-token UX:** an unset token renders as a bold, visible `[LEGAL_CONTROLLER_ADDRESS not set]` rather than silently vanishing; if `LEGAL_CONTROLLER_NAME` or `LEGAL_CONTROLLER_EMAIL` is missing, a prominent warning banner sits above the document ("⚠ This legal notice is incomplete — the operator has not set …"). The app never blocks on this; the page is always present, just visibly unfinished until configured.
+- **Config-derived conditional sections:** SMTP, analytics (+ processor host), SSO providers (+ the Google/Discord = US-transfer note), and the operator alert webhook include/omit based on the same flags the app already computes. Per-org webhooks, player accounts, and tokens are org-level toggles, not deployment-level — those sections always render, phrased conditionally ("if your organizer has enabled …").
+- **`LEGAL_*` env vars** (all optional, `LEGAL_` prefix, "inert / fall back when unset", parsed in `config.ts` the same way as the `smtp` / `oidc` / `tracking` blocks):
+  - `LEGAL_PAGE_ENABLED` — default `true`; `false` hides the built-in page + its footer link (deployer relies only on `LEGAL_LINK_URL`).
+  - `LEGAL_CONTROLLER_NAME` / `LEGAL_CONTROLLER_ADDRESS` / `LEGAL_CONTROLLER_EMAIL` / `LEGAL_CONTROLLER_PHONE` — identity block, shared by Impressum + privacy notice. Name + email drive the "incomplete" warning.
+  - `LEGAL_REGISTER_INFO` — optional free line for Vereins-/Handelsregister details (associations / companies).
+  - `LEGAL_DPO_CONTACT` — optional; whole "Data protection officer" line omitted when blank.
+  - `LEGAL_LAWFUL_BASIS` — enum `legitimate-interest` (default) | `consent` | `contract`; swaps the roster/results-publication basis paragraph. Mirrors `docs/gdpr.md` §3.1's three realistic options.
+  - `LEGAL_RETENTION_TOURNAMENTS` / `LEGAL_RETENTION_LOGS` — free text; sensible generic fallbacks (logs fallback keys off `REQUEST_LOG` — "no visitor IP is stored" when `minimal`).
+  - `LEGAL_HOSTING_PROVIDER` — free text (name + country), e.g. "Hetzner Online GmbH, Germany" or "self-hosted on-premises".
+  - `LEGAL_SUPERVISORY_AUTHORITY` — free text block (name / address / URL) for the Art. 77 complaint-right paragraph; generic fallback.
+  - `LEGAL_SMTP_PROVIDER` / `LEGAL_ANALYTICS_PROVIDER` — free text; only rendered when that feature is on. `LEGAL_ANALYTICS_PROVIDER` falls back to the origin of `TRACKING_SCRIPT_URL`.
+  - `LEGAL_LAST_UPDATED` — date string; falls back to the build date.
+- **app-config:** `GET /api/app-config` gains a `legal` object (all the resolved `LEGAL_*` values + the config-derived booleans for the conditional sections). `useAppConfig` / `AppConfig` typed to match. Still static-per-deployment, still `staleTime: Infinity`.
+- **Footer:** always renders a "Legal notice" `<Link to="/legal">` when `legal.enabled`; keeps rendering the `LEGAL_LINK_URL` link (its own label) alongside it when set. Update the `Footer.tsx` comment that currently says "no Impressum/Privacy content ships with the app itself".
+- **Docs:** new `docs/deployment.md` section for the `LEGAL_*` vars (which matter most); README "Legal Link" reframed — the privacy/legal notice is now built-in, fill `LEGAL_*`; `LEGAL_LINK_URL` demoted to "an extra link". `docs/gdpr.md` §3.1 + §5 checklist updated — the "write and host a privacy notice" step becomes "fill the `LEGAL_*` vars and review the generated page"; the balancing-test / inform-the-players / AVV duties stay. `docs/privacy-policy-template.md` gains a note that the built-in page exists and this template is for self-hosting/translation. `.env.example`, `docker-compose.yml`, `docker-compose.image.yml`.
+- **Closes the PI-103 follow-up tail:** the "state plainly that EU deployments must set `LEGAL_LINK_URL`" reframing is superseded (it's built-in now); the "organizer signup → acknowledge the privacy notice" nudge is folded in here (link to `/legal`, which now always exists). The "roster add-player → one-line reminder to inform that person" nudge is still a separate small add — noted, not built here.
+- **Tests:** `renderLegalDoc` unit tests — token substitution, unset-token placeholder rendering, the "incomplete" trigger, each conditional section's include/omit for the relevant flag, and the `LEGAL_LAWFUL_BASIS` paragraph switch. No route-level test (repo convention).
+- **Out of scope:** a DE (or any non-EN) translation of the page; a DB-stored / in-app-editable policy (env-only, deliberately); a cookie-consent banner (analytics stays cookieless); per-org policies (one deployment = one controller = the operator).
+- [ ] Not started — spec only (this entry).
 
 ---
 
