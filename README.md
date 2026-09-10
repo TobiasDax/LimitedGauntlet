@@ -180,9 +180,9 @@ The first person to register creates the organization during signup. Any organiz
 
 One login can belong to **several organizations** — as an organizer of some and, separately, a player at others. An org switcher in the top bar moves between them, and accepting a new invite adds a membership rather than forcing a second account. Leaving your last org keeps the account; it lands on an org chooser.
 
-## OIDC Login
+## SSO Login
 
-The server can be configured to support an additional OIDC login path, or OIDC only with no option to log in with a local account.
+The server can add a **Sign in with…** button for a generic OIDC provider, Google, or Discord — alongside local passwords, or (`LOCAL_LOGIN_DISABLED=true`) as the only way in. SSO never creates a new organization: it links to an existing organizer account by verified email, or provisions one for a pending co-organizer invite. Setup is in [Config](#config) below.
 
 ## Data Export/Import
 
@@ -194,13 +194,9 @@ If you have historical data you want to display in Limited Gauntlet, I created a
 
 ## Webhooks
 
-Any organizer can wire an event stream out of the app from **Settings → Webhooks** — no code change or redeploy needed. An org can configure any number of webhooks, each with its own URL and its own regenerable HMAC signing secret, delivered independently — so the same events can go to several places at once (e.g. Home Assistant and a Discord relay) without one affecting the other.
+Any organizer can wire an event stream out of the app from **Settings → Webhooks** — no code change or redeploy. Configure any number of webhooks, each with its own URL and regenerable HMAC secret, delivered in parallel so the same events can fan out to Home Assistant *and* a Discord relay without one affecting the other. Events fire for pairings posted, round start/extend/complete, and pod completion; each HMAC-signed payload carries resolved names, table numbers, standings, and an `endsAt` timestamp, so a receiver never has to call back into the API. Delivery is fire-and-forget with no retries.
 
-Webhooks fire for five events: pairings being posted, a round starting, a round being extended, a round completing, and a pod finishing (`pairings.posted`, `round.started`, `round.extended`, `round.completed`, `pod.completed`). Every payload carries the pod and tournament it belongs to, plus event-specific detail — resolved player/team names and table numbers for pairings, the updated ranked standings for a completed round, the winner for a finished pod — so a receiver never has to call back into the API to know what happened. There's no continuous "time remaining" stream: a receiver derives its own live countdown from the `endsAt` timestamp each payload carries, the same way the app's own frontend does.
-
-Each request is signed (`X-LimitedGauntlet-Signature: sha256=<hmac>`) so a receiver can verify it actually came from your deployment. Delivery is fire-and-forget with a short timeout and no retries — a slow or unreachable receiver never blocks a round action in the app. A "Send test event" button on the Settings page lets you check a new webhook works before relying on it. See [docs/deployment.md § 9](docs/deployment.md#9-optional-outbound-webhooks-home-assistant-etc) for configuration details.
-
-Separately, a deployment-level `ADMIN_WEBHOOK_URL` (config, not per-org) fires an HMAC-signed POST to the operator when a new organization signs up — useful on a public instance with open signup.
+Full event catalog, payload shapes, and a signature-verification snippet: **[docs/webhooks.md](docs/webhooks.md)**. Network setup: [docs/deployment.md § 9](docs/deployment.md#9-optional-outbound-webhooks-home-assistant-etc).
 
 ## API and MCP
 
@@ -224,152 +220,45 @@ No git clone or build needed — images are published to GHCR on every tagged re
 2. Copy `.env.example` to `.env` and fill it in (see Config below).
 3. `docker compose up -d` — migrations are applied automatically on start.
 
-`:latest` tracks the newest release automatically. For a controlled, reproducible deployment, pin a specific version instead (e.g. `ghcr.io/tobiasdax/limitedgauntlet:0.2.0`) and bump it deliberately with `docker compose pull && docker compose up -d` when you're ready to upgrade — migrations still apply automatically either way.
+`:latest` tracks the newest release automatically. For a controlled, reproducible deployment, pin a specific version instead (e.g. `ghcr.io/tobiasdax/limitedgauntlet:0.13.0`) and bump it deliberately with `docker compose pull && docker compose up -d` when you're ready to upgrade — migrations still apply automatically either way.
 
 No ingress is defined by default: the app publishes no host port and no reverse proxy/tunnel is bundled. Add a `docker-compose.override.yml` or change your local compose file to expose it — a published port for LAN/direct use, or your own reverse proxy/tunnel service on a shared network — see [docs/deployment.md § 4](docs/deployment.md#4-exposure-and-alternatives) for both patterns, including setting `TRUSTED_PROXIES` to match.
 
 ## Config
 
-### OIDC
+Everything lives in `.env` — copy [`.env.example`](.env.example), which documents every variable inline. The only two you **must** set:
 
-Optional OIDC / SSO login (single identity provider per deployment). Entirely optional: leave `OIDC_ISSUER` empty and the app runs password-only (the "Sign in with" button just isn't shown). When set, an SSO login links to an existing organizer account by verified email, or provisions one if the email has a pending co-organizer invite — it never creates a new org, so the closed-signup posture is preserved. `OIDC_ISSUER` is the provider's base URL (discovery must be reachable at `<issuer>/.well-known/openid-configuration`). Register `OIDC_REDIRECT_URI` at the provider as `<APP_BASE_URL>/api/auth/oidc/callback` (leave it blank to derive that automatically from `APP_BASE_URL`). See [docs/deployment.md § 8](docs/deployment.md#8-optional-sso-login-oidc-google-discord) for the full SSO setup guide.
+| | |
+|---|---|
+| **`POSTGRES_PASSWORD`** | a real secret, not the placeholder |
+| **`SESSION_SECRET`** | `openssl rand -hex 32` — the app refuses to start without it |
 
-```
-OIDC_ISSUER=
-OIDC_CLIENT_ID=
-OIDC_CLIENT_SECRET=
-OIDC_REDIRECT_URI=
-OIDC_PROVIDER_NAME=SSO
-OIDC_SCOPE=openid email profile
-```
+To create the first organizer account, set `ALLOW_SIGNUP=true`, sign up, set it back. Behind a TLS reverse proxy or tunnel, also set `TRUSTED_PROXIES` to the proxy's exact IP/CIDR and `SESSION_COOKIE_SECURE=true` — see [docs/deployment.md § 4](docs/deployment.md#4-exposure-and-alternatives).
 
-### Google Login
+Everything else is an optional feature, inert until its variables are set:
 
-Optional social login — independent of OIDC. Set both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to show the "Sign in with Google" button. Account-linking follows the same rules as OIDC: links to an existing organizer account by verified email, or provisions one if the email has a pending co-organizer invite — never creates a new org. Full setup walkthrough: [docs/sso-google-discord.md](docs/sso-google-discord.md).
+| Feature | Variables | Setup notes |
+|---|---|---|
+| Transactional email (email-change verification) | `SMTP_*` | leave `SMTP_HOST` blank to disable |
+| SSO — generic OIDC | `OIDC_*` | ↓ redirect URIs below |
+| SSO — Google / Discord | `GOOGLE_*` / `DISCORD_*` | [docs/sso-google-discord.md](docs/sso-google-discord.md) |
+| SSO-only (no local passwords) | `LOCAL_LOGIN_DISABLED` | only takes effect once SSO is configured |
+| Web analytics (self-hosted Umami) | `TRACKING_*` | [docs/deployment.md § 10](docs/deployment.md#10-optional-web-analytics-umami) |
+| IP-address privacy (logs + analytics) | `REQUEST_LOG` (`minimal`), `TRACKING_FORWARD_IP` (`truncated`) | [docs/deployment.md § 10b](docs/deployment.md) |
+| Built-in `/legal` page | `LEGAL_*` | [docs/deployment.md § 2b](docs/deployment.md), [docs/player-privacy.md](docs/player-privacy.md) |
+| Operator alert on new-org signup | `ADMIN_WEBHOOK_*` | [docs/deployment.md § 11](docs/deployment.md#11-optional-operator-alert-on-a-new-org-signup) |
 
-1. Create an **OAuth 2.0 Web application** client in [Google Cloud Console](https://console.cloud.google.com/).
-2. Add an **Authorized redirect URI**: `<APP_BASE_URL>/api/auth/sso/google/callback`
-3. Copy the credentials into `.env`:
+SSO links a login to an existing organizer account by verified email (or provisions one for a pending co-organizer invite) — it never creates a new org, so the closed-signup posture holds.
 
-```
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-```
+### SSO redirect URIs
 
-### Discord Login
+Register these at the provider (`<APP_BASE_URL>` is your public base URL):
 
-Same account-linking rules apply. Set both `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` to show the "Sign in with Discord" button. Full setup walkthrough: [docs/sso-google-discord.md](docs/sso-google-discord.md).
+- **OIDC** — `<APP_BASE_URL>/api/auth/oidc/callback` (or leave `OIDC_REDIRECT_URI` blank to derive it). Discovery must resolve at `<OIDC_ISSUER>/.well-known/openid-configuration`.
+- **Google** — `<APP_BASE_URL>/api/auth/sso/google/callback`; an OAuth 2.0 *Web application* client in Google Cloud Console.
+- **Discord** — `<APP_BASE_URL>/api/auth/sso/discord/callback`; an app in the Discord Developer Portal, scopes `identify` + `email`.
 
-1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications).
-2. Under **OAuth2 → Redirects**, add: `<APP_BASE_URL>/api/auth/sso/discord/callback`
-3. Required OAuth2 scopes: `identify` + `email`
-4. Copy the credentials into `.env`:
-
-```
-DISCORD_CLIENT_ID=
-DISCORD_CLIENT_SECRET=
-```
-
-### Local Login
-
-Switch to SSO-only: disable local password login + local signup so OIDC is the only way in. Only takes effect when OIDC above is configured (a fail-safe so you can't lock yourself out). New users signing in via SSO for the first time get an org-setup screen (when ALLOW_SIGNUP=true); existing/invited accounts keep working. Leave false to keep local email+password accounts alongside SSO.
-
-```
-LOCAL_LOGIN_DISABLED=false
-```
-
-### Public Signup
-
-Closed by default. Set to `true` only while someone actually needs to create an account, then set it back to `false` (requires a restart either way: `docker compose up -d` picks up the new value). This is also needed to create the initial user account.
-
-```
-ALLOW_SIGNUP=false
-```
-
-### SMTP
-
-Optional SMTP for transactional email (currently: verifying an organizer's new email address before switching to it). Entirely optional — leave `SMTP_HOST` empty and email features stay disabled (email changes just aren't offered) without affecting the rest of the app. `SMTP_FROM` is the From: address. `SMTP_SECURE=true` means implicit TLS (port 465); `false` means STARTTLS (587).
-
-```
-SMTP_HOST=
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=
-SMTP_PASS=
-SMTP_FROM=
-```
-
-### POSTGRES
-
-Postgres credentials used by both the `db` and `app` services.
-
-```
-POSTGRES_USER=limitedgauntlet
-POSTGRES_PASSWORD=changeme
-POSTGRES_DB=limitedgauntlet
-```
-
-### Trusted Proxies
-
-Comma-separated exact proxy IPs/CIDRs allowed to set `X-Forwarded-*` identity. Leave blank for direct/LAN mode (no reverse proxy or tunnel in front). If you put a reverse proxy or tunnel (Cloudflare Tunnel, Nginx, Caddy, Traefik, ...) in front, set this to its exact container IP/CIDR on the network it shares with the app. Never use a broad Docker/private-network CIDR.
-
-```
-TRUSTED_PROXIES=
-```
-
-### Session Secret
-
-Session cookie signing key — 32 bytes, hex-encoded. Generate with `openssl rand -hex 32`.
-
-```
-SESSION_SECRET=
-```
-
-Set `SESSION_COOKIE_SECURE` to `true` once a TLS-terminating reverse proxy is in front of this app (marks the session cookie Secure, so it's dropped over plain HTTP). Leave `false` for local/LAN-only use.
-
-```
-SESSION_COOKIE_SECURE=false
-```
-
-### Base URL
-
-Public base URL the app is reached at (e.g. `https://gauntlet.example.com`). Used to build absolute links in emails. If empty, the app derives it from the request origin — fine for most setups; set it if you send mail from behind a proxy that rewrites the host.
-
-```
-APP_BASE_URL=
-```
-
-### Legal / privacy notice
-
-The app serves a **built-in Impressum + privacy notice at `/legal`** (linked from the footer), rendered from `LEGAL_*` env vars. An EU deployment should fill at least `LEGAL_CONTROLLER_NAME` and `LEGAL_CONTROLLER_EMAIL`; unset fields show as visible placeholders. `LEGAL_LINK_URL` / `LEGAL_LINK_LABEL` add an optional extra footer link, and `LEGAL_PAGE_ENABLED=false` drops the built-in page. **Full field reference and guidance:** [docs/deployment.md § 2b](docs/deployment.md) and [docs/player-privacy.md](docs/player-privacy.md); your operator obligations are in [docs/gdpr.md](docs/gdpr.md). All the vars are listed in `.env.example`.
-
-### Web Analytics
-
-Optional deployer-configured web analytics — currently [Umami](https://umami.is) only, via env vars, never a hardcoded default. Off by default: leave `TRACKING_PROVIDER` empty and no tracking script is ever added to any page. Set all three to enable, pointing at your own Umami instance; each is strictly validated at startup (script URL must be `https://`, code must be a well-formed UUID) — the app refuses to start on a bad value rather than silently shipping an unvalidated script tag. See [docs/deployment.md § 10](docs/deployment.md#10-optional-web-analytics-umami) for the full setup guide.
-
-```
-TRACKING_PROVIDER=
-TRACKING_SCRIPT_URL=
-TRACKING_CODE=
-```
-
-### Privacy of IP addresses
-
-`REQUEST_LOG` (`minimal` default / `full` / `off`) controls how much of each HTTP request the access log keeps — `minimal` omits the client IP and query string. `TRACKING_FORWARD_IP` (`truncated` default / `full` / `off`) controls how much of the visitor IP is forwarded to the analytics collector. See [docs/deployment.md § 10b](docs/deployment.md) and [docs/gdpr.md § 3.6](docs/gdpr.md).
-
-```
-REQUEST_LOG=minimal
-TRACKING_FORWARD_IP=truncated
-```
-
-### Admin Webhook
-
-Optional operator alert on a new org signup — only relevant with `ALLOW_SIGNUP=true`. Off by default: leave `ADMIN_WEBHOOK_URL` empty and nothing fires. An HMAC-signed HTTP POST, same scheme as the per-org webhooks in Settings, receiver-agnostic (Home Assistant, Discord, ntfy, your own script — anything that accepts a POST). `ADMIN_WEBHOOK_SECRET` must be at least 16 characters. See [docs/deployment.md § 11](docs/deployment.md#11-optional-operator-alert-on-a-new-org-signup) for the full setup guide.
-
-```
-ADMIN_WEBHOOK_URL=
-ADMIN_WEBHOOK_SECRET=
-```
+Full walkthroughs: [docs/deployment.md § 8](docs/deployment.md#8-optional-sso-login-oidc-google-discord) and [docs/sso-google-discord.md](docs/sso-google-discord.md).
 
 ---
 
@@ -387,6 +276,8 @@ See [`ROADMAP.md`](ROADMAP.md) for the full list (including project-health / CI 
 **Deployment** — production hardening, reverse proxy / TLS exposure options, SSO setup, webhooks, and updating an existing install. See [docs/deployment.md](docs/deployment.md).
 
 **Pairings & Standings** — how Swiss pairing, cross-pod opponent avoidance, and standings tiebreakers work in detail. See [docs/pairings-and-standings.md](docs/pairings-and-standings.md).
+
+**Webhooks** — the event catalog, payload shapes, and signature verification. See [docs/webhooks.md](docs/webhooks.md).
 
 **Player privacy** — the anonymise / export / pseudonymise tools, player self-service, and the built-in `/legal` page, from the organizer's and player's side. See [docs/player-privacy.md](docs/player-privacy.md).
 
