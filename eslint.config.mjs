@@ -61,6 +61,11 @@ export default tseslint.config(
         "error",
         { checksVoidReturn: { attributes: false, properties: false } },
       ],
+      // ESLint 10 recommended. Fires on a deliberate `let x: T = null`
+      // initializer that TS needs for definite-assignment even when the
+      // `null` branch is the one actually read later — our idiom, not a bug,
+      // same as the opt-outs above.
+      "no-useless-assignment": "off",
     },
   },
 
@@ -77,7 +82,15 @@ export default tseslint.config(
       "react-refresh": reactRefresh,
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
+      // react-hooks 7's `recommended` now bundles the whole React Compiler
+      // rule family (immutability / purity / set-state-in-effect / …). This
+      // app hasn't adopted the compiler, and those rules fire on established
+      // working patterns (a running-rank `let` mutated inside a render
+      // `.map()`, one-shot error state set in a mount effect). Take only the
+      // two classic rules — the codebase passes both. Adopting the compiler
+      // set is its own future item.
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
     },
   },

@@ -20,7 +20,7 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 - **PI-95** — read-path performance before the 40–60 player event: client + query-shape parts shipped (v0.8.0); the in-process standings cache and the real-deploy load test are still open. (Response compression stays reverted, see PI-98.)
 - **PI-102** — v0.9.1 boot-crash hotfix + the follow-up boot-time dependency guard (`docker/preflight.cjs`) both shipped. ✅ done 2026-09-10; the guard runs for the first time on the next image build/deploy, then this moves to the build log.
 - **PI-109** — Prisma 6→7: architecture migration, its own session. Not started; we stay on 6.19.3 until then.
-- **PI-111** — ESLint 10 + lint-plugin majors (`eslint` 9→10, `react-hooks` 5→7, `globals` 16→17): dev-tooling only, split out of PI-101, not started.
+- **PI-111** — ESLint 10 + lint-plugin majors (`eslint` 9→10, `react-hooks` 5→7, `globals` 16→17): dev-tooling only. ✅ done 2026-09-10; CI (Node 22) is the final gate, then moves to the build log.
 
 ## New improvements (backlog)
 
@@ -99,11 +99,13 @@ What it involves (from the [v7 upgrade guide](https://www.prisma.io/docs/orm/mor
 - [ ] Minimums are already met: Node 20.19+ (we're on 22), TypeScript 5.4+ (on 7-native / 6-compat).
 - [ ] Browser-verify on the demo, then a DB backup before the live rollout.
 
-### PI-111 — ESLint 10 + lint-plugin majors (dev-tooling batch)
-Split out of PI-101, which only covered the security pass + in-range bumps. All of these are dev-only, none ship in the image — so the same "own batch, one commit per bump, CI-gated" pattern as `deps/majors-2026-09`, and zero runtime/deploy risk.
-- [ ] `eslint` 9.39 → 10.x **+** `@eslint/js` 9 → 10 — v10 is flat-config-only, which this repo already uses (`eslint.config.mjs`); work through the removed-rules / renamed-options list and the dropped Node 18 support (CI is on 22).
-- [ ] `eslint-plugin-react-hooks` 5 → 7 — 7.x brings rule renames + the newer exhaustive-deps analysis; expect a handful of new warnings to triage (mirrors PI-91's "2 deliberate warnings" posture).
-- [ ] `globals` 16 → 17 — data-only package, low risk.
-- [ ] `eslint-plugin-react-refresh` 0.4.26 → 0.5.6 — pinned exact today; 0.x, so treat as breaking and eyeball the two existing `react-refresh/only-export-components` warnings.
-- [ ] `typescript-eslint` stays on 8.70 (current latest 8.x; no 9.x yet).
-- [ ] Validate: `npm run lint` + `format:check` clean on Node 22, CI green. Nothing here is in `dependencies`, so no image rebuild / browser-verify needed.
+### PI-111 — ESLint 10 + lint-plugin majors (dev-tooling batch) ✅ (done 2026-09-10)
+Split out of PI-101, which only covered the security pass + in-range bumps. Dev-only, none imported by `server/dist` — no runtime behaviour change, CI is the gate.
+- [x] `eslint` 9.39.5 → **10.10.0** + `@eslint/js` 9.39.5 → **10.0.1**. Flat config was already the only config; no rule surprises from core beyond `no-useless-assignment` (see below). Engine `^20.19 || ^22.13 || >=24` — dev machine (20.19.4) and CI (Node 22) both fine.
+- [x] `eslint-plugin-react-hooks` 5.2.0 → **7.1.1**. v7's `configs.recommended` now bundles the whole **React Compiler** rule family (`immutability`, `purity`, `set-state-in-effect`, …). This app hasn't adopted the compiler and those rules errored on working patterns (a running-rank `let` mutated inside a render `.map()` in `GesamtwertungList`/`HallOfFameOverview`; one-shot error state set in a mount effect in `VerifyEmailPage`/`OidcRelinkPage`/`OidcSetupPage`). Decision (PI-91's "lenient start" posture): stop spreading v7's `recommended` and set only the two classic rules explicitly — `react-hooks/rules-of-hooks` (error) + `react-hooks/exhaustive-deps` (warn), both of which the codebase passes. Adopting the compiler rule set is its own future item.
+- [x] `globals` 16.5.0 → **17.12.0** (data-only, no issues). `eslint-plugin-react-refresh` 0.4.26 → **0.5.6** (the two existing `only-export-components` warnings still stand, unchanged — the deliberate PI-91 pair).
+- [x] `typescript-eslint` stays **8.70.0** — its peer already allows `eslint ^10.0.0`, no bump needed. `eslint-config-prettier` stays 10.1.8 (already latest).
+- [x] `no-useless-assignment` (new in ESLint 10 recommended) → `off` with a comment: it flags deliberate `let x: T = null` initializers that TS needs for definite-assignment even when the `null` branch is the one read later (`routes/auth.ts`). Same "our idiom, not a bug" treatment as the other opt-outs.
+- [x] `docker/**` added to the ESLint `ignores` (for PI-102's `preflight.cjs` — deploy helper, outside every tsconfig).
+- [x] `npm run build` (all three), `npm run lint` (0 errors, the 2 known warnings), `npm run format:check`, and the server legal test all green locally on Node 20.19; `npx npm@10 install` regen kept every server runtime dep hoisted (preflight passes), `npm audit` 0. CI (Node 22) is the final gate.
+- [ ] **Note, not blocking:** react-hooks 7 pulls a real dep tree (`@babel/core`, `zod`) for its AST analysis. The Dockerfile runtime stage still `COPY`s the whole `node_modules` (dev deps included — the long-standing tech-debt item behind PI-94/PI-102's "prod-only install in the runtime stage"), so the image grows ~15 MB. Fold into that cleanup when it happens.
