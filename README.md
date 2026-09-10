@@ -40,7 +40,11 @@ A tournament can be only one draft, or a whole slew of different pods, spanning 
 
 Each tournament can have its own rich-text description, stat breakdown, and value overview.
 
+Pods in a tournament are split into **Scheduled** and **On demand** tabs. A scheduled pod can carry a date and start time; a multi-day tournament groups its scheduled pods under per-day headings. Finished (and cancelled) pods sink to the bottom of the list in completion order, and an organizer can reorder the rest with up/down arrows. Each pod row shows its current entrant count at a glance.
+
 ![Tournament overview](docs/screenshots/02-tournament-overview.png)
+
+<!-- screenshot: the Scheduled / On demand pod-list tabs with date dividers -->
 
 ### Player Accounts
 
@@ -58,7 +62,7 @@ People can be assigned to a pod or a team for those events.
 
 #### Seatings
 
-After the first round gets paired, the pairings are used to calculate a draft seating order. This happens based on cross seating and is displayed as a virtual table above the pairings for the first round.
+Draft, Chaos Draft, and Sealed pods get a dedicated **Seatings** tab. Generating seatings creates round 1 behind the scenes and shows only the derived seating chart — a virtual table computed from the round-1 pairing via cross-seating — with no "who plays whom" listing. Revealing the pairings is a separate, deliberate action: after the physical draft or deckbuild, the organizer clicks **Reveal pairings**, and only then do round-1 opponents become visible anywhere (the Pairings tab, Display Mode, the public page). Later rounds are computed from the previous round's results, so there's nothing to hide.
 
 #### Pairings
 
@@ -74,7 +78,15 @@ An additional timer can be created before pairing, for draft or deck-building ti
 
 #### Dropped Players
 
-Between rounds any player can be dropped from a pod; the remaining rounds will then include a bye if a dropped player results in an uneven player count.
+A player can be dropped from the Pairings screen — both between rounds and **mid-round**, right where their match result is entered (the organizer picks who dropped alongside the result). Either way the drop takes effect from the next round, adding a bye if it leaves an uneven count.
+
+#### Cancelling a pod
+
+A pod that was called off (rather than played out) can be **cancelled** from its settings, behind a confirmation. A cancelled pod moves to the finished area, is marked as such, and is excluded from all stats and tokens. It can be un-cancelled if it was a mistake.
+
+#### On-demand side events
+
+For the pods that get fired up spontaneously (a Chaosdraft when enough people want one), the organizer signs a player up for **every** on-demand pod they'd be happy to play. When one of those pods actually starts, its entrants are **automatically withdrawn from the other not-yet-started on-demand pods** — so you don't have to unwind the extra sign-ups by hand. Each on-demand pod can have a capacity with a "ready to start" indicator, and undoing a pod's first pairing offers to re-add the players it withdrew.
 
 #### Standings
 
@@ -106,7 +118,7 @@ Since all players in an org are tracked through multiple games, we can provide s
 
 Most importantly, the overall rating and their average win rate and points, but also the number of times a player won the main event of a tournament.
 
-Each player also features a personal page with more stats on them individually and in relation to their opponents.
+Every player name in the app is a link to that player's personal page — more stats on them individually and in relation to their opponents, plus a full history of every pod they've been in (upcoming and finished, each linking to the pod).
 
 ![Hall of Fame](docs/screenshots/11-hall-of-fame.png)
 
@@ -134,7 +146,23 @@ An opt-in org wide points system for players. Based on Participation and standin
 
 Each page has an additional public URL that is not indexed by search engines but can be shared with players or friends. This is a read-only view of the data.
 
-For organizations that prefer a bit more privacy, a password can be set by an organizer.
+For organizations that prefer a bit more privacy, a password can be set by an organizer to gate the whole public surface.
+
+## Privacy & GDPR
+
+Since player names and full histories sit on open URLs, the app ships the tools for handling that:
+
+- **Pseudonymise a player on public pages** — their name becomes a stable handle like `Player 7F2A` everywhere public, results still followable, real name off the open web. The right default for anyone under 16.
+- **Anonymise a player** — honours an erasure request without breaking the historical record (scrubs the name, keeps every result).
+- **Per-player data export** — a readable JSON of everything the app holds about one player, triggered by an organizer or by the player from their own portal.
+- **Player self-service** — a logged-in player can correct their own name and file a removal request.
+- A **built-in Impressum + privacy notice at `/legal`**, rendered from `LEGAL_*` env vars, so an EU deployment is compliant-by-default without hosting its own.
+
+Full walkthrough in [docs/player-privacy.md](docs/player-privacy.md). The operator's compliance side — lawful basis, processor agreements, retention, breach process — is in [docs/gdpr.md](docs/gdpr.md).
+
+<!-- screenshot: the roster row "Privacy ▾" menu (Pseudonymise / Anonymise / Download data) -->
+<!-- screenshot: the built-in /legal page -->
+
 
 ---
 
@@ -146,9 +174,11 @@ Besides the Magic-focused functions needed to run a successful limited tournamen
 
 Timers, pairings, and standings all update live — no need to reload the page.
 
-## Multiple Organizers
+## Organizer Accounts
 
-The first person to register is the main TO and creates the organization during signup. If other users need to be able to edit a tournament or pod, they can be invited through the Settings screen. Invites are sent via SMTP, which must be configured on the server.
+The first person to register creates the organization during signup. Any organizer can then invite co-organizers from the Settings screen — all members of an org have equal power, there's no owner role. Invites work with or without SMTP: if mail is configured they're emailed, otherwise the organizer just shares the invite link (with a QR code).
+
+One login can belong to **several organizations** — as an organizer of some and, separately, a player at others. An org switcher in the top bar moves between them, and accepting a new invite adds a membership rather than forcing a second account. Leaving your last org keeps the account; it lands on an org chooser.
 
 ## OIDC Login
 
@@ -169,6 +199,8 @@ Any organizer can wire an event stream out of the app from **Settings → Webhoo
 Webhooks fire for five events: pairings being posted, a round starting, a round being extended, a round completing, and a pod finishing (`pairings.posted`, `round.started`, `round.extended`, `round.completed`, `pod.completed`). Every payload carries the pod and tournament it belongs to, plus event-specific detail — resolved player/team names and table numbers for pairings, the updated ranked standings for a completed round, the winner for a finished pod — so a receiver never has to call back into the API to know what happened. There's no continuous "time remaining" stream: a receiver derives its own live countdown from the `endsAt` timestamp each payload carries, the same way the app's own frontend does.
 
 Each request is signed (`X-LimitedGauntlet-Signature: sha256=<hmac>`) so a receiver can verify it actually came from your deployment. Delivery is fire-and-forget with a short timeout and no retries — a slow or unreachable receiver never blocks a round action in the app. A "Send test event" button on the Settings page lets you check a new webhook works before relying on it. See [docs/deployment.md § 9](docs/deployment.md#9-optional-outbound-webhooks-home-assistant-etc) for configuration details.
+
+Separately, a deployment-level `ADMIN_WEBHOOK_URL` (config, not per-org) fires an HMAC-signed POST to the operator when a new organization signs up — useful on a public instance with open signup.
 
 ## API and MCP
 
@@ -309,32 +341,7 @@ APP_BASE_URL=
 
 ### Legal / privacy notice
 
-The app serves a **built-in Impressum + privacy notice at `/legal`**, linked from the footer, rendered in English from the values below. The SMTP / analytics / SSO / operator-webhook sections appear automatically based on what you've enabled. A deployment for people in the EU/EEA/UK should fill at least `LEGAL_CONTROLLER_NAME` and `LEGAL_CONTROLLER_EMAIL` — an unset field renders as a visible "(not configured — set LEGAL_…)" placeholder and a missing name/email puts an "incomplete" banner on the page. This does not replace your other duties (choosing and documenting a lawful basis, informing players, signing processor agreements) — see [docs/gdpr.md](docs/gdpr.md). Full field reference in [docs/deployment.md § 2b](docs/deployment.md).
-
-```
-LEGAL_PAGE_ENABLED=true
-LEGAL_CONTROLLER_NAME=
-LEGAL_CONTROLLER_ADDRESS=
-LEGAL_CONTROLLER_EMAIL=
-LEGAL_CONTROLLER_PHONE=
-LEGAL_REGISTER_INFO=
-LEGAL_DPO_CONTACT=
-LEGAL_LAWFUL_BASIS=legitimate-interest
-LEGAL_RETENTION_TOURNAMENTS=
-LEGAL_RETENTION_LOGS=
-LEGAL_HOSTING_PROVIDER=
-LEGAL_SUPERVISORY_AUTHORITY=
-LEGAL_SMTP_PROVIDER=
-LEGAL_ANALYTICS_PROVIDER=
-LEGAL_LAST_UPDATED=
-```
-
-`LEGAL_LINK_URL` / `LEGAL_LINK_LABEL` add an **optional extra footer link** alongside the built-in page — for a lawyer-drafted policy or a corporate Impressum. Set `LEGAL_PAGE_ENABLED=false` to drop the built-in page and rely only on that link.
-
-```
-LEGAL_LINK_URL=
-LEGAL_LINK_LABEL=
-```
+The app serves a **built-in Impressum + privacy notice at `/legal`** (linked from the footer), rendered from `LEGAL_*` env vars. An EU deployment should fill at least `LEGAL_CONTROLLER_NAME` and `LEGAL_CONTROLLER_EMAIL`; unset fields show as visible placeholders. `LEGAL_LINK_URL` / `LEGAL_LINK_LABEL` add an optional extra footer link, and `LEGAL_PAGE_ENABLED=false` drops the built-in page. **Full field reference and guidance:** [docs/deployment.md § 2b](docs/deployment.md) and [docs/player-privacy.md](docs/player-privacy.md); your operator obligations are in [docs/gdpr.md](docs/gdpr.md). All the vars are listed in `.env.example`.
 
 ### Web Analytics
 
@@ -368,19 +375,20 @@ ADMIN_WEBHOOK_SECRET=
 
 # Roadmap
 
-The app is **feature-complete and running in production** ([latest release](https://github.com/TobiasDax/LimitedGauntlet/releases/latest)). The full, always-current backlog lives in [`ROADMAP.md`](ROADMAP.md) — a quick snapshot of what's still planned:
+The app is **feature-complete and running in production** ([latest release](https://github.com/TobiasDax/LimitedGauntlet/releases/latest)). The full, always-current backlog lives in [`ROADMAP.md`](ROADMAP.md) — a quick snapshot of the notable items still planned:
 
 * **Deck photos** — upload a photo of each entrant's drafted deck to the pod's standings page; one photo per entrant, viewable in a modal (PI-62).
 * **Legacy history import via the UI** — accept the `legacy-data.json` format the `/import-history` Claude skill produces directly through Settings → Import, without requiring shell access (PI-39).
-* **SSO-only first-password** — a Settings affordance letting accounts created exclusively via SSO set a local password without needing to supply a current one (PI-42 follow-up).
 
-See [`ROADMAP.md`](ROADMAP.md) for the full list, status, and design notes.
+See [`ROADMAP.md`](ROADMAP.md) for the full list (including project-health / CI items), status, and design notes.
 
 # Further Reading
 
 **Deployment** — production hardening, reverse proxy / TLS exposure options, SSO setup, webhooks, and updating an existing install. See [docs/deployment.md](docs/deployment.md).
 
 **Pairings & Standings** — how Swiss pairing, cross-pod opponent avoidance, and standings tiebreakers work in detail. See [docs/pairings-and-standings.md](docs/pairings-and-standings.md).
+
+**Player privacy** — the anonymise / export / pseudonymise tools, player self-service, and the built-in `/legal` page, from the organizer's and player's side. See [docs/player-privacy.md](docs/player-privacy.md).
 
 **GDPR / DSGVO** — what personal data the app stores, your responsibilities as the operator, and a fill-in privacy-policy template (EN + DE). See [docs/gdpr.md](docs/gdpr.md) and [docs/privacy-policy-template.md](docs/privacy-policy-template.md).
 

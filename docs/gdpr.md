@@ -343,6 +343,8 @@ and, for an integrity/loss breach, part of your mitigation.
 
 ## 8. Related
 
+- `docs/player-privacy.md` — the organizer/player-facing "what the buttons do"
+  for the anonymise / export / pseudonymise tools and the `/legal` page
 - The built-in `/legal` page — configure it via the `LEGAL_*` vars in
   `docs/deployment.md` § 2b
 - `docs/privacy-policy-template.md` — a longer adaptable notice (EN + DE), for
