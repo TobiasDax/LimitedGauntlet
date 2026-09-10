@@ -1,7 +1,7 @@
 # Build log (archived)
 
 > **This is the historical build record, kept for reference — it is no longer the file to read first.**
-> The whole numbered build (Steps 0–12) and most of the post-1.0 backlog (PI-1 … PI-110) below are **done and browser-verified**. A handful of still-open items (PI-39, PI-62, PI-92, PI-95, PI-101, PI-102, PI-109) live in [`ROADMAP.md`](../ROADMAP.md) instead — read that first for current status and the next actual work. Full design rationale lives in [`PLAN.md`](../PLAN.md). This file stays as the detailed "how each piece was built and verified" log.
+> The whole numbered build (Steps 0–12) and most of the post-1.0 backlog (PI-1 … PI-110) below are **done and browser-verified**. A handful of still-open items (PI-39, PI-62, PI-92, PI-95, PI-102, PI-109, PI-111) live in [`ROADMAP.md`](../ROADMAP.md) instead — read that first for current status and the next actual work. Full design rationale lives in [`PLAN.md`](../PLAN.md). This file stays as the detailed "how each piece was built and verified" log.
 
 Granular checklist. Full rationale for any step lives in `PLAN.md`.
 
@@ -1079,6 +1079,30 @@ Raised by another organizer describing how a real on-demand side-event system ne
 - [ ] **Not done — MCP:** the MCP `generate_round` tool sends no `onDemandResolution`, so generating round 1 of an on-demand pod with conflicts through MCP 409s `on_demand_conflicts` rather than resolving it. Deferred exactly like PI-78/80's MCP coverage — the modal is an organizer-at-the-table UI action, not a scriptable one.
 - [ ] **Not done — `docs/deployment.md`:** no note added — PI-100 has no config knob and doesn't change any webhook/pairing-visibility contract a deployer configures, so there's nothing for that file (unlike PI-80's §9).
 - [x] Browser-verified on the live instance (2026-09-10).
+
+### PI-101 — Dependency security pass + turn Dependabot on ✅ (audit clean; closed 2026-09-10)
+Audit of what PI-90's `.github/dependabot.yml` is actually producing (checked 2026-09-09).
+
+- [x] **Dependabot turned on (2026-09-09).** The config was in place but the repo-settings feature was off (`dependabot_security_updates: disabled`, `/automated-security-fixes` → `enabled: false`, alerts off). Tobias enabled Dependabot alerts + security updates + grouped security updates + version updates in repo Settings → Code security. Verified: `security_and_analysis.dependabot_security_updates: enabled`, `/automated-security-fixes` → `{enabled: true, paused: false}`, `/vulnerability-alerts` → 204.
+
+- **Applied directly on this branch (2026-09-09) rather than merging the GitHub PRs** — `origin` is Forgejo, so the fixes land as normal commits and go through Forgejo CI like anything else. `npm audit` went 5 (1 high + 4 moderate) → 2 moderate. `npm run build` / `lint` / `format:check` all green afterwards.
+  - [x] **`nodemailer` `^9.0.5` → `^9.1.1`** (`server/package.json`) — the one *high* (Dependabot #23). In-range, non-breaking. 4 advisories (`resolveContent()` file-access bypass, IDN allow-list bypass, `addressparser` ReDoS, RFC 5322 comment mis-parse). Verified safe for this app: `services/mailer.ts` only ever passes `to`/`subject`/`text`/`html` — no attachments, no `path:`/`content:`, so the tightened `resolveContent` access policy is a no-op here.
+  - [x] **`hono` 4.13.4 → 4.13.7** + **`qs` 6.15.3 → 6.16.0** — both moderate, both transitive under `@modelcontextprotocol/sdk` (`@hono/node-server`; `express@5`). Pinned via root `package.json` `overrides` (needed `npm update hono qs` after adding the overrides — npm 9 doesn't re-resolve already-locked transitives on a plain `npm install`). Low real exposure (the MCP HTTP surface is a trusted-local tool), clean bumps.
+  - [x] **`vitest` + `@vitest/mocker` 3.2.7 advisory — resolved by the majors batch.** Originally deferred (3→4 is a major, and bumping it under npm 9 wedged the arborist). Superseded when **T2 took Vitest 3→5** in `deps/majors-2026-09` (v0.10.0) — the `@vitest/mocker` path-traversal advisory clears with it. No separate vitest bump needed.
+
+- **Major upgrades** — merged as PR #1 (`deps/majors-2026-09`, 2026-09-10), **shipped in v0.10.0**. Forgejo CI green + live click-through OK. One commit per tranche, each validated on Node 22 (build + lint + format + migration-drift + full server suite):
+  - [x] **T1** — `argon2` 0.41→0.45, `nodemailer` 9→10. No code changes.
+  - [x] **T2** — Vite 6→8 (now bundles with Rolldown), `@vitejs/plugin-react` 4→6, Vitest 3→5. Vitest 5 dropped `**/dist/**` from the default test exclude → pinned `test.include` in `vitest.config.ts` (was running every test twice).
+  - [x] **T3** — `zod` 3→4 (server + mcp). Version bump only; deprecated APIs (`nativeEnum`, `ZodIssueCode`, `.email()`, `.datetime()`) still work — flagged for a later cleanup.
+  - [x] **T4** — `openid-client` 5→6. `services/sso.ts` ported to the v6 functional API (`discovery` / `buildAuthorizationUrl` / `authorizationCodeGrant`, `random*` PKCE helpers). Public contract unchanged; `routes/auth.ts` untouched. Smoke-tested against Google's real discovery; **Pocket ID + Discord logins browser-verified 2026-09-10. Google not yet tested** — it shares Pocket ID's `oidcComplete` path, so low risk.
+  - [x] **T6** — TypeScript 5.9→**7** (native) for `tsc` builds + `@typescript/typescript6` (TS6 API) for typescript-eslint; `typescript-eslint` 8.69→8.70; `types: ["node"]` added to server/mcp tsconfig (the real fix for the mcp lint-resolution issue behind PI-102's accidental 6.0.3 break). `tsc --noEmit` server: 6.3s→1.4s (~4x). Replaces PI-102's temporary `overrides.typescript` pin.
+  - [ ] **T5 — Prisma 6→7: deferred to its own item (PI-109).** Not a version bump — Rust-free client + driver adapter + new `prisma-client` generator + `prisma.config.ts` + `@prisma/client` import-path change across 25 files + Dockerfile/entrypoint/CI. Needs a demo browser-verify before the live DB. Prisma 6.19.3 is current-latest-6.x, no CVEs.
+  - [ ] `@types/node` `22 → 26` — **not done, deliberately.** CI + deploy run Node 22, so `@types/node@22` is the correct match; 26 would type against APIs the runtime doesn't have.
+
+- [x] **In-range patch/minor bumps — landed.** `fastify` 5.12.3, `@tanstack/react-query` 5.102.8, `react-router-dom` 7.18.3, `tsx` 4.23.13, `@types/react-dom` 19.3.0 were all pulled in by the v0.9.1 lockfile regen + the majors batch.
+  - [ ] **`nodemailer` 10.0.2 → 10.0.3 — deliberately held (2026-09-10).** The one in-range bump still available. A clean regen (`rm -rf **/node_modules package-lock.json && npx npm@10 install`) with npm 10.9.9 **de-hoists `nodemailer` to `server/node_modules/`** — the exact PI-102 boot-crash failure mode (the Dockerfile runtime stage copies only root `/app/node_modules`). Reproducible: `^10.0.2` hoists to root, `^10.0.3` doesn't, with byte-identical package metadata (same `engines`, no deps). `npm audit` is 0 either way and 10.0.3 has no advisory or functional change, so it isn't worth forcing. Revisit alongside PI-102's Dockerfile hardening, or when npm's resolver stops doing this.
+
+- [x] **Closed 2026-09-10:** `npm audit` = **0 vulnerabilities**, 0 open Dependabot alerts, Dependabot PRs #23/#24/#25 all closed. The remaining ESLint-stack majors (`eslint` 9→10, `eslint-plugin-react-hooks` 5→7, `globals` 16→17, `@eslint/js` 9→10) are dev-tooling only and split out to **PI-111**.
 
 ### PI-103 — GDPR compliance baseline (docs + `LEGAL_LINK` expectations) ✅ (v0.10.0; docs-only, browser-verify N/A)
 The controller for any deployment is the org running it, not the project — but there was no document saying so, no privacy-notice template, and the README frames `LEGAL_LINK_URL` as "optional" when it's effectively mandatory in the EU.
