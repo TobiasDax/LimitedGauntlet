@@ -19,7 +19,7 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 - **PI-92** — expand CI: migration-drift + lint shipped (v0.8.0, green on the runner); the PR-time Docker image build + boot smoke test is blocked — the Forgejo runner gives job steps no `docker` CLI (re-add once that's fixed).
 - **PI-95** — read-path performance before the 40–60 player event: client + query-shape parts shipped (v0.8.0); the in-process standings cache and the real-deploy load test are still open. (Response compression stays reverted, see PI-98.)
 - **PI-102** — v0.9.1 boot-crash hotfix + the follow-up boot-time dependency guard (`docker/preflight.cjs`) both shipped. ✅ done 2026-09-10; the guard runs for the first time on the next image build/deploy, then this moves to the build log.
-- **PI-109** — Prisma 6→7: architecture migration, its own session. Not started; we stay on 6.19.3 until then.
+- **PI-109** — Prisma 6→7 (client engine + driver adapter): ⏳ implemented on branch `prisma-7` (compile-clean); the DB-dependent verification (migrate, test suite, CI, Docker boot, load test) + a live DB backup are still needed before it merges. `main` stays on 6.19.3. Full checklist in the branch's ROADMAP.
 - **PI-111** — ESLint 10 + lint-plugin majors (`eslint` 9→10, `react-hooks` 5→7, `globals` 16→17): dev-tooling only. ✅ done 2026-09-10; CI (Node 22) is the final gate, then moves to the build log.
 
 ## New improvements (backlog)
@@ -84,20 +84,16 @@ The v0.9.0 image failed every boot with `ERR_MODULE_NOT_FOUND: Cannot find packa
 - [x] **Second regen fallout — CI lint broke from v0.9.1 (found on the PI-104–107 push, run #18/#19).** The v0.9.1 regen also let root `typescript` float **5.9.3 → 6.0.3** (`"peer": true`) — `prisma`'s peer is an unbounded `typescript >=5.1.0`, and the fresh resolve took latest. `typescript-eslint@8.69.0` (peer `>=4.8.4 <6.1.0`, but not actually built for TS 6) then couldn't build a type-checked program for the `mcp` project, so every `mcp/src/*.ts` line lit up `no-unsafe-*` ("Unsafe member access `.env` on a type that cannot be resolved") — 20 errors, lint step red. `npm run build` stayed green because each workspace `tsc` uses its own pinned `typescript@5.9.3`. **Fix:** added `"typescript": "^5.9.3"` to root `overrides` + regenerated the lockfile with npm 10 (`npx npm@10 install --package-lock-only`) — root `typescript` back to 5.9.3, the three de-hoisted workspace copies collapse to one. Minimal diff (−43/+4), matches exactly what v0.9.0 (last green CI) shipped. Remove the override when the toolchain is ready for the deliberate TS 6/7 bump in PI-101's pending-majors batch.
 - [x] **Pin removed in the majors batch (T6, `deps/majors-2026-09`).** Root cause of the mcp-only breakage was TS 6+ no longer auto-including `@types/node` — fixed properly with `"types": ["node"]` in `server/tsconfig.json` + `mcp/tsconfig.json`, then TS moved to 7-native for builds with the `@typescript/typescript6` compat for typescript-eslint. The `overrides.typescript` entry is gone.
 
-### PI-109 — Prisma 6 → 7 (its own item, deferred from the majors batch)
-Prisma 7 is an architecture migration, not a version bump, and it changes how the app talks to the live database — so it gets its own session with a full demo browser-verify before it goes anywhere near the live instance. We're on `6.19.3` (current-latest 6.x, no CVEs, fully supported) until then.
+### PI-109 — Prisma 6 → 7 (client engine + driver adapter) ⏳ (implemented on branch `prisma-7`)
+Prisma 7 is an architecture migration, not a version bump. **Implemented on branch `prisma-7`** (2026-09-10) — compile-clean (`tsc` ×3 + lint + format + `prisma generate`), but the DB-dependent verification can only run against a real Postgres, so it stays off `main` until then. The branch's own copy of this entry has the full what-was-done + what-still-needs-checking breakdown; the short version:
+- Packages 6.19 → 7.10 (`@prisma/client`, `prisma`, new `@prisma/adapter-pg`) — the two runtime packages also declared in the **root** `package.json` so npm hoists them (PI-102's guard caught `@prisma/client` de-hoisting mid-work).
+- Generator `prisma-client-js` → `prisma-client` (`output` → gitignored `server/src/generated/prisma`, `moduleFormat = esm`, `importFileExtension = js` — `NodeNext` unchanged). `datasource.url` removed from the schema.
+- New `server/prisma.config.ts` (schema/migrations/datasource for the CLI, loads `.env` itself). New `server/src/db.ts` barrel + `makePrismaClient()` factory wiring `PrismaPg`; all 25 `@prisma/client` imports and the 14 bare `new PrismaClient()` sites rerouted.
+- `entrypoint.sh` / `Dockerfile` / the CI migration-drift step updated for Prisma 7's CLI changes.
 
-What it involves (from the [v7 upgrade guide](https://www.prisma.io/docs/orm/more/upgrade-guides/upgrading-versions/upgrading-to-prisma-7)):
-- [ ] **Generator:** `prisma-client-js` → `prisma-client` with a required `output` path — the client generates into the source tree, not `node_modules`. Add the output dir to `.gitignore` and generate in CI/Docker build.
-- [ ] **Import path:** `@prisma/client` → the generated location, across **25 files**. Mitigate with a `tsconfig` `paths` alias (`"@prisma/client": ["./server/prisma/generated/client"]`) so the 25 imports don't all change — decide when building.
-- [ ] **Rust-free client → driver adapter:** add `@prisma/adapter-pg`; `server/src/prisma.ts` becomes `new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) })`. This is the real behavioural change — load-test the demo.
-- [ ] **`prisma.config.ts`** at repo root (schema location, migrations path, DB URL for the CLI). Env vars are no longer auto-loaded by the CLI.
-- [ ] **CLI:** `prisma migrate deploy` no longer auto-runs `generate`; `--skip-generate`/`--skip-seed` removed. `docker/entrypoint.sh` runs `migrate deploy` at container start — confirm `generate` already ran at build time (`Dockerfile:21`) and the generated client is copied into the runtime stage.
-- [ ] **tsconfig:** Prisma 7 recommends `moduleResolution: "bundler"`; server is on `NodeNext`. Check whether `NodeNext` still works or the server tsconfig needs changing (ripples to every relative import's `.js` extension).
-- [ ] **CI:** `.forgejo/workflows/ci.yml`'s `prisma:generate` step + the migration-drift check both need to work with the new generator/config; `vitest.globalSetup.ts` runs `prisma migrate deploy`.
-- [ ] **Test files:** the ~14 that do `new PrismaClient()` directly — same import-path change (covered by the tsconfig alias if used).
-- [ ] Minimums are already met: Node 20.19+ (we're on 22), TypeScript 5.4+ (on 7-native / 6-compat).
-- [ ] Browser-verify on the demo, then a DB backup before the live rollout.
+**Still to verify before merge (needs Postgres):** `migrate deploy`, the driver adapter connecting + a load test on the demo, the server test suite, CI green (esp. the rewritten drift check), the Docker image building + booting, `import-legacy.ts` — then a **DB backup** and merge.
+
+**Known cost:** Prisma 7's CLI (devDependency) pulls `mysql2` + `deepmerge-ts` with **4 high `npm audit` advisories** that aren't overridable and don't apply to a postgres-only project. CI runs no `npm audit`. Weigh before merging; re-check on a Prisma CLI update.
 
 ### PI-111 — ESLint 10 + lint-plugin majors (dev-tooling batch) ✅ (done 2026-09-10)
 Split out of PI-101, which only covered the security pass + in-range bumps. Dev-only, none imported by `server/dist` — no runtime behaviour change, CI is the gate.
