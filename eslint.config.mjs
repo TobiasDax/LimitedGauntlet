@@ -20,6 +20,7 @@ export default tseslint.config(
       "**/vitest.*.ts",
       "eslint.config.mjs",
       "scripts/**", // one-off legacy-data prep helpers, outside every tsconfig
+      "docker/**", // deploy-time shell/node helpers, outside every tsconfig
     ],
   },
 

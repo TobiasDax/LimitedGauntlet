@@ -37,6 +37,7 @@ COPY --from=server-build --chown=node:node /app/server/dist server/dist
 COPY --from=server-build --chown=node:node /app/server/prisma server/prisma
 COPY --from=client-build --chown=node:node /app/client/dist client/dist
 COPY --chown=node:node docker/entrypoint.sh entrypoint.sh
+COPY --chown=node:node docker/preflight.cjs preflight.cjs
 RUN chmod +x entrypoint.sh
 
 USER node
