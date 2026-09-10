@@ -1,27 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { buildRedactor, HIDDEN_PLAYER_NAME } from "./publicVisibility.js";
+import { buildRedactor } from "./publicVisibility.js";
 
-describe("buildRedactor (PI-107)", () => {
+const aliases = (entries: [string, string][]) => new Map(entries);
+
+describe("buildRedactor (PI-107/110)", () => {
   it("reports which ids are hidden", () => {
-    const r = buildRedactor(["p1", "p3"]);
+    const r = buildRedactor(
+      aliases([
+        ["p1", "Player 7F2A"],
+        ["p3", "Player Q9KM"],
+      ]),
+    );
     expect(r.isHidden("p1")).toBe(true);
     expect(r.isHidden("p2")).toBe(false);
     expect(r.isHidden(null)).toBe(false);
     expect(r.isHidden(undefined)).toBe(false);
   });
 
-  it("swaps the name for the placeholder only when hidden", () => {
-    const r = buildRedactor(new Set(["p1"]));
-    expect(r.name("p1", "Alice")).toBe(HIDDEN_PLAYER_NAME);
+  it("swaps the name for the player's alias only when hidden", () => {
+    const r = buildRedactor(aliases([["p1", "Player 7F2A"]]));
+    expect(r.name("p1", "Alice")).toBe("Player 7F2A");
     expect(r.name("p2", "Bob")).toBe("Bob");
     expect(r.name(null, "fallback")).toBe("fallback");
   });
 
-  it("redacts displayName on a player object without mutating the input", () => {
-    const r = buildRedactor(["p1"]);
+  it("swaps displayName on a player object without mutating the input", () => {
+    const r = buildRedactor(aliases([["p1", "Player 7F2A"]]));
     const alice = { id: "p1", displayName: "Alice", orgId: "o1" };
     const out = r.player(alice);
-    expect(out.displayName).toBe(HIDDEN_PLAYER_NAME);
+    expect(out.displayName).toBe("Player 7F2A");
     expect(out.orgId).toBe("o1");
     expect(alice.displayName).toBe("Alice");
     expect(r.player({ id: "p2", displayName: "Bob" }).displayName).toBe("Bob");
@@ -29,8 +36,8 @@ describe("buildRedactor (PI-107)", () => {
     expect(r.player(undefined)).toBeUndefined();
   });
 
-  it("an empty hidden set is a no-op redactor", () => {
-    const r = buildRedactor([]);
+  it("an empty map is a no-op redactor", () => {
+    const r = buildRedactor(new Map());
     expect(r.name("p1", "Alice")).toBe("Alice");
     expect(r.player({ id: "p1", displayName: "Alice" }).displayName).toBe("Alice");
   });

@@ -236,12 +236,19 @@ model Player {
   // genuine mistakes / test data.
   anonymisedAt DateTime?
   // PI-107 — set when a player (or an organizer on their behalf) objects to
-  // appearing on the open public pages (Art. 21). While set, every
-  // /api/public/... route renders this player's name as a generic
-  // placeholder and their public stats page 404s; the organizer's own views
-  // and all standings/pairing math are unaffected (they still count exactly
-  // as before — this only redacts the name on the public surface).
+  // appearing on the open public pages (Art. 21), or when an organizer wants a
+  // minor pseudonymised there (PI-110). While set, every /api/public/... route
+  // renders this player's name as their `publicAlias` instead of `displayName`;
+  // the organizer's own views and all standings/pairing math are unaffected
+  // (they still count exactly as before — this only pseudonymises the name on
+  // the public surface).
   publicHiddenAt DateTime?
+  // PI-110 — a stable, per-org-unique public handle ("Player 7F2A") generated
+  // the first time `publicHiddenAt` is set and kept thereafter (so re-hiding
+  // reuses the same handle). Only rendered publicly while `publicHiddenAt` is
+  // set; null otherwise. Cleared by anonymisation (the scrubbed label becomes
+  // the public name then).
+  publicAlias String?
 
   organization      Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
   identity          PlayerIdentity?    @relation(fields: [identityId], references: [id], onDelete: SetNull)

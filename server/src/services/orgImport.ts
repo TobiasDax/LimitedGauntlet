@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "../prisma.js";
 import { EXPORT_FORMAT_VERSION } from "./orgExport.js";
+import { randomPublicAlias } from "./playerPrivacy.js";
 import { syncPodTokenAwards, zStandingBonuses } from "./tokens.js";
 
 // Importer for LimitedGauntlet's own export format (PI-39), the counterpart to
@@ -185,9 +186,14 @@ const tournamentSchema = z
 const dataSchema = z
   .object({
     players: z.array(playerName).max(IMPORT_LIMITS.players),
-    // PI-104/107 — optional so pre-existing exports still import.
+    // PI-104/107/110 — optional so pre-existing exports still import.
     anonymisedPlayers: z.array(playerName).max(IMPORT_LIMITS.players).optional().default([]),
     publicHiddenPlayers: z.array(playerName).max(IMPORT_LIMITS.players).optional().default([]),
+    publicAliases: z
+      .array(z.object({ player: playerName, alias: z.string().trim().min(1).max(60) }).strict())
+      .max(IMPORT_LIMITS.players)
+      .optional()
+      .default([]),
     tokensEnabled: z.boolean().optional().default(false),
     tokenLedger: z.array(tokenTxnSchema).max(IMPORT_LIMITS.tokenLedger).optional().default([]),
     tournaments: z.array(tournamentSchema).max(IMPORT_LIMITS.tournaments),
@@ -379,7 +385,12 @@ async function importOrgDataInTransaction(
   // Upsert every referenced player once, up front (org-scoped, keyed on
   // displayName — the same identity the export used).
   const playerIdByName = new Map<string, string>();
-  const allNames = new Set<string>([...data.players, ...data.anonymisedPlayers, ...data.publicHiddenPlayers]);
+  const allNames = new Set<string>([
+    ...data.players,
+    ...data.anonymisedPlayers,
+    ...data.publicHiddenPlayers,
+    ...data.publicAliases.map((a) => a.player),
+  ]);
   for (const t of data.tournaments) {
     for (const n of t.players) allNames.add(n);
     for (const pod of t.pods) {
@@ -417,6 +428,32 @@ async function importOrgDataInTransaction(
       where: { id: playerId(name), publicHiddenAt: null },
       data: { publicHiddenAt: new Date() },
     });
+  }
+
+  // PI-110 — restore each hidden player's public handle. Explicit aliases from
+  // the file first (skipped on a collision with one already in the org), then
+  // generate one for any hidden player still without.
+  const usedAliases = new Set<string>(
+    (await db.player.findMany({ where: { orgId, publicAlias: { not: null } }, select: { publicAlias: true } })).flatMap(
+      (p) => (p.publicAlias ? [p.publicAlias] : []),
+    ),
+  );
+  for (const { player, alias } of data.publicAliases) {
+    if (usedAliases.has(alias)) continue;
+    const { count } = await db.player.updateMany({
+      where: { id: playerId(player), publicAlias: null },
+      data: { publicAlias: alias },
+    });
+    if (count > 0) usedAliases.add(alias);
+  }
+  for (const name of data.publicHiddenPlayers) {
+    const p = await db.player.findFirst({ where: { id: playerId(name) }, select: { id: true, publicAlias: true } });
+    if (p && !p.publicAlias) {
+      let alias = randomPublicAlias();
+      while (usedAliases.has(alias)) alias = randomPublicAlias();
+      await db.player.update({ where: { id: p.id }, data: { publicAlias: alias } });
+      usedAliases.add(alias);
+    }
   }
 
   // PI-72 — enable tokens on the target org if the file has them on (never

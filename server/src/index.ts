@@ -37,8 +37,26 @@ const clientDistPath = path.resolve(__dirname, "../../client/dist");
 // requests and one of them silently loses.
 const httpServer = createServer();
 
+// PI-108 — REQUEST_LOG controls how much of each request the access log keeps.
+// "minimal" (the default) logs method / url path / status / duration but not
+// the client IP or query string; "full" is Fastify's default; "off" drops the
+// access log entirely (errors + app logs still print).
+const loggerOption =
+  config.requestLog === "off"
+    ? false
+    : config.requestLog === "full"
+      ? true
+      : {
+          serializers: {
+            req: (req: { method: string; url: string }) => ({
+              method: req.method,
+              url: req.url.split("?")[0],
+            }),
+          },
+        };
+
 const app = Fastify({
-  logger: true,
+  logger: loggerOption,
   // Only explicitly configured peers may supply forwarding headers. This is
   // also the shared security boundary for @fastify/rate-limit's request.ip key.
   trustProxy: config.trustedProxies,

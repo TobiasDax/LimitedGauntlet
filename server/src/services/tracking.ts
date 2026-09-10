@@ -26,6 +26,25 @@
 // as long as Node's default fetch timeouts (5 minutes) allow.
 const FETCH_TIMEOUT_MS = 5_000;
 
+// PI-108 — coarsen a client IP before it's forwarded to the analytics
+// collector: drop the last IPv4 octet (/24) or the IPv6 host bits (keep /48).
+// Enough for country/region geo, not a full address. Anything that doesn't
+// look like an IP is passed through unchanged (shouldn't happen — the caller
+// hands us Fastify's request.ip).
+export function truncateIp(ip: string): string {
+  const mapped = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i.exec(ip);
+  const v4 = mapped ? mapped[1] : /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip) ? ip : null;
+  if (v4) {
+    const octets = v4.split(".");
+    return `${octets[0]}.${octets[1]}.${octets[2]}.0`;
+  }
+  if (ip.includes(":")) {
+    const groups = ip.split(":").filter((g) => g !== "");
+    return `${groups.slice(0, 3).join(":")}::`;
+  }
+  return ip;
+}
+
 export interface ProxiedScript {
   status: number;
   contentType: string;

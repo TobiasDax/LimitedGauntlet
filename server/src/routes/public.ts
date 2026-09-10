@@ -10,7 +10,7 @@ import { computeHallOfFameOverview, computePlayerStats, type HeadToHeadEntry } f
 import { computeSeatings } from "../services/seatings.js";
 import { redactUnrevealedRound1 } from "../services/pairingsVisibility.js";
 import { buildRedactor, type Redactor } from "../services/publicVisibility.js";
-import { getHiddenPlayerIds } from "../services/playerPrivacy.js";
+import { getHiddenPlayerAliases } from "../services/playerPrivacy.js";
 
 const tournamentParams = z.object({ slug: z.string().min(1), id: z.string().min(1) });
 const podParams = z.object({ slug: z.string().min(1), id: z.string().min(1) });
@@ -64,13 +64,13 @@ function redactEntrant<
 // Loaded once per public request. An org with no hidden players gets a
 // no-op redactor.
 async function publicRedactor(orgId: string): Promise<Redactor> {
-  return buildRedactor(await getHiddenPlayerIds(orgId));
+  return buildRedactor(await getHiddenPlayerAliases(orgId));
 }
 
 // Same, when the handler has a pod's tournamentId but not the orgId.
 async function publicRedactorByTournament(tournamentId: string): Promise<Redactor> {
   const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { orgId: true } });
-  return buildRedactor(t ? await getHiddenPlayerIds(t.orgId) : []);
+  return buildRedactor(t ? await getHiddenPlayerAliases(t.orgId) : new Map<string, string>());
 }
 
 // Which org ids this visitor has unlocked (PI-27), stored in the encrypted
@@ -478,17 +478,6 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
       reply.code(404).send({ error: "not_found" });
       return;
     }
-    // PI-107 — a player hidden from the public pages (Art. 21) has no public
-    // stats page at all.
-    const subject = await prisma.player.findFirst({
-      where: { id: params.data.playerId, orgId: organization.id },
-      select: { publicHiddenAt: true },
-    });
-    if (subject?.publicHiddenAt) {
-      reply.code(404).send({ error: "not_found" });
-      return;
-    }
-
     const [stats, redactor] = await Promise.all([
       computePlayerStats(organization.id, params.data.playerId),
       publicRedactor(organization.id),
@@ -497,11 +486,15 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
       reply.code(404).send({ error: "not_found" });
       return;
     }
+    // PI-110 — a hidden player's stats page still works, just under their
+    // public handle: the subject's own name and every opponent name on the
+    // page go through the same alias substitution.
     const redactH2H = (e: HeadToHeadEntry | null): HeadToHeadEntry | null =>
       e ? { ...e, displayName: redactor.name(e.playerId, e.displayName) } : e;
     reply.send({
       stats: {
         ...stats,
+        displayName: redactor.name(stats.playerId, stats.displayName),
         headToHead: stats.headToHead.map(redactH2H),
         mostPlayedOpponent: redactH2H(stats.mostPlayedOpponent),
         nemesis: redactH2H(stats.nemesis),

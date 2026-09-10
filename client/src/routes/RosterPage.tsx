@@ -29,11 +29,11 @@ import type { Player } from "../lib/types";
 
 const norm = (s: string) => s.trim().toLowerCase();
 
-// PI-104/105/107 — the GDPR data-subject-rights actions for one roster entry:
-// anonymise (Art. 17 erasure that keeps standings intact), hide/show on the
-// public pages (Art. 21 objection), and download the player's own data
-// (Art. 15 / 20). Tucked behind a "Privacy ▾" toggle so the common row stays
-// uncluttered. See docs/gdpr.md.
+// PI-104/105/107/110 — the GDPR data-subject-rights actions for one roster
+// entry: anonymise (Art. 17 erasure that keeps standings intact), pseudonymise
+// on the public pages (Art. 21 objection / a minor's name), and download the
+// player's own data (Art. 15 / 20). Tucked behind a "Privacy ▾" toggle so the
+// common row stays uncluttered. See docs/gdpr.md.
 function PrivacyControls({ player }: { player: Player }) {
   const [open, setOpen] = useState(false);
   const [confirmAnon, setConfirmAnon] = useState(false);
@@ -51,13 +51,20 @@ function PrivacyControls({ player }: { player: Player }) {
           <Button variant="ghost" onClick={() => download.mutate({ id: player.id, name: player.displayName })}>
             {download.isPending ? "Preparing…" : "Download data"}
           </Button>
-          <Button
-            variant="ghost"
-            disabled={setHidden.isPending}
-            onClick={() => setHidden.mutate({ id: player.id, hidden: !player.publicHidden })}
-          >
-            {player.publicHidden ? "Show on public pages" : "Hide from public pages"}
-          </Button>
+          <div className="flex flex-col gap-0.5">
+            <Button
+              variant="ghost"
+              disabled={setHidden.isPending}
+              onClick={() => setHidden.mutate({ id: player.id, hidden: !player.publicHidden })}
+            >
+              {player.publicHidden ? "Show name on public pages" : "Pseudonymise on public pages"}
+            </Button>
+            {player.publicHidden && player.publicAlias && (
+              <span className="px-4 text-[11px] text-ink-muted">
+                Shown publicly as <span className="font-semibold text-ink-secondary">{player.publicAlias}</span>
+              </span>
+            )}
+          </div>
           {!player.anonymised && (
             <Button variant="danger" onClick={() => setConfirmAnon(true)}>
               Anonymise
@@ -248,7 +255,7 @@ function RosterRow({
           {player.displayName}
         </Link>
         {player.anonymised && <StatusPill tone="critical">Anonymised</StatusPill>}
-        {player.publicHidden && <StatusPill tone="warning">Hidden from public</StatusPill>}
+        {player.publicHidden && <StatusPill tone="warning">Public: {player.publicAlias ?? "pseudonym"}</StatusPill>}
       </div>
       <div className="flex flex-wrap items-center gap-1">
         {!player.anonymised && <AccountControls player={player} orgSlug={orgSlug} />}

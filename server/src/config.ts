@@ -6,6 +6,13 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function envEnum<const T extends string>(name: string, allowed: readonly T[], fallback: T): T {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  if ((allowed as readonly string[]).includes(raw)) return raw as T;
+  throw new Error(`${name} must be one of: ${allowed.join(", ")} (got "${raw}")`);
+}
+
 function parseSessionKey(hex: string): Buffer {
   const key = Buffer.from(hex, "hex");
   if (key.length !== 32) {
@@ -105,6 +112,19 @@ export const config = {
     url: process.env.ADMIN_WEBHOOK_URL,
     secret: process.env.ADMIN_WEBHOOK_SECRET,
   }),
+  // PI-108 — how much of each HTTP request the access log records.
+  //   "minimal" (default): method, url path, status, duration — no client IP,
+  //                        no query string.
+  //   "full":    Fastify's default request log, which includes remoteAddress.
+  //   "off":     no access log at all (error + application logs still print).
+  requestLog: envEnum("REQUEST_LOG", ["minimal", "full", "off"] as const, "minimal"),
+  // PI-108 — how the visitor IP is forwarded to the analytics collector
+  //   (only relevant when TRACKING_* is configured).
+  //   "truncated" (default): last IPv4 octet / IPv6 host bits zeroed — Umami
+  //                          still gets coarse geo, not a full address.
+  //   "full":  the exact client IP.
+  //   "off":   no X-Forwarded-For sent to the collector.
+  trackingForwardIp: envEnum("TRACKING_FORWARD_IP", ["truncated", "full", "off"] as const, "truncated"),
 };
 
 export function isEmailConfigured(): boolean {
