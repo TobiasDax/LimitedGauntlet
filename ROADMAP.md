@@ -10,7 +10,7 @@ The app is **feature-complete and running in production** — tagged releases (l
 
 **GDPR pass:** PI-103 + PI-104–107 (compliance docs + Datenschutzerklärung template; anonymise a player, per-player data export, player self-service name edit + removal request, hide-from-public switch) **shipped in v0.10.0**, browser-verified 2026-09-10; adds migration `20260909130000_gdpr_player_privacy_fields`.
 
-**Privacy round 2** (branch `privacy/round-2`, code-complete, CI + browser-verify pending): **PI-110** — the hide-from-public switch renders a stable per-player handle ("Player 7F2A") instead of "Hidden player" and the public stats page works under it (migration `20260910120000_player_public_alias`); it's the tool for pseudonymising minors. **PI-108** — `REQUEST_LOG` (default `minimal`, keeps the client IP out of the access log) + `TRACKING_FORWARD_IP` (default `truncated`) env knobs. Server suite 173.
+**Privacy round 2** — PI-108 + PI-110 **shipped in v0.11.0** (merged as PR #2, browser-verified 2026-09-10). **PI-110** — the hide-from-public switch renders a stable per-player handle ("Player 7F2A") instead of "Hidden player" and the public stats page works under it (migration `20260910120000_player_public_alias`); it's the tool for pseudonymising minors. **PI-108** — `REQUEST_LOG` (default `minimal`, keeps the client IP out of the access log) + `TRACKING_FORWARD_IP` (default `truncated`) env knobs. Server suite 173.
 
 **Dependency majors batch** (`deps/majors-2026-09`, merged as PR #1, **shipped in v0.10.0**): T1 argon2 + nodemailer, T2 Vite 8 / Vitest 5 / plugin-react 6, T3 zod 4, T4 openid-client 6 (sso.ts ported — **Pocket ID + Discord SSO browser-verified; Google not yet tested**), T6 TypeScript 7-native for builds (~4x faster typecheck) + TS6-compat for typescript-eslint. All validated on Node 22 (build + lint + format + migration-drift + server suite 167) and a live click-through. **Prisma 7 (T5) split off to PI-109** — architecture migration, own session.
 
@@ -352,15 +352,15 @@ If a player objects to appearing on the open public pages, the only levers today
 - [x] **Docs:** `docs/gdpr.md` §3.5.
 - [x] Browser-verified (2026-09-10).
 
-### PI-108 — Request-log IP posture + analytics IP + retention config ✅ (branch `privacy/round-2`, code-complete)
+### PI-108 — Request-log IP posture + analytics IP + retention config ✅ (v0.11.0, browser-verified 2026-09-10)
 `Fastify({ logger: true })` (`index.ts`) writes the client IP for every request with no retention limit and no disclosure; `routes/tracking.ts` forwards `request.ip` to the deployer's Umami as `x-forwarded-for`. Both need a lawful basis (Art. 6(1)(f) is defensible) *and* disclosure *and*, for the logs, a retention limit.
 - [x] **Configurable request logging** — `REQUEST_LOG=minimal|full|off` (default `minimal`). At `minimal`, `index.ts` gives Fastify a `serializers.req` that logs `method` / url path / status / duration but not `remoteAddress` or the query string. `full` = today's behaviour; `off` = no access log (errors + app logs still print). `config.ts#envEnum` fails startup on any other value, matching the `parseTracking*`/`parseTrustedProxies` posture.
 - [x] **Analytics IP minimisation** — `TRACKING_FORWARD_IP=truncated|full|off` (default `truncated`). `services/tracking.ts#truncateIp` (pure, unit-tested) zeroes the last IPv4 octet / IPv6 host bits (keeps /48); `routes/tracking.ts` applies the mode before `proxyTrackingSend`. `off` sends no `X-Forwarded-For`.
 - [x] **Docs** — `.env.example`, both `docker-compose*.yml`, `docs/deployment.md` §10 (analytics IP) + new §10b (request logging), `docs/gdpr.md` §3.6 rewritten, README env reference.
 - [ ] **Deferred — auto-prune old tournaments:** an org setting to anonymise/delete tournaments older than N years. Most groups want the permanent record; its own item if ever wanted.
-- [ ] Browser-verified (esp. that `REQUEST_LOG=minimal` doesn't drop something operationally useful, and analytics geo still works at `truncated`).
+- [x] Browser-verified (2026-09-10).
 
-### PI-110 — Hidden players get a stable public handle ("Player 7F2A"), not "Hidden player" ✅ (branch `privacy/round-2`, code-complete)
+### PI-110 — Hidden players get a stable public handle ("Player 7F2A"), not "Hidden player" ✅ (v0.11.0, browser-verified 2026-09-10)
 Extends PI-107's switch. The toggle is unchanged; only what it renders. Idea from Tobias (an "underage" case): publish a followable pseudonym instead of the real name, so players can still find each other at the event but children's names aren't on the open pages. Confirmed the pseudonym is still *pseudonymised* personal data under GDPR (Recital 26 — the organizer holds the map) — still a worthwhile, proportionate measure for minors (Recital 38).
 - [x] **Behind the existing "hide from public" setting** (Tobias's call — same thing, one control). Not a separate "minor" flag: the toggle *is* the action; recording age-status isn't needed. Docs frame it as the tool for under-16s.
 - [x] **Schema** — `Player.publicAlias String?` (migration `20260910120000_player_public_alias`). Generated the first time `publicHiddenAt` is set (unambiguous 4-char alphabet: no 0/O/1/I/L, no vowels; ~530k combos, per-org-unique with retry); kept on un-hide so a re-hide reuses the same handle; cleared by anonymisation.
@@ -370,7 +370,7 @@ Extends PI-107's switch. The toggle is unchanged; only what it renders. Idea fro
 - [x] **Client** — roster Privacy row shows "Shown publicly as **Player 7F2A**"; `StatusPill` shows the handle; copy → "Pseudonymise on public pages".
 - [x] **Docs** — `docs/gdpr.md` §3.5 rewritten, §3.9 (Minors) now points here as the concrete tool.
 - [x] **Tests** — redactor-with-map; alias generation / stability across hide-unhide-rehide / per-org uniqueness; anonymise clears `publicHiddenAt` + `publicAlias`; export round-trip incl. the regenerate-on-missing path. Server suite 173.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-10).
 
 ---
 
