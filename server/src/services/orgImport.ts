@@ -8,7 +8,7 @@ import {
   Prisma,
   RoundStatus,
   TournamentStatus,
-} from "@prisma/client";
+} from "../db.js";
 import { prisma } from "../prisma.js";
 import { EXPORT_FORMAT_VERSION } from "./orgExport.js";
 import { randomPublicAlias } from "./playerPrivacy.js";

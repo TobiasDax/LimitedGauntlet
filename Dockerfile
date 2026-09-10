@@ -35,6 +35,7 @@ COPY --from=deps --chown=node:node /app/package.json package.json
 COPY --chown=node:node server/package.json server/package.json
 COPY --from=server-build --chown=node:node /app/server/dist server/dist
 COPY --from=server-build --chown=node:node /app/server/prisma server/prisma
+COPY --from=server-build --chown=node:node /app/server/prisma.config.ts server/prisma.config.ts
 COPY --from=client-build --chown=node:node /app/client/dist client/dist
 COPY --chown=node:node docker/entrypoint.sh entrypoint.sh
 COPY --chown=node:node docker/preflight.cjs preflight.cjs

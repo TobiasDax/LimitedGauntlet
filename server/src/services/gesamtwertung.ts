@@ -1,4 +1,4 @@
-import type { PodStatus } from "@prisma/client";
+import type { PodStatus } from "../db.js";
 import { prisma } from "../prisma.js";
 import { computePodStandings, podIsPlayed } from "./standings.js";
 

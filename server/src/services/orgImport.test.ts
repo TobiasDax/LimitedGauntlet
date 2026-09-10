@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import { makePrismaClient } from "../db.js";
 import { IMPORT_LIMITS, importOrgData, parseOrgExport } from "./orgImport.js";
 import { buildOrgExport } from "./orgExport.js";
 import { recordManualTokenTxn, syncPodTokenAwards, getPlayerTokenBalance } from "./tokens.js";
@@ -74,7 +74,7 @@ describe("parseOrgExport import budgets", () => {
   });
 });
 
-const prisma = new PrismaClient();
+const prisma = makePrismaClient();
 afterAll(async () => {
   await prisma.$disconnect();
 });

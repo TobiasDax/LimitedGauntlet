@@ -7,6 +7,6 @@ set -e
 # looped v0.9.0 *after* migrations had already run.
 node preflight.cjs
 
-./node_modules/.bin/prisma migrate deploy --schema server/prisma/schema.prisma
+./node_modules/.bin/prisma migrate deploy --config server/prisma.config.ts
 
 exec node server/dist/index.js

@@ -14,16 +14,16 @@
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import {
-  PrismaClient,
+  makePrismaClient,
   type PodFormat,
   type ConstructedFormat,
   type MatchResult,
   type TournamentStatus,
-} from "@prisma/client";
+} from "../db.js";
 import { hashPassword } from "../auth/password.js";
 import { lookupCardByName } from "../services/scryfall.js";
 
-const prisma = new PrismaClient();
+const prisma = makePrismaClient();
 
 // A single match in a legacy round. Team pods (see importTeamPod) supply only
 // {a, b, result} and games are derived from the result (Bo1). Individual

@@ -26,3 +26,7 @@ docker-compose.override.yml
 # The transcribed round-by-round history (real names + results) that feeds the
 # import. Pure-logic helpers (build-/validate-/verify-*) stay committable.
 /scripts/rounds-data.mjs
+
+# Prisma 7 generates the client into the source tree (PI-109). Regenerated
+# in CI and the Docker build; never committed.
+/server/src/generated/

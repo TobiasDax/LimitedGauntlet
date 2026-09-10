@@ -12,6 +12,11 @@
     "hono": "^4.13.7",
     "qs": "^6.16.0"
   },
+  "//dependencies": "PI-109: the Prisma 7 client + pg adapter are also declared here so npm hoists them to the root node_modules the Docker runtime stage copies. npm's resolver otherwise nests a lone-consumer workspace dep under server/node_modules (the PI-102 de-hoist hazard), which never makes it into the image.",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0"
+  },
   "scripts": {
     "dev:server": "npm run dev --workspace server",
     "dev:client": "npm run dev --workspace client",
