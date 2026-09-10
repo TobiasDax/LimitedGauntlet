@@ -10,6 +10,11 @@ import { defineConfig } from "vitest/config";
 //     (which requires it) at import time.
 export default defineConfig({
   test: {
+    // Only the source tests. `tsc -p tsconfig.json` also emits the compiled
+    // `.test.js` files into `dist/`, and Vitest 5 no longer excludes `dist/`
+    // by default (Vitest ≤4 did), so without this the suite runs every file
+    // twice.
+    include: ["src/**/*.test.ts"],
     globalSetup: ["./vitest.globalSetup.ts"],
     env: {
       DATABASE_URL: process.env.DATABASE_URL ?? "postgresql://postgres:test@127.0.0.1:5842/lgtest",

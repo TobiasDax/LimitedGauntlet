@@ -1,4 +1,4 @@
-import { Issuer, generators, type Client, type TokenSet } from "openid-client";
+import * as oidc from "openid-client";
 import { config, type SsoProviderId } from "../config.js";
 import { prisma } from "../prisma.js";
 import { isEmailConfigured, resolveBaseUrl, sendMail } from "./mailer.js";
@@ -80,44 +80,57 @@ function oidcConfigFor(provider: "oidc" | "google"): OidcProviderConfig {
   };
 }
 
-// Discovered clients are memoized per provider — discovery is a network
+// Discovered configurations are memoized per provider — discovery is a network
 // round-trip we only want to make once. A failed discovery is not cached.
-const clientPromises = new Map<string, Promise<Client>>();
+// (openid-client v6: the `Issuer`/`Client` classes are gone; `discovery()`
+// returns a `Configuration` that the functional API takes as its first arg.)
+const configPromises = new Map<string, Promise<oidc.Configuration>>();
 
-async function getOidcClient(provider: "oidc" | "google"): Promise<Client> {
+async function getOidcConfig(provider: "oidc" | "google"): Promise<oidc.Configuration> {
   const cfg = oidcConfigFor(provider);
-  let promise = clientPromises.get(provider);
+  let promise = configPromises.get(provider);
   if (!promise) {
-    promise = (async () => {
-      const issuer = await Issuer.discover(cfg.issuer);
-      return new issuer.Client({
-        client_id: cfg.clientId,
-        client_secret: cfg.clientSecret,
-        response_types: ["code"],
+    promise = oidc
+      .discovery(
+        new URL(cfg.issuer),
+        cfg.clientId,
+        cfg.clientSecret,
+        undefined,
+        // Allow a plain-HTTP issuer (a self-hoster's LAN Authelia/Keycloak).
+        // v5's Issuer.discover accepted http issuers too, so this keeps parity.
+        cfg.issuer.startsWith("http://") ? { execute: [oidc.allowInsecureRequests] } : undefined,
+      )
+      .catch((err: unknown) => {
+        configPromises.delete(provider);
+        throw err;
       });
-    })().catch((err) => {
-      clientPromises.delete(provider);
-      throw err;
-    });
-    clientPromises.set(provider, promise);
+    configPromises.set(provider, promise);
   }
   return promise;
 }
 
+// Rebuild the full callback URL v6's authorizationCodeGrant expects from the
+// registered redirect URI plus the query params the provider sent back.
+function callbackUrl(redirectUri: string, params: Record<string, string>): URL {
+  const url = new URL(redirectUri);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  return url;
+}
+
 async function oidcBegin(provider: "oidc" | "google", redirectUri: string): Promise<SsoAuthStart> {
-  const client = await getOidcClient(provider);
-  const codeVerifier = generators.codeVerifier();
-  const codeChallenge = generators.codeChallenge(codeVerifier);
-  const state = generators.state();
-  const nonce = generators.nonce();
-  const url = client.authorizationUrl({
+  const conf = await getOidcConfig(provider);
+  const codeVerifier = oidc.randomPKCECodeVerifier();
+  const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier);
+  const state = oidc.randomState();
+  const nonce = oidc.randomNonce();
+  const url = oidc.buildAuthorizationUrl(conf, {
     scope: oidcConfigFor(provider).scope,
     redirect_uri: redirectUri,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
     state,
     nonce,
-  });
+  }).href;
   return { url, state, nonce, codeVerifier };
 }
 
@@ -127,13 +140,15 @@ async function oidcComplete(
   params: Record<string, string>,
   checks: SsoChecks,
 ): Promise<SsoIdentity> {
-  const client = await getOidcClient(provider);
-  const tokenSet: TokenSet = await client.callback(redirectUri, params, {
-    state: checks.state,
-    nonce: checks.nonce,
-    code_verifier: checks.codeVerifier,
+  const conf = await getOidcConfig(provider);
+  const tokens = await oidc.authorizationCodeGrant(conf, callbackUrl(redirectUri, params), {
+    expectedState: checks.state,
+    expectedNonce: checks.nonce,
+    pkceCodeVerifier: checks.codeVerifier,
+    idTokenExpected: true,
   });
-  const claims = tokenSet.claims();
+  const claims = tokens.claims();
+  if (!claims) throw new Error("sso_userinfo_failed");
   return {
     subject: claims.sub,
     email: typeof claims.email === "string" ? claims.email.toLowerCase() : null,
@@ -149,9 +164,9 @@ const DISCORD_TOKEN = "https://discord.com/api/oauth2/token";
 const DISCORD_USER = "https://discord.com/api/users/@me";
 
 async function discordBegin(redirectUri: string): Promise<SsoAuthStart> {
-  const codeVerifier = generators.codeVerifier();
-  const codeChallenge = generators.codeChallenge(codeVerifier);
-  const state = generators.state();
+  const codeVerifier = oidc.randomPKCECodeVerifier();
+  const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier);
+  const state = oidc.randomState();
   const url =
     `${DISCORD_AUTHORIZE}?` +
     new URLSearchParams({
