@@ -4,7 +4,7 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.11.0**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-110 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.12.0**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
 
 **Live instance (DaxLite, `limited-gauntlet-live`):** fully migrated — 30/30 migrations, `prisma migrate status` clean (checked 2026-09-10). Recently shipped **and** browser-verified, now in the build log: PI-75 (operator signup webhook), PI-76–84 (the pod-list cluster — reorder, finished-pods sink, Scheduled/On-demand tabs, timestamps, date dividers, pod cancel), PI-85 (deployer analytics), PI-86 (one login across multiple orgs), PI-87 (Settings/Profile split), PI-88–91 / 93 / 94 / 98 (project-health: CI on Forgejo, ESLint + Prettier, tag-triggered GHCR release, container hardening, the `@fastify/compress` hotfix), PI-96/97 (player detail page, per-pod entrant count), PI-99/100 (pod participation fix + on-demand side events), PI-103–108 / 110 (the GDPR/DSGVO pass + privacy round 2, v0.10.0–v0.11.0).
 
@@ -18,7 +18,7 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 - **PI-62** — deck photos (the app's first user-uploaded file): scoped via interview, not started.
 - **PI-92** — expand CI: migration-drift + lint shipped (v0.8.0, green on the runner); the PR-time Docker image build + boot smoke test is blocked — the Forgejo runner gives job steps no `docker` CLI (re-add once that's fixed).
 - **PI-95** — read-path performance before the 40–60 player event: client + query-shape parts shipped (v0.8.0); the in-process standings cache and the real-deploy load test are still open. (Response compression stays reverted, see PI-98.)
-- **PI-112** — built-in `/legal` page (Impressum + privacy notice, English, personalised by `LEGAL_*` env), auto-linked from the footer. ✅ code-complete, browser-verify pending.
+- **PI-112** — built-in `/legal` page (Impressum + privacy notice, English, personalised by `LEGAL_*` env), auto-linked from the footer. ✅ shipped v0.12.0; blank-state verified, full live-configured verify pending.
 - **PI-102** — v0.9.1 boot-crash hotfix shipped; the follow-up Dockerfile hardening (a boot-time `require.resolve` check for critical modules) is not done — and the `nodemailer` de-hoist that caused it is confirmed still reproducible under npm 10.
 - **PI-109** — Prisma 6→7: architecture migration, its own session. Not started; we stay on 6.19.3 until then.
 - **PI-111** — ESLint 10 + lint-plugin majors (`eslint` 9→10, `react-hooks` 5→7, `globals` 16→17): dev-tooling only, split out of PI-101, not started.
@@ -56,9 +56,9 @@ Idea from Tobias: on a pod's standings page, let each entrant have a photo of th
 
 ## GDPR / DSGVO backlog
 
-The data-subject-rights tooling (PI-104–108, PI-110) shipped in v0.10.0–v0.11.0 and is in the build log. **PI-112** (the built-in `/legal` page) is code-complete and awaiting a browser-verify — once that lands it can move to the build log and this section is empty again.
+The data-subject-rights tooling (PI-104–108, PI-110) shipped in v0.10.0–v0.11.0 and is in the build log. **PI-112** (the built-in `/legal` page) shipped in v0.12.0; the blank/unconfigured state is verified, and once the fully-configured render is checked on the live instance it moves to the build log and this section is empty again.
 
-### PI-112 — Built-in privacy / legal page, personalised by env (retire the "host your own" requirement) ✅ (code-complete, browser-verify pending)
+### PI-112 — Built-in privacy / legal page, personalised by env (retire the "host your own" requirement) ✅ (shipped v0.12.0; blank-state verified, live-configured verify pending)
 Idea from Tobias (2026-09-10): a privacy notice is effectively **mandatory for every EU deployment**, but today the app ships none — it only offers `LEGAL_LINK_URL` for a deployer to point at a page they wrote and hosted themselves (`docs/privacy-policy-template.md` is a 474-line fill-in template). That's fragile: a self-hoster who skips it is non-compliant and the app does nothing to stop or even warn them. Ship the notice **in** the app as a real sub-page, personalised through env vars, linked automatically from the footer — so a deployment is compliant-by-default once a few `LEGAL_*` vars are filled, with no external hosting step.
 
 **The lever the app has that a static hosted doc doesn't:** it already knows its own processing surface — `isEmailConfigured()`, `configuredSsoProviders()`, `config.tracking`, `config.adminWebhook`. So the SMTP / analytics / SSO / operator-webhook sections of the notice can **auto-include or omit themselves** to match what's actually turned on, instead of a deployer hand-editing a template and getting it wrong.
@@ -99,7 +99,8 @@ Idea from Tobias (2026-09-10): a privacy notice is effectively **mandatory for e
 - [x] **PI-103 tail:** signup page now shows a "by creating an organization you acknowledge the legal notice / you are the data controller" line linking `/legal` (when the page is enabled). The README/deployment "must set `LEGAL_LINK_URL`" reframe is superseded. The roster add-player reminder is still a separate small add — not built here.
 - [x] **Tests:** `server/src/legal/privacyPolicy.test.ts` — 10 cases (substitution, placeholder, incomplete trigger, each conditional section on/off, US-transfer note only for Google/Discord, lawful-basis switch, `requestLogKeepsIp` log wording, optional DPO/phone lines). `tsc -b` (server + client + mcp), `vite build`, `eslint`, `prettier` all clean locally. Full server suite + browser-verify pending on Tobias's side.
 - [x] **Docs:** `.env.example` (full `LEGAL_*` block), both compose files, `docs/deployment.md` § 2b (field table), README "Legal / privacy notice" rewrite, `docs/gdpr.md` §3.1 / §4 / §5 / §8, `docs/privacy-policy-template.md` header note.
-- [ ] Browser-verify on a live/demo deploy: `/legal` renders with real `LEGAL_*` values; the incomplete banner shows when name/email are blank; the analytics/SSO/SMTP sections appear only when those are configured; footer link present on authed + public + player + `/legal` itself; reachable on a PI-27-locked org.
+- [x] Blank-state verified (2026-09-10): `/legal` renders and the "(not configured — set LEGAL_…)" placeholders + incomplete banner show when the `LEGAL_*` vars are unset.
+- [ ] Still to verify once `LEGAL_*` is filled on the live instance: the fully-populated render, the analytics/SSO/SMTP sections appearing only when configured, footer link on authed + public + player layouts, and reachability on a PI-27-locked org. Then move this entry to `docs/BUILD-LOG.md`.
 
 ---
 
