@@ -277,6 +277,28 @@ The browser never talks to `TRACKING_SCRIPT_URL` directly: this app proxies the 
 
 Only Umami is supported today (`TRACKING_PROVIDER=umami` is the only valid value), but the mechanism is provider-abstracted internally (`server/src/trackingProviders.ts`) so a second provider can be added later without redesigning this.
 
+**Visitor IP forwarding.** The proxy passes the visitor's IP to your collector as `X-Forwarded-For` so Umami can do geo. `TRACKING_FORWARD_IP` controls how much of it goes:
+
+```
+TRACKING_FORWARD_IP=truncated   # default — last IPv4 octet / IPv6 host bits zeroed (coarse geo only)
+TRACKING_FORWARD_IP=full        # the exact client IP
+TRACKING_FORWARD_IP=off         # send no X-Forwarded-For at all
+```
+
+See [docs/gdpr.md § 3.6](gdpr.md) for the data-protection context, and pair this with an IP-hashing/-dropping setting in Umami itself.
+
+## 10b. Request logging
+
+`REQUEST_LOG` sets how much of each HTTP request the access log keeps:
+
+```
+REQUEST_LOG=minimal   # default — method, url path, status, duration; no client IP, no query string
+REQUEST_LOG=full      # Fastify's default request log, which includes the client IP
+REQUEST_LOG=off       # no access log (error + application logs still print)
+```
+
+At `full`, remember client IPs are personal data — give your log store a retention limit and disclose it (see [docs/gdpr.md § 3.6](gdpr.md)).
+
 ## 11. Optional: operator alert on a new org signup
 
 Only relevant on a deployment with `ALLOW_SIGNUP=true` — with signups open to the public, nothing otherwise tells you when a new organization actually gets created. Off by default:

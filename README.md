@@ -326,6 +326,15 @@ TRACKING_SCRIPT_URL=
 TRACKING_CODE=
 ```
 
+### Privacy of IP addresses
+
+`REQUEST_LOG` (`minimal` default / `full` / `off`) controls how much of each HTTP request the access log keeps — `minimal` omits the client IP and query string. `TRACKING_FORWARD_IP` (`truncated` default / `full` / `off`) controls how much of the visitor IP is forwarded to the analytics collector. See [docs/deployment.md § 10b](docs/deployment.md) and [docs/gdpr.md § 3.6](docs/gdpr.md).
+
+```
+REQUEST_LOG=minimal
+TRACKING_FORWARD_IP=truncated
+```
+
 ### Admin Webhook
 
 Optional operator alert on a new org signup — only relevant with `ALLOW_SIGNUP=true`. Off by default: leave `ADMIN_WEBHOOK_URL` empty and nothing fires. An HMAC-signed HTTP POST, same scheme as the per-org webhooks in Settings, receiver-agnostic (Home Assistant, Discord, ntfy, your own script — anything that accepts a POST). `ADMIN_WEBHOOK_SECRET` must be at least 16 characters. See [docs/deployment.md § 11](docs/deployment.md#11-optional-operator-alert-on-a-new-org-signup) for the full setup guide.

@@ -1,6 +1,18 @@
 import type { FastifyInstance } from "fastify";
 import { config } from "../config.js";
-import { proxyTrackingScript, proxyTrackingSend } from "../services/tracking.js";
+import { proxyTrackingScript, proxyTrackingSend, truncateIp } from "../services/tracking.js";
+
+// PI-108 — what to put in the X-Forwarded-For the collector sees.
+function forwardedIpFor(clientIp: string): string | undefined {
+  switch (config.trackingForwardIp) {
+    case "off":
+      return undefined;
+    case "truncated":
+      return truncateIp(clientIp);
+    default:
+      return clientIp;
+  }
+}
 
 // PI-85 follow-up — same-origin proxy for the deployer's analytics script +
 // collect endpoint. See services/tracking.ts for why. Not registered at all
@@ -31,7 +43,7 @@ export async function trackingRoutes(app: FastifyInstance): Promise<void> {
     const { status, contentType, body } = await proxyTrackingSend(upstreamOrigin, JSON.stringify(request.body), {
       contentType: request.headers["content-type"],
       userAgent: request.headers["user-agent"],
-      forwardedFor: request.ip,
+      forwardedFor: forwardedIpFor(request.ip),
     });
     reply.code(status).header("content-type", contentType).send(body);
   });

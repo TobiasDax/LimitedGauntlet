@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
-import { proxyTrackingScript, proxyTrackingSend } from "./tracking.js";
+import { proxyTrackingScript, proxyTrackingSend, truncateIp } from "./tracking.js";
 
 async function withTestServer(
   handler: (req: IncomingMessage, body: string) => { status: number; contentType: string; body: string },
@@ -30,6 +30,26 @@ async function withTestServer(
     requests,
   };
 }
+
+describe("truncateIp (PI-108)", () => {
+  it("zeroes the last IPv4 octet", () => {
+    expect(truncateIp("203.0.113.45")).toBe("203.0.113.0");
+    expect(truncateIp("192.168.1.255")).toBe("192.168.1.0");
+  });
+
+  it("handles IPv4-mapped IPv6", () => {
+    expect(truncateIp("::ffff:203.0.113.45")).toBe("203.0.113.0");
+  });
+
+  it("keeps only the /48 prefix of an IPv6 address", () => {
+    expect(truncateIp("2001:db8:85a3:8d3:1319:8a2e:370:7348")).toBe("2001:db8:85a3::");
+    expect(truncateIp("2001:db8:1234::1")).toBe("2001:db8:1234::");
+  });
+
+  it("passes through anything that isn't an IP", () => {
+    expect(truncateIp("unknown")).toBe("unknown");
+  });
+});
 
 describe("proxyTrackingScript", () => {
   it("relays the upstream script's status, content-type, and body verbatim", async () => {

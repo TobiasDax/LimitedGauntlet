@@ -166,19 +166,26 @@ anonymisation is irreversible.
 The org-wide public-password lock (`PI-27`, `Settings → Public page access`)
 remains the option when the whole event should be non-public.
 
-### 3.6 IP addresses logged and forwarded without notice or limit — `PI-108`
+### 3.6 IP addresses in logs and analytics — `PI-108` ✅ (partly)
 
-`logger: true` writes client IPs for every request with no retention policy and
-no mention in any user-facing text. The analytics proxy forwards the visitor IP
-to Umami. Both need a lawful basis (Art. 6(1)(f) for security/operations is
-defensible) **and** disclosure, and the logs need a retention limit.
+Two places touch a visitor's IP: the HTTP access log, and (if analytics is on)
+the forward to your Umami collector. Both need a lawful basis (Art. 6(1)(f) for
+secure operation is defensible) **and** disclosure, and the logs need a
+retention limit. Two env knobs now reduce the exposure by default:
 
-Mitigations available now:
+- **`REQUEST_LOG`** — `minimal` (the default) logs method / url path / status /
+  duration but **not** the client IP or query string. `full` restores the raw
+  request log; `off` drops the access log entirely.
+- **`TRACKING_FORWARD_IP`** — `truncated` (the default) zeroes the last IPv4
+  octet / IPv6 host bits before forwarding to the collector, so Umami still does
+  country/region geo but never sees a full address. `full` sends the exact IP;
+  `off` sends none.
 
-- Ship your container logs to something with a retention limit (e.g. 14–30 days)
-  and say so in your policy.
-- Configure your Umami instance **not to store raw IP addresses** (Umami hashes
-  them by default and can be set to drop them).
+Still on you:
+
+- If you set `REQUEST_LOG=full`, give your container logs a retention limit
+  (e.g. 14–30 days) and say so in your policy.
+- Configure your Umami instance to hash or drop IPs as well (defence in depth).
 - Keep analytics **cookieless** (Umami's default) — this keeps you out of the
   § 25 TTDSG consent requirement for storing/reading data on the device. If you
   add cookie-based analytics later, you need a consent banner.
