@@ -99,12 +99,12 @@ Prisma 7 is an architecture migration, not a version bump — it changes how the
 - [x] **The driver adapter connects and queries** — the full server test suite (all 14+ DB-touching files, now on `makePrismaClient()` → `PrismaPg`) is green against real Postgres. The main behavioural risk is retired.
 
 **Still to check before the live deploy (needs Docker / the demo — CI can't do these):**
-- [ ] **Docker image builds and boots.** CI doesn't build images (PI-92); the GHCR build runs on the v0.13.0 tag. Boot-test that image (or a local `docker build`) before publishing the release: `prisma.config.ts` + `dotenv` must resolve in the runtime image, `migrate deploy --config server/prisma.config.ts` must work from `/app`, and PI-102's `preflight.cjs` must pass (it now checks the root-declared `@prisma/client` too).
+- [ ] **Docker image builds and boots.** First attempt on DaxLite (2026-09-10) crash-looped: `./node_modules/.bin/prisma: not found` — npm had de-hoisted the `prisma` CLI into `server/node_modules`. Fixed in `61cefae` (declare `prisma` in the root `package.json`, like the client/adapter; `preflight.cjs` now checks it + `.bin/prisma` + `dotenv`). **Re-test the rebuilt image**, then the GHCR build on the v0.13.0 tag.
 - [ ] **Load test the demo** — the driver adapter's connection-pool behaviour under the ~50-phone pattern (PI-95's long-standing ask; more relevant now that the client engine changed).
 - [ ] `import-legacy.ts` end-to-end (not covered by the test suite).
 - [ ] **Back up the live DB before the v0.13.0 deploy.**
 
-**Known cost (accepted at merge):** Prisma 7's CLI (a devDependency) pulls **`mysql2` + `deepmerge-ts` with 4 high `npm audit` advisories** that are **not overridable** (npm won't reach them) and **inapplicable to a postgres-only project** — the CLI's MySQL code path never runs for us, and the `deepmerge-ts` stack-exhaustion needs a recursive object graph the config loader never sees (our `prisma.config.ts` is flat). CI runs no `npm audit`. Re-check when Prisma ships a CLI update.
+**Known cost (accepted at merge):** Prisma 7's CLI pulls **`mysql2` (1 high `npm audit` advisory)** — down from 4 after the root-deps re-resolve let the `deepmerge-ts` override finally apply; `npm audit` is now 2 total (1 high + 1 moderate). The `mysql2` advisory is **inapplicable to a postgres-only project** (the CLI's MySQL code path never runs for us) and not overridable. CI runs no `npm audit`. Re-check when Prisma ships a CLI update.
 - [ ] Minor hygiene, not blocking: no `.dockerignore` exists, so the gitignored `server/src/generated/` is sent in the build context then overwritten by `prisma generate` — add a `.dockerignore` sometime.
 
 ### PI-111 — ESLint 10 + lint-plugin majors (dev-tooling batch) ✅ (done 2026-09-10)
