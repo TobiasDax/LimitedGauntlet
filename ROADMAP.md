@@ -8,9 +8,9 @@ The app is **feature-complete and running in production** — tagged releases (l
 
 **Shipped, browser-verify on a live deploy still pending:** PI-75 (operator signup webhook), PI-76–PI-84 (the pod-list cluster — organizer reorder, finished-pods sink, Scheduled/On-demand tabs, scheduled + actual timestamps, date dividers, pod cancel; first live pass 2026-09-05 found PI-77's sink broken on pre-existing data — needs the `20260905140000` backfill migration applied first), PI-85 (deployer analytics), PI-87 (Settings/Profile split), PI-99 (not-yet-started pods counted as played), PI-100 (on-demand side events — needs migration `20260909120000`). **PI-86** (one login across multiple orgs) is merged and verified on the demo — **the live rollout still needs a DB backup first** (see PI-86's deployment note).
 
-**GDPR pass:** PI-103 (compliance docs + Datenschutzerklärung template) shipped. PI-104–107 (anonymise a player, per-player data export, player self-service name edit + removal request, hide-from-public switch) are code-complete + server-tested — browser-verify pending; they add migration `20260909130000_gdpr_player_privacy_fields`. PI-108 (log/analytics IP posture + retention) not started.
+**GDPR pass:** PI-103 (compliance docs + Datenschutzerklärung template) + PI-104–107 (anonymise a player, per-player data export, player self-service name edit + removal request, hide-from-public switch) shipped and **browser-verified 2026-09-10**; adds migration `20260909130000_gdpr_player_privacy_fields`. PI-108 (log/analytics IP posture + retention) not started. Not yet released — pending a version tag.
 
-**Dependency majors batch** (branch `deps/majors-2026-09`, 2026-09-09/10): T1 argon2 + nodemailer, T2 Vite 8 / Vitest 5 / plugin-react 6, T3 zod 4, T4 openid-client 6 (sso.ts ported — **live SSO browser-verify pending**), T6 TypeScript 7-native for builds (~4x faster typecheck) + TS6-compat for typescript-eslint. All validated on Node 22 (build + lint + format + migration-drift + server suite 167). **Prisma 7 (T5) split off to PI-109** — architecture migration, own session. Merge the branch when Forgejo CI is green.
+**Dependency majors batch** (`deps/majors-2026-09`, merged to `main` as PR #1, Forgejo CI green): T1 argon2 + nodemailer, T2 Vite 8 / Vitest 5 / plugin-react 6, T3 zod 4, T4 openid-client 6 (sso.ts ported — **Pocket ID SSO browser-verified; Google/Discord not yet tested**), T6 TypeScript 7-native for builds (~4x faster typecheck) + TS6-compat for typescript-eslint. All validated on Node 22 (build + lint + format + migration-drift + server suite 167) and a live click-through. **Prisma 7 (T5) split off to PI-109** — architecture migration, own session.
 
 ## Open items
 
@@ -312,7 +312,7 @@ The controller for any deployment is the org running it, not the project — but
   - When an organizer adds a roster player, surface a one-line reminder that they must inform that person (links to the org's `LEGAL_LINK_URL` if set).
   - Organizer signup: show the `LEGAL_LINK` as a "by signing up you acknowledge the privacy notice" link when it's configured.
 
-### PI-104 — Anonymise a player (erasure without destroying the competitive record) ✅ (code-complete, browser-verify pending)
+### PI-104 — Anonymise a player (erasure without destroying the competitive record) ✅ (browser-verified 2026-09-10)
 `DELETE /api/players/:id` (`routes/players.ts:112`) cascades through `Entrant` → `Match` (schema `onDelete: Cascade`), so honouring an Art. 17 erasure request today silently rewrites historical standings, Gesamtwertung and Hall of Fame. There's no pseudonymisation path. This is the single biggest functional GDPR gap.
 - [x] **Built — `services/playerPrivacy.ts#anonymisePlayer(orgId, playerId)`** (org-scoped, idempotent, returns `null` for a foreign player). One `$transaction`: `displayName` → `"Anonymised player <cuid-tail>"` (the tail keeps two anonymisations in one org from colliding the case-insensitive unique-name check), `email`/`identityId` → null, `playerInvite.deleteMany`, `tokenTransaction.updateMany` blanking `note` text. Every `Entrant`/`Match`/`CardPull`/`TokenTransaction` **amount** row is kept. `POST /api/players/:id/anonymise` (`routes/players.ts`).
 - [x] **Built — `Player.anonymisedAt DateTime?`** (migration `20260909130000_gdpr_player_privacy_fields`, additive, no backfill). Surfaced on the roster list as `player.anonymised` (boolean); `createPlayerInvite` now 409s (`anonymised`) on an anonymised row.
@@ -321,26 +321,26 @@ The controller for any deployment is the org running it, not the project — but
 - [x] **Frontend:** roster row → "Privacy ▾" → **Anonymise** (danger, behind the shared `Modal` confirm spelling out irreversibility). An anonymised row shows a `StatusPill` and drops its account controls. `useAnonymisePlayer` invalidates the whole query cache (the name is in standings / HoF / pod history everywhere).
 - [x] **Audit — denormalised names:** only `Team.name` / `Pod.name` / `Tournament.description` can embed a name, and they're shared across entrants — deliberately **not** auto-edited (documented as a known limitation; an organizer edits them by hand if needed). Past webhook deliveries can't be recalled — also documented, not solved.
 - [x] **Tests:** `services/playerPrivacy.test.ts` — proves `computePodStandings` + token balance are byte-identical before/after, entrant + match rows survive, identity row survives, invites gone, note blanked; idempotency; foreign-org `null`. Plus the export/import round-trip case in `orgImport.test.ts`.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-10).
 
-### PI-105 — Per-player data export (Art. 15 / 20) ✅ (code-complete, browser-verify pending)
+### PI-105 — Per-player data export (Art. 15 / 20) ✅ (browser-verified 2026-09-10)
 `Settings → Export` (PI-38) is whole-org and organizer-only. A single person exercising their right of access / portability has no self-contained export.
 - [x] **Built — `services/playerDataExport.ts#buildPlayerDataExport(orgId, playerId)`** → a readable (not re-importable) JSON doc: profile (incl. their own login email, anonymised/hidden flags), tournament check-ins, pods with finish + drop round, every match with opponent name + score, card-pull attributions, and the token ledger (null when the org has tokens off). `playerExportFilename()` shared helper.
 - [x] **Routes:** `GET /api/players/:id/export` (organizer, `routes/players.ts`) and `GET /api/player/export` (`requirePlayerAuth`, `routes/playerAccounts.ts`) — both send with a `content-disposition` attachment filename.
 - [x] **Frontend:** roster row → "Privacy ▾" → **Download data** (`useDownloadPlayerData`); portal → **Your account → Download my data** (`useDownloadOwnData`). Both bypass the JSON `api` client for the blob download, same pattern as the org export.
 - [x] **Docs:** `docs/gdpr.md` §3.3 rewritten.
 - [x] **Tests:** `services/playerDataExport.test.ts` — collects the player's matches/pods/finish/card-pulls, `null` ledger when tokens off, foreign-org `null`, filename sanitisation.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-10).
 
-### PI-106 — Player self-service: edit own name, request removal (Art. 16 / 17 / 21) ✅ (code-complete, browser-verify pending)
+### PI-106 — Player self-service: edit own name, request removal (Art. 16 / 17 / 21) ✅ (browser-verified 2026-09-10)
 A logged-in player (PI-52) can check in and report results but can't correct their own display name or ask to be removed through the app.
 - [x] **Rectification:** `PATCH /api/player/me` (`requirePlayerAuth`) → `renameOwnPlayer` (`services/playerAccounts.ts`), same case-insensitive uniqueness rule (shared `rosterNameTaken`), frozen on an anonymised entry. No organizer approval — it's their own name.
 - [x] **Erasure / objection request:** `POST /api/player/removal-request` (`requirePlayerAuth`, rate-limited 3/hour). Notifies **every organizer by email** when SMTP is configured and **always `request.log.warn`s** — so an instance without mail still surfaces it in `docker compose logs`. No self-executing erase (anonymisation is irreversible); a human actions it. Chose email+log over a webhook event (the per-org webhook system is pod-scoped) or a new in-app queue model.
 - [x] **Frontend:** portal gains a **"Your account"** section — inline name edit, "Download my data", and "Request removal" (optional message textarea, success confirmation).
 - [x] **Docs:** `docs/gdpr.md` §3.4 / §3.5.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-10).
 
-### PI-107 — Per-player "hide from public pages" (Art. 21 objection) ✅ (code-complete, browser-verify pending)
+### PI-107 — Per-player "hide from public pages" (Art. 21 objection) ✅ (browser-verified 2026-09-10)
 If a player objects to appearing on the open public pages, the only levers today are the org-wide password lock (PI-27) or full anonymisation. Need a per-person switch.
 - [x] **Built — `Player.publicHiddenAt DateTime?`** (same migration as PI-104). `services/playerPrivacy.ts#setPlayerPublicHidden` (set/clear, no-op when already in state) + `getHiddenPlayerIds(orgId)`. `POST /api/players/:id/public-visibility` `{ hidden }`. Round-trips through export/import as `data.publicHiddenPlayers`.
 - [x] **Semantics — option (a), as leaned:** a hidden player still appears in public standings/pairings/Gesamtwertung/HoF but their name renders as **"Hidden player"** with no working link, and their public stats page 404s. The organizer's own views and every standings/pairing computation are untouched — this is a name redaction on the public read surface only.
@@ -348,7 +348,7 @@ If a player objects to appearing on the open public pages, the only levers today
 - [x] **Organizer UI:** roster row → "Privacy ▾" → **Hide / Show on public pages**; a `StatusPill` marks a hidden row in the (unaffected) organizer view.
 - [x] **Not done — realtime:** the toggle doesn't push a live socket update to open public pages (a refresh picks it up; it isn't time-critical like a pairing reveal). Noted.
 - [x] **Docs:** `docs/gdpr.md` §3.5.
-- [ ] Browser-verified.
+- [x] Browser-verified (2026-09-10).
 
 ### PI-108 — Request-log IP posture + analytics IP + retention config
 `Fastify({ logger: true })` (`index.ts`) writes the client IP for every request with no retention limit and no disclosure; `routes/tracking.ts` forwards `request.ip` to the deployer's Umami as `x-forwarded-for`. Both need a lawful basis (Art. 6(1)(f) is defensible) *and* disclosure *and*, for the logs, a retention limit.
@@ -518,11 +518,11 @@ Audit of what PI-90's `.github/dependabot.yml` is actually producing (checked 20
   - [x] **`hono` 4.13.4 → 4.13.7** + **`qs` 6.15.3 → 6.16.0** — both moderate, both transitive under `@modelcontextprotocol/sdk` (`@hono/node-server`; `express@5`). Pinned via root `package.json` `overrides` (needed `npm update hono qs` after adding the overrides — npm 9 doesn't re-resolve already-locked transitives on a plain `npm install`). Low real exposure (the MCP HTTP surface is a trusted-local tool), clean bumps.
   - [ ] **`vitest` + `@vitest/mocker` 3.2.7 → moderate — DEFERRED.** Dev/test-only, not shipped (path-traversal via a mock redirect — needs a malicious test in-repo). The advisory is fixed in `4.1.11`, but 3→4 is a major bump, and bumping it here wedged npm 9's arborist (`Cannot read properties of null (reading 'edgesOut')`) on this machine. A fresh `npm ci` in CI won't hit that — do it as its own change: set `server/package.json` `"vitest": "^4.1.11"`, `npm install` on a clean checkout, run the full server suite, eyeball `server/vitest.config.ts` (`globalSetup` + `test.env` are stable across 3→4, so it should be quiet). Or fold it into the Vite 8 / Vitest 5 frontend-tooling bump below.
 
-- **Pending major upgrades** — done on branch `deps/majors-2026-09` (2026-09-09/10), one commit per tranche, each validated on Node 22 (build + lint + format + migration-drift + full server suite):
+- **Major upgrades** — merged to `main` as PR #1 (`deps/majors-2026-09`, 2026-09-10), Forgejo CI green + live click-through OK. One commit per tranche, each validated on Node 22 (build + lint + format + migration-drift + full server suite):
   - [x] **T1** — `argon2` 0.41→0.45, `nodemailer` 9→10. No code changes.
   - [x] **T2** — Vite 6→8 (now bundles with Rolldown), `@vitejs/plugin-react` 4→6, Vitest 3→5. Vitest 5 dropped `**/dist/**` from the default test exclude → pinned `test.include` in `vitest.config.ts` (was running every test twice).
   - [x] **T3** — `zod` 3→4 (server + mcp). Version bump only; deprecated APIs (`nativeEnum`, `ZodIssueCode`, `.email()`, `.datetime()`) still work — flagged for a later cleanup.
-  - [x] **T4** — `openid-client` 5→6. `services/sso.ts` ported to the v6 functional API (`discovery` / `buildAuthorizationUrl` / `authorizationCodeGrant`, `random*` PKCE helpers). Public contract unchanged; `routes/auth.ts` untouched. Smoke-tested against Google's real discovery. **Live SSO login still wants a browser-verify.**
+  - [x] **T4** — `openid-client` 5→6. `services/sso.ts` ported to the v6 functional API (`discovery` / `buildAuthorizationUrl` / `authorizationCodeGrant`, `random*` PKCE helpers). Public contract unchanged; `routes/auth.ts` untouched. Smoke-tested against Google's real discovery; **Pocket ID login browser-verified 2026-09-10. Google + Discord not yet tested** (Google shares T4's `oidcComplete` path; Discord's is a separate `fetch` flow with only the PKCE helpers swapped).
   - [x] **T6** — TypeScript 5.9→**7** (native) for `tsc` builds + `@typescript/typescript6` (TS6 API) for typescript-eslint; `typescript-eslint` 8.69→8.70; `types: ["node"]` added to server/mcp tsconfig (the real fix for the mcp lint-resolution issue behind PI-102's accidental 6.0.3 break). `tsc --noEmit` server: 6.3s→1.4s (~4x). Replaces PI-102's temporary `overrides.typescript` pin.
   - [ ] **T5 — Prisma 6→7: deferred to its own item (PI-109).** Not a version bump — Rust-free client + driver adapter + new `prisma-client` generator + `prisma.config.ts` + `@prisma/client` import-path change across 25 files + Dockerfile/entrypoint/CI. Needs a demo browser-verify before the live DB. Prisma 6.19.3 is current-latest-6.x, no CVEs.
   - [ ] `@types/node` `22 → 26` — **not done, deliberately.** CI + deploy run Node 22, so `@types/node@22` is the correct match; 26 would type against APIs the runtime doesn't have.
