@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "../db.js";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";

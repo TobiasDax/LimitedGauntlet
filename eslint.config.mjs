@@ -21,6 +21,7 @@ export default tseslint.config(
       "eslint.config.mjs",
       "scripts/**", // one-off legacy-data prep helpers, outside every tsconfig
       "docker/**", // deploy-time shell/node helpers, outside every tsconfig
+      "server/src/generated/**", // Prisma 7 generated client (PI-109)
     ],
   },
 

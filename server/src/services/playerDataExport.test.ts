@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import { makePrismaClient } from "../db.js";
 import { buildPlayerDataExport, playerExportFilename } from "./playerDataExport.js";
 
-const prisma = new PrismaClient();
+const prisma = makePrismaClient();
 
 afterAll(async () => {
   await prisma.$disconnect();

@@ -1,3 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { makePrismaClient } from "./db.js";
 
-export const prisma = new PrismaClient();
+// The shared client for the running server. Tests and one-off scripts make
+// their own via makePrismaClient() (see db.ts).
+export const prisma = makePrismaClient();

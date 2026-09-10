@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "../db.js";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../prisma.js";

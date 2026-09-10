@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import { networkInterfaces } from "node:os";
 import { createHmac } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import { makePrismaClient } from "../db.js";
 import {
   buildMatchesPayload,
   buildStandingsPayload,
@@ -16,7 +16,7 @@ import {
   sendWebhookEvent,
 } from "./webhooks.js";
 
-const prisma = new PrismaClient();
+const prisma = makePrismaClient();
 
 afterAll(async () => {
   await prisma.$disconnect();

@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import { makePrismaClient } from "../db.js";
 import {
   acceptPlayerInvite,
   authenticatePlayer,
@@ -9,7 +9,7 @@ import {
   submitPlayerResult,
 } from "./playerAccounts.js";
 
-const prisma = new PrismaClient();
+const prisma = makePrismaClient();
 
 afterAll(async () => {
   await prisma.$disconnect();

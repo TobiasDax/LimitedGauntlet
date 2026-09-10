@@ -1,4 +1,4 @@
-import type { PodFormat } from "@prisma/client";
+import type { PodFormat } from "../db.js";
 import { prisma } from "../prisma.js";
 import { computePodStandings, podIsPlayed } from "./standings.js";
 import { computeGesamtwertung } from "./gesamtwertung.js";

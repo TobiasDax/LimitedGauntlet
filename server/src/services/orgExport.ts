@@ -8,7 +8,7 @@ import type {
   PodStatus,
   RoundStatus,
   TournamentStatus,
-} from "@prisma/client";
+} from "../db.js";
 
 // LimitedGauntlet's own portable export format (PI-38), the round-trip
 // counterpart to the history-import path. Unlike the one-time legacy import

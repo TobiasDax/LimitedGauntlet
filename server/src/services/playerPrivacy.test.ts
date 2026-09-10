@@ -1,10 +1,10 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import { makePrismaClient } from "../db.js";
 import { anonymisePlayer, getHiddenPlayerAliases, rosterNameTaken, setPlayerPublicHidden } from "./playerPrivacy.js";
 import { computePodStandings } from "./standings.js";
 import { getPlayerTokenBalance } from "./tokens.js";
 
-const prisma = new PrismaClient();
+const prisma = makePrismaClient();
 
 afterAll(async () => {
   await prisma.$disconnect();

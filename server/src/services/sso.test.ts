@@ -1,10 +1,10 @@
 import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import { makePrismaClient } from "../db.js";
 import { config } from "../config.js";
 import { configuredSsoProviders } from "../config.js";
 import { linkOrProvisionFromSso, parseDiscordUser, type SsoIdentity } from "./sso.js";
 
-const prisma = new PrismaClient();
+const prisma = makePrismaClient();
 
 afterAll(async () => {
   await prisma.$disconnect();
