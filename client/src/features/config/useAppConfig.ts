@@ -18,6 +18,9 @@ export interface TrackingConfig {
 export interface AppConfig {
   legalLinkUrl: string | null;
   legalLinkLabel: string | null;
+  // PI-112 — whether the built-in /legal page (Impressum + privacy notice) is
+  // served. The footer links it when true; the content comes from GET /api/legal.
+  legalPageEnabled?: boolean;
   // Configured SSO providers to show a button for (PI-42 / PI-43), in display
   // order. Empty array = password-only.
   ssoProviders?: SsoProvider[];

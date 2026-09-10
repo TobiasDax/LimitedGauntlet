@@ -100,9 +100,14 @@ You still need:
   the privacy notice (or a link) when they join the roster. The invite email for
   player accounts should link to it.
 
-Set `LEGAL_LINK_URL` / `LEGAL_LINK_LABEL` to your hosted privacy notice. In the
-EU this is effectively **mandatory**, not the "optional" the README currently
-implies.
+The app now **ships the privacy notice** — a built-in Impressum + Datenschutz­erklärung
+at `/legal`, linked from the footer, rendered in English from the `LEGAL_*` env
+values (see `docs/deployment.md` § 2b). Fill at least `LEGAL_CONTROLLER_NAME` and
+`LEGAL_CONTROLLER_EMAIL`; set `LEGAL_LAWFUL_BASIS` to the option you actually rely
+on. `LEGAL_LINK_URL` is now only for an *additional* externally-hosted document.
+The built-in page still doesn't do the rest of this section for you — you choose
+the lawful basis, do and record the balancing test, and get the notice in front
+of the players.
 
 ### 3.2 Erasure — `PI-104` ✅
 
@@ -240,6 +245,9 @@ protection) are yours to handle:
   player without breaking the record, per-player data export (organizer and
   self-service), self-service name correction, and a per-player "pseudonymise on
   public pages" switch (a stable handle — also the tool for minors).
+- **Built-in Impressum + privacy notice** (`PI-112`, `/legal`): rendered from
+  `LEGAL_*` env, linked from every footer, with the SMTP / analytics / SSO /
+  operator-webhook sections auto-matched to what the deployment has enabled.
 
 ---
 
@@ -248,10 +256,13 @@ protection) are yours to handle:
 **Before you let real people's data into a live instance:**
 
 - [ ] Decide your **lawful basis** for the roster + public results (§ 3.1) and
-      write it down.
-- [ ] Write a **privacy notice** from `docs/privacy-policy-template.md`, host it,
-      and set `LEGAL_LINK_URL` / `LEGAL_LINK_LABEL`.
-- [ ] **Tell your players** — hand them the notice when they join the roster.
+      write it down. Set `LEGAL_LAWFUL_BASIS` to match.
+- [ ] Fill the **`LEGAL_*` env vars** (`docs/deployment.md` § 2b) so the built-in
+      `/legal` page names a real controller, authority, retention period, and
+      processors — then read the generated page and confirm it's accurate for
+      you. Host your own instead only if you need lawyer-drafted text; then point
+      `LEGAL_LINK_URL` at it (and optionally `LEGAL_PAGE_ENABLED=false`).
+- [ ] **Tell your players** — hand them the `/legal` link when they join the roster.
 - [ ] Sign an **AVV** with your VPS host, and with your SMTP provider / analytics
       host / any managed service you use.
 - [ ] Set a **log retention** limit on your host and an Umami retention/IP setting.
@@ -332,6 +343,9 @@ and, for an integrity/loss breach, part of your mitigation.
 
 ## 8. Related
 
-- `docs/privacy-policy-template.md` — the adaptable notice (EN + DE)
+- The built-in `/legal` page — configure it via the `LEGAL_*` vars in
+  `docs/deployment.md` § 2b
+- `docs/privacy-policy-template.md` — a longer adaptable notice (EN + DE), for
+  self-hosting your own instead of / alongside the built-in page
 - `docs/deployment.md` — `TRUSTED_PROXIES`, SMTP, analytics, webhooks, backups
-- `ROADMAP.md` — `PI-103`…`PI-108` track the outstanding tooling
+- `ROADMAP.md` — the GDPR items (`PI-103`…`PI-108`, `PI-110`, `PI-112`)

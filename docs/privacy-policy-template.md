@@ -1,8 +1,15 @@
 # Privacy policy template / Vorlage Datenschutzerklärung
 
+> **You may not need this file.** The app ships a built-in Impressum + privacy
+> notice at `/legal`, rendered from the `LEGAL_*` env vars — see
+> `docs/deployment.md` § 2b. Fill those in and you have a working notice without
+> touching this template. Use the template below only if you want your own
+> lawyer-drafted text, a translation, or a longer document — host it and point
+> `LEGAL_LINK_URL` / `LEGAL_LINK_LABEL` at it (optionally with
+> `LEGAL_PAGE_ENABLED=false` to drop the built-in page).
+
 A starting point for the privacy notice **you** must publish if you run a Limited
-Gauntlet instance for people in the EU/EEA/UK. Host the finished text somewhere
-public and point `LEGAL_LINK_URL` / `LEGAL_LINK_LABEL` at it.
+Gauntlet instance for people in the EU/EEA/UK.
 
 > **Not legal advice.** Written by the project, not a lawyer. It reflects what the
 > software does (see `docs/gdpr.md`), but the responsibility for a correct,

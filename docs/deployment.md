@@ -44,6 +44,33 @@ Set at minimum:
 
 Everything else in `.env.example` has a working default, including `TRUSTED_PROXIES` (blank — direct/LAN mode). See section 4 below before you decide how the app will actually be reached: the default Compose files ship with no host port published and no bundled reverse proxy or tunnel, so you need to add one via an override before the app is reachable at all.
 
+**If you run this for people in the EU/EEA/UK, also read [`docs/gdpr.md`](gdpr.md) — you are the data controller.** The `SMTP_*`, `TRACKING_*`, webhook, and SSO options below each add a recipient or processor you must disclose; the legal-notice fields in § 2b make that disclosure for you.
+
+## 2b. Legal / privacy notice
+
+The app serves a **built-in Impressum + privacy notice at `/legal`**, linked from every footer and reachable without a login (it stays outside an org's optional public-password lock, by design). It is one English document assembled from the `LEGAL_*` env values — the operator personalises it with env vars instead of writing and hosting a page. The **SMTP, analytics, SSO, and operator-webhook sections include themselves automatically** based on what this deployment has enabled, so they can't fall out of sync with your actual configuration.
+
+Every field is optional. An unset one renders as a visible "(not configured — set LEGAL_…)" placeholder; a missing `LEGAL_CONTROLLER_NAME` or `LEGAL_CONTROLLER_EMAIL` puts an "incomplete" banner on the page. For an EU deployment, fill at least those two.
+
+| Variable | What it fills |
+|---|---|
+| `LEGAL_PAGE_ENABLED` | `false` drops the built-in page (and its footer link) entirely — use only if you link your own via `LEGAL_LINK_URL`. Default `true`. |
+| `LEGAL_CONTROLLER_NAME` / `_ADDRESS` / `_EMAIL` / `_PHONE` | The responsible party (Impressum + "who is responsible"). Name + email are the minimum. |
+| `LEGAL_REGISTER_INFO` | Optional Vereins-/Handelsregister line for an association or company. |
+| `LEGAL_DPO_CONTACT` | Whole "Data protection officer: …" line; omitted when blank (most small setups don't need one). |
+| `LEGAL_LAWFUL_BASIS` | `legitimate-interest` (default), `consent`, or `contract` — swaps the Art. 6(1) paragraph for the public-results processing. Decide this deliberately (see `docs/gdpr.md` § 3.1). |
+| `LEGAL_RETENTION_TOURNAMENTS` | Free text, e.g. `kept as a permanent competitive record; deletion on request`. |
+| `LEGAL_RETENTION_LOGS` | Free text, e.g. `30 days` — only shown when `REQUEST_LOG=full`. At the default `minimal` the page states no visitor IP is logged. |
+| `LEGAL_HOSTING_PROVIDER` | e.g. `Hetzner Online GmbH, Germany` or `self-hosted on-premises`. |
+| `LEGAL_SUPERVISORY_AUTHORITY` | Name / address / URL of your data-protection authority (for the Art. 77 complaint-right paragraph). |
+| `LEGAL_SMTP_PROVIDER` | Name + country of your mail provider — only rendered when SMTP is configured. |
+| `LEGAL_ANALYTICS_PROVIDER` | Only rendered when analytics is configured; falls back to the host of `TRACKING_SCRIPT_URL`. |
+| `LEGAL_LAST_UPDATED` | Date string shown as "Last updated: …". |
+
+`LEGAL_LINK_URL` / `LEGAL_LINK_LABEL` still exist as an **additional** footer link (a lawyer-drafted policy, a separate corporate Impressum, …) shown next to the built-in one.
+
+**This does not make you compliant on its own.** You still choose and document a lawful basis, actually inform the players you add to a roster, and sign processor agreements. `docs/gdpr.md` § 5 is the checklist.
+
 ## 3. First boot
 
 Published image (Option A):

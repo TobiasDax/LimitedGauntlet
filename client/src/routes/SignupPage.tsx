@@ -131,6 +131,16 @@ export function SignupPage() {
           Log in
         </Link>
       </p>
+
+      {appConfig?.legalPageEnabled !== false && (
+        <p className="mt-3 text-center text-[12px] text-ink-muted">
+          By creating an organization you acknowledge the{" "}
+          <Link to="/legal" className="underline hover:text-ink-secondary">
+            legal notice
+          </Link>
+          . As the organizer you are the data controller for the people you add.
+        </p>
+      )}
     </div>
   );
 }

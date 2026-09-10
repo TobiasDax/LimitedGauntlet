@@ -307,9 +307,29 @@ Public base URL the app is reached at (e.g. `https://gauntlet.example.com`). Use
 APP_BASE_URL=
 ```
 
-### Legal Link
+### Legal / privacy notice
 
-Optional footer legal link (e.g. Impressum/Privacy Policy). This is self-hosted OSS with no built-in legal content — if your jurisdiction requires one, host it yourself and point these at it. Leave both empty to omit the link entirely (footer still shows GitHub + License).
+The app serves a **built-in Impressum + privacy notice at `/legal`**, linked from the footer, rendered in English from the values below. The SMTP / analytics / SSO / operator-webhook sections appear automatically based on what you've enabled. A deployment for people in the EU/EEA/UK should fill at least `LEGAL_CONTROLLER_NAME` and `LEGAL_CONTROLLER_EMAIL` — an unset field renders as a visible "(not configured — set LEGAL_…)" placeholder and a missing name/email puts an "incomplete" banner on the page. This does not replace your other duties (choosing and documenting a lawful basis, informing players, signing processor agreements) — see [docs/gdpr.md](docs/gdpr.md). Full field reference in [docs/deployment.md § 2b](docs/deployment.md).
+
+```
+LEGAL_PAGE_ENABLED=true
+LEGAL_CONTROLLER_NAME=
+LEGAL_CONTROLLER_ADDRESS=
+LEGAL_CONTROLLER_EMAIL=
+LEGAL_CONTROLLER_PHONE=
+LEGAL_REGISTER_INFO=
+LEGAL_DPO_CONTACT=
+LEGAL_LAWFUL_BASIS=legitimate-interest
+LEGAL_RETENTION_TOURNAMENTS=
+LEGAL_RETENTION_LOGS=
+LEGAL_HOSTING_PROVIDER=
+LEGAL_SUPERVISORY_AUTHORITY=
+LEGAL_SMTP_PROVIDER=
+LEGAL_ANALYTICS_PROVIDER=
+LEGAL_LAST_UPDATED=
+```
+
+`LEGAL_LINK_URL` / `LEGAL_LINK_LABEL` add an **optional extra footer link** alongside the built-in page — for a lawyer-drafted policy or a corporate Impressum. Set `LEGAL_PAGE_ENABLED=false` to drop the built-in page and rely only on that link.
 
 ```
 LEGAL_LINK_URL=

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useAppConfig } from "../features/config/useAppConfig";
 
 const GITHUB_URL = "https://github.com/TobiasDax/LimitedGauntlet";
@@ -13,10 +14,13 @@ function GitHubMark() {
   );
 }
 
-// Shared footer for both the authed Layout and the public PublicLayout.
-// GitHub + License are always present (this is OSS); the legal link is
-// deployer-configured (LEGAL_LINK_URL/LEGAL_LINK_LABEL) and only renders
-// when set — no Impressum/Privacy content ships with the app itself.
+// Shared footer for the authed Layout, the public PublicLayout, the player
+// portal, and the standalone /legal page. GitHub + License are always present
+// (this is OSS). The built-in "Legal notice" link (PI-112, /legal — an
+// Impressum + privacy notice rendered from LEGAL_* env) shows unless the
+// operator turned it off with LEGAL_PAGE_ENABLED=false. LEGAL_LINK_URL /
+// LEGAL_LINK_LABEL (PI-35) is an optional *additional* link for a
+// separately-hosted policy, and renders alongside it when set.
 export function Footer() {
   const { data } = useAppConfig();
 
@@ -29,6 +33,11 @@ export function Footer() {
       <a href={`${GITHUB_URL}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer" className={linkClass}>
         License
       </a>
+      {data?.legalPageEnabled !== false && (
+        <Link to="/legal" className={linkClass}>
+          Legal notice
+        </Link>
+      )}
       {data?.legalLinkUrl && data.legalLinkLabel && (
         <a href={data.legalLinkUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
           {data.legalLinkLabel}

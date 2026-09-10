@@ -56,12 +56,42 @@ export const config = {
     // STARTTLS (587) vs implicit TLS (465). Default false = STARTTLS.
     secure: process.env.SMTP_SECURE === "true",
   },
-  // Optional footer legal link (PI-35) — a deployer can point this at their
-  // own hosted Impressum/Privacy Policy/etc. Blank by default: this is
-  // self-hosted OSS, so there's no built-in legal content to ship, and the
-  // footer simply omits the link when unset.
+  // Optional footer legal link (PI-35) — a deployer can point this at a
+  // lawyer-drafted policy, a corporate Impressum, etc. Blank by default. Since
+  // PI-112 this is an *additional* footer link, shown alongside the built-in
+  // /legal page (not a replacement for it).
   legalLinkUrl: process.env.LEGAL_LINK_URL ?? "",
   legalLinkLabel: process.env.LEGAL_LINK_LABEL ?? "",
+  // Built-in /legal page (PI-112) — an English Impressum + privacy notice
+  // rendered from these values, so an EU deployment is compliant-by-default
+  // without hosting its own. Every field is optional: an unset one renders as
+  // a visible `[LEGAL_… not set]` placeholder, and a missing controller name
+  // or email puts an "incomplete" warning banner on the page. Set
+  // LEGAL_PAGE_ENABLED=false to drop the page entirely and rely only on
+  // LEGAL_LINK_URL. See docs/gdpr.md and docs/deployment.md.
+  legal: {
+    pageEnabled: process.env.LEGAL_PAGE_ENABLED !== "false",
+    controllerName: process.env.LEGAL_CONTROLLER_NAME ?? "",
+    controllerAddress: process.env.LEGAL_CONTROLLER_ADDRESS ?? "",
+    controllerEmail: process.env.LEGAL_CONTROLLER_EMAIL ?? "",
+    controllerPhone: process.env.LEGAL_CONTROLLER_PHONE ?? "",
+    registerInfo: process.env.LEGAL_REGISTER_INFO ?? "",
+    dpoContact: process.env.LEGAL_DPO_CONTACT ?? "",
+    // Which Art. 6(1) basis the roster/public-results section states. Mirrors
+    // docs/gdpr.md §3.1's three realistic options.
+    lawfulBasis: envEnum(
+      "LEGAL_LAWFUL_BASIS",
+      ["legitimate-interest", "consent", "contract"] as const,
+      "legitimate-interest",
+    ),
+    retentionTournaments: process.env.LEGAL_RETENTION_TOURNAMENTS ?? "",
+    retentionLogs: process.env.LEGAL_RETENTION_LOGS ?? "",
+    hostingProvider: process.env.LEGAL_HOSTING_PROVIDER ?? "",
+    supervisoryAuthority: process.env.LEGAL_SUPERVISORY_AUTHORITY ?? "",
+    smtpProvider: process.env.LEGAL_SMTP_PROVIDER ?? "",
+    analyticsProvider: process.env.LEGAL_ANALYTICS_PROVIDER ?? "",
+    lastUpdated: process.env.LEGAL_LAST_UPDATED ?? "",
+  },
   // Optional OIDC / SSO login (PI-42). One identity provider per deployment.
   // Entirely optional: if issuer/clientId/clientSecret aren't all set,
   // isOidcConfigured() is false and the app runs password-only (the "Sign in

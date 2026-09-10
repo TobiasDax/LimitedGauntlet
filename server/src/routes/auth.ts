@@ -144,6 +144,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     reply.send({
       legalLinkUrl: config.legalLinkUrl || null,
       legalLinkLabel: config.legalLinkLabel || null,
+      // PI-112 — whether the built-in /legal page (Impressum + privacy notice)
+      // is served. The footer links it when true; the content itself comes
+      // from GET /api/legal, not from here.
+      legalPageEnabled: config.legal.pageEnabled,
       // Configured SSO providers to render a button for (PI-42 / PI-43),
       // in display order — [] means password-only.
       ssoProviders: configuredSsoProviders(),
