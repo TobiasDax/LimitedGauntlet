@@ -30,7 +30,7 @@ export function PodTabs({ podId }: { podId: string }) {
     // (Entrants/Seatings/Pairings/Standings/Value) don't fit a narrow phone
     // screen, the row scrolls horizontally instead of the tabs shrinking or
     // wrapping onto a second line.
-    <div className="mb-6 flex gap-1 overflow-x-auto border-b border-border">
+    <div className="mb-6 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border">
       {visible.map((tab) => {
         const href = `${base}${tab.suffix}`;
         const active = pathname === href;
