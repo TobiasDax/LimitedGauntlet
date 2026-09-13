@@ -7,6 +7,10 @@ build/
 .DS_Store
 .mcp.json
 
+# Scratch working directory (e.g. raw screenshot exports before they're
+# placed into docs/screenshots) — never a permanent home for anything.
+/temp/
+
 # Scratch release notes — drafted per release, fed to `gh release edit -F`,
 # then deleted. The published GitHub Release is the permanent copy.
 /RELEASE_NOTES_v*.md
