@@ -137,11 +137,29 @@ jobs:
           apt-get install -y --no-install-recommends docker.io
 
       - name: Wait for the DinD daemon
+        # PI-92 debugging (2026-09-14): `docker` never resolves here, even
+        # after the full wait — and the sidecar container never shows up on
+        # the runner host's own `docker ps -a` either, even watched live.
+        # Dump everything we can from inside the job itself instead of
+        # continuing to guess from the outside.
         run: |
+          ok=""
           for _ in $(seq 1 30); do
-            docker info >/dev/null 2>&1 && break
+            if docker info >/dev/null 2>&1; then ok=1; break; fi
             sleep 1
           done
+          if [ -z "$ok" ]; then
+            echo "::group::Diagnostics"
+            echo "--- env (docker-related) ---"; env | grep -i docker || true
+            echo "--- /etc/hosts ---"; cat /etc/hosts || true
+            echo "--- /etc/resolv.conf ---"; cat /etc/resolv.conf || true
+            echo "--- getent hosts docker ---"; getent hosts docker || echo "(no match)"
+            echo "--- docker version (client only) ---"; docker version || true
+            echo "--- docker -H tcp://docker:2375 info (explicit host) ---"; docker -H tcp://docker:2375 info || true
+            echo "--- docker context ls ---"; docker context ls || true
+            echo "::endgroup::"
+            exit 1
+          fi
           docker info
 
       - name: Build the runtime image
