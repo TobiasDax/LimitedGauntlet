@@ -18,6 +18,7 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 - **PI-62** — deck photos (the app's first user-uploaded file): scoped via interview, not started.
 - **PI-92** — expand CI: migration-drift + lint shipped (v0.8.0, green on the runner); the PR-time Docker image build + boot smoke test is blocked — the Forgejo runner gives job steps no `docker` CLI (re-add once that's fixed).
 - **PI-95** — read-path performance before the 40–60 player event: client + query-shape parts shipped (v0.8.0); the in-process standings cache and the real-deploy load test are still open. (Response compression stays reverted, see PI-98.) The load test now also wants to cover the Prisma 7 driver adapter's connection-pool behaviour (PI-109, v0.13.0).
+- **PI-113** — webhook SSRF hardening: the 2026-09-14 vulnerability scan found that DNS rebinding or an unchecked 307/308 redirect can bypass the intended loopback/link-local destination block. Pin the validated address to the connection and reject or validate every redirect hop; add regression tests for both paths.
 
 ## New improvements (backlog)
 
@@ -47,6 +48,21 @@ Idea from Tobias: on a pod's standings page, let each entrant have a photo of th
   - Accepted file types (JPEG/PNG/HEIC/WebP from phones — the preview generation step needs to handle re-encoding HEIC to something browsers can actually render, since the original stays HEIC for the "download original" action but the preview can't be).
   - Whether an MCP tool is warranted (leaning no, per PI-33's precedent — this is an organizer-at-the-table UI action, not a bulk/scriptable operation).
 - [ ] Not started — scoping/interview only.
+
+---
+
+### PI-113 — Harden outbound webhooks against redirect and DNS-rebinding SSRF (medium severity)
+The 2026-09-14 Codex Security scan validated one source-backed finding in `server/src/services/webhooks.ts`. An authenticated organizer may configure and test an arbitrary HTTP(S) webhook. `isSafeWebhookTarget()` resolves and checks the hostname first, but `deliverWebhook()` later calls `fetch()` with the original URL. The actual connection therefore performs a separate DNS resolution and follows redirects by default. A hostname that changes its DNS answer, or an attacker-controlled endpoint returning a 307/308 redirect, can deliver the POST to loopback or link-local services that the current guard explicitly intends to block (CWE-918).
+
+Private RFC1918 destinations remain an intentional product requirement for Home Assistant and similar LAN automation. This item should preserve that behavior and close only the gap between the destination approved by policy and the destination actually contacted.
+
+- [ ] **Block redirect pivots immediately:** set outbound webhook requests to `redirect: "manual"` and treat 3xx responses as failed deliveries. If redirects become a product requirement later, resolve, validate, and pin every hop with a small maximum-hop limit; never delegate redirect handling to the default `fetch()` behavior.
+- [ ] **Make DNS validation and connection atomic:** replace the lookup-then-fetch sequence with one shared outbound-request helper that resolves the hostname once, validates every returned address with `isLoopbackOrLinkLocalAddress()`, and binds the actual socket lookup to an approved address while preserving the original hostname for the HTTP `Host` header and TLS SNI/certificate validation. Do not silently fall back to a normal second DNS lookup.
+- [ ] **Apply the helper everywhere:** route `sendWebhookEvent`, `sendTestWebhookEvent`, and the operator-level `sendAdminWebhookEvent` through the same pinned-destination path so scheduled, test, and signup deliveries enforce one invariant.
+- [ ] **Regression tests:** cover a 307/308 redirect to `127.0.0.1`, `::1`, and `169.254.169.254`; a controlled resolver whose answer changes between validation and connection; multiple DNS answers where any address is denied; and an allowed RFC1918 target to prove the documented LAN use case still works.
+- [ ] **Operational verification:** on a real deployment, confirm normal HTTPS webhooks still validate certificates and receive the expected signed body, rejected redirects fail clearly in the Settings test UI, and neither rejection nor DNS failure delays round lifecycle requests beyond the existing five-second ceiling.
+
+**Scan context:** revision `57c344b289621ac412e3cdf7ad88f2ab21af163f`; severity medium, confidence high. The scan was static and did not send exploit traffic. `npm audit` also reported two `mysql2` advisories inherited through Prisma tooling, but the application uses PostgreSQL and no attacker-controlled MySQL runtime path was found, so those advisories are not tracked as an exploitable product finding here.
 
 ---
 
