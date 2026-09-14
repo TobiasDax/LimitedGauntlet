@@ -9,12 +9,10 @@ name: CI
 # a registered runner with a Docker backend advertising the `ubuntu-latest`
 # label — see docs/development.md "Continuous integration".
 #
-# The `image` job needs the runner's job containers to reach a Docker daemon.
-# Currently wired via the host-socket-mount approach (`container.options: "-v
-# /var/run/docker.sock:/var/run/docker.sock"` in the runner's own config.yaml)
-# — TEMPORARY, on the way to a safer DinD sidecar service that doesn't expose
-# the host socket to job containers (tracked in ROADMAP PI-92). The release
-# image is still built + smoke-covered on GitHub for every tag via
+# The `image` job needs a Docker daemon to talk to — it gets one from a
+# Docker-in-Docker `services:` sidecar (see that job), not a host socket
+# mount, so it needs no runner-side config at all. The release image is
+# still built + smoke-covered on GitHub for every tag via
 # .github/workflows/docker-publish.yml, which stays GitHub-only and is
 # guarded to no-op if a Forgejo runner picks it up.
 
@@ -108,16 +106,43 @@ jobs:
     # or move it to a nightly schedule.
     runs-on: ubuntu-latest
 
+    # DinD sidecar, not a host-socket mount: act_runner's own security
+    # allowlist (`container.valid_volumes`) silently drops an unlisted
+    # host bind mount — confirmed by a real run (task 60, 2026-09-14):
+    # `[/var/run/docker.sock] is not a valid volume, will be ignored`, so
+    # `docker` had nothing to talk to. A `services:` container needs no
+    # host bind mount at all — same mechanism the `check` job already uses
+    # for its `postgres` service, just with Docker-in-Docker instead.
+    # `--privileged` is required for the inner daemon to start; TLS is
+    # disabled between this job and its own throwaway sidecar (never
+    # leaves the job's private network) to skip unnecessary cert setup.
+    services:
+      docker:
+        image: docker:27-dind
+        options: --privileged
+        env:
+          DOCKER_TLS_CERTDIR: ""
+
+    env:
+      DOCKER_HOST: tcp://docker:2375
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Install docker CLI
-        # The socket mount (runner config.yaml) gives this job container a
-        # path to the host's Docker daemon, but not the `docker` binary
-        # itself — the job container's own base image doesn't ship one.
+        # The service above is the daemon; this job container still needs
+        # the `docker` binary itself to talk to it.
         run: |
           apt-get update
           apt-get install -y --no-install-recommends docker.io
+
+      - name: Wait for the DinD daemon
+        run: |
+          for _ in $(seq 1 30); do
+            docker info >/dev/null 2>&1 && break
+            sleep 1
+          done
+          docker info
 
       - name: Build the runtime image
         # Surfaces Dockerfile / multi-stage / `npm ci` breakage on the PR

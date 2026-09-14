@@ -64,12 +64,15 @@ typecheck/build of all three workspaces, and the server test suite (against a
 throwaway Postgres 16 service container).
 
 A PR-time `docker build` + boot smoke test (ROADMAP PI-92) runs as a separate
-`image` job. Job containers reach the host's Docker daemon via a socket mount
-configured on the runner itself (`container.options: "-v
-/var/run/docker.sock:/var/run/docker.sock"` in the runner's `config.yaml`) —
-this is a **temporary** setup, on the way to a safer DinD sidecar service that
-doesn't expose the host socket to job containers (tracked in ROADMAP PI-92).
-The release image is still built and boot-covered on GitHub for every tag via
+`image` job. It gets a Docker daemon from a Docker-in-Docker (`docker:27-dind`)
+`services:` sidecar, the same pattern the `check` job already uses for its
+Postgres service — no runner-config change needed, and no host socket exposed
+to job containers. (An earlier attempt mounted the host's
+`/var/run/docker.sock` via the runner's own `config.yaml`; that silently
+didn't work — `act_runner`'s `container.valid_volumes` allowlist drops an
+unlisted host bind mount rather than erroring, so `docker` had nothing to
+talk to. The DinD sidecar needs no such allowlist entry at all.) The release
+image is still built and boot-covered on GitHub for every tag via
 `docker-publish.yml`.
 
 It runs on **Forgejo Actions**, not GitHub Actions — `origin` is the Forgejo
