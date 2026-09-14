@@ -116,42 +116,41 @@ jobs:
     # `--privileged` is required for the inner daemon to start; TLS is
     # disabled between this job and its own throwaway sidecar (never
     # leaves the job's private network) to skip unnecessary cert setup.
+    # PI-92 debugging (2026-09-14): TEMPORARY — isolating whether ANY second
+    # service (not just the battle-tested `postgres` in the `check` job) can
+    # resolve on this runner at all, independent of --privileged/dind. A
+    # trivial, privilege-free nginx probe with the same health-check shape
+    # postgres uses. Revert to the real docker:27-dind service once this
+    # answers the question either way.
     services:
-      docker:
-        image: docker:27-dind
-        # PI-92 debugging (2026-09-14): the `docker` alias never resolved at
-        # all without a health check, even after ruling out the volume issue
-        # above (confirmed by a clean restart + rerun, task 68) — matching
-        # the `postgres` service below, which has one and works. act_runner
-        # may only attach a service's network alias once it reports healthy.
+      probe:
+        image: nginx:alpine
         options: >-
-          --privileged
-          --health-cmd "docker info"
+          --health-cmd "wget -q -O- http://localhost/ || exit 1"
           --health-interval 2s
           --health-timeout 3s
           --health-retries 15
-        env:
-          DOCKER_TLS_CERTDIR: ""
-
-    env:
-      DOCKER_HOST: tcp://docker:2375
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install docker CLI
-        # The service above is the daemon; this job container still needs
-        # the `docker` binary itself to talk to it.
+      - name: Probe whether a second service resolves at all
+        run: |
+          echo "::group::Diagnostics"
+          echo "--- /etc/hosts ---"; cat /etc/hosts || true
+          echo "--- getent hosts probe ---"; getent hosts probe || echo "(no match)"
+          echo "--- curl http://probe/ ---"; curl -fsS http://probe/ || echo "(curl failed)"
+          echo "::endgroup::"
+          getent hosts probe
+
+      - name: SKIPPED — Install docker CLI
+        if: false
         run: |
           apt-get update
           apt-get install -y --no-install-recommends docker.io
 
-      - name: Wait for the DinD daemon
-        # PI-92 debugging (2026-09-14): `docker` never resolves here, even
-        # after the full wait — and the sidecar container never shows up on
-        # the runner host's own `docker ps -a` either, even watched live.
-        # Dump everything we can from inside the job itself instead of
-        # continuing to guess from the outside.
+      - name: SKIPPED — Wait for the DinD daemon
+        if: false
         run: |
           ok=""
           for _ in $(seq 1 30); do
@@ -172,13 +171,15 @@ jobs:
           fi
           docker info
 
-      - name: Build the runtime image
+      - name: SKIPPED — Build the runtime image
+        if: false
         # Surfaces Dockerfile / multi-stage / `npm ci` breakage on the PR
         # instead of at release time (docker-publish.yml only builds on a
         # tag). No push — the image is thrown away after the smoke test.
         run: docker build -t limitedgauntlet:ci .
 
-      - name: Boot smoke test
+      - name: SKIPPED — Boot smoke test
+        if: false
         # Proves the container starts, `prisma migrate deploy` runs clean on
         # an empty DB (entrypoint.sh), and the server binds and answers —
         # none of which the vitest suite exercises (it imports modules, it
