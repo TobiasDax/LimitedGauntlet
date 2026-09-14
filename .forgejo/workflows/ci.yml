@@ -116,46 +116,36 @@ jobs:
     # `--privileged` is required for the inner daemon to start; TLS is
     # disabled between this job and its own throwaway sidecar (never
     # leaves the job's private network) to skip unnecessary cert setup.
-    # PI-92 debugging (2026-09-14): TEMPORARY — isolating whether ANY second
-    # service (not just the battle-tested `postgres` in the `check` job) can
-    # resolve on this runner at all, independent of --privileged/dind. A
-    # trivial, privilege-free nginx probe with the same health-check shape
-    # postgres uses. Revert to the real docker:27-dind service once this
-    # answers the question either way.
+    # PI-92 debugging round 3 (2026-09-14): --privileged is confirmed NOT the
+    # problem (a privileged nginx probe resolved fine). Something about the
+    # docker:27-dind image itself fails to start/stay alive on this host —
+    # a classic nested-Docker-in-Docker compatibility gap (this whole CI
+    # system already runs inside Docker, so dind here is a second level of
+    # nesting). Trying an older tag before giving up on DinD entirely.
     services:
-      probe:
-        image: nginx:alpine
-        # PI-92 debugging round 2: the plain probe (no --privileged) resolved
-        # fine. Adding --privileged here now, keeping everything else
-        # identical, to isolate whether that specific flag is what breaks
-        # the docker:27-dind service, independent of the dind image itself.
+      docker:
+        image: docker:24-dind
         options: >-
           --privileged
-          --health-cmd "wget -q -O- http://localhost/ || exit 1"
+          --health-cmd "docker info"
           --health-interval 2s
           --health-timeout 3s
           --health-retries 15
+        env:
+          DOCKER_TLS_CERTDIR: ""
+
+    env:
+      DOCKER_HOST: tcp://docker:2375
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Probe whether a second service resolves at all
-        run: |
-          echo "::group::Diagnostics"
-          echo "--- /etc/hosts ---"; cat /etc/hosts || true
-          echo "--- getent hosts probe ---"; getent hosts probe || echo "(no match)"
-          echo "--- curl http://probe/ ---"; curl -fsS http://probe/ || echo "(curl failed)"
-          echo "::endgroup::"
-          getent hosts probe
-
-      - name: SKIPPED — Install docker CLI
-        if: false
+      - name: Install docker CLI
         run: |
           apt-get update
           apt-get install -y --no-install-recommends docker.io
 
-      - name: SKIPPED — Wait for the DinD daemon
-        if: false
+      - name: Wait for the DinD daemon
         run: |
           ok=""
           for _ in $(seq 1 30); do
