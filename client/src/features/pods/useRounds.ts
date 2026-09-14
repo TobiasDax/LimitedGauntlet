@@ -20,11 +20,22 @@ function invalidatePod(queryClient: ReturnType<typeof useQueryClient>, podId: st
 // first click sends nothing and the server 409s if there's a conflict to resolve.
 export type OnDemandResolution = "withdraw" | "keep";
 
+// PI-115 — tableSizes is only meaningful when generating round 1 of a
+// DRAFT/CHAOS_DRAFT pod that's split into multiple physical tables; omitted
+// (or generating any other round) means "one big table", today's behavior.
+export interface GenerateRoundInput {
+  resolution?: OnDemandResolution;
+  tableSizes?: number[];
+}
+
 export function useGenerateRound(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (resolution: OnDemandResolution | void) =>
-      api.post<{ round: Round }>(`/pods/${podId}/rounds`, resolution ? { onDemandResolution: resolution } : undefined),
+    mutationFn: ({ resolution, tableSizes }: GenerateRoundInput = {}) =>
+      api.post<{ round: Round }>(`/pods/${podId}/rounds`, {
+        ...(resolution ? { onDemandResolution: resolution } : {}),
+        ...(tableSizes ? { tableSizes } : {}),
+      }),
     onSuccess: () => invalidatePod(queryClient, podId),
   });
 }
@@ -47,13 +58,15 @@ export interface ManualPairInput {
   pairs: ManualPair[];
   // PI-100 — same on-demand round-1 resolution as useGenerateRound.
   onDemandResolution?: OnDemandResolution;
+  // PI-115 — same table-split shape as useGenerateRound's GenerateRoundInput.
+  tableSizes?: number[];
 }
 
 export function useManualPairRound(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ pairs, onDemandResolution }: ManualPairInput) =>
-      api.post<{ round: Round }>(`/pods/${podId}/rounds/manual`, { pairs, onDemandResolution }),
+    mutationFn: ({ pairs, onDemandResolution, tableSizes }: ManualPairInput) =>
+      api.post<{ round: Round }>(`/pods/${podId}/rounds/manual`, { pairs, onDemandResolution, tableSizes }),
     onSuccess: () => invalidatePod(queryClient, podId),
   });
 }
@@ -142,6 +155,9 @@ export function roundErrorMessage(err: unknown): string {
     if (err.message === "round_locked") return "This round has already started — swaps only work before it starts.";
     if (err.message === "cannot_swap_bye") return "Can't swap into or out of a bye slot.";
     if (err.message === "no_op") return "Pick two different seats to swap.";
+    if (err.message === "table_split_not_allowed")
+      return "Table splits only apply to round 1 of a Draft or Chaos Draft pod.";
+    if (err.message === "invalid_table_shape") return "That table split doesn't add up to every active entrant.";
     if (err.message === "round_already_started")
       return "This round has already started — it can't be un-paired anymore.";
   }

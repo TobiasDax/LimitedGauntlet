@@ -155,6 +155,9 @@ export interface Entrant {
   playerId: string | null;
   teamId: string | null;
   droppedAfterRound: number | null;
+  // PI-115 — which physical draft table this entrant sits at when the pod's
+  // round 1 split into multiple tables. Null = not split / single table.
+  draftTable: number | null;
   player: Player | null;
   team: Team | null;
 }

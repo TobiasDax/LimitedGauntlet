@@ -1,9 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import type { Prisma } from "../db.js";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findOwnedPod, findOwnedRound, findOwnedMatch } from "../services/ownership.js";
 import { generatePairings, getActiveEntrants, getLatestRound, PairingError } from "../services/pairing.js";
+import { fillTables, validateTableShape, MIN_TABLE_SIZE, type FillPair } from "../services/tableFill.js";
 import { inferCardPullAttribution } from "../services/cardPullInference.js";
 import { syncPodTokenAwards } from "../services/tokens.js";
 import {
@@ -26,7 +28,11 @@ const extendSchema = z.object({
 // with the conflict list so the client can show the modal; the retry carries
 // the choice. Irrelevant for every other round / non-on-demand pod.
 const onDemandResolution = z.enum(["withdraw", "keep"]).optional();
-const generateRoundSchema = z.object({ onDemandResolution });
+// PI-115 — only meaningful for round 1 of a DRAFT/CHAOS_DRAFT pod: the TO's
+// chosen physical-table shape (each entry a table's seat count), locked in
+// before pairing exists. Purely a seating concern — see tableFill.ts.
+const tableSizes = z.array(z.number().int().min(MIN_TABLE_SIZE)).min(1).optional();
+const generateRoundSchema = z.object({ onDemandResolution, tableSizes });
 const manualPairSchema = z.object({
   pairs: z
     .array(
@@ -37,7 +43,45 @@ const manualPairSchema = z.object({
     )
     .min(1),
   onDemandResolution,
+  tableSizes,
 });
+
+// PI-115 — splitting into physical tables is a draft-specific, pack-passing
+// concern (see ROADMAP PI-115); sealed/constructed/custom pods never offer it.
+const TABLE_SPLIT_FORMATS = new Set(["DRAFT", "CHAOS_DRAFT"]);
+
+// Shared by both round-1 pairing routes below. `pairs` is whichever pairing
+// is about to be persisted (the generated suggestion, or the manual body) —
+// entrantCount is derived from it rather than re-queried. Table groups never
+// feed back into pairing.ts; this only decides where entrants physically sit.
+function resolveTableSplit(
+  pod: { format: string },
+  nextRoundNumber: number,
+  sizes: number[] | undefined,
+  pairs: FillPair[],
+):
+  | { error: "table_split_not_allowed" | "invalid_table_shape"; reason?: string }
+  | { assignment: Map<string, number> | null } {
+  if (!sizes) return { assignment: null };
+  if (nextRoundNumber !== 1 || !TABLE_SPLIT_FORMATS.has(pod.format)) {
+    return { error: "table_split_not_allowed" };
+  }
+  const entrantCount = pairs.reduce((n, p) => n + (p.entrantBId ? 2 : 1), 0);
+  const shapeError = validateTableShape(entrantCount, sizes);
+  if (shapeError) return { error: "invalid_table_shape", reason: shapeError };
+  return { assignment: fillTables(pairs, sizes) };
+}
+
+// Persists a table-split fill (if any) inside the same transaction that just
+// created round 1's Match rows.
+async function persistTableSplit(tx: Prisma.TransactionClient, assignment: Map<string, number> | null): Promise<void> {
+  if (!assignment) return;
+  await Promise.all(
+    [...assignment.entries()].map(([entrantId, table]) =>
+      tx.entrant.update({ where: { id: entrantId }, data: { draftTable: table } }),
+    ),
+  );
+}
 
 const swapSchema = z.object({
   matchAId: z.string().min(1),
@@ -148,6 +192,12 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       throw err;
     }
 
+    const tableSplit = resolveTableSplit(pod, nextRoundNumber, body.data.tableSizes, suggestion.pairs);
+    if ("error" in tableSplit) {
+      reply.code(400).send(tableSplit);
+      return;
+    }
+
     const { round, affectedPodIds } = await prisma.$transaction(async (tx) => {
       const created = await tx.round.create({ data: { podId: pod.id, roundNumber: nextRoundNumber } });
       await tx.match.createMany({
@@ -158,6 +208,7 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
           entrantBId: pair.entrantBId,
         })),
       });
+      await persistTableSplit(tx, tableSplit.assignment);
       // PI-82 — the real "pod actually started" moment, regardless of
       // format: round 1's Match rows being created (for DRAFT/CHAOS_DRAFT/
       // SEALED this is the same action as PI-80's "Generate seatings").
@@ -234,6 +285,12 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
+    const tableSplit = resolveTableSplit(pod, nextRoundNumber, body.data.tableSizes, body.data.pairs);
+    if ("error" in tableSplit) {
+      reply.code(400).send(tableSplit);
+      return;
+    }
+
     // PI-100 — same on-demand withdraw decision as the auto-pairing route above.
     const withdrawOnDemand = nextRoundNumber === 1 && pod.isOnDemand && body.data.onDemandResolution === "withdraw";
     if (nextRoundNumber === 1 && pod.isOnDemand && !body.data.onDemandResolution) {
@@ -254,6 +311,7 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
           entrantBId: pair.entrantBId,
         })),
       });
+      await persistTableSplit(tx, tableSplit.assignment);
       // PI-82 — same "actually started" stamp as the auto-pairing route above.
       if (nextRoundNumber === 1) {
         await tx.pod.update({ where: { id: pod.id }, data: { actualStartedAt: new Date() } });
@@ -362,6 +420,9 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     // too, since generation was what set it.
     if (round.roundNumber === 1) {
       await prisma.pod.update({ where: { id: round.podId }, data: { actualStartedAt: null } });
+      // PI-115 — a fresh re-pair should let the TO reconfigure (or drop) the
+      // table split from scratch, not inherit the undone pairing's fill.
+      await prisma.entrant.updateMany({ where: { podId: round.podId }, data: { draftTable: null } });
     }
 
     // PI-100 — if starting this round auto-withdrew entrants from other

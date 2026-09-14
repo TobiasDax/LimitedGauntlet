@@ -12,6 +12,7 @@ import { entrantDisplayName } from "../lib/entrant";
 import { useCountdown } from "../lib/useCountdown";
 import { PrepTimerDisplay } from "../components/PrepTimer";
 import { SeatingChart } from "../components/SeatingChart";
+import { groupSeatsByTable } from "../lib/seatings";
 import { Eyebrow, ScreenDek, ScreenTitle } from "../components/ui";
 import { CardGallery, formatEur } from "../components/CardGallery";
 import type { Entrant, Match, Round } from "../lib/types";
@@ -128,12 +129,16 @@ export function PublicPodPage() {
   const pod = podData.pod;
   const entrantById = new Map(pod.entrants.map((e) => [e.id, e]));
   const rounds = [...(roundsData?.rounds ?? [])].reverse();
-  const seatByEntrantId = new Map((seatingData?.seats ?? []).map((s) => [s.entrantId, s.seat]));
+  const seats = seatingData?.seats ?? [];
+  // PI-115 — a split pod's rows all carry a table number; groupSeatsByTable
+  // returns null when they don't (unsplit pod), so the two branches below
+  // are mutually exclusive.
+  const splitSeats = groupSeatsByTable(seats);
+  const seatByEntrantId = new Map(seats.map((s) => [s.entrantId, s.seat]));
   // The seating chart is only useful while people are finding their seats —
   // once round 1 is under way it's just noise, so drop it then.
   const round1 = (roundsData?.rounds ?? []).find((r) => r.roundNumber === 1);
-  const showSeating =
-    seatingFormats.has(pod.format) && seatByEntrantId.size > 0 && (!round1 || round1.status === "PENDING");
+  const showSeating = seatingFormats.has(pod.format) && seats.length > 0 && (!round1 || round1.status === "PENDING");
 
   return (
     <div>
@@ -152,11 +157,29 @@ export function PublicPodPage() {
       {showSeating && (
         <section className="mb-12">
           <h2 className="font-display mb-4 text-[20px] font-bold">Seating</h2>
-          <SeatingChart
-            seatByEntrantId={seatByEntrantId}
-            entrantById={entrantById}
-            entrantCount={pod.entrants.length}
-          />
+          {splitSeats ? (
+            [...splitSeats.entries()]
+              .sort(([a], [b]) => a - b)
+              .map(([table, seatByEntrantIdForTable]) => (
+                <div key={table} className="mb-6">
+                  <h3 className="mb-2 font-display text-[14px] font-bold">
+                    Table {table} ({seatByEntrantIdForTable.size} players)
+                  </h3>
+                  <SeatingChart
+                    seatByEntrantId={seatByEntrantIdForTable}
+                    entrantById={entrantById}
+                    entrantCount={seatByEntrantIdForTable.size}
+                    showByeBadge={false}
+                  />
+                </div>
+              ))
+          ) : (
+            <SeatingChart
+              seatByEntrantId={seatByEntrantId}
+              entrantById={entrantById}
+              entrantCount={pod.entrants.length}
+            />
+          )}
         </section>
       )}
 

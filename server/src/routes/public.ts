@@ -7,7 +7,7 @@ import { hasValidPlayerSession } from "../services/playerAccounts.js";
 import { computeGesamtwertung, countTournamentParticipants } from "../services/gesamtwertung.js";
 import { computePodStandings } from "../services/standings.js";
 import { computeHallOfFameOverview, computePlayerStats, type HeadToHeadEntry } from "../services/playerStats.js";
-import { computeSeatings } from "../services/seatings.js";
+import { computeSeatings, computeSplitSeatings } from "../services/seatings.js";
 import { redactUnrevealedRound1 } from "../services/pairingsVisibility.js";
 import { buildRedactor, type Redactor } from "../services/publicVisibility.js";
 import { getHiddenPlayerAliases } from "../services/playerPrivacy.js";
@@ -360,14 +360,24 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
       reply.code(404).send({ error: "not_found" });
       return;
     }
-    const [round1, entrantCount] = await Promise.all([
+    const [round1, entrants] = await Promise.all([
       prisma.round.findUnique({
         where: { podId_roundNumber: { podId: pod.id, roundNumber: 1 } },
         include: { matches: { orderBy: { tableNumber: "asc" } } },
       }),
-      prisma.entrant.count({ where: { podId: pod.id } }),
+      prisma.entrant.findMany({ where: { podId: pod.id }, select: { id: true, draftTable: true } }),
     ]);
-    const seats = round1 ? computeSeatings(round1.matches, entrantCount) : [];
+    // PI-115 — a split pod's seating is table-group data (Entrant.draftTable),
+    // never derived from round 1's pairing, so it's available as soon as the
+    // TO locks in the split fill — same reveal-independent availability as
+    // the unsplit case below.
+    const splitEntrants = entrants.filter((e): e is { id: string; draftTable: number } => e.draftTable !== null);
+    const seats =
+      splitEntrants.length > 0
+        ? computeSplitSeatings(splitEntrants)
+        : round1
+          ? computeSeatings(round1.matches, entrants.length)
+          : [];
     reply.send({ seats });
   });
 

@@ -4,8 +4,10 @@ import { usePod } from "../features/pods/usePods";
 import { useGenerateRound, useRounds, roundErrorMessage } from "../features/pods/useRounds";
 import { usePodRealtime } from "../features/pods/usePodRealtime";
 import { useOnDemandStartGuard } from "../features/pods/useOnDemandStartGuard";
-import { computeSeatings } from "../lib/seatings";
+import { computeSeatings, computeSplitSeatings, groupSeatsByTable } from "../lib/seatings";
+import { validateTableShape, SPLIT_ELIGIBLE_ABOVE } from "../lib/tableShape";
 import { SeatingChart } from "../components/SeatingChart";
+import { TableShapeForm } from "../components/TableShapeForm";
 import { ManualPairingForm } from "../components/ManualPairingForm";
 import { OnDemandConflictModal } from "../components/OnDemandConflictModal";
 import { PodTabs } from "../components/PodTabs";
@@ -14,6 +16,10 @@ import { Button, Eyebrow, FormError, ScreenDek, ScreenTitle } from "../component
 // PI-79 — same format list as PodTabs' Seatings-tab visibility check: the
 // formats where packs (or a sealed pool) actually get seated around a table.
 const seatingFormats = new Set(["DRAFT", "CHAOS_DRAFT", "SEALED"]);
+
+// PI-115 — splitting into multiple physical tables is a draft-specific,
+// pack-passing concern (sealed doesn't pass packs around a table).
+const splitFormats = new Set(["DRAFT", "CHAOS_DRAFT"]);
 
 // PI-80 — every seating-related UI lives on its own tab now, not folded
 // into the Pairings tab the way PI-51 originally shipped it. "Generate
@@ -29,14 +35,20 @@ export function SeatingsPage() {
   const startGuard = useOnDemandStartGuard();
   usePodRealtime(id, podData?.pod.tournamentId);
   const [showManual, setShowManual] = useState(false);
+  // PI-115 — undefined = one big table (today's behavior); only offered/read
+  // before round 1 exists, see TableShapeForm below.
+  const [tableSizes, setTableSizes] = useState<number[] | undefined>(undefined);
 
   const runGenerate = (resolution?: "withdraw" | "keep") =>
-    generateRound.mutate(resolution, {
-      onError: (e) => {
-        if (startGuard.catchConflicts(e)) generateRound.reset();
+    generateRound.mutate(
+      { resolution, tableSizes },
+      {
+        onError: (e) => {
+          if (startGuard.catchConflicts(e)) generateRound.reset();
+        },
+        onSuccess: startGuard.clear,
       },
-      onSuccess: startGuard.clear,
-    });
+    );
 
   if (isLoading || !podData) return <p className="text-ink-muted">Loading…</p>;
 
@@ -44,8 +56,16 @@ export function SeatingsPage() {
   const entrantById = new Map(pod.entrants.map((e) => [e.id, e]));
   const rounds = roundsData?.rounds ?? [];
   const round1 = rounds.find((r) => r.roundNumber === 1);
-  const seatByEntrantId = round1 ? computeSeatings(round1.matches, pod.entrants.length) : null;
   const usesSeating = seatingFormats.has(pod.format);
+
+  // PI-115 — a split pod's seating comes from Entrant.draftTable (set at
+  // round-1-generation time), never from the pairing itself.
+  const splitEntrants = pod.entrants.filter((e): e is typeof e & { draftTable: number } => e.draftTable !== null);
+  const splitSeats = splitEntrants.length > 0 ? groupSeatsByTable(computeSplitSeatings(splitEntrants)) : null;
+  const seatByEntrantId = !splitSeats && round1 ? computeSeatings(round1.matches, pod.entrants.length) : null;
+
+  const offerSplit = splitFormats.has(pod.format) && pod.entrants.length > SPLIT_ELIGIBLE_ABOVE;
+  const shapeError = tableSizes ? validateTableShape(pod.entrants.length, tableSizes) : null;
 
   return (
     <div>
@@ -78,29 +98,64 @@ export function SeatingsPage() {
       ) : !round1 ? (
         pod.entrants.length < 2 ? (
           <p className="text-ink-muted">Add at least 2 entrants before generating seatings.</p>
-        ) : !showManual ? (
-          <div className="flex items-center gap-3">
-            <Button variant="primary" onClick={() => runGenerate()} disabled={generateRound.isPending}>
-              {generateRound.isPending ? "Generating…" : "Generate seatings"}
-            </Button>
-            <button
-              type="button"
-              onClick={() => setShowManual(true)}
-              className="text-[12.5px] text-ink-secondary underline hover:text-accent-strong"
-            >
-              Seat manually instead
-            </button>
-            {generateRound.isError && <FormError>{roundErrorMessage(generateRound.error)}</FormError>}
-          </div>
         ) : (
-          <ManualPairingForm
-            podId={pod.id}
-            activeEntrants={pod.entrants}
-            roundNumber={1}
-            onDone={() => setShowManual(false)}
-            onCancel={() => setShowManual(false)}
-          />
+          <>
+            {offerSplit && <TableShapeForm entrantCount={pod.entrants.length} onChange={setTableSizes} />}
+            {!showManual ? (
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="primary"
+                  onClick={() => runGenerate()}
+                  disabled={generateRound.isPending || !!shapeError}
+                >
+                  {generateRound.isPending ? "Generating…" : "Generate seatings"}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setShowManual(true)}
+                  className="text-[12.5px] text-ink-secondary underline hover:text-accent-strong"
+                >
+                  Seat manually instead
+                </button>
+                {generateRound.isError && <FormError>{roundErrorMessage(generateRound.error)}</FormError>}
+              </div>
+            ) : (
+              <ManualPairingForm
+                podId={pod.id}
+                activeEntrants={pod.entrants}
+                roundNumber={1}
+                tableSizes={tableSizes}
+                onDone={() => setShowManual(false)}
+                onCancel={() => setShowManual(false)}
+              />
+            )}
+          </>
         )
+      ) : splitSeats ? (
+        <>
+          {[...splitSeats.entries()]
+            .sort(([a], [b]) => a - b)
+            .map(([table, seatByEntrantIdForTable]) => (
+              <div key={table} className="mb-6">
+                <h3 className="mb-2 font-display text-[14px] font-bold">
+                  Table {table} ({seatByEntrantIdForTable.size} players)
+                </h3>
+                <SeatingChart
+                  seatByEntrantId={seatByEntrantIdForTable}
+                  entrantById={entrantById}
+                  entrantCount={seatByEntrantIdForTable.size}
+                  showByeBadge={false}
+                />
+              </div>
+            ))}
+          <p className="text-[13px] text-ink-secondary">
+            Seatings are generated. Head to the{" "}
+            <Link to={`/pods/${id}/rounds`} className="text-link underline hover:text-link-strong">
+              Pairings tab
+            </Link>{" "}
+            to reveal round 1's pairings once everyone's found their seat.
+          </p>
+        </>
       ) : seatByEntrantId && seatByEntrantId.size > 0 ? (
         <>
           <SeatingChart

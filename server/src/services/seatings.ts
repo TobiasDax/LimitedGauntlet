@@ -10,9 +10,14 @@
 // falls outside the pod. Table numbers are re-numbered 1..M by sorted
 // tableNumber for a stable order — which entrant of a pair gets the lower
 // vs. higher seat number is arbitrary.
+// `table` is null for an unsplit pod's pairing-derived seat (the whole pod
+// is one physical table). PI-115's computeSplitSeatings below sets it to the
+// 1-indexed physical table number for a pod split across multiple tables —
+// see Entrant.draftTable in schema.prisma.
 export interface SeatAssignment {
   entrantId: string;
   seat: number;
+  table: number | null;
 }
 
 interface SeatableMatch {
@@ -32,12 +37,37 @@ export function computeSeatings(round1Matches: SeatableMatch[], entrantCount: nu
   const seats: SeatAssignment[] = [];
   realMatches.forEach((match, index) => {
     const seat = index + 1;
-    seats.push({ entrantId: match.entrantAId, seat });
-    seats.push({ entrantId: match.entrantBId!, seat: seat + tableCount });
+    seats.push({ entrantId: match.entrantAId, seat, table: null });
+    seats.push({ entrantId: match.entrantBId!, seat: seat + tableCount, table: null });
   });
   if (byeMatch) {
-    seats.push({ entrantId: byeMatch.entrantAId, seat: tableCount });
+    seats.push({ entrantId: byeMatch.entrantAId, seat: tableCount, table: null });
   }
 
+  return seats;
+}
+
+// PI-115 — seating for a pod split into multiple physical tables. Unlike
+// computeSeatings above, this is never derived from round 1's pairing (that
+// stays deliberately unconstrained, see pairing.ts) — it's purely "who's
+// assigned to which table" (Entrant.draftTable, set by tableFill.ts's
+// fillTables at round-1-generation time), with a local seat number 1..k
+// assigned in a stable (sorted-by-id) order within each table. Which
+// specific number a given entrant gets within their table is arbitrary,
+// same precedent as computeSeatings above.
+export function computeSplitSeatings(entrants: Array<{ id: string; draftTable: number }>): SeatAssignment[] {
+  const byTable = new Map<number, string[]>();
+  for (const e of entrants) {
+    const group = byTable.get(e.draftTable) ?? [];
+    group.push(e.id);
+    byTable.set(e.draftTable, group);
+  }
+
+  const seats: SeatAssignment[] = [];
+  for (const [table, ids] of byTable) {
+    [...ids].sort().forEach((entrantId, index) => {
+      seats.push({ entrantId, seat: index + 1, table });
+    });
+  }
   return seats;
 }

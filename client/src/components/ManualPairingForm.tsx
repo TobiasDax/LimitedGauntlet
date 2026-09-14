@@ -16,12 +16,16 @@ export function ManualPairingForm({
   podId,
   activeEntrants,
   roundNumber,
+  tableSizes,
   onDone,
   onCancel,
 }: {
   podId: string;
   activeEntrants: Entrant[];
   roundNumber: number;
+  // PI-115 — round 1's TO-chosen table split (Seatings tab only), forwarded
+  // through unchanged; see useRounds.ts's ManualPairInput.
+  tableSizes?: number[];
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -44,7 +48,11 @@ export function ManualPairingForm({
   // the modal retries with a resolution.
   const submit = (resolution?: "withdraw" | "keep") =>
     manualPair.mutate(
-      { pairs: pairs.map((p) => ({ entrantAId: p.a, entrantBId: p.b || null })), onDemandResolution: resolution },
+      {
+        pairs: pairs.map((p) => ({ entrantAId: p.a, entrantBId: p.b || null })),
+        onDemandResolution: resolution,
+        tableSizes,
+      },
       {
         onSuccess: () => {
           startGuard.clear();

@@ -448,12 +448,15 @@ export function PairingsPage() {
   // this on-demand pod shares entrants with other on-demand pods, and the modal
   // retries with "withdraw" / "keep".
   const runGenerate = (resolution?: "withdraw" | "keep") =>
-    generateRound.mutate(resolution, {
-      onError: (e) => {
-        if (startGuard.catchConflicts(e)) generateRound.reset();
+    generateRound.mutate(
+      { resolution },
+      {
+        onError: (e) => {
+          if (startGuard.catchConflicts(e)) generateRound.reset();
+        },
+        onSuccess: startGuard.clear,
       },
-      onSuccess: startGuard.clear,
-    });
+    );
 
   return (
     <div>

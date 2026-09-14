@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import type { SeatAssignment } from "../../lib/seatings";
 import type {
   CardPull,
   Entrant,
@@ -119,11 +120,9 @@ export function usePublicRounds(slug: string | undefined, podId: string | undefi
 
 // PI-79/80 — deliberately public even before round 1's pairings are
 // revealed (that's the point: find your seat, then discover your opponent
-// once you get there). Never carries opponent pairings — just entrant→seat.
-export interface PublicSeatAssignment {
-  entrantId: string;
-  seat: number;
-}
+// once you get there). Never carries opponent pairings — just entrant→seat
+// (plus, since PI-115, which physical table — also never opponent data).
+export type PublicSeatAssignment = SeatAssignment;
 
 export function usePublicSeating(slug: string | undefined, podId: string | undefined) {
   return useQuery({
