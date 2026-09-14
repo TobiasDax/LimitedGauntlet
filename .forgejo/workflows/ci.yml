@@ -119,7 +119,17 @@ jobs:
     services:
       docker:
         image: docker:27-dind
-        options: --privileged
+        # PI-92 debugging (2026-09-14): the `docker` alias never resolved at
+        # all without a health check, even after ruling out the volume issue
+        # above (confirmed by a clean restart + rerun, task 68) — matching
+        # the `postgres` service below, which has one and works. act_runner
+        # may only attach a service's network alias once it reports healthy.
+        options: >-
+          --privileged
+          --health-cmd "docker info"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
         env:
           DOCKER_TLS_CERTDIR: ""
 
