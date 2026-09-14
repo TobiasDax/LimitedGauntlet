@@ -110,13 +110,27 @@ export function SeatingChart({
           entirely. */}
       <div ref={containerRef} className={`flex w-full gap-2 ${isColumnMode ? "flex-row" : "flex-col"}`}>
         {isColumnMode ? (
-          <>
-            <div className="flex flex-1 flex-col gap-2">
-              {emptyBottomSlot && <div key="empty" aria-hidden="true" />}
-              {bottomRow.map(cell)}
-            </div>
-            <div className="flex flex-1 flex-col gap-2">{topRow.map(cell)}</div>
-          </>
+          // A real 2-column CSS Grid, not two independent flex columns: with
+          // grid-auto-flow: column and an explicit row count, the browser
+          // fills the first `tableCount` DOM items into column 1 (left) then
+          // the rest into column 2 (right) -- and because it's one grid,
+          // every row's height matches its tallest cell across BOTH columns
+          // (default align-items: stretch), so the invisible empty-slot div
+          // for an odd entrant count stretches to a full seat's height
+          // instead of collapsing to 0px the way it would in a lone flex
+          // column with nothing to borrow height from.
+          <div
+            className="grid w-full gap-2"
+            style={{
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gridTemplateRows: `repeat(${tableCount}, minmax(0, 1fr))`,
+              gridAutoFlow: "column",
+            }}
+          >
+            {emptyBottomSlot && <div key="empty" aria-hidden="true" />}
+            {bottomRow.map(cell)}
+            {topRow.map(cell)}
+          </div>
         ) : (
           <>
             <div className="grid w-full gap-2" style={{ gridTemplateColumns: `repeat(${tableCount}, minmax(0, 1fr))` }}>
