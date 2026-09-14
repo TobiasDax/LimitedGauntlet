@@ -64,16 +64,27 @@ typecheck/build of all three workspaces, and the server test suite (against a
 throwaway Postgres 16 service container).
 
 A PR-time `docker build` + boot smoke test (ROADMAP PI-92) runs as a separate
-`image` job. It gets a Docker daemon from a Docker-in-Docker (`docker:27-dind`)
-`services:` sidecar, the same pattern the `check` job already uses for its
-Postgres service — no runner-config change needed, and no host socket exposed
-to job containers. (An earlier attempt mounted the host's
-`/var/run/docker.sock` via the runner's own `config.yaml`; that silently
-didn't work — `act_runner`'s `container.valid_volumes` allowlist drops an
-unlisted host bind mount rather than erroring, so `docker` had nothing to
-talk to. The DinD sidecar needs no such allowlist entry at all.) The release
-image is still built and boot-covered on GitHub for every tag via
-`docker-publish.yml`.
+`image` job. Its job container reaches the host's Docker daemon via a socket
+mount configured on the runner itself:
+
+```yaml
+container:
+  options: "... -v /var/run/docker.sock:/var/run/docker.sock"
+  valid_volumes:
+    - /var/run/docker.sock
+```
+
+Both lines matter — `act_runner` silently **drops** an unlisted host bind
+mount from `options` rather than erroring (`[/var/run/docker.sock] is not a
+valid volume, will be ignored`), so the `valid_volumes` entry is required for
+the mount in `options` to actually take effect. A Docker-in-Docker
+`services:` sidecar (no host exposure at all) was tried first and would be
+the safer design, but never worked on this runner — two different
+`docker:*-dind` versions both failed to start, independent of `--privileged`
+(confirmed fine via a probe test), most likely a nested-containerization
+limitation on the host itself (this whole CI system already runs inside
+Docker). The release image is still built and boot-covered on GitHub for
+every tag via `docker-publish.yml`.
 
 It runs on **Forgejo Actions**, not GitHub Actions — `origin` is the Forgejo
 instance and GitHub is only a downstream push-mirror, so Forgejo is where

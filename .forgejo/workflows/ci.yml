@@ -9,10 +9,17 @@ name: CI
 # a registered runner with a Docker backend advertising the `ubuntu-latest`
 # label — see docs/development.md "Continuous integration".
 #
-# The `image` job needs a Docker daemon to talk to — it gets one from a
-# Docker-in-Docker `services:` sidecar (see that job), not a host socket
-# mount, so it needs no runner-side config at all. The release image is
-# still built + smoke-covered on GitHub for every tag via
+# The `image` job needs a Docker daemon to talk to. A Docker-in-Docker
+# `services:` sidecar was tried first (no host exposure at all) but never
+# worked on this runner — two different docker:*-dind versions both failed
+# to start (2026-09-14), independent of the --privileged flag (confirmed
+# fine via a probe), most likely a nested-containerization limitation on the
+# host itself. Settled on a host-socket mount instead: the runner's own
+# config.yaml mounts /var/run/docker.sock into job containers
+# (`container.options` + the matching `container.valid_volumes` entry —
+# act_runner silently drops an unlisted host bind mount rather than
+# erroring, which cost real debugging time before this was understood). The
+# release image is still built + smoke-covered on GitHub for every tag via
 # .github/workflows/docker-publish.yml, which stays GitHub-only and is
 # guarded to no-op if a Forgejo runner picks it up.
 
@@ -106,75 +113,24 @@ jobs:
     # or move it to a nightly schedule.
     runs-on: ubuntu-latest
 
-    # DinD sidecar, not a host-socket mount: act_runner's own security
-    # allowlist (`container.valid_volumes`) silently drops an unlisted
-    # host bind mount — confirmed by a real run (task 60, 2026-09-14):
-    # `[/var/run/docker.sock] is not a valid volume, will be ignored`, so
-    # `docker` had nothing to talk to. A `services:` container needs no
-    # host bind mount at all — same mechanism the `check` job already uses
-    # for its `postgres` service, just with Docker-in-Docker instead.
-    # `--privileged` is required for the inner daemon to start; TLS is
-    # disabled between this job and its own throwaway sidecar (never
-    # leaves the job's private network) to skip unnecessary cert setup.
-    # PI-92 debugging round 3 (2026-09-14): --privileged is confirmed NOT the
-    # problem (a privileged nginx probe resolved fine). Something about the
-    # docker:27-dind image itself fails to start/stay alive on this host —
-    # a classic nested-Docker-in-Docker compatibility gap (this whole CI
-    # system already runs inside Docker, so dind here is a second level of
-    # nesting). Trying an older tag before giving up on DinD entirely.
-    services:
-      docker:
-        image: docker:24-dind
-        options: >-
-          --privileged
-          --health-cmd "docker info"
-          --health-interval 2s
-          --health-timeout 3s
-          --health-retries 15
-        env:
-          DOCKER_TLS_CERTDIR: ""
-
-    env:
-      DOCKER_HOST: tcp://docker:2375
-
     steps:
       - uses: actions/checkout@v4
 
       - name: Install docker CLI
+        # The runner's own host-socket mount gives this job container a path
+        # to the host's Docker daemon, but not the `docker` binary itself —
+        # the job container's own base image doesn't ship one.
         run: |
           apt-get update
           apt-get install -y --no-install-recommends docker.io
 
-      - name: Wait for the DinD daemon
-        run: |
-          ok=""
-          for _ in $(seq 1 30); do
-            if docker info >/dev/null 2>&1; then ok=1; break; fi
-            sleep 1
-          done
-          if [ -z "$ok" ]; then
-            echo "::group::Diagnostics"
-            echo "--- env (docker-related) ---"; env | grep -i docker || true
-            echo "--- /etc/hosts ---"; cat /etc/hosts || true
-            echo "--- /etc/resolv.conf ---"; cat /etc/resolv.conf || true
-            echo "--- getent hosts docker ---"; getent hosts docker || echo "(no match)"
-            echo "--- docker version (client only) ---"; docker version || true
-            echo "--- docker -H tcp://docker:2375 info (explicit host) ---"; docker -H tcp://docker:2375 info || true
-            echo "--- docker context ls ---"; docker context ls || true
-            echo "::endgroup::"
-            exit 1
-          fi
-          docker info
-
-      - name: SKIPPED — Build the runtime image
-        if: false
+      - name: Build the runtime image
         # Surfaces Dockerfile / multi-stage / `npm ci` breakage on the PR
         # instead of at release time (docker-publish.yml only builds on a
         # tag). No push — the image is thrown away after the smoke test.
         run: docker build -t limitedgauntlet:ci .
 
-      - name: SKIPPED — Boot smoke test
-        if: false
+      - name: Boot smoke test
         # Proves the container starts, `prisma migrate deploy` runs clean on
         # an empty DB (entrypoint.sh), and the server binds and answers —
         # none of which the vitest suite exercises (it imports modules, it
