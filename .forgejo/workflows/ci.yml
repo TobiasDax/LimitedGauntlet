@@ -119,10 +119,21 @@ jobs:
       - name: Install docker CLI
         # The runner's own host-socket mount gives this job container a path
         # to the host's Docker daemon, but not the `docker` binary itself —
-        # the job container's own base image doesn't ship one.
+        # the job container's own base image doesn't ship one. Debian's
+        # `docker.io` apt package ships a very old client (API 1.41) that's
+        # too old to speak to a modern host daemon ("client version 1.41 is
+        # too old, minimum supported API version is 1.44"), so pull a current
+        # static binary from Docker's own release server instead.
         run: |
+          set -euo pipefail
           apt-get update
-          apt-get install -y --no-install-recommends docker.io
+          apt-get install -y --no-install-recommends curl ca-certificates
+          curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-27.3.1.tgz \
+            -o /tmp/docker.tgz
+          tar -xzf /tmp/docker.tgz -C /tmp
+          install -m 0755 /tmp/docker/docker /usr/local/bin/docker
+          rm -rf /tmp/docker.tgz /tmp/docker
+          docker version --format '{{.Client.Version}} (API {{.Client.APIVersion}})'
 
       - name: Build the runtime image
         # Surfaces Dockerfile / multi-stage / `npm ci` breakage on the PR
