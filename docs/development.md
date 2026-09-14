@@ -63,12 +63,13 @@ if `schema.prisma` was edited without a matching migration), the
 typecheck/build of all three workspaces, and the server test suite (against a
 throwaway Postgres 16 service container).
 
-A PR-time `docker build` + boot smoke test (ROADMAP PI-92) is deliberately
-**not** in the workflow: the runner executes job steps inside a plain
-container with no `docker` CLI or host socket, so it can't build an image.
-Re-add that job once the runner can (mount `/var/run/docker.sock` via the
-runner's `config.yml` `container.options`, or run a DinD service). The
-release image is still built and boot-covered on GitHub for every tag via
+A PR-time `docker build` + boot smoke test (ROADMAP PI-92) runs as a separate
+`image` job. Job containers reach the host's Docker daemon via a socket mount
+configured on the runner itself (`container.options: "-v
+/var/run/docker.sock:/var/run/docker.sock"` in the runner's `config.yaml`) —
+this is a **temporary** setup, on the way to a safer DinD sidecar service that
+doesn't expose the host socket to job containers (tracked in ROADMAP PI-92).
+The release image is still built and boot-covered on GitHub for every tag via
 `docker-publish.yml`.
 
 It runs on **Forgejo Actions**, not GitHub Actions — `origin` is the Forgejo
