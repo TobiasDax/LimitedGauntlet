@@ -58,10 +58,15 @@ export function SeatingsPage() {
   const round1 = rounds.find((r) => r.roundNumber === 1);
   const usesSeating = seatingFormats.has(pod.format);
 
-  // PI-115 — a split pod's seating comes from Entrant.draftTable (set at
-  // round-1-generation time), never from the pairing itself.
-  const splitEntrants = pod.entrants.filter((e): e is typeof e & { draftTable: number } => e.draftTable !== null);
-  const splitSeats = splitEntrants.length > 0 ? groupSeatsByTable(computeSplitSeatings(splitEntrants)) : null;
+  // PI-115 — which table each entrant sits at (Entrant.draftTable) comes
+  // from the fill step, not pairing — but the seat *numbers* within a table
+  // still derive from round 1's real pairing wherever it landed at that
+  // table (see computeSplitSeatings).
+  const entrantTable = new Map(
+    pod.entrants.filter((e) => e.draftTable !== null).map((e) => [e.id, e.draftTable!] as const),
+  );
+  const splitSeats =
+    entrantTable.size > 0 && round1 ? groupSeatsByTable(computeSplitSeatings(round1.matches, entrantTable)) : null;
   const seatByEntrantId = !splitSeats && round1 ? computeSeatings(round1.matches, pod.entrants.length) : null;
 
   const offerSplit = splitFormats.has(pod.format) && pod.entrants.length > SPLIT_ELIGIBLE_ABOVE;

@@ -47,21 +47,77 @@ describe("computeSeatings", () => {
 });
 
 describe("computeSplitSeatings", () => {
-  it("groups entrants by table and numbers each table's seats 1..k independently", () => {
-    const seats = computeSplitSeatings([
-      { id: "a", draftTable: 1 },
-      { id: "b", draftTable: 1 },
-      { id: "c", draftTable: 2 },
-    ]);
-    const byId = new Map(seats.map((s) => [s.entrantId, s]));
-    expect(byId.get("a")?.table).toBe(1);
-    expect(byId.get("b")?.table).toBe(1);
-    expect(byId.get("c")?.table).toBe(2);
-    expect(byId.get("c")?.seat).toBe(1);
-    expect(new Set([byId.get("a")?.seat, byId.get("b")?.seat])).toEqual(new Set([1, 2]));
+  // Regression case: an 8-seat table (crazy town, PI-115 real-world bug
+  // report) whose four round-1 pairs are entirely same-table. The seat
+  // numbering must come from those actual pairs, not an arbitrary sort —
+  // seat i has to cross-pair with seat i+4 to match who's really playing whom.
+  it("derives an 8-seat table's local seat-across-the-table convention from its own round-1 pairs", () => {
+    const matches = [
+      { tableNumber: 1, entrantAId: "p4", entrantBId: "p16" },
+      { tableNumber: 2, entrantAId: "p8", entrantBId: "p20" },
+      { tableNumber: 3, entrantAId: "p7", entrantBId: "p13" },
+      { tableNumber: 4, entrantAId: "p1", entrantBId: "p19" },
+    ];
+    const entrantTable = new Map(["p1", "p4", "p7", "p8", "p13", "p16", "p19", "p20"].map((id) => [id, 1]));
+
+    const seats = computeSplitSeatings(matches, entrantTable);
+    const seatOf = new Map(seats.map((s) => [s.entrantId, s.seat]));
+
+    expect(seats).toHaveLength(8);
+    for (const s of seats) expect(s.table).toBe(1);
+    // Every real pair's two seats must be exactly 4 (= 8/2) apart.
+    const realPairs: Array<[string, string]> = [
+      ["p4", "p16"],
+      ["p8", "p20"],
+      ["p7", "p13"],
+      ["p1", "p19"],
+    ];
+    for (const [a, b] of realPairs) {
+      expect(Math.abs(seatOf.get(a)! - seatOf.get(b)!)).toBe(4);
+    }
   });
 
-  it("is empty with no entrants", () => {
-    expect(computeSplitSeatings([])).toEqual([]);
+  it("groups matches by table and numbers each table's seats independently", () => {
+    const matches = [
+      { tableNumber: 1, entrantAId: "a", entrantBId: "b" },
+      { tableNumber: 2, entrantAId: "c", entrantBId: "d" },
+    ];
+    const entrantTable = new Map([
+      ["a", 1],
+      ["b", 1],
+      ["c", 2],
+      ["d", 2],
+    ]);
+    const seats = computeSplitSeatings(matches, entrantTable);
+    const byId = new Map(seats.map((s) => [s.entrantId, s]));
+    expect(byId.get("a")?.table).toBe(1);
+    expect(byId.get("c")?.table).toBe(2);
+    expect(byId.get("c")?.seat).toBe(1);
+  });
+
+  it("treats a pair split across two tables as a local solo seat on each side", () => {
+    // tableFill.ts's rare forced-split edge case: e and f are real round-1
+    // opponents but landed at different physical tables.
+    const matches = [
+      { tableNumber: 1, entrantAId: "a", entrantBId: "b" },
+      { tableNumber: 2, entrantAId: "e", entrantBId: "f" },
+    ];
+    const entrantTable = new Map([
+      ["a", 1],
+      ["b", 1],
+      ["e", 1],
+      ["f", 2],
+    ]);
+    const seats = computeSplitSeatings(matches, entrantTable);
+    const byId = new Map(seats.map((s) => [s.entrantId, s]));
+    expect(byId.get("e")?.table).toBe(1);
+    expect(byId.get("f")?.table).toBe(2);
+    // Table 1 has 3 real seats (a, b, e); table 2 has 1 (f).
+    expect([...byId.values()].filter((s) => s.table === 1)).toHaveLength(3);
+    expect([...byId.values()].filter((s) => s.table === 2)).toHaveLength(1);
+  });
+
+  it("is empty with no matches", () => {
+    expect(computeSplitSeatings([], new Map())).toEqual([]);
   });
 });

@@ -37,12 +37,21 @@ export function computeSeatings(round1Matches: Match[], entrantCount: number): M
   return seats;
 }
 
-// PI-115 — a pod split into multiple physical tables. Unlike computeSeatings
-// above, never derived from round 1's pairing (that stays deliberately
-// unconstrained, see the server's pairing.ts) — it's purely "who's assigned
-// to which table" (Entrant.draftTable, set by the server's tableFill.ts at
-// round-1-generation time), with a local seat number 1..k assigned in a
-// stable (sorted-by-id) order within each table. Mirrors the server's
+// PI-115 — seating for a pod split into multiple physical tables. The table
+// *assignment* (who's at which table, Entrant.draftTable) never comes from
+// pairing — that stays deliberately unconstrained, see the server's
+// pairing.ts. But within a table, the classic cross-table convention still
+// applies to whichever round-1 pairs actually landed at that table (the
+// common case, since the server's tableFill.ts tries hard to keep pairs
+// together): seat i pairs with seat i+M using computeSeatings' exact same
+// logic above, just scoped to this table's own entrants and matches.
+//
+// A pair split across two tables (tableFill.ts's rare forced-split edge
+// case) has no local partner at either table — each half is treated as a
+// local "solo" seat (same shape as computeSeatings' bye handling, seat M),
+// even though they do have a real opponent, just elsewhere. Never labeled a
+// "Round 1 bye" in the UI (see SeatingChart's showByeBadge), since that
+// callout would be wrong for this specific case. Mirrors the server's
 // services/seatings.ts computeSplitSeatings (kept in sync deliberately, same
 // precedent as computeSeatings above already being duplicated server-side).
 export interface SeatAssignment {
@@ -51,19 +60,40 @@ export interface SeatAssignment {
   table: number | null;
 }
 
-export function computeSplitSeatings(entrants: Array<{ id: string; draftTable: number }>): SeatAssignment[] {
-  const byTable = new Map<number, string[]>();
-  for (const e of entrants) {
-    const group = byTable.get(e.draftTable) ?? [];
-    group.push(e.id);
-    byTable.set(e.draftTable, group);
+export function computeSplitSeatings(round1Matches: Match[], entrantTable: Map<string, number>): SeatAssignment[] {
+  const localMatchesByTable = new Map<number, Match[]>();
+  const pushLocal = (table: number, match: Match) => {
+    const arr = localMatchesByTable.get(table) ?? [];
+    arr.push(match);
+    localMatchesByTable.set(table, arr);
+  };
+
+  for (const match of round1Matches) {
+    const tableA = entrantTable.get(match.entrantAId);
+    if (tableA === undefined) continue;
+
+    if (match.entrantBId === null) {
+      pushLocal(tableA, match);
+      continue;
+    }
+
+    const tableB = entrantTable.get(match.entrantBId);
+    if (tableB === undefined) continue;
+
+    if (tableA === tableB) {
+      pushLocal(tableA, match);
+    } else {
+      pushLocal(tableA, { ...match, entrantBId: null });
+      pushLocal(tableB, { ...match, entrantAId: match.entrantBId, entrantBId: null });
+    }
   }
 
   const seats: SeatAssignment[] = [];
-  for (const [table, ids] of byTable) {
-    [...ids].sort().forEach((entrantId, index) => {
-      seats.push({ entrantId, seat: index + 1, table });
-    });
+  for (const [table, matches] of localMatchesByTable) {
+    const localEntrantCount = matches.reduce((n, m) => n + (m.entrantBId ? 2 : 1), 0);
+    for (const [entrantId, seat] of computeSeatings(matches, localEntrantCount)) {
+      seats.push({ entrantId, seat, table });
+    }
   }
   return seats;
 }

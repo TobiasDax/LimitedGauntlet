@@ -367,14 +367,17 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
       }),
       prisma.entrant.findMany({ where: { podId: pod.id }, select: { id: true, draftTable: true } }),
     ]);
-    // PI-115 — a split pod's seating is table-group data (Entrant.draftTable),
-    // never derived from round 1's pairing, so it's available as soon as the
-    // TO locks in the split fill — same reveal-independent availability as
-    // the unsplit case below.
-    const splitEntrants = entrants.filter((e): e is { id: string; draftTable: number } => e.draftTable !== null);
+    // PI-115 — which table each entrant sits at (Entrant.draftTable) is
+    // available as soon as the TO locks in the split fill, same
+    // reveal-independent availability as the unsplit seating below — but the
+    // actual seat *numbers* within a table still come from round 1's real
+    // pairing wherever it landed at that table (see computeSplitSeatings).
+    const entrantTable = new Map(
+      entrants.filter((e) => e.draftTable !== null).map((e) => [e.id, e.draftTable!] as const),
+    );
     const seats =
-      splitEntrants.length > 0
-        ? computeSplitSeatings(splitEntrants)
+      entrantTable.size > 0
+        ? computeSplitSeatings(round1?.matches ?? [], entrantTable)
         : round1
           ? computeSeatings(round1.matches, entrants.length)
           : [];
