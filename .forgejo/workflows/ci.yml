@@ -125,7 +125,12 @@ jobs:
     services:
       probe:
         image: nginx:alpine
+        # PI-92 debugging round 2: the plain probe (no --privileged) resolved
+        # fine. Adding --privileged here now, keeping everything else
+        # identical, to isolate whether that specific flag is what breaks
+        # the docker:27-dind service, independent of the dind image itself.
         options: >-
+          --privileged
           --health-cmd "wget -q -O- http://localhost/ || exit 1"
           --health-interval 2s
           --health-timeout 3s
