@@ -4,7 +4,9 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.15.1**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.15.2**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+
+**v0.15.2:** two bug fixes reported by Tobias. PI-117 — inviting a co-organizer whose email already had an account in a *different* org was wrongly refused; now creates the invite normally and lets the existing PI-86 "log in to accept" flow handle it. PI-118 — a pod's public standings leaked who has round 1's bye before pairings were revealed (a bye is auto-scored the instant round 1 is generated); standings now hide on the same condition as pairings and reveal together. Both code-complete, live-verify pending.
 
 **v0.15.1:** PI-116 (running app version shown in the footer, linked to its GitHub release page — code-complete, browser-verify pending).
 
@@ -23,8 +25,8 @@ The app is **feature-complete and running in production** — latest release **v
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
 - **PI-116** — show the running app version in the footer, linked to its GitHub release page: code-complete, browser-verify pending.
-- **PI-117** — bug fix: inviting a co-organizer whose email already has an account (in a *different* org) wrongly refused with "That email already has an account." Code-complete, live-verify pending.
-- **PI-118** — bug fix: a pod's public standings leaked who has round 1's bye before pairings are revealed (the bye is auto-scored the instant round 1 is generated). Code-complete, live-verify pending; a related, lower-severity variant in the weekend Gesamtwertung table and player Hall of Fame pages is flagged but not yet fixed (see its write-up).
+- **PI-117** — bug fix: inviting a co-organizer whose email already has an account (in a *different* org) wrongly refused with "That email already has an account." Code shipped in v0.15.2, live-verify pending.
+- **PI-118** — bug fix: a pod's public standings leaked who has round 1's bye before pairings are revealed (the bye is auto-scored the instant round 1 is generated). Code shipped in v0.15.2, live-verify pending; a related, lower-severity variant in the weekend Gesamtwertung table and player Hall of Fame pages is a known, deliberately-deferred gap (see its write-up) — confirmed with Tobias not worth fixing now.
 
 ## New improvements (backlog)
 
@@ -40,7 +42,7 @@ Idea from Tobias (2026-09-15): put the running version number next to the GitHub
 - [x] `tsc -b`/`eslint`/`prettier` clean on all three workspaces.
 - [ ] **Not yet browser-verified** — this sandbox has no Docker/browser to click through the actual rendered footer. Tobias should confirm the version link appears and resolves to the correct release page on a real running instance.
 
-### PI-117 — Bug fix: co-organizer invite wrongly refused for an email with an account in a different org ⏳ (code-complete 2026-09-15, live-verify pending)
+### PI-117 — Bug fix: co-organizer invite wrongly refused for an email with an account in a different org ⏳ (shipped in v0.15.2, live-verify pending)
 Reported by Tobias: inviting a co-organizer whose email already has an `OrganizerAccount` — just in some *other* org, not this one — refused with "That email already has an account," even though PI-86 already split accounts from org membership specifically so one person can belong to multiple orgs.
 
 **Root cause:** `POST /api/settings/organizers/invite` (`server/src/routes/settings.ts`) checked only whether *any* `OrganizerAccount` existed for the email and 409'd unconditionally — it never checked whether that account was actually a member of *this* org. This meant the invite (and its `OrganizerInvite` row) was never even created for an existing account, so the accept-invite flow's already-built "you already have an account — log in to accept" path (`GET /api/auth/invite/:token`'s `accountExists` flag, and `AcceptInvitePage.tsx`'s corresponding branch) could never actually be reached in practice.
@@ -52,7 +54,7 @@ Deliberately **not** implemented as "silently add them to the org and just notif
 - [x] Root cause identified, fix implemented and typechecked/linted/formatted clean on both client and server.
 - [ ] **Not yet live-verified** — no route-level tests exist for this file (matches this codebase's existing test convention: `routes/*.ts` files aren't directly unit-tested, only the service layer is) and the sandbox has no DB/browser. Tobias should confirm end-to-end: invite an email that already has an account in a different org, confirm the invite is created (not refused), confirm the invitee receives the email and the accept-invite page shows the "log in to accept" branch (not a signup form), and confirm accepting adds the membership without creating a duplicate account.
 
-### PI-118 — Bug fix: a pod's public standings leak who has round 1's bye before pairings are revealed ⏳ (code-complete 2026-09-15, live-verify pending)
+### PI-118 — Bug fix: a pod's public standings leak who has round 1's bye before pairings are revealed ⏳ (shipped in v0.15.2, live-verify pending)
 Reported by Tobias: after seatings are confirmed but before round 1 is revealed/started, a player checking the pod's public standings can already see someone sitting at 3 (or however many `pointsWin` is configured) points — the bye recipient, since a bye needs no opponent to report a result against and is auto-scored the instant round 1's `Match` rows are created (`podStats.ts`'s `tallyMatches`, unconditional on `entrantBId === null`). Wanted: hide standings the same way PI-80 already hides pairings, revealed together.
 
 **Fixed:** extracted the exact condition PI-80's `redactUnrevealedRound1` already used into a shared, exported `isRound1Unrevealed()` predicate (`server/src/services/pairingsVisibility.ts`), so "hidden" means the same thing everywhere. `GET /api/public/o/:slug/pods/:id/standings` now fetches round 1's `pairingsRevealedAt` first and returns `{ standings: [] }` without ever calling `computePodStandings` when it's unrevealed — same shape the client already handles for a SETUP pod with no entrants yet. `PublicPodPage.tsx` mirrors the per-round `hidden` flag it already computes for the Pairings section to pick the right empty-state copy ("Standings aren't revealed yet…") instead of the misleading "No entrants yet."
