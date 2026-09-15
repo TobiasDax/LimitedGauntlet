@@ -142,6 +142,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // session — currently just the optional footer legal link (PI-35).
   app.get("/api/app-config", async (_request, reply) => {
     reply.send({
+      // PI-116 — shown in the footer, linked to this version's GitHub release
+      // page. Sourced from the root package.json, so it can't drift from
+      // what's actually running.
+      appVersion: config.appVersion,
       legalLinkUrl: config.legalLinkUrl || null,
       legalLinkLabel: config.legalLinkLabel || null,
       // PI-112 — whether the built-in /legal page (Impressum + privacy notice)

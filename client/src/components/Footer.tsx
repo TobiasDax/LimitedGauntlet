@@ -16,7 +16,9 @@ function GitHubMark() {
 
 // Shared footer for the authed Layout, the public PublicLayout, the player
 // portal, and the standalone /legal page. GitHub + License are always present
-// (this is OSS). The built-in "Legal notice" link (PI-112, /legal — an
+// (this is OSS). The version link (PI-116) points at that version's GitHub
+// release page — omitted if appVersion isn't in app-config yet (query still
+// loading). The built-in "Legal notice" link (PI-112, /legal — an
 // Impressum + privacy notice rendered from LEGAL_* env) shows unless the
 // operator turned it off with LEGAL_PAGE_ENABLED=false. LEGAL_LINK_URL /
 // LEGAL_LINK_LABEL (PI-35) is an optional *additional* link for a
@@ -30,6 +32,16 @@ export function Footer() {
         <GitHubMark />
         GitHub
       </a>
+      {data?.appVersion && (
+        <a
+          href={`${GITHUB_URL}/releases/tag/v${data.appVersion}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+        >
+          v{data.appVersion}
+        </a>
+      )}
       <a href={`${GITHUB_URL}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer" className={linkClass}>
         License
       </a>

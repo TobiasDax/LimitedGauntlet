@@ -16,6 +16,9 @@ export interface TrackingConfig {
 }
 
 export interface AppConfig {
+  // PI-116 — the running app version, e.g. "0.15.0". Footer links it to
+  // that version's GitHub release page.
+  appVersion?: string;
   legalLinkUrl: string | null;
   legalLinkLabel: string | null;
   // PI-112 — whether the built-in /legal page (Impressum + privacy notice) is

@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -23,7 +27,20 @@ function parseSessionKey(hex: string): Buffer {
   return key;
 }
 
+// PI-116 — the running app version, for the footer's link to its GitHub
+// release page. Read from the root package.json (the single shared version
+// per PI-22) rather than an env var, so it can't drift from what's actually
+// built into the image. Resolved relative to this file's own location
+// (../.. from server/src or, identically, server/dist — see index.ts's
+// clientDistPath for the same pattern) so it works from both `tsx` dev and
+// the compiled runtime regardless of process.cwd().
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootPackageJson = JSON.parse(fs.readFileSync(path.join(__dirname, "../../package.json"), "utf-8")) as {
+  version: string;
+};
+
 export const config = {
+  appVersion: rootPackageJson.version,
   port: Number(process.env.PORT ?? 8080),
   host: process.env.HOST ?? "0.0.0.0",
   // Exact proxy peers/CIDRs allowed to supply forwarding headers. Blank means
