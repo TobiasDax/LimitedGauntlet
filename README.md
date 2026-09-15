@@ -264,12 +264,7 @@ Full walkthroughs: [docs/deployment.md § 8](docs/deployment.md#8-optional-sso-l
 
 # Roadmap
 
-The app is **feature-complete and running in production** ([latest release](https://github.com/TobiasDax/LimitedGauntlet/releases/latest)). The full, always-current backlog lives in [`ROADMAP.md`](ROADMAP.md) — a quick snapshot of the notable items still planned:
-
-* **Deck photos** — upload a photo of each entrant's drafted deck to the pod's standings page; one photo per entrant, viewable in a modal (PI-62).
-* **Legacy history import via the UI** — accept the `legacy-data.json` format the `/import-history` Claude skill produces directly through Settings → Import, without requiring shell access (PI-39).
-
-See [`ROADMAP.md`](ROADMAP.md) for the full list (including project-health / CI items), status, and design notes.
+The app is **feature-complete and running in production** ([latest release](https://github.com/TobiasDax/LimitedGauntlet/releases/latest)). What's left in the backlog is mostly project-health work (CI, load testing, a security hardening item) rather than user-facing features — see [`ROADMAP.md`](ROADMAP.md) for the full list, status, and design notes.
 
 # Further Reading
 
