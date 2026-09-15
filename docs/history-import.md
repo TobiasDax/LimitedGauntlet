@@ -1,6 +1,10 @@
 # History Import
 
-If you're migrating from spreadsheets, a legacy pairing site, or manually-maintained docs instead of starting fresh, `server/src/scripts/import-legacy.ts` reads a JSON file of past tournament history — names, pods, points, card pulls — and inserts it directly via Prisma. It's idempotent (safe to re-run; existing rows are left alone rather than duplicated) and never goes through the HTTP API.
+If you're migrating from spreadsheets, a legacy pairing site, or manually-maintained docs instead of starting fresh, there are two ways to load that history in — pick based on whether you already have an organization set up.
+
+**Already have an org and are logged in?** Go to **Settings → Import** and upload your `legacy-data.json` file directly — it imports into *your* current organization (no new org or login created), validates the file before touching the database, and rolls back the whole import cleanly if it hits a bad reference partway through. This is the easier path for most self-hosters; the rest of this page describes the older CLI-only path below, which is still there for the "no org exists yet" case (it's the one path into the app that works regardless of `ALLOW_SIGNUP`).
+
+`server/src/scripts/import-legacy.ts` reads the same JSON file of past tournament history — names, pods, points, card pulls — and inserts it directly via Prisma. It's idempotent (safe to re-run; existing rows are left alone rather than duplicated) and never goes through the HTTP API.
 
 ## The data file
 
@@ -8,7 +12,7 @@ If you're migrating from spreadsheets, a legacy pairing site, or manually-mainta
 
 ## Building that file by hand is the hard part
 
-This project ships a Claude Code skill for it: [`import-history`](../.claude/skills/import-history/SKILL.md). If you're using Claude Code against this repo, run `/import-history` and describe (or paste) whatever your existing records look like — a spreadsheet, an old pairing site export, Outline/Notion docs, plain notes, screenshots. It knows the exact JSON schema the importer expects, interviews you tournament-by-tournament and pod-by-pod, and validates name/format consistency before writing the file (the importer itself throws on the first bad reference and doesn't roll back what it already inserted, so getting this right up front matters). No Claude Code? The schema and gotchas are all documented in that same skill file — readable on its own even without running it as a skill.
+This project ships a Claude Code skill for it: [`import-history`](../.claude/skills/import-history/SKILL.md). If you're using Claude Code against this repo, run `/import-history` and describe (or paste) whatever your existing records look like — a spreadsheet, an old pairing site export, Outline/Notion docs, plain notes, screenshots. It knows the exact JSON schema the importer expects, interviews you tournament-by-tournament and pod-by-pod, and validates name/format consistency before writing the file (the CLI script throws on the first bad reference and doesn't roll back what it already inserted for that tournament, so getting this right up front matters there — the Settings → Import UI path is more forgiving, rolling back the whole import cleanly on any bad reference). No Claude Code? The schema and gotchas are all documented in that same skill file — readable on its own even without running it as a skill.
 
 ## Running the import
 

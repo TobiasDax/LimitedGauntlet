@@ -6,7 +6,9 @@ import { hashPassword, verifyPassword } from "../auth/password.js";
 import { requireSessionAuth } from "../auth/middleware.js";
 import { isEmailConfigured, sendMail, resolveBaseUrl } from "../services/mailer.js";
 import { buildOrgExport, type ExportSections } from "../services/orgExport.js";
-import { ImportInProgressError, parseOrgExport, importOrgData } from "../services/orgImport.js";
+import { parseOrgExport, importOrgData } from "../services/orgImport.js";
+import { parseLegacyImport, importLegacyData } from "../services/legacyImport.js";
+import { ImportInProgressError } from "../services/importLock.js";
 import { generateWebhookSecret, sendTestWebhookEvent } from "../services/webhooks.js";
 import { refreshRealtimeAuthorization } from "../realtime.js";
 import { syncPodTokenAwards } from "../services/tokens.js";
@@ -423,23 +425,39 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // --- Data import (PI-39) ---
-  // Accepts a file produced by the export above and rebuilds its `data` section
-  // into THIS org. Idempotent at the tournament level (a same-named tournament
-  // is skipped), so re-uploading is safe. Rate-limited — this is a heavy,
-  // write-many operation.
+  // Accepts either a file produced by the export above, or a legacy-data.json
+  // history file (the /import-history skill's format, previously only
+  // importable via the operator-only server/src/scripts/import-legacy.ts CLI
+  // script) — and rebuilds it into THIS org. Idempotent at the tournament
+  // level (a same-named tournament is skipped), so re-uploading is safe.
+  // Rate-limited — this is a heavy, write-many operation.
   app.post(
     "/api/settings/import",
     // Bump the body limit well past Fastify's 1MB default — an export with card
     // images/history for several tournaments can run large.
     { bodyLimit: 25 * 1024 * 1024, config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
     async (request, reply) => {
-      const parsed = parseOrgExport(request.body);
+      const exportParsed = parseOrgExport(request.body);
+      // The two formats are structurally distinct (an export always carries
+      // `application`/`formatVersion`; a legacy file never does), so
+      // "doesn't look like an export at all" is the only case worth trying
+      // the other parser for — a file that looks like a malformed export
+      // reports that specific problem instead.
+      const parsed = exportParsed.ok
+        ? { format: "export" as const, ...exportParsed }
+        : exportParsed.error === "not_our_format"
+          ? { format: "legacy" as const, ...parseLegacyImport(request.body) }
+          : { format: "export" as const, ...exportParsed };
+
       if (!parsed.ok || !parsed.data) {
         reply.code(parsed.error === "import_too_large" ? 413 : 400).send({ error: parsed.error ?? "invalid_shape" });
         return;
       }
       try {
-        const summary = await importOrgData(request.organizer!.orgId, parsed.data);
+        const summary =
+          parsed.format === "export"
+            ? await importOrgData(request.organizer!.orgId, parsed.data)
+            : await importLegacyData(request.organizer!.orgId, parsed.data);
         reply.send({ ok: true, summary });
       } catch (err) {
         if (err instanceof ImportInProgressError) {

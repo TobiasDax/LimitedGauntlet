@@ -76,8 +76,8 @@ export function ExportImportSection() {
       <Card className="p-5">
         <p className="mb-1 font-display text-[15px] font-bold">Import</p>
         <p className="mb-4 text-[13.5px] text-ink-secondary">
-          Load a LimitedGauntlet export file into this organization. Tournaments already here (matched by name) are left
-          untouched, so re-importing is safe.
+          Load a LimitedGauntlet export file, or a legacy-data.json history file, into this organization. Tournaments
+          already here (matched by name) are left untouched, so re-importing is safe.
         </p>
         <input
           ref={fileRef}

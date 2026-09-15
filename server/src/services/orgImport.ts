@@ -11,6 +11,7 @@ import {
 } from "../db.js";
 import { prisma } from "../prisma.js";
 import { EXPORT_FORMAT_VERSION } from "./orgExport.js";
+import { withImportLock } from "./importLock.js";
 import { randomPublicAlias } from "./playerPrivacy.js";
 import { syncPodTokenAwards, zStandingBonuses } from "./tokens.js";
 
@@ -345,19 +346,8 @@ function measureImport(data: ParsedExportData): { records: number; stringCharact
   return { records, stringCharacters };
 }
 
-export class ImportInProgressError extends Error {
-  constructor() {
-    super("An organization import is already running");
-    this.name = "ImportInProgressError";
-  }
-}
-
-let importInProgress = false;
-
 export async function importOrgData(orgId: string, data: ParsedExportData): Promise<ImportSummary> {
-  if (importInProgress) throw new ImportInProgressError();
-  importInProgress = true;
-  try {
+  return withImportLock(async () => {
     const summary = await prisma.$transaction((tx) => importOrgDataInTransaction(tx, orgId, data), {
       maxWait: 5_000,
       timeout: 120_000,
@@ -370,9 +360,7 @@ export async function importOrgData(orgId: string, data: ParsedExportData): Prom
       for (const pod of pods) await syncPodTokenAwards(pod.id);
     }
     return summary;
-  } finally {
-    importInProgress = false;
-  }
+  });
 }
 
 async function importOrgDataInTransaction(
