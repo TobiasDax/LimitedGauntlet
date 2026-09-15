@@ -1,7 +1,7 @@
 # Build log (archived)
 
 > **This is the historical build record, kept for reference — it is no longer the file to read first.**
-> The whole numbered build (Steps 0–12) and most of the post-1.0 backlog (PI-1 … PI-112) below are **done and browser-verified**. A handful of still-open items (PI-95, PI-116) and parked ideas (PI-62) live in [`ROADMAP.md`](../ROADMAP.md) instead — read that first for current status and the next actual work. Full design rationale lives in [`PLAN.md`](../PLAN.md). This file stays as the detailed "how each piece was built and verified" log.
+> The whole numbered build (Steps 0–12) and most of the post-1.0 backlog (PI-1 … PI-112) below are **done and browser-verified**. One still-open item (PI-116) and a parked idea (PI-62) live in [`ROADMAP.md`](../ROADMAP.md) instead — read that first for current status and the next actual work. Full design rationale lives in [`PLAN.md`](../PLAN.md). This file stays as the detailed "how each piece was built and verified" log.
 
 Granular checklist. Full rationale for any step lives in `PLAN.md`.
 

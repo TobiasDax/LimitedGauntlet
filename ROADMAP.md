@@ -22,7 +22,6 @@ The app is **feature-complete and running in production** — latest release **v
 
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
-- **PI-95** — read-path performance before the 40–60 player event: client + query-shape parts shipped (v0.8.0); the in-process standings cache and the real-deploy load test are still open. (Response compression stays reverted, see PI-98.) The load test now also wants to cover the Prisma 7 driver adapter's connection-pool behaviour (PI-109, v0.13.0).
 - **PI-116** — show the running app version in the footer, linked to its GitHub release page: code-complete, browser-verify pending.
 
 ## New improvements (backlog)
@@ -41,16 +40,7 @@ Idea from Tobias (2026-09-15): put the running version number next to the GitHub
 
 ## Project-health backlog (from the 2026-09-06 code audit)
 
-Not feature work — these harden the project itself. None is a live bug at this app's scale (Tobias's own event is 8–10 players); they matter because it's a public OSS project anyone can `docker compose up`, and because a year of AI-assisted sessions has no automated gate catching regressions. The CI / lint / release / hardening keystones (PI-88–92, 93, 94) are shipped and in the build log; what's left below is the still-open remainder plus the dependency and Prisma items.
-
-### PI-95 — Read-path performance for a 40–60 player event ⏳ (client + query-shape parts shipped v0.8.0; in-process cache + load test still open)
-Moving the live instance to a 14 GB box (PI-94) took memory pressure off the table, but the app still recomputes everything from Postgres on every request and the client refetches aggressively. Under ~50 phones at a venue this is a real load pattern — cheap to fix, worth doing before the event.
-
-- [x] **`QueryClient` defaults.** `main.tsx` now sets `staleTime: 30_000` + `refetchOnWindowFocus: false` (was a bare `new QueryClient()` → TanStack's `staleTime: 0` + focus-refetch, so every phone-unlock refetched every query on screen). Realtime Socket.IO invalidation still keeps watched data fresh where it matters. Biggest lever.
-- [x] **Parallelized `computeGesamtwertung`'s pod loop** — was a serial `for (const pod of pods) { await computePodStandings(pod.id) }` (~50 sequential round-trips for a 10-pod tournament); now `Promise.all` over the pods, then the point-accumulation loop stays sequential for determinism. Confirmed the needed indexes already exist: `Match.roundId` (`@@index([roundId])`), `Round.podId` (`@@unique([podId, roundNumber])` covers it), `Entrant.podId` (`@@index([podId])`).
-- [x] ~~**Response compression** — `@fastify/compress` (`global: true`) registered in `index.ts`.~~ **Reverted in v0.8.1 (PI-98).** On the live deploy (Node 22, behind Cloudflare) the plugin returned `200` with `content-length: 0` and an empty body for the larger nested API responses (`/api/tournaments/:id`, and by extension the public tournament/pod pages) — the `vary: accept-encoding` header was there but no payload. Smaller responses (`/api/players`, `/api/tournaments`, gesamtwertung) were fine, so it's size/streaming-triggered. Couldn't reproduce in the Node 20 dev sandbox with the full middleware stack, so root cause is unconfirmed. Behind Cloudflare the plugin bought the live deploy nothing anyway (CF already Brotli's everything); a LAN/non-CF deployer loses on-the-fly compression until this is re-approached with a real load/repro test.
-- [x] **Load test, run against the live deploy (2026-09-15).** k6 script at `scripts/loadtest/pod-load-test.js` (see its `README.md`): ~60 viewer VUs on pod + tournament pages + a 3-VU organizer result-submission burst partway through. First run showed a 2% HTTP error rate, but `docker stats` on the live host showed **no CPU or memory movement at all** during the test — the errors were the app's own global per-IP rate limiter (`max: 200/min`) blocking the test tooling itself (all simulated VUs share one real source IP, unlike real per-phone venue traffic), not the server struggling. Decided **not** to chase a "clean" re-run (e.g. via a temporary `RATE_LIMIT_MAX` bump) — the actual question ("does the server break a sweat at this load") was already answered: no.
-- [x] ~~**In-process cache for `computeGesamtwertung` / `computePodStandings`**~~ **Not needed for now**, per the load test above — at a 40–60 player event's traffic level the server shows no measurable resource pressure without it. Revisit if a future event is meaningfully larger, or if a real load test ever does show CPU/memory pressure.
+Not feature work — these harden the project itself. Nothing genuinely open remains here at the moment; the CI / lint / release / hardening / performance keystones (PI-88–92, 93–95, 98) are all shipped and in the build log.
 
 ## Ideas (unlikely to be built)
 
