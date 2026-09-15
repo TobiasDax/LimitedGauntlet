@@ -139,6 +139,11 @@ export function PublicPodPage() {
   // once round 1 is under way it's just noise, so drop it then.
   const round1 = (roundsData?.rounds ?? []).find((r) => r.roundNumber === 1);
   const showSeating = seatingFormats.has(pod.format) && seats.length > 0 && (!round1 || round1.status === "PENDING");
+  // PI-118 — mirrors the per-round `hidden` check above: the server also
+  // returns an empty standings array while round 1 is unrevealed (a bye's
+  // auto-scored win would otherwise leak itself early), so this picks the
+  // right empty-state copy instead of implying no one has signed up.
+  const standingsHidden = !!round1 && round1.roundNumber === 1 && !round1.pairingsRevealedAt;
 
   return (
     <div>
@@ -253,7 +258,11 @@ export function PublicPodPage() {
             </table>
           </div>
         ) : (
-          <p className="text-ink-muted">No entrants yet.</p>
+          <p className="text-ink-muted">
+            {standingsHidden
+              ? "Standings aren't revealed yet — check back once pairings are revealed."
+              : "No entrants yet."}
+          </p>
         )}
       </section>
 

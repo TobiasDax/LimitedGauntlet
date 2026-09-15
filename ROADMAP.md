@@ -24,6 +24,7 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 
 - **PI-116** — show the running app version in the footer, linked to its GitHub release page: code-complete, browser-verify pending.
 - **PI-117** — bug fix: inviting a co-organizer whose email already has an account (in a *different* org) wrongly refused with "That email already has an account." Code-complete, live-verify pending.
+- **PI-118** — bug fix: a pod's public standings leaked who has round 1's bye before pairings are revealed (the bye is auto-scored the instant round 1 is generated). Code-complete, live-verify pending; a related, lower-severity variant in the weekend Gesamtwertung table and player Hall of Fame pages is flagged but not yet fixed (see its write-up).
 
 ## New improvements (backlog)
 
@@ -50,6 +51,17 @@ Deliberately **not** implemented as "silently add them to the org and just notif
 
 - [x] Root cause identified, fix implemented and typechecked/linted/formatted clean on both client and server.
 - [ ] **Not yet live-verified** — no route-level tests exist for this file (matches this codebase's existing test convention: `routes/*.ts` files aren't directly unit-tested, only the service layer is) and the sandbox has no DB/browser. Tobias should confirm end-to-end: invite an email that already has an account in a different org, confirm the invite is created (not refused), confirm the invitee receives the email and the accept-invite page shows the "log in to accept" branch (not a signup form), and confirm accepting adds the membership without creating a duplicate account.
+
+### PI-118 — Bug fix: a pod's public standings leak who has round 1's bye before pairings are revealed ⏳ (code-complete 2026-09-15, live-verify pending)
+Reported by Tobias: after seatings are confirmed but before round 1 is revealed/started, a player checking the pod's public standings can already see someone sitting at 3 (or however many `pointsWin` is configured) points — the bye recipient, since a bye needs no opponent to report a result against and is auto-scored the instant round 1's `Match` rows are created (`podStats.ts`'s `tallyMatches`, unconditional on `entrantBId === null`). Wanted: hide standings the same way PI-80 already hides pairings, revealed together.
+
+**Fixed:** extracted the exact condition PI-80's `redactUnrevealedRound1` already used into a shared, exported `isRound1Unrevealed()` predicate (`server/src/services/pairingsVisibility.ts`), so "hidden" means the same thing everywhere. `GET /api/public/o/:slug/pods/:id/standings` now fetches round 1's `pairingsRevealedAt` first and returns `{ standings: [] }` without ever calling `computePodStandings` when it's unrevealed — same shape the client already handles for a SETUP pod with no entrants yet. `PublicPodPage.tsx` mirrors the per-round `hidden` flag it already computes for the Pairings section to pick the right empty-state copy ("Standings aren't revealed yet…") instead of the misleading "No entrants yet."
+
+Deliberately scoped to the public **pod standings** route only (what was actually reported) — the organizer's own authenticated standings view is untouched (same reveal-blind-vs-reveal-aware split PI-80 already established between public and authenticated reads).
+
+- [x] Shared predicate extracted + tested (`pairingsVisibility.test.ts`), public standings route fixed, client empty-state copy fixed. `tsc -b`/`eslint`/`prettier` clean on both workspaces.
+- [ ] **Not yet live-verified** — same sandbox limitation as PI-117 (no DB/browser). Tobias should confirm: generate a pod with an odd entrant count (forcing a bye) through seating, check the public pod page shows no standings until "Reveal pairings," then confirm the bye's points appear immediately once revealed.
+- [ ] **Known, narrower related leak not yet fixed — needs a decision.** The same bye-before-reveal points also flow into the weekend Gesamtwertung table (`computeGesamtwertung`, shared by the public Gesamtwertung route, the organizer's own view, and the spreadsheet export) and a player's individual Hall-of-Fame page (`computePlayerStats`, similarly shared). Fixing those requires threading a "hide unrevealed round 1" option through shared service functions that authenticated/export callers must keep bypassing — more invasive than this pass, and the practical exposure window is much narrower (aggregated weekend totals, or a specific player's own history page, rather than the one page every attendee actually watches). Left open pending Tobias's call on whether it's worth closing now or can wait.
 
 ## Project-health backlog (from the 2026-09-06 code audit)
 

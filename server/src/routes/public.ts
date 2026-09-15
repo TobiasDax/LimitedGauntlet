@@ -8,7 +8,7 @@ import { computeGesamtwertung, countTournamentParticipants } from "../services/g
 import { computePodStandings } from "../services/standings.js";
 import { computeHallOfFameOverview, computePlayerStats, type HeadToHeadEntry } from "../services/playerStats.js";
 import { computeSeatings, computeSplitSeatings } from "../services/seatings.js";
-import { redactUnrevealedRound1 } from "../services/pairingsVisibility.js";
+import { redactUnrevealedRound1, isRound1Unrevealed } from "../services/pairingsVisibility.js";
 import { buildRedactor, type Redactor } from "../services/publicVisibility.js";
 import { getHiddenPlayerAliases } from "../services/playerPrivacy.js";
 
@@ -393,6 +393,18 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     const pod = await findPublicPod(params.data.slug, params.data.id);
     if (!pod) {
       reply.code(404).send({ error: "not_found" });
+      return;
+    }
+    // PI-118 — round 1's bye (if any) is auto-scored the moment its Match row
+    // is created, before there's anything to reveal, so an unrevealed round 1
+    // must hide standings the same way it hides pairings (see
+    // isRound1Unrevealed's comment) — otherwise a bye leaks itself early.
+    const round1 = await prisma.round.findFirst({
+      where: { podId: pod.id, roundNumber: 1 },
+      select: { roundNumber: true, pairingsRevealedAt: true },
+    });
+    if (isRound1Unrevealed(round1)) {
+      reply.send({ standings: [] });
       return;
     }
     const [rows, entrants, redactor] = await Promise.all([
