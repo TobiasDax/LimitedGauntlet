@@ -28,6 +28,7 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 - **PI-117** — bug fix: inviting a co-organizer whose email already has an account (in a *different* org) wrongly refused with "That email already has an account." Code shipped in v0.15.2, live-verify pending.
 - **PI-118** — bug fix: a pod's public standings leaked who has round 1's bye before pairings are revealed (the bye is auto-scored the instant round 1 is generated). Code shipped in v0.15.2, live-verify pending; a related, lower-severity variant in the weekend Gesamtwertung table and player Hall of Fame pages is a known, deliberately-deferred gap (see its write-up) — confirmed with Tobias not worth fixing now.
 - **PI-119** — bug fix: long entrant names overflowed a `SeatingChart` seat box's border instead of wrapping, spilling into neighboring seats. Code-complete, browser-verify pending.
+- **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Not started.
 
 ## New improvements (backlog)
 
@@ -75,6 +76,23 @@ Reported by Tobias (screenshot, a real 20+ entrant pod): a long name like "Matth
 
 - [x] Fixed, `tsc -b`/`eslint`/`prettier` clean.
 - [ ] **Not yet browser-verified** — this sandbox has no browser to visually confirm the wrap/no-overflow behavior on a real long name. Tobias should re-check the same pod that showed the bug.
+
+### PI-120 — Player portal: list the player's own pods, and link tournaments to their public page
+Idea from Tobias (2026-09-15), from the player portal at `/o/<slug>/player`:
+- A list of every pod the player is currently signed up for (an `Entrant` row exists for them, directly or via a team), so they can jump straight to that pod's page instead of hunting for it, and — new capability — remove themselves from a pod if needed.
+- Clicking a tournament in the portal's "Tournaments" section should open that tournament's page and show all its pods, the same view the public link already gives (`/o/<slug>/tournaments/:id`, `PublicTournamentPage.tsx`).
+
+**The tournament-link half is cheap:** that public page already exists and already lists every pod. The portal's tournament cards (`PlayerPortalPage.tsx`) just need to link there — no new backend work.
+
+**The "your pods" list is mostly already computed, just not exposed:** `GET /api/player/portal` (`server/src/routes/playerAccounts.ts`) already queries every `Entrant` row the player has across the org (`myEntrants`/`myEntrantIds`) — today used only internally to figure out `mySide` on an active match. Surfacing it as a real list (pod id/name, tournament, format) is a small addition to that same query's `select` plus the response shape; the client renders it as a new portal section linking to each pod's public page.
+
+**"Remove themselves from the pod" is a genuinely new capability, not yet designed — the harder part:**
+- No player-facing removal exists today. The only self-service leave today is `DELETE /api/player/tournaments/:id/check-in` (PI-100's on-demand check-in), which only works *before* a player has actually been paired into a pod — the organizer-only `DELETE /api/entrants/:id` (`pods.ts`) is what actually removes an `Entrant` row, and it hard-deletes (cascading to every `Match` row referencing them, per `onDelete: Cascade`).
+- The organizer UI only allows that delete when `canModifyRoster` (`PodPage.tsx`): `rounds.length === 0`, or the pod's last round is `COMPLETED` (about to generate the next one) — i.e., never while a round with real reported results depends on that entrant's `Match` rows, since cascading the delete would silently corrupt other players' win/loss history and tiebreakers.
+- A player self-service version needs at least as conservative a guard, probably more so: letting a player unilaterally remove themselves once real results exist (even from a prior, now-completed round) risks the same corruption without an organizer in the loop to notice/fix pairings. Safest starting scope is probably "only before round 1 exists" (mirrors the check-in/check-out symmetry PI-100 already has) — round 1+ likely still needs "ask an organizer," same as today's `already_entered` error already tells the player.
+- Not decided: whether a team pod's player can leave individually (removing just themselves cascades the *whole team*, same as the organizer path today) — probably needs its own message/confirmation distinguishing "just you" from "your whole team."
+
+- [ ] Not started.
 
 ## Project-health backlog (from the 2026-09-06 code audit)
 
