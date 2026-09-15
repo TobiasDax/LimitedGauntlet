@@ -19,12 +19,12 @@
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "argon2": "^0.45.1",
-    "fastify": "^5.2.1",
-    "nodemailer": "^10.0.2",
+    "fastify": "^5.12.4",
+    "nodemailer": "^10.0.9",
     "openid-client": "^6.8.8",
     "socket.io": "^4.8.1",
     "write-excel-file": "^4.1.1",
-    "zod": "^4.6.0"
+    "zod": "^4.6.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
