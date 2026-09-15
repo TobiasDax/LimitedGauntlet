@@ -344,13 +344,28 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         reply.code(400).send({ error: "invalid_input" });
         return;
       }
-      const taken = await prisma.organizerAccount.findUnique({ where: { email: body.data.email } });
-      if (taken) {
-        reply.code(409).send({ error: "email_taken" });
-        return;
+      const orgId = request.organizer!.orgId;
+      // PI-86 split accounts from org membership, so an email already having
+      // an OrganizerAccount (in some other org) is not itself a reason to
+      // refuse — only already being a member of *this* org is. Letting the
+      // invite through for an existing account is exactly the multi-org-join
+      // path accept-invite already supports: the invitee logs in as their
+      // existing identity and one click adds the membership, no new
+      // account/password created. (Previously this route 409'd here
+      // unconditionally, which meant that path could never actually be
+      // reached — the bug this comment is fixing.)
+      const existingAccount = await prisma.organizerAccount.findUnique({ where: { email: body.data.email } });
+      if (existingAccount) {
+        const alreadyMember = await prisma.organizerMembership.findUnique({
+          where: { accountId_orgId: { accountId: existingAccount.id, orgId } },
+          select: { id: true },
+        });
+        if (alreadyMember) {
+          reply.code(409).send({ error: "already_member" });
+          return;
+        }
       }
 
-      const orgId = request.organizer!.orgId;
       // A fresh invite supersedes any still-pending one for the same address —
       // re-inviting is how a lost/expired link gets resent, no separate
       // "resend" endpoint needed.

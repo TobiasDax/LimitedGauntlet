@@ -31,7 +31,11 @@ export function OrganizersSection() {
 
   const errorCode = inviteOrganizer.isError ? codeOf(inviteOrganizer.error) : null;
   const errorText =
-    errorCode === "email_taken" ? "That email already has an account." : errorCode ? "Something went wrong." : null;
+    errorCode === "already_member"
+      ? "That person is already a member of this organization."
+      : errorCode
+        ? "Something went wrong."
+        : null;
 
   return (
     <div>

@@ -23,6 +23,7 @@ The app is **feature-complete and running in production** — latest release **v
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
 - **PI-116** — show the running app version in the footer, linked to its GitHub release page: code-complete, browser-verify pending.
+- **PI-117** — bug fix: inviting a co-organizer whose email already has an account (in a *different* org) wrongly refused with "That email already has an account." Code-complete, live-verify pending.
 
 ## New improvements (backlog)
 
@@ -37,6 +38,18 @@ Idea from Tobias (2026-09-15): put the running version number next to the GitHub
 - [x] **Footer change:** `client/src/components/Footer.tsx` renders a `vX.Y.Z` link right after the GitHub link (same `linkClass` styling) pointing at `.../releases/tag/vX.Y.Z`, only when `appVersion` has loaded.
 - [x] `tsc -b`/`eslint`/`prettier` clean on all three workspaces.
 - [ ] **Not yet browser-verified** — this sandbox has no Docker/browser to click through the actual rendered footer. Tobias should confirm the version link appears and resolves to the correct release page on a real running instance.
+
+### PI-117 — Bug fix: co-organizer invite wrongly refused for an email with an account in a different org ⏳ (code-complete 2026-09-15, live-verify pending)
+Reported by Tobias: inviting a co-organizer whose email already has an `OrganizerAccount` — just in some *other* org, not this one — refused with "That email already has an account," even though PI-86 already split accounts from org membership specifically so one person can belong to multiple orgs.
+
+**Root cause:** `POST /api/settings/organizers/invite` (`server/src/routes/settings.ts`) checked only whether *any* `OrganizerAccount` existed for the email and 409'd unconditionally — it never checked whether that account was actually a member of *this* org. This meant the invite (and its `OrganizerInvite` row) was never even created for an existing account, so the accept-invite flow's already-built "you already have an account — log in to accept" path (`GET /api/auth/invite/:token`'s `accountExists` flag, and `AcceptInvitePage.tsx`'s corresponding branch) could never actually be reached in practice.
+
+**Fixed:** the invite route now looks up the existing account (if any) and only refuses (`already_member`) when that account already has an `OrganizerMembership` in *this specific* org. Otherwise it creates the invite exactly as it would for a brand-new email — the invitee gets the same emailed link, and accept-invite already knows to skip the name/password form and just ask them to log in and click "Join", adding a membership without creating a second account. `OrganizersSection.tsx`'s error copy updated to match (`already_member` → "That person is already a member of this organization.").
+
+Deliberately **not** implemented as "silently add them to the org and just notify by email" (closer to Tobias's initial phrasing) — requiring the invitee's own accept click preserves the same consent model every other invite already uses (nobody's org membership list changes without their own action), and reuses PI-86's already-built, previously-dead-code acceptance path instead of adding a new no-consent code path.
+
+- [x] Root cause identified, fix implemented and typechecked/linted/formatted clean on both client and server.
+- [ ] **Not yet live-verified** — no route-level tests exist for this file (matches this codebase's existing test convention: `routes/*.ts` files aren't directly unit-tested, only the service layer is) and the sandbox has no DB/browser. Tobias should confirm end-to-end: invite an email that already has an account in a different org, confirm the invite is created (not refused), confirm the invitee receives the email and the accept-invite page shows the "log in to accept" branch (not a signup form), and confirm accepting adds the membership without creating a duplicate account.
 
 ## Project-health backlog (from the 2026-09-06 code audit)
 
