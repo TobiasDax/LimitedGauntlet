@@ -1,6 +1,8 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { isIP } from "node:net";
-import { lookup } from "node:dns/promises";
+import { lookup as dnsLookup } from "node:dns/promises";
+import * as http from "node:http";
+import * as https from "node:https";
 import { prisma } from "../prisma.js";
 import { computePodStandings } from "./standings.js";
 
@@ -60,31 +62,48 @@ export function isLoopbackOrLinkLocalAddress(address: string): boolean {
   return true; // not a valid IP at all — refuse rather than guess
 }
 
-// Best-effort SSRF guard: resolve the target hostname and refuse delivery if
-// it points at a loopback/link-local address. Not airtight — the actual HTTP
-// request re-resolves DNS itself, so a receiver using DNS rebinding between
-// this check and the connection isn't fully closed off. This protects the
-// app's own interface and cloud-metadata-style endpoints from an org's
-// webhook config; it does NOT restrict LAN targets, which is the expected
-// use case (see above).
-export async function isSafeWebhookTarget(rawUrl: string): Promise<boolean> {
-  let url: URL;
-  try {
-    url = new URL(rawUrl);
-  } catch {
-    return false;
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+export interface ResolvedAddress {
+  address: string;
+  family: 4 | 6;
+}
 
-  const host = url.hostname;
-  if (isIP(host)) return !isLoopbackOrLinkLocalAddress(host);
+// Injectable so tests can simulate a rebinding/mixed-answer resolver without
+// controlling real DNS — see webhooks.test.ts. Production always uses the
+// default (real dns.lookup).
+export type DnsLookupFn = (hostname: string) => Promise<Array<{ address: string; family: number }>>;
 
-  try {
-    const results = await lookup(host, { all: true });
-    return results.length > 0 && results.every((r) => !isLoopbackOrLinkLocalAddress(r.address));
-  } catch {
-    return false;
+const realDnsLookup: DnsLookupFn = (hostname) => dnsLookup(hostname, { all: true });
+
+// PI-113 — the ONE DNS resolution performed for a delivery attempt. Every
+// resolved address must be safe (a hostname mixing a safe and an unsafe
+// address is refused outright, not partially trusted) — but critically, the
+// single address this returns is also the exact address deliverWebhook pins
+// the actual TCP/TLS connection to below, via a custom `lookup`. That's what
+// closes the DNS-rebinding gap the old isSafeWebhookTarget()-then-fetch()
+// sequence had: there is no second, independent resolution for an attacker's
+// authoritative nameserver to answer differently on.
+export async function resolveSafeAddress(
+  host: string,
+  lookupFn: DnsLookupFn = realDnsLookup,
+): Promise<ResolvedAddress | null> {
+  const ipVersion = isIP(host);
+  if (ipVersion) {
+    return isLoopbackOrLinkLocalAddress(host) ? null : { address: host, family: ipVersion as 4 | 6 };
   }
+
+  let results: Array<{ address: string; family: number }>;
+  try {
+    results = await lookupFn(host);
+  } catch {
+    return null;
+  }
+  if (results.length === 0 || results.some((r) => isLoopbackOrLinkLocalAddress(r.address))) return null;
+
+  // Which of the (all-safe) answers gets pinned is arbitrary, same "which
+  // one is arbitrary" precedent as computeSeatings elsewhere in this app —
+  // prefer IPv4 only for deterministic test/log output on a dual-stack answer.
+  const chosen = results.find((r) => r.family === 4) ?? results[0]!;
+  return { address: chosen.address, family: chosen.family as 4 | 6 };
 }
 
 export interface DeliveryResult {
@@ -93,22 +112,87 @@ export interface DeliveryResult {
   error?: string;
 }
 
-export async function deliverWebhook(url: string, secret: string, payload: WebhookPayload): Promise<DeliveryResult> {
-  const body = JSON.stringify(payload);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5_000);
+// PI-113 — pins the actual socket to the address resolveSafeAddress already
+// validated, via Node's `lookup` connection option: the hostname stays
+// `url.hostname` everywhere else (Host header, TLS SNI, certificate
+// hostname validation all key off it normally), only the low-level
+// address-for-this-hostname resolution is intercepted, so a legitimate TLS
+// cert for the real hostname still validates correctly against a
+// loopback-avoiding, otherwise-arbitrary pinned IP.
+//
+// This also closes the redirect-pivot gap for free: unlike fetch(), Node's
+// core http/https clients never auto-follow redirects — a 3xx response
+// simply comes back as this address's actual response (falling out of the
+// existing `ok: status in 200-299` check below as a failed delivery), with
+// no second, unvalidated connection ever made.
+function pinnedLookup(resolved: ResolvedAddress): http.RequestOptions["lookup"] {
+  return (_hostname, _options, callback) => {
+    callback(null, [{ address: resolved.address, family: resolved.family }]);
+  };
+}
+
+function requestOnce(
+  url: URL,
+  resolved: ResolvedAddress,
+  headers: Record<string, string>,
+  body: string,
+  timeoutMs: number,
+): Promise<{ status: number }> {
+  return new Promise((resolvePromise, reject) => {
+    const transport = url.protocol === "https:" ? https : http;
+    const req = transport.request(
+      {
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port || (url.protocol === "https:" ? 443 : 80),
+        path: `${url.pathname}${url.search}`,
+        method: "POST",
+        headers,
+        lookup: pinnedLookup(resolved),
+        // Explicit belt-and-suspenders alongside `hostname` above: forces
+        // the right TLS SNI/cert-hostname target regardless of Node version
+        // quirks in how `lookup` interacts with servername defaulting.
+        ...(url.protocol === "https:" ? { servername: url.hostname } : {}),
+        timeout: timeoutMs,
+      },
+      (res) => {
+        res.resume(); // drain the body — no delivery caller reads it, and an
+        // unconsumed response keeps the socket (and this promise) open.
+        res.on("end", () => resolvePromise({ status: res.statusCode ?? 0 }));
+        res.on("error", reject);
+      },
+    );
+    req.on("timeout", () => req.destroy(new Error("timed out")));
+    req.on("error", reject);
+    req.end(body);
+  });
+}
+
+export async function deliverWebhook(
+  url: string,
+  secret: string,
+  payload: WebhookPayload,
+  overrides?: { lookup?: DnsLookupFn },
+): Promise<DeliveryResult> {
+  let parsed: URL;
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-LimitedGauntlet-Signature": signPayload(secret, body) },
-      body,
-      signal: controller.signal,
-    });
-    return { ok: res.ok, status: res.status };
+    parsed = new URL(url);
+  } catch {
+    return { ok: false, error: "unsafe_target" };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return { ok: false, error: "unsafe_target" };
+
+  const resolved = await resolveSafeAddress(parsed.hostname, overrides?.lookup);
+  if (!resolved) return { ok: false, error: "unsafe_target" };
+
+  const body = JSON.stringify(payload);
+  const headers = { "Content-Type": "application/json", "X-LimitedGauntlet-Signature": signPayload(secret, body) };
+
+  try {
+    const { status } = await requestOnce(parsed, resolved, headers, body, 5_000);
+    return { ok: status >= 200 && status < 300, status };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "request_failed" };
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -151,15 +235,6 @@ export async function sendWebhookEvent(
 
     await Promise.all(
       webhooks.map(async (webhook) => {
-        if (!(await isSafeWebhookTarget(webhook.url))) {
-          console.warn("Webhook delivery skipped: target resolves to a loopback/link-local address", {
-            orgId,
-            podId,
-            webhookId: webhook.id,
-            event,
-          });
-          return;
-        }
         const result = await deliverWebhook(webhook.url, webhook.secret, payload);
         if (!result.ok) {
           console.warn("Webhook delivery failed", { orgId, podId, webhookId: webhook.id, event, ...result });
@@ -247,7 +322,6 @@ export async function sendTestWebhookEvent(
     select: { url: true, secret: true },
   });
   if (!webhook) return { ok: false, error: "not_found" };
-  if (!(await isSafeWebhookTarget(webhook.url))) return { ok: false, error: "unsafe_target" };
 
   return deliverWebhook(webhook.url, webhook.secret, {
     event: "test",
@@ -310,10 +384,6 @@ export async function sendAdminWebhookEvent(
   data: { orgName: string; orgSlug: string; creatorEmail: string },
 ): Promise<void> {
   try {
-    if (!(await isSafeWebhookTarget(webhook.url))) {
-      console.warn("Admin webhook delivery skipped: target resolves to a loopback/link-local address");
-      return;
-    }
     const result = await deliverWebhook(webhook.url, webhook.secret, {
       event: "organization.created",
       timestamp: new Date().toISOString(),

@@ -9,11 +9,12 @@ import {
   buildStandingsPayload,
   deliverWebhook,
   isLoopbackOrLinkLocalAddress,
-  isSafeWebhookTarget,
   parseAdminWebhookConfig,
+  resolveSafeAddress,
   sendAdminWebhookEvent,
   sendTestWebhookEvent,
   sendWebhookEvent,
+  type DnsLookupFn,
 } from "./webhooks.js";
 
 const prisma = makePrismaClient();
@@ -39,7 +40,7 @@ function ownNonLoopbackAddress(): string {
 }
 
 async function withTestServer(
-  handler: (req: IncomingMessage, body: string) => { status: number; body?: string },
+  handler: (req: IncomingMessage, body: string) => { status: number; body?: string; headers?: Record<string, string> },
 ): Promise<{
   url: string;
   close: () => Promise<void>;
@@ -53,7 +54,7 @@ async function withTestServer(
       const body = Buffer.concat(chunks).toString("utf8");
       requests.push({ headers: req.headers, body });
       const result = handler(req, body);
-      res.writeHead(result.status, { "Content-Type": "application/json" });
+      res.writeHead(result.status, { "Content-Type": "application/json", ...result.headers });
       res.end(result.body ?? "{}");
     });
   });
@@ -87,23 +88,50 @@ describe("isLoopbackOrLinkLocalAddress", () => {
   });
 });
 
-describe("isSafeWebhookTarget", () => {
-  it("rejects non-http(s) protocols and malformed URLs", async () => {
-    await expect(isSafeWebhookTarget("ftp://example.com/hook")).resolves.toBe(false);
-    await expect(isSafeWebhookTarget("not a url")).resolves.toBe(false);
+describe("resolveSafeAddress", () => {
+  it("accepts an IP-literal LAN address", async () => {
+    await expect(resolveSafeAddress(ownNonLoopbackAddress())).resolves.toEqual({
+      address: ownNonLoopbackAddress(),
+      family: 4,
+    });
   });
 
-  it("rejects an IP-literal loopback/link-local target", async () => {
-    await expect(isSafeWebhookTarget("http://127.0.0.1:9999/hook")).resolves.toBe(false);
-    await expect(isSafeWebhookTarget("http://169.254.169.254/hook")).resolves.toBe(false);
-  });
-
-  it("accepts an IP-literal LAN target", async () => {
-    await expect(isSafeWebhookTarget(`http://${ownNonLoopbackAddress()}:9999/hook`)).resolves.toBe(true);
+  it("rejects an IP-literal loopback/link-local address", async () => {
+    await expect(resolveSafeAddress("127.0.0.1")).resolves.toBeNull();
+    await expect(resolveSafeAddress("169.254.169.254")).resolves.toBeNull();
   });
 
   it("resolves a hostname and rejects it if it resolves to loopback", async () => {
-    await expect(isSafeWebhookTarget("http://localhost:9999/hook")).resolves.toBe(false);
+    await expect(resolveSafeAddress("localhost")).resolves.toBeNull();
+  });
+
+  // PI-113 regression: a hostname with multiple DNS answers is refused
+  // outright if ANY of them is loopback/link-local — not partially trusted
+  // by picking one of the safe ones — same conservative posture as before.
+  it("rejects a hostname whose answers include even one unsafe address", async () => {
+    const mixedLookup: DnsLookupFn = async () => [
+      { address: "192.168.1.5", family: 4 },
+      { address: "127.0.0.1", family: 4 },
+    ];
+    await expect(resolveSafeAddress("mixed.example", mixedLookup)).resolves.toBeNull();
+  });
+
+  it("accepts a hostname whose every answer is safe, pinning to one of them", async () => {
+    const allSafeLookup: DnsLookupFn = async () => [
+      { address: "192.168.1.5", family: 4 },
+      { address: "192.168.1.6", family: 4 },
+    ];
+    await expect(resolveSafeAddress("multi.example", allSafeLookup)).resolves.toEqual({
+      address: "192.168.1.5",
+      family: 4,
+    });
+  });
+
+  it("propagates a resolver failure as unsafe rather than throwing", async () => {
+    const failingLookup: DnsLookupFn = async () => {
+      throw new Error("ENOTFOUND");
+    };
+    await expect(resolveSafeAddress("nowhere.example", failingLookup)).resolves.toBeNull();
   });
 });
 
@@ -145,6 +173,79 @@ describe("deliverWebhook", () => {
     });
     expect(result.ok).toBe(false);
     expect(result.error).toBeTruthy();
+  });
+
+  it("rejects non-http(s) protocols and malformed URLs without attempting a connection", async () => {
+    const payload = { event: "test" as const, timestamp: "now", data: {} };
+    await expect(deliverWebhook("ftp://example.com/hook", "s", payload)).resolves.toEqual({
+      ok: false,
+      error: "unsafe_target",
+    });
+    await expect(deliverWebhook("not a url", "s", payload)).resolves.toEqual({ ok: false, error: "unsafe_target" });
+  });
+
+  it("skips a loopback/link-local target without attempting a connection", async () => {
+    const result = await deliverWebhook("http://127.0.0.1:9999/hook", "s", {
+      event: "test",
+      timestamp: "now",
+      data: {},
+    });
+    expect(result).toEqual({ ok: false, error: "unsafe_target" });
+  });
+
+  // PI-113 regression: fetch() used to auto-follow a redirect by default,
+  // so a receiver returning a 307/308 could pivot the actual connection
+  // anywhere — including back at the app itself or a cloud metadata
+  // endpoint — after the target URL had already passed the safety check.
+  // Node's core http/https client never follows redirects on its own, so a
+  // 3xx just has to be treated as a failed delivery, not specially chased.
+  it.each([307, 308])("treats a %d redirect as a failed delivery instead of following it", async (status) => {
+    const server = await withTestServer(() => ({
+      status,
+      headers: { Location: "http://127.0.0.1/should-never-be-reached" },
+    }));
+    try {
+      const result = await deliverWebhook(server.url, "s", { event: "test", timestamp: "now", data: {} });
+      expect(result).toEqual({ ok: false, status });
+      expect(server.requests).toHaveLength(1); // only the original request, nothing chased the Location
+    } finally {
+      await server.close();
+    }
+  });
+
+  // PI-113 regression: the old isSafeWebhookTarget()-then-fetch() sequence
+  // resolved DNS twice — once to validate, once (inside fetch) to actually
+  // connect — leaving a window for a rebinding nameserver to answer
+  // differently the second time. Proven here by a lookup stub that would
+  // return an unsafe address on any call after the first: delivery must
+  // still land on the real server, and the stub must be called exactly once.
+  it("pins the connection to the single resolved address — a DNS answer that changes later can't redirect it", async () => {
+    const server = await withTestServer(() => ({ status: 200 }));
+    try {
+      // A hostname, not an IP literal — an IP-literal URL never calls the
+      // lookup function at all (resolveSafeAddress short-circuits on it),
+      // so this has to go through real hostname resolution to actually
+      // exercise the atomic-pinning behavior under test.
+      const { hostname: realAddress, port } = new URL(server.url);
+      const fakeHostnameUrl = `http://webhook-rebinding-test.invalid:${port}/hook`;
+      let calls = 0;
+      const rebindingLookup: DnsLookupFn = async () => {
+        calls++;
+        if (calls === 1) return [{ address: realAddress, family: 4 }];
+        return [{ address: "127.0.0.1", family: 4 }]; // what a second lookup would maliciously answer
+      };
+      const result = await deliverWebhook(
+        fakeHostnameUrl,
+        "s",
+        { event: "test", timestamp: "now", data: {} },
+        { lookup: rebindingLookup },
+      );
+      expect(result).toEqual({ ok: true, status: 200 });
+      expect(server.requests).toHaveLength(1);
+      expect(calls).toBe(1); // never re-resolved
+    } finally {
+      await server.close();
+    }
   });
 });
 
@@ -396,8 +497,8 @@ describe("sendAdminWebhookEvent", () => {
 
   it("never throws when a safe (non-loopback) target is unreachable", async () => {
     // Port 1 on the machine's own real interface: a safe (non-loopback)
-    // target per isSafeWebhookTarget, but nothing is listening — exercises
-    // the fetch-failure path, distinct from the SSRF-skip path below.
+    // target per resolveSafeAddress, but nothing is listening — exercises
+    // the connection-failure path, distinct from the SSRF-skip path below.
     await expect(
       sendAdminWebhookEvent(
         { url: `http://${ownNonLoopbackAddress()}:1`, secret: "a".repeat(16) },
