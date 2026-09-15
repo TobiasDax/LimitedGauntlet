@@ -1,7 +1,7 @@
 # Build log (archived)
 
 > **This is the historical build record, kept for reference — it is no longer the file to read first.**
-> The whole numbered build (Steps 0–12) and most of the post-1.0 backlog (PI-1 … PI-112) below are **done and browser-verified**. A handful of still-open items (PI-39, PI-62, PI-92, PI-95) live in [`ROADMAP.md`](../ROADMAP.md) instead — read that first for current status and the next actual work. Full design rationale lives in [`PLAN.md`](../PLAN.md). This file stays as the detailed "how each piece was built and verified" log.
+> The whole numbered build (Steps 0–12) and most of the post-1.0 backlog (PI-1 … PI-112) below are **done and browser-verified**. A handful of still-open items (PI-39, PI-95, PI-113) and parked ideas (PI-62) live in [`ROADMAP.md`](../ROADMAP.md) instead — read that first for current status and the next actual work. Full design rationale lives in [`PLAN.md`](../PLAN.md). This file stays as the detailed "how each piece was built and verified" log.
 
 Granular checklist. Full rationale for any step lives in `PLAN.md`.
 
@@ -1299,7 +1299,7 @@ Tobias flagged (Android Chrome screenshot, a 20-seat pod on `Neuburger Magic Tes
 - [x] Column-mode alignment bug found on a real phone and fixed (v0.14.1).
 - [x] **Browser-verified (2026-09-14):** row mode at desktop width, the column-mode alignment fix, and the resize-triggered live flip between modes all confirmed working. `MIN_SEAT_WIDTH_PX = 84` accepted as-is in practice.
 
-### PI-92 — Expand CI: migration drift, image build on PRs, boot smoke test ✅ (migration-drift + lint v0.8.0; image build / smoke test 2026-09-14, unreleased)
+### PI-92 — Expand CI: migration drift, image build on PRs, boot smoke test ✅ (migration-drift + lint v0.8.0; image build / smoke test v0.15.0)
 `.forgejo/workflows/ci.yml`'s `check` job (typecheck, lint/format, migration-drift, server test suite) had no PR-time coverage of the actual Docker image — a broken `Dockerfile` or a runtime-only failure (missing env var, bad `CMD`) could land on `main` undetected between tagged releases.
 
 **Added:** a separate `image` job — `docker build`, then a Postgres container + the built image on a shared Docker network, polling `/api/healthz` before tearing everything down.

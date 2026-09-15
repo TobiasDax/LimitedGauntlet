@@ -4,13 +4,13 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.14.1**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.15.0**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+
+**v0.15.0:** PI-92 (CI now builds the Docker image and runs a boot smoke test on every PR, closing the last gap in project-health coverage — full write-up in the build log). Also ships the code for PI-113 (webhook SSRF hardening) and PI-39 (legacy-data.json import via the Settings UI) — both stay listed as open below until Tobias deploys/click-through-verifies them on a live instance, per this project's shipped-**and**-verified convention.
 
 **v0.14.0:** PI-115 (split a large draft/chaos-draft pod into multiple physical tables — shape picker, pair-preserving table fill, per-table seating on both the organizer and public pages; browser/data-verified against a real 20-entrant pod, including a seat-numbering bug caught and fixed via that testing).
 
 **v0.14.1:** a column-mode alignment bug in PI-114's responsive seating chart, caught on a real phone right after v0.14.0 shipped — column mode's empty-slot spacer for an odd entrant count wasn't taking up any vertical space, misaligning the two columns. PI-114 is now fully browser-verified and closed out in the build log.
-
-**Unreleased on `main`:** PI-92's PR-time Docker image build + boot smoke test is now green end-to-end on the Forgejo runner (host-socket mount + a modern static `docker` CLI, after a Docker-in-Docker sidecar design was tried and abandoned) — closed out in the build log.
 
 **Live instance (DaxLite, `limited-gauntlet-live`):** running **v0.14.1** as of 2026-09-14, deploy confirmed working (includes the new `20260914140000_entrant_draft_table` migration). Recently shipped **and** browser-verified, now in the build log: PI-75 (operator signup webhook), PI-76–84 (the pod-list cluster — reorder, finished-pods sink, Scheduled/On-demand tabs, timestamps, date dividers, pod cancel), PI-85 (deployer analytics), PI-86 (one login across multiple orgs), PI-87 (Settings/Profile split), PI-88–91 / 93 / 94 / 98 (project-health: CI on Forgejo, ESLint + Prettier, tag-triggered GHCR release, container hardening, the `@fastify/compress` hotfix), PI-96/97 (player detail page, per-pod entrant count), PI-99/100 (pod participation fix + on-demand side events), PI-103–108 / 110 (the GDPR/DSGVO pass + privacy round 2, v0.10.0–v0.11.0), PI-112 (built-in `/legal` page, v0.12.0), PI-102 / PI-109 / PI-111 (boot-time dep guard, Prisma 7, ESLint 10 — v0.13.0), PI-115 (multi-table draft splits, v0.14.0/v0.14.1), PI-114 (responsive seating chart, v0.14.0/v0.14.1).
 
@@ -20,9 +20,9 @@ The app is **feature-complete and running in production** — latest release **v
 
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
-- **PI-39** — organizer data import: code-complete (both the PI-38 export format and now `legacy-data.json` history files import through the same Settings UI, sharing one concurrency guard). 11 new tests, full server suite (213) green. Not yet UI-verified in a browser.
+- **PI-39** — organizer data import: code shipped in v0.15.0 (both the PI-38 export format and now `legacy-data.json` history files import through the same Settings UI, sharing one concurrency guard). 11 new tests, full server suite (213) green. Not yet UI-verified in a browser.
 - **PI-95** — read-path performance before the 40–60 player event: client + query-shape parts shipped (v0.8.0); the in-process standings cache and the real-deploy load test are still open. (Response compression stays reverted, see PI-98.) The load test now also wants to cover the Prisma 7 driver adapter's connection-pool behaviour (PI-109, v0.13.0).
-- **PI-113** — webhook SSRF hardening: code-complete (`deliverWebhook()` now resolves DNS once and pins the connection to that address instead of `fetch()`-ing the raw URL, which also blocks redirect pivots for free) — 4 new regression tests, full server suite (202) green. Not yet deployed to the live instance.
+- **PI-113** — webhook SSRF hardening: code shipped in v0.15.0 (`deliverWebhook()` now resolves DNS once and pins the connection to that address instead of `fetch()`-ing the raw URL, which also blocks redirect pivots for free) — 4 new regression tests, full server suite (202) green. Not yet deployed to the live instance.
 
 ## New improvements (backlog)
 
@@ -30,7 +30,7 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
-### PI-39 — Organizer data import (UI) ⏳ (v1 + legacy-format step both code-complete 2026-09-14, UI click-through pending)
+### PI-39 — Organizer data import (UI) ⏳ (v1 + legacy-format step both shipped in v0.15.0, UI click-through pending)
 A UI path to import data into an organization, so imports don't require shell/`import-legacy` access.
 - [x] **v1:** accepts the PI-38 export file and rebuilds its `data` into the current org. New `server/src/services/orgImport.ts` (zod-validated envelope + `importOrgData`) + `POST /api/settings/import` (25MB body limit, rate-limited). Runs in one transaction and is **idempotent at the tournament level** (same-named tournament skipped), matching `import-legacy`'s posture — re-importing is safe. Typed errors (`not_our_format`/`invalid_shape`/`unsupported_version`/`no_data`/`import_failed`) surfaced with clear UI copy.
 - [x] **UI:** file picker in the same Settings section; `useImportOrg` parses/posts the file and invalidates the whole query cache on success, then shows a created/skipped summary.
@@ -39,7 +39,7 @@ A UI path to import data into an organization, so imports don't require shell/`i
 - [x] **Docs:** `docs/history-import.md` now leads with the UI path for an organizer who already has an org, keeping the CLI path documented for the no-org-yet case; README's roadmap preview updated (this and PI-62 both resolved).
 - [ ] **Not yet UI-verified** — this sandbox has no Docker to run a full `vite build`/click through the Settings page, so the actual file-picker flow (as opposed to the underlying import logic, which is thoroughly tested against a real DB) hasn't been exercised in a browser. Tobias should check on a real instance: upload both a PI-38 export and a `legacy-data.json` file through Settings → Import and confirm the summary/error copy renders as expected for each.
 
-### PI-113 — Harden outbound webhooks against redirect and DNS-rebinding SSRF (medium severity) ⏳ (code-complete 2026-09-14, deploy pending)
+### PI-113 — Harden outbound webhooks against redirect and DNS-rebinding SSRF (medium severity) ⏳ (shipped in v0.15.0, deploy pending)
 The 2026-09-14 Codex Security scan validated one source-backed finding in `server/src/services/webhooks.ts`. An authenticated organizer may configure and test an arbitrary HTTP(S) webhook. `isSafeWebhookTarget()` resolved and checked the hostname first, but `deliverWebhook()` later called `fetch()` with the original URL. The actual connection therefore performed a separate DNS resolution and followed redirects by default. A hostname that changed its DNS answer, or an attacker-controlled endpoint returning a 307/308 redirect, could deliver the POST to loopback or link-local services that the guard explicitly intended to block (CWE-918).
 
 Private RFC1918 destinations remain an intentional product requirement for Home Assistant and similar LAN automation — the fix preserves that and closes only the gap between the destination approved by policy and the destination actually contacted.
