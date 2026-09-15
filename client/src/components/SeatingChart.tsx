@@ -90,7 +90,7 @@ export function SeatingChart({
         }`}
       >
         <span className="text-[10.5px] font-semibold tracking-wide text-accent uppercase">Seat {seat}</span>
-        <span className="min-w-0 truncate font-display text-[14px] font-bold">
+        <span className="w-full min-w-0 font-display text-[14px] leading-tight font-bold break-words">
           {entrant ? entrantDisplayName(entrant) : "—"}
         </span>
         {isBye && <span className="text-[10px] tracking-wide text-ink-muted uppercase">Round 1 bye</span>}

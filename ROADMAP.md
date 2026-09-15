@@ -27,6 +27,7 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 - **PI-116** — show the running app version in the footer, linked to its GitHub release page: code-complete, browser-verify pending.
 - **PI-117** — bug fix: inviting a co-organizer whose email already has an account (in a *different* org) wrongly refused with "That email already has an account." Code shipped in v0.15.2, live-verify pending.
 - **PI-118** — bug fix: a pod's public standings leaked who has round 1's bye before pairings are revealed (the bye is auto-scored the instant round 1 is generated). Code shipped in v0.15.2, live-verify pending; a related, lower-severity variant in the weekend Gesamtwertung table and player Hall of Fame pages is a known, deliberately-deferred gap (see its write-up) — confirmed with Tobias not worth fixing now.
+- **PI-119** — bug fix: long entrant names overflowed a `SeatingChart` seat box's border instead of wrapping, spilling into neighboring seats. Code-complete, browser-verify pending.
 
 ## New improvements (backlog)
 
@@ -63,7 +64,17 @@ Deliberately scoped to the public **pod standings** route only (what was actuall
 
 - [x] Shared predicate extracted + tested (`pairingsVisibility.test.ts`), public standings route fixed, client empty-state copy fixed. `tsc -b`/`eslint`/`prettier` clean on both workspaces.
 - [ ] **Not yet live-verified** — same sandbox limitation as PI-117 (no DB/browser). Tobias should confirm: generate a pod with an odd entrant count (forcing a bye) through seating, check the public pod page shows no standings until "Reveal pairings," then confirm the bye's points appear immediately once revealed.
-- [ ] **Known, narrower related leak not yet fixed — needs a decision.** The same bye-before-reveal points also flow into the weekend Gesamtwertung table (`computeGesamtwertung`, shared by the public Gesamtwertung route, the organizer's own view, and the spreadsheet export) and a player's individual Hall-of-Fame page (`computePlayerStats`, similarly shared). Fixing those requires threading a "hide unrevealed round 1" option through shared service functions that authenticated/export callers must keep bypassing — more invasive than this pass, and the practical exposure window is much narrower (aggregated weekend totals, or a specific player's own history page, rather than the one page every attendee actually watches). Left open pending Tobias's call on whether it's worth closing now or can wait.
+- [x] **Known, narrower related leak — deliberately deferred, confirmed with Tobias (2026-09-15).** The same bye-before-reveal points also flow into the weekend Gesamtwertung table (`computeGesamtwertung`, shared by the public Gesamtwertung route, the organizer's own view, and the spreadsheet export) and a player's individual Hall-of-Fame page (`computePlayerStats`, similarly shared). Fixing those would require threading a "hide unrevealed round 1" option through shared service functions that authenticated/export callers must keep bypassing — more invasive than this pass, and the practical exposure window is much narrower (aggregated weekend totals, or a specific player's own history page, rather than the one page every attendee actually watches). **Decision: not worth it for now** — the main standings page (what was actually reported) is enough.
+
+### PI-119 — Bug fix: long entrant names overflow a seat box's border in `SeatingChart` ⏳ (code-complete 2026-09-15, browser-verify pending)
+Reported by Tobias (screenshot, a real 20+ entrant pod): a long name like "Matthias Werner-W…" or "Bernhard Frisch" rendered past its seat box's right border, overlapping the neighboring seat instead of staying inside its own box.
+
+**Root cause:** the name `<span>` used Tailwind's `truncate` (single-line, `overflow: hidden` + ellipsis), but never had a `w-full` — and its parent cell is a `flex-col` container with `items-center`, which centers children at their own natural content width rather than stretching them to fill it. Without a defined width to clip against, the span just grew as wide as its full text needed and rendered past its own box's edge; `truncate`'s `overflow: hidden` had nothing to actually clip.
+
+**Fixed:** `client/src/components/SeatingChart.tsx`'s name span now gets `w-full` (so it's genuinely constrained to the seat box's width, sidestepping the `items-center` sizing quirk) and swaps `truncate` for `break-words` (wraps onto a second line, including breaking a single long unbroken word, instead of single-line-and-clip) — matching what was actually asked for ("line breaks and never overflow") rather than an ellipsis cut. `leading-tight` keeps a two-line name from inflating the seat box too much. One shared component, so this fixes both the organizer's Seatings page and the public pod page's seating chart at once.
+
+- [x] Fixed, `tsc -b`/`eslint`/`prettier` clean.
+- [ ] **Not yet browser-verified** — this sandbox has no browser to visually confirm the wrap/no-overflow behavior on a real long name. Tobias should re-check the same pod that showed the bug.
 
 ## Project-health backlog (from the 2026-09-06 code audit)
 
