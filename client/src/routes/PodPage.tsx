@@ -365,6 +365,26 @@ function CapacityNote({ capacity, count }: { capacity: number | null; count: num
   );
 }
 
+// PI-121 — always-visible headcount above the entrants list, so it's there
+// at a glance without waiting for CapacityNote's at/over-capacity warning
+// (which only ever fires once you've actually hit the cap) or flipping to
+// the pod-list view's own "N / M" indicator (PI-100, PodList.tsx).
+function EntrantHeadcount({
+  count,
+  capacity,
+  noun,
+}: {
+  count: number;
+  capacity: number | null;
+  noun: "players" | "teams";
+}) {
+  return (
+    <p className="mb-2 text-[12.5px] text-ink-muted">
+      {capacity != null ? `${count} / ${capacity} ${noun}` : `${count} ${noun}`}
+    </p>
+  );
+}
+
 function IndividualEntrants({
   podId,
   podName,
@@ -383,6 +403,7 @@ function IndividualEntrants({
 
   return (
     <div>
+      <EntrantHeadcount count={entrants.length} capacity={capacity} noun="players" />
       <CapacityNote capacity={capacity} count={entrants.length} />
       <Card className="mb-4 divide-y divide-border">
         {entrants.length === 0 && <p className="px-5 py-4 text-[13.5px] text-ink-muted">No entrants yet.</p>}
@@ -450,6 +471,7 @@ function TeamEntrants({
 
   return (
     <div>
+      <EntrantHeadcount count={entrants.length} capacity={capacity} noun="teams" />
       <CapacityNote capacity={capacity} count={entrants.length} />
       <Card className="mb-4 divide-y divide-border">
         {entrants.length === 0 && <p className="px-5 py-4 text-[13.5px] text-ink-muted">No teams yet.</p>}
