@@ -463,6 +463,18 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
+    // Once round 1 exists, the entrant list the pairing was actually built
+    // from is fixed — someone added afterward would have 0 matches for every
+    // round already generated, silently breaking the "everyone plays
+    // everyone" assumption pairing.ts relies on. Undo the pairing (which
+    // deletes round 1 entirely) to add more, same as the client's "Undo
+    // pairing" button already offers.
+    const roundCount = await prisma.round.count({ where: { podId: pod.id } });
+    if (roundCount > 0) {
+      reply.code(400).send({ error: "pod_already_paired" });
+      return;
+    }
+
     if (pod.isTeamEvent) {
       const body = teamEntrantSchema.safeParse(request.body);
       if (!body.success) {

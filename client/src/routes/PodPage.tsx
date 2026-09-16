@@ -391,12 +391,14 @@ function IndividualEntrants({
   entrants,
   capacity,
   canModifyRoster,
+  canAddEntrants,
 }: {
   podId: string;
   podName: string;
   entrants: Entrant[];
   capacity: number | null;
   canModifyRoster: boolean;
+  canAddEntrants: boolean;
 }) {
   const removeEntrant = useRemoveEntrant(podId);
   const [showPicker, setShowPicker] = useState(false);
@@ -429,9 +431,15 @@ function IndividualEntrants({
         ))}
       </Card>
 
-      <Button variant="primary" onClick={() => setShowPicker(true)}>
-        + Add players
-      </Button>
+      {canAddEntrants ? (
+        <Button variant="primary" onClick={() => setShowPicker(true)}>
+          + Add players
+        </Button>
+      ) : (
+        <p className="text-[13px] text-ink-muted">
+          Round 1 has already been paired — undo the pairing on the Pairings tab to add more players.
+        </p>
+      )}
       {removeEntrant.isError && <FormError>{entrantErrorMessage(removeEntrant.error)}</FormError>}
 
       {showPicker && (
@@ -452,12 +460,14 @@ function TeamEntrants({
   teamSize,
   capacity,
   canModifyRoster,
+  canAddEntrants,
 }: {
   podId: string;
   entrants: Entrant[];
   teamSize: number | null;
   capacity: number | null;
   canModifyRoster: boolean;
+  canAddEntrants: boolean;
 }) {
   const { data: playersData } = usePlayers();
   const addTeam = useAddTeamEntrant(podId);
@@ -500,7 +510,11 @@ function TeamEntrants({
         ))}
       </Card>
 
-      {available.length > 0 ? (
+      {!canAddEntrants ? (
+        <p className="text-[13px] text-ink-muted">
+          Round 1 has already been paired — undo the pairing on the Pairings tab to add more teams.
+        </p>
+      ) : available.length > 0 ? (
         <Card className="p-5">
           <form
             className="flex flex-col gap-3"
@@ -581,6 +595,13 @@ export function PodPage() {
   // one is ACTIVE/PENDING — same gate PairingsPage uses before pairing the
   // next round.
   const canModifyRoster = rounds.length === 0 || lastRound?.status === "COMPLETED";
+  // Bug fix (2026-09-16): adding a brand-new entrant once round 1 exists is
+  // never safe, even between rounds — they'd have 0 matches for every round
+  // already generated, breaking the pairing/standings assumptions the pod
+  // was built on. Stricter than canModifyRoster: only "no rounds at all"
+  // allows it. Undo the pairing (which deletes round 1 entirely) to add
+  // more. Server enforces this too (POST /api/pods/:id/entrants).
+  const canAddEntrants = rounds.length === 0;
 
   return (
     <div>
@@ -651,6 +672,7 @@ export function PodPage() {
           teamSize={pod.teamSize}
           capacity={pod.capacity}
           canModifyRoster={canModifyRoster}
+          canAddEntrants={canAddEntrants}
         />
       ) : (
         <IndividualEntrants
@@ -659,6 +681,7 @@ export function PodPage() {
           entrants={pod.entrants}
           capacity={pod.capacity}
           canModifyRoster={canModifyRoster}
+          canAddEntrants={canAddEntrants}
         />
       )}
     </div>
