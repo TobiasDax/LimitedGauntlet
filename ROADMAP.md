@@ -30,6 +30,7 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 - **PI-119** — bug fix: long entrant names overflowed a `SeatingChart` seat box's border instead of wrapping, spilling into neighboring seats. Code-complete, browser-verify pending.
 - **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code-complete, browser-verify pending.
 - **PI-121** — show an always-visible entrant headcount (and capacity if set) on a pod's Entrants tab. Code-complete, browser-verify pending.
+- **PI-122** — bug fix: adding entrants stayed enabled after round 1 was paired; now blocked (client + server) until the pairing is undone. Code-complete, browser-verify pending.
 
 ## New improvements (backlog)
 
@@ -98,6 +99,17 @@ Idea from Tobias (2026-09-16): on a pod's Entrants tab, show how many players/te
 
 - [x] Built, `tsc -b`/`eslint`/`prettier` clean.
 - [ ] **Not yet browser-verified** — sandbox has no browser. Tobias should confirm the count shows correctly with and without a capacity set, on both individual and team pods.
+
+### PI-122 — Bug fix: adding entrants stayed enabled after round 1 was paired ⏳ (code-complete 2026-09-16, browser-verify pending)
+Reported by Tobias: once pairings are generated, adding players to a pod should be deactivated — to add more, the pod needs to be unpaired first (via the existing "Undo pairing" button).
+
+**Root cause:** `canModifyRoster` (`PodPage.tsx`, `rounds.length === 0 || lastRound?.status === "COMPLETED"`) already gates drop/undrop, but the "+ Add players" / "+ Add team" UI was never gated by anything at all — always enabled regardless of round state. Server-side, `POST /api/pods/:id/entrants` (`pods.ts`) had no round check either. Someone added mid-tournament would have 0 matches for every round already generated, breaking the "everyone plays everyone" assumption pairing/standings are built on.
+
+**Fixed:** a new, deliberately **stricter** gate than `canModifyRoster` — `canAddEntrants = rounds.length === 0` — no "between completed rounds" allowance, since a newly-added entrant is never safe once round 1 exists at all, only before it. `IndividualEntrants`/`TeamEntrants` hide the add UI behind it, showing "Round 1 has already been paired — undo the pairing on the Pairings tab to add more" instead. Server-side, the route now checks `round.count` for the pod and refuses (`pod_already_paired`) before either the team or individual/bulk add path runs — enforced independently of the UI, not just disabled client-side.
+
+- [x] Fixed both client and server, `tsc -b`/`eslint`/`prettier` clean.
+- [ ] **Not yet browser-verified** — sandbox has no DB/browser, and no route-level tests exist for `pods.ts` (matches this codebase's established convention — only service-layer functions get real-DB tests). Tobias should confirm: generate round 1, confirm the add-players/add-team UI is replaced by the explanatory message, then undo the pairing and confirm adding works again.
+- **Related, not addressed:** the "Remove" button next to each entrant (`DELETE /api/entrants/:id`) has no round-state guard either, and unlike drop, it hard-deletes — cascading to that entrant's `Match` rows if any exist. Found while investigating this bug but out of scope for what was reported (removal, not addition); flagging since it's the same class of gap.
 
 ## Project-health backlog (from the 2026-09-06 code audit)
 
