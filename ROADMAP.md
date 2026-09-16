@@ -4,11 +4,13 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.15.2**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.15.3**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+
+**v0.15.3:** PI-119 (bug fix — long entrant names overflowed a seat box's border instead of wrapping), PI-120 (player portal: list the player's own pods with a self-service leave, and link tournaments to their public page), PI-121 (always-visible entrant headcount, and capacity if set, on a pod's Entrants tab), and PI-122 (bug fix — adding entrants stayed enabled after round 1 was paired; Remove and Drop are now mutually exclusive by pod state, both client- and server-enforced). All code-complete, browser/live-verify pending.
 
 **v0.15.2:** two bug fixes reported by Tobias. PI-117 — inviting a co-organizer whose email already had an account in a *different* org was wrongly refused; now creates the invite normally and lets the existing PI-86 "log in to accept" flow handle it. PI-118 — a pod's public standings leaked who has round 1's bye before pairings were revealed (a bye is auto-scored the instant round 1 is generated); standings now hide on the same condition as pairings and reveal together. Both code-complete, live-verify pending.
 
-**v0.15.1:** PI-116 (running app version shown in the footer, linked to its GitHub release page — code-complete, browser-verify pending).
+**v0.15.1:** PI-116 (running app version shown in the footer, linked to its GitHub release page — shipped, browser-verify pending).
 
 **v0.15.0:** PI-92 (CI now builds the Docker image and runs a boot smoke test on every PR, closing the last gap in project-health coverage — full write-up in the build log). PI-113 (webhook SSRF hardening) and PI-39 (legacy-data.json import via the Settings UI) shipped their code here and are now fully deployed/browser-verified — closed out in the build log.
 
@@ -24,13 +26,13 @@ The app is **feature-complete and running in production** — latest release **v
 
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
-- **PI-116** — show the running app version in the footer, linked to its GitHub release page: code-complete, browser-verify pending.
+- **PI-116** — show the running app version in the footer, linked to its GitHub release page: shipped in v0.15.1, browser-verify pending.
 - **PI-117** — bug fix: inviting a co-organizer whose email already has an account (in a *different* org) wrongly refused with "That email already has an account." Code shipped in v0.15.2, live-verify pending.
 - **PI-118** — bug fix: a pod's public standings leaked who has round 1's bye before pairings are revealed (the bye is auto-scored the instant round 1 is generated). Code shipped in v0.15.2, live-verify pending; a related, lower-severity variant in the weekend Gesamtwertung table and player Hall of Fame pages is a known, deliberately-deferred gap (see its write-up) — confirmed with Tobias not worth fixing now.
-- **PI-119** — bug fix: long entrant names overflowed a `SeatingChart` seat box's border instead of wrapping, spilling into neighboring seats. Code-complete, browser-verify pending.
-- **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code-complete, browser-verify pending.
-- **PI-121** — show an always-visible entrant headcount (and capacity if set) on a pod's Entrants tab. Code-complete, browser-verify pending.
-- **PI-122** — bug fix: adding entrants stayed enabled after round 1 was paired; now blocked (client + server) until the pairing is undone. Code-complete, browser-verify pending.
+- **PI-119** — bug fix: long entrant names overflowed a `SeatingChart` seat box's border instead of wrapping, spilling into neighboring seats. Code shipped in v0.15.3, browser-verify pending.
+- **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code shipped in v0.15.3, browser-verify pending.
+- **PI-121** — show an always-visible entrant headcount (and capacity if set) on a pod's Entrants tab. Code shipped in v0.15.3, browser-verify pending.
+- **PI-122** — bug fix: adding entrants stayed enabled after round 1 was paired; now blocked (client + server) until the pairing is undone, and Remove/Drop are mutually exclusive by pod state. Code shipped in v0.15.3, browser-verify pending.
 
 ## New improvements (backlog)
 
@@ -38,7 +40,7 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
-### PI-116 — Show the running app version in the footer, linked to its release notes ⏳ (code-complete 2026-09-15, browser-verify pending)
+### PI-116 — Show the running app version in the footer, linked to its release notes ⏳ (shipped in v0.15.1, browser-verify pending)
 Idea from Tobias (2026-09-15): put the running version number next to the GitHub link in `client/src/components/Footer.tsx`, linking to that version's GitHub release page (`https://github.com/TobiasDax/LimitedGauntlet/releases/tag/vX.Y.Z`) — easy access to the release notes for whatever's actually deployed, without needing to know the version to look it up.
 
 - [x] **Version reaches the frontend.** `server/src/config.ts` reads `version` from the root `package.json` (the single shared version per PI-22) at startup, resolved relative to `config.ts`'s own file location so it works identically from `tsx` dev and the compiled `server/dist` runtime regardless of `process.cwd()` (same pattern `index.ts` already used for `clientDistPath`). Exposed as `appVersion` on the existing public `GET /api/app-config` endpoint (`server/src/routes/auth.ts`) — no new env var, and it can't drift from what's actually built into the image.
@@ -69,7 +71,7 @@ Deliberately scoped to the public **pod standings** route only (what was actuall
 - [ ] **Not yet live-verified** — same sandbox limitation as PI-117 (no DB/browser). Tobias should confirm: generate a pod with an odd entrant count (forcing a bye) through seating, check the public pod page shows no standings until "Reveal pairings," then confirm the bye's points appear immediately once revealed.
 - [x] **Known, narrower related leak — deliberately deferred, confirmed with Tobias (2026-09-15).** The same bye-before-reveal points also flow into the weekend Gesamtwertung table (`computeGesamtwertung`, shared by the public Gesamtwertung route, the organizer's own view, and the spreadsheet export) and a player's individual Hall-of-Fame page (`computePlayerStats`, similarly shared). Fixing those would require threading a "hide unrevealed round 1" option through shared service functions that authenticated/export callers must keep bypassing — more invasive than this pass, and the practical exposure window is much narrower (aggregated weekend totals, or a specific player's own history page, rather than the one page every attendee actually watches). **Decision: not worth it for now** — the main standings page (what was actually reported) is enough.
 
-### PI-119 — Bug fix: long entrant names overflow a seat box's border in `SeatingChart` ⏳ (code-complete 2026-09-15, browser-verify pending)
+### PI-119 — Bug fix: long entrant names overflow a seat box's border in `SeatingChart` ⏳ (shipped in v0.15.3, browser-verify pending)
 Reported by Tobias (screenshot, a real 20+ entrant pod): a long name like "Matthias Werner-W…" or "Bernhard Frisch" rendered past its seat box's right border, overlapping the neighboring seat instead of staying inside its own box.
 
 **Root cause:** the name `<span>` used Tailwind's `truncate` (single-line, `overflow: hidden` + ellipsis), but never had a `w-full` — and its parent cell is a `flex-col` container with `items-center`, which centers children at their own natural content width rather than stretching them to fill it. Without a defined width to clip against, the span just grew as wide as its full text needed and rendered past its own box's edge; `truncate`'s `overflow: hidden` had nothing to actually clip.
@@ -79,7 +81,7 @@ Reported by Tobias (screenshot, a real 20+ entrant pod): a long name like "Matth
 - [x] Fixed, `tsc -b`/`eslint`/`prettier` clean.
 - [ ] **Not yet browser-verified** — this sandbox has no browser to visually confirm the wrap/no-overflow behavior on a real long name. Tobias should re-check the same pod that showed the bug.
 
-### PI-120 — Player portal: list the player's own pods, and link tournaments to their public page ⏳ (code-complete 2026-09-16, browser-verify pending)
+### PI-120 — Player portal: list the player's own pods, and link tournaments to their public page ⏳ (shipped in v0.15.3, browser-verify pending)
 Idea from Tobias (2026-09-15), from the player portal at `/o/<slug>/player`:
 - A list of every pod the player is currently signed up for (an `Entrant` row exists for them, directly or via a team), so they can jump straight to that pod's page instead of hunting for it, and — new capability — leave a pod if needed.
 - Clicking a tournament in the portal's "Tournaments" section should open that tournament's page and show all its pods, the same view the public link already gives (`/o/<slug>/tournaments/:id`, `PublicTournamentPage.tsx`).
@@ -92,7 +94,7 @@ Idea from Tobias (2026-09-15), from the player portal at `/o/<slug>/player`:
 - [ ] **Not yet browser-verified** — sandbox has no DB/browser. Tobias should confirm: a pod before round 1 shows "Leave" and fully removes on confirm; a pod between rounds shows "Leave" and drops (entrant stays visible elsewhere as dropped); a pod mid-round surfaces the `round_in_progress` error; tournament links land on the right public page.
 - **Known limitation, not addressed:** a team pod's player leaving/dropping takes the *whole team* with them, same as the organizer path today — no per-member leave. Flagged during scoping as undecided; shipped as-is since it matches existing organizer behavior exactly rather than inventing new semantics.
 
-### PI-121 — Show an entrant headcount (and capacity, if set) on the pod's Entrants tab ⏳ (code-complete 2026-09-16, browser-verify pending)
+### PI-121 — Show an entrant headcount (and capacity, if set) on the pod's Entrants tab ⏳ (shipped in v0.15.3, browser-verify pending)
 Idea from Tobias (2026-09-16): on a pod's Entrants tab, show how many players/teams are currently added, and the max if one's set — so the organizer doesn't have to count rows or flip to the pod-list view to see it.
 
 **Built:** a new always-visible `EntrantHeadcount` component (`PodPage.tsx`) renders above the entrants list in both `IndividualEntrants` and `TeamEntrants` — `"N players"`/`"N teams"` when no capacity is set, `"N / M players"`/`"N / M teams"` when it is (same "N / M" pattern `PodList.tsx`'s on-demand tab already uses). Sits alongside the existing `CapacityNote`, which still shows its own "at/over capacity, you can still add more" warning once relevant — the two aren't mutually exclusive.
@@ -100,7 +102,7 @@ Idea from Tobias (2026-09-16): on a pod's Entrants tab, show how many players/te
 - [x] Built, `tsc -b`/`eslint`/`prettier` clean.
 - [ ] **Not yet browser-verified** — sandbox has no browser. Tobias should confirm the count shows correctly with and without a capacity set, on both individual and team pods.
 
-### PI-122 — Bug fix: adding entrants stayed enabled after round 1 was paired ⏳ (code-complete 2026-09-16, browser-verify pending)
+### PI-122 — Bug fix: adding entrants stayed enabled after round 1 was paired ⏳ (shipped in v0.15.3, browser-verify pending)
 Reported by Tobias: once pairings are generated, adding players to a pod should be deactivated — to add more, the pod needs to be unpaired first (via the existing "Undo pairing" button).
 
 **Root cause:** `canModifyRoster` (`PodPage.tsx`, `rounds.length === 0 || lastRound?.status === "COMPLETED"`) already gates drop/undrop, but the "+ Add players" / "+ Add team" UI was never gated by anything at all — always enabled regardless of round state. Server-side, `POST /api/pods/:id/entrants` (`pods.ts`) had no round check either. Someone added mid-tournament would have 0 matches for every round already generated, breaking the "everyone plays everyone" assumption pairing/standings are built on.
