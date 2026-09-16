@@ -29,6 +29,7 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 - **PI-118** — bug fix: a pod's public standings leaked who has round 1's bye before pairings are revealed (the bye is auto-scored the instant round 1 is generated). Code shipped in v0.15.2, live-verify pending; a related, lower-severity variant in the weekend Gesamtwertung table and player Hall of Fame pages is a known, deliberately-deferred gap (see its write-up) — confirmed with Tobias not worth fixing now.
 - **PI-119** — bug fix: long entrant names overflowed a `SeatingChart` seat box's border instead of wrapping, spilling into neighboring seats. Code-complete, browser-verify pending.
 - **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Not started.
+- **PI-121** — show an always-visible entrant headcount (and capacity if set) on a pod's Entrants tab. Not started.
 
 ## New improvements (backlog)
 
@@ -91,6 +92,14 @@ Idea from Tobias (2026-09-15), from the player portal at `/o/<slug>/player`:
 - **Decided:** the player-facing action should actually be **drop**, not remove, once the pod has started — "remove" was the wrong word for what's actually wanted. Two-tier behavior: **pod not started yet** (`rounds.length === 0`) → real removal (hard-delete the `Entrant` row, same as today's organizer path in that state — nothing to preserve, they were never really "in" it). **Pod already started** (round 1+ exists) → self-drop instead (reuse `POST /api/entrants/:id/drop`'s exact semantics/guard, adapted to a player-auth route) — preserves match history, blocked while a round is `ACTIVE` same as the organizer version, so a player can only drop between rounds. Round 1 *in progress* still means "ask an organizer," matching today's `already_entered` error.
 - Not decided: whether a team pod's player can leave individually (removing/dropping just themselves cascades the *whole team* today, same as the organizer path) — probably needs its own message/confirmation distinguishing "just you" from "your whole team."
 
+- [ ] Not started.
+
+### PI-121 — Show an entrant headcount (and capacity, if set) on the pod's Entrants tab
+Idea from Tobias (2026-09-16): on a pod's Entrants tab, show how many players/teams are currently added, and the max if one's set — so the organizer doesn't have to count rows or flip to the pod-list view to see it.
+
+**Mostly already there, just not always visible:** `PodPage.tsx` already has a `CapacityNote` component fed `capacity` and `entrants.length` — both `IndividualEntrants` and `TeamEntrants` (the two Entrants-tab renderers) already receive and pass these through. The catch: `CapacityNote` only renders once **at or over** capacity (`if (capacity == null || count < capacity) return null`) — below that, and for every pod with no capacity set at all (i.e. every non-on-demand pod, since `capacity` is documented as "the only sensible value for a scheduled pod" being `null`), the Entrants tab shows no count whatsoever. `PodList.tsx`'s on-demand tab already has the exact "N / M" display pattern to match (`${pod.entrantCount} / ${pod.capacity} ${pod.isTeamEvent ? "teams" : "players"}`) — this is really "put that same always-visible display on the Entrants tab too," not a new concept.
+
+- **Scope:** a persistent header line above the entrants list — plain `"N players"` (or `"N teams"`) when `capacity` is null, `"N / M players"` when it's set — replacing or sitting alongside the existing over-capacity warning (that note's "you can still add more" framing stays useful once at/over the cap; the two aren't mutually exclusive).
 - [ ] Not started.
 
 ## Project-health backlog (from the 2026-09-06 code audit)
