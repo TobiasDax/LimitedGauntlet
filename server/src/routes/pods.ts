@@ -660,14 +660,23 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const latest = await getLatestRound(entrant.podId);
-    if (latest && latest.status !== "COMPLETED") {
+    // Bug fix (2026-09-16): dropping only makes sense once the pod is
+    // actually under way — before round 1 exists there's nothing to
+    // preserve, and "Remove" is the correct action instead. Not just a UI
+    // nicety: enforced here too so it can't be reached with a stale page or
+    // a direct API call.
+    if (!latest) {
+      reply.code(400).send({ error: "pod_not_started" });
+      return;
+    }
+    if (latest.status !== "COMPLETED") {
       reply.code(400).send({ error: "round_in_progress" });
       return;
     }
 
     const updated = await prisma.entrant.update({
       where: { id: entrant.id },
-      data: { droppedAfterRound: latest?.roundNumber ?? 0 },
+      data: { droppedAfterRound: latest.roundNumber },
     });
     await syncPodTokenAwards(entrant.podId);
     reply.send({ entrant: updated });
@@ -714,6 +723,16 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
     const entrant = await findOwnedEntrant(params.data.id, request.organizer!.orgId);
     if (!entrant) {
       reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    // Bug fix (2026-09-16): removal is a hard delete, cascading to every
+    // Match row the entrant is in — only safe before the pod has started at
+    // all. Once round 1 exists, "Drop" is the correct (non-destructive)
+    // action instead. Mirrors POST /api/pods/:id/entrants' own
+    // pod_already_paired guard on the add side.
+    if (await getLatestRound(entrant.podId)) {
+      reply.code(400).send({ error: "pod_already_paired" });
       return;
     }
 

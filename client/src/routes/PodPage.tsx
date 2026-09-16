@@ -422,10 +422,13 @@ function IndividualEntrants({
               <span className="font-display text-[15px] font-bold">{entrantDisplayName(e)}</span>
             )}
             <div className="flex items-center gap-2">
-              <EntrantDropControl podId={podId} entrant={e} canModifyRoster={canModifyRoster} />
-              <Button variant="ghost" onClick={() => removeEntrant.mutate(e.id)}>
-                Remove
-              </Button>
+              {canAddEntrants ? (
+                <Button variant="ghost" onClick={() => removeEntrant.mutate(e.id)}>
+                  Remove
+                </Button>
+              ) : (
+                <EntrantDropControl podId={podId} entrant={e} canModifyRoster={canModifyRoster} />
+              )}
             </div>
           </div>
         ))}
@@ -501,10 +504,13 @@ function TeamEntrants({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <EntrantDropControl podId={podId} entrant={e} canModifyRoster={canModifyRoster} />
-              <Button variant="ghost" onClick={() => removeEntrant.mutate(e.id)}>
-                Remove
-              </Button>
+              {canAddEntrants ? (
+                <Button variant="ghost" onClick={() => removeEntrant.mutate(e.id)}>
+                  Remove
+                </Button>
+              ) : (
+                <EntrantDropControl podId={podId} entrant={e} canModifyRoster={canModifyRoster} />
+              )}
             </div>
           </div>
         ))}

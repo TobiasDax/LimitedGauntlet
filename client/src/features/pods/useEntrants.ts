@@ -77,7 +77,8 @@ export function entrantErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.message === "round_in_progress") return "Finish the current round before changing who's dropped.";
     if (err.message === "pod_already_paired")
-      return "This pod's round 1 has already been paired — undo the pairing on the Pairings tab to add more entrants.";
+      return "This pod's round 1 has already been paired — undo the pairing on the Pairings tab first.";
+    if (err.message === "pod_not_started") return "This pod hasn't started yet — remove the entrant instead.";
     if (err.message === "already_dropped" || err.message === "not_dropped")
       return "That entrant's drop status just changed — reload and try again.";
     if (err.message === "name_taken") {
