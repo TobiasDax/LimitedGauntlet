@@ -25,7 +25,9 @@ export type PlayerAccountError =
   | "invalid_or_expired"
   | "wrong_password"
   | "not_your_match"
-  | "round_not_active";
+  | "round_not_active"
+  | "round_in_progress"
+  | "already_dropped";
 
 export class PlayerAccountFailure extends Error {
   constructor(public code: PlayerAccountError) {
@@ -211,4 +213,52 @@ export async function submitPlayerResult(
     data: { gamesWonA, gamesWonB, result, reportedAt: new Date() },
   });
   return { match: updated, podId: match.round.podId, tournamentId: match.round.pod.tournamentId };
+}
+
+// PI-120 — a player leaving a pod themselves. Two-tier, matching what an
+// organizer can already do (pods.ts DELETE /api/entrants/:id and POST
+// /api/entrants/:id/drop) but picked automatically instead of the organizer
+// choosing:
+//   - Pod hasn't started (no rounds exist yet): real removal. Nothing to
+//     preserve — they were never actually paired into anything.
+//   - Pod has started: drop instead (droppedAfterRound), same as the
+//     organizer's non-destructive path — keeps every Match row (and thus
+//     every other player's standings/tiebreakers) intact. Guarded the same
+//     way the organizer route is: only between rounds (latest round
+//     COMPLETED), never while one is ACTIVE — round 1 in progress still
+//     means "ask an organizer" (the already_entered check-in error already
+//     tells the player this).
+// A team entrant's removal/drop is whole-team, same as the organizer path —
+// one member leaving takes the team out (or drops it) entirely.
+export async function leavePod(
+  podId: string,
+  orgId: string,
+  playerId: string,
+): Promise<{ podId: string; dropped: boolean }> {
+  const entrant = await prisma.entrant.findFirst({
+    where: {
+      podId,
+      pod: { tournament: { orgId } },
+      OR: [{ playerId }, { team: { members: { some: { playerId } } } }],
+    },
+    select: { id: true, teamId: true, droppedAfterRound: true },
+  });
+  if (!entrant) throw new PlayerAccountFailure("not_found");
+
+  const latest = await prisma.round.findFirst({ where: { podId }, orderBy: { roundNumber: "desc" } });
+
+  if (!latest) {
+    if (entrant.teamId) {
+      await prisma.team.delete({ where: { id: entrant.teamId } });
+    } else {
+      await prisma.entrant.delete({ where: { id: entrant.id } });
+    }
+    return { podId, dropped: false };
+  }
+
+  if (entrant.droppedAfterRound !== null) throw new PlayerAccountFailure("already_dropped");
+  if (latest.status !== "COMPLETED") throw new PlayerAccountFailure("round_in_progress");
+
+  await prisma.entrant.update({ where: { id: entrant.id }, data: { droppedAfterRound: latest.roundNumber } });
+  return { podId, dropped: true };
 }

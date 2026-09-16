@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../../lib/api";
-import type { PlayerPortalMatch, PlayerPortalTournament, PlayerSession } from "../../lib/types";
+import type { PlayerPortalMatch, PlayerPortalPod, PlayerPortalTournament, PlayerSession } from "../../lib/types";
 
 // The self-service player portal (PI-52). Its own auth surface and query
 // namespace (["player", ...]), entirely separate from the organizer's ["me"].
@@ -74,6 +74,7 @@ export function useAcceptPlayerInvite() {
 interface PortalResponse {
   tournaments: PlayerPortalTournament[];
   matches: PlayerPortalMatch[];
+  pods: PlayerPortalPod[];
 }
 
 export function usePlayerPortal(enabled: boolean) {
@@ -99,6 +100,17 @@ export function useCheckIn() {
       checkedIn
         ? api.delete<void>(`/player/tournaments/${tournamentId}/check-in`)
         : api.post<void>(`/player/tournaments/${tournamentId}/check-in`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["player", "portal"] }),
+  });
+}
+
+// PI-120 — self-service "leave this pod". The server decides remove vs drop
+// based on whether the pod has started; the response just says which
+// happened, so the caller can show the right confirmation.
+export function useLeavePod() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (podId: string) => api.delete<{ dropped: boolean }>(`/player/pods/${podId}/entrant`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["player", "portal"] }),
   });
 }

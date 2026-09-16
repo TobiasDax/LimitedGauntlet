@@ -5,6 +5,7 @@ import {
   authenticatePlayer,
   createPlayerInvite,
   hashInviteToken,
+  leavePod,
   revokePlayerAccount,
   submitPlayerResult,
 } from "./playerAccounts.js";
@@ -192,6 +193,76 @@ describe("player accounts (PI-52)", () => {
       const { match: updated } = await submitPlayerResult(match.id, org.id, p1.id, 5, 0);
       expect(updated.gamesWonA).toBe(1);
       expect(updated.result).toBe("A_WINS");
+    });
+  });
+
+  describe("leavePod (PI-120)", () => {
+    async function podWithEntrant(opts?: { team?: boolean }) {
+      const { org, tournament, unique } = await setup();
+      const p1 = await makePlayer(org.id, "P1");
+      const pod = await prisma.pod.create({
+        data: {
+          tournamentId: tournament.id,
+          name: "Pod",
+          format: "DRAFT",
+          sequenceOrder: 0,
+          matchFormat: "BO3",
+          isTeamEvent: !!opts?.team,
+          teamSize: opts?.team ? 1 : null,
+        },
+      });
+      let entrantId: string;
+      if (opts?.team) {
+        const team = await prisma.team.create({
+          data: { podId: pod.id, name: "Team A", members: { create: { playerId: p1.id } } },
+        });
+        entrantId = (await prisma.entrant.create({ data: { podId: pod.id, teamId: team.id } })).id;
+      } else {
+        entrantId = (await prisma.entrant.create({ data: { podId: pod.id, playerId: p1.id } })).id;
+      }
+      return { org, pod, p1, entrantId, unique };
+    }
+
+    it("removes the entrant outright when the pod hasn't started", async () => {
+      const { org, pod, p1, entrantId } = await podWithEntrant();
+      const result = await leavePod(pod.id, org.id, p1.id);
+      expect(result.dropped).toBe(false);
+      expect(await prisma.entrant.findUnique({ where: { id: entrantId } })).toBeNull();
+    });
+
+    it("removing a team entrant deletes the whole team", async () => {
+      const { org, pod, p1 } = await podWithEntrant({ team: true });
+      await leavePod(pod.id, org.id, p1.id);
+      expect(await prisma.team.findMany({ where: { podId: pod.id } })).toHaveLength(0);
+      expect(await prisma.entrant.findMany({ where: { podId: pod.id } })).toHaveLength(0);
+    });
+
+    it("drops instead of removing once the pod has started, between rounds", async () => {
+      const { org, pod, p1, entrantId } = await podWithEntrant();
+      const round = await prisma.round.create({ data: { podId: pod.id, roundNumber: 1, status: "COMPLETED" } });
+      const result = await leavePod(pod.id, org.id, p1.id);
+      expect(result.dropped).toBe(true);
+      const entrant = await prisma.entrant.findUnique({ where: { id: entrantId } });
+      expect(entrant?.droppedAfterRound).toBe(round.roundNumber);
+    });
+
+    it("refuses to drop while a round is in progress", async () => {
+      const { org, pod, p1 } = await podWithEntrant();
+      await prisma.round.create({ data: { podId: pod.id, roundNumber: 1, status: "ACTIVE" } });
+      await expect(leavePod(pod.id, org.id, p1.id)).rejects.toMatchObject({ code: "round_in_progress" });
+    });
+
+    it("refuses to drop an already-dropped entrant", async () => {
+      const { org, pod, p1, entrantId } = await podWithEntrant();
+      await prisma.round.create({ data: { podId: pod.id, roundNumber: 1, status: "COMPLETED" } });
+      await prisma.entrant.update({ where: { id: entrantId }, data: { droppedAfterRound: 1 } });
+      await expect(leavePod(pod.id, org.id, p1.id)).rejects.toMatchObject({ code: "already_dropped" });
+    });
+
+    it("rejects a player with no entrant in that pod", async () => {
+      const { org, pod, unique } = await podWithEntrant();
+      const outsider = await makePlayer(org.id, `Outsider-${unique}`);
+      await expect(leavePod(pod.id, org.id, outsider.id)).rejects.toMatchObject({ code: "not_found" });
     });
   });
 });

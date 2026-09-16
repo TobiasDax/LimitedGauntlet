@@ -51,6 +51,19 @@ export interface PlayerPortalMatch {
   result: MatchResult;
 }
 
+// PI-120 — a pod the player currently has an entrant row in.
+export interface PlayerPortalPod {
+  entrantId: string;
+  podId: string;
+  podName: string;
+  tournamentId: string;
+  tournamentName: string;
+  // Whether round 1 has been generated yet — determines whether leaving
+  // removes them outright or drops them (server decides; see leavePod()).
+  started: boolean;
+  dropped: boolean;
+}
+
 export interface PlayerSession {
   player: { id: string; displayName: string };
   organization: { slug: string; name: string };

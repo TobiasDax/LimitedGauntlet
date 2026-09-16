@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { ApiError } from "../lib/api";
 import {
   useCheckIn,
   useDownloadOwnData,
+  useLeavePod,
   usePlayerMe,
   usePlayerPortal,
   useRenameSelf,
@@ -14,7 +16,7 @@ import { usePlayerPortalTokens } from "../features/tokens/useTokens";
 import { Stepper } from "../components/Stepper";
 import { PlayerTokenLedger } from "../components/PlayerTokenLedger";
 import { Button, Card, Eyebrow, FormError, ScreenTitle, TextField, Textarea } from "../components/ui";
-import type { PlayerPortalMatch } from "../lib/types";
+import type { PlayerPortalMatch, PlayerPortalPod } from "../lib/types";
 
 function MyMatchCard({ match }: { match: PlayerPortalMatch }) {
   const submit = useSubmitPlayerResult();
@@ -72,6 +74,51 @@ function MyMatchCard({ match }: { match: PlayerPortalMatch }) {
           </FormError>
         )}
       </form>
+    </Card>
+  );
+}
+
+// PI-120 — one pod the player is currently entered in, with a self-service
+// "leave" action. The server decides remove-vs-drop (see leavePod()'s own
+// comment); the confirm copy here just previews which one `started` implies,
+// so the player isn't surprised by which happened.
+function MyPodCard({ pod, slug }: { pod: PlayerPortalPod; slug: string }) {
+  const leavePod = useLeavePod();
+  const podHref = `/o/${slug}/tournaments/${pod.tournamentId}/pods/${pod.podId}`;
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <Link to={podHref} className="font-display text-[14.5px] font-bold hover:text-accent-strong">
+            {pod.podName}
+          </Link>
+          <div className="text-[11.5px] text-ink-muted">{pod.tournamentName}</div>
+        </div>
+        {pod.dropped ? (
+          <span className="text-[11px] tracking-wide text-ink-muted uppercase">Dropped</span>
+        ) : (
+          <Button
+            variant="ghost"
+            disabled={leavePod.isPending}
+            onClick={() => {
+              const message = pod.started
+                ? "Drop from this pod? You'll be excluded from future pairings, but your match history stays intact."
+                : "Leave this pod? You haven't been paired into it yet, so this removes you entirely.";
+              if (confirm(message)) leavePod.mutate(pod.podId);
+            }}
+          >
+            {leavePod.isPending ? "Leaving…" : "Leave"}
+          </Button>
+        )}
+      </div>
+      {leavePod.isError && (
+        <FormError>
+          {leavePod.error instanceof ApiError && leavePod.error.message === "round_in_progress"
+            ? "Wait for the current round to finish before leaving."
+            : "Couldn't leave that pod. Try again."}
+        </FormError>
+      )}
     </Card>
   );
 }
@@ -182,6 +229,7 @@ function AccountSection({ currentName }: { currentName: string }) {
 }
 
 export function PlayerPortalPage() {
+  const { slug } = useParams<{ slug: string }>();
   const { data: me } = usePlayerMe();
   const { data, isLoading } = usePlayerPortal(!!me);
   const checkIn = useCheckIn();
@@ -222,6 +270,19 @@ export function PlayerPortalPage() {
       </section>
 
       <section>
+        <h2 className="mb-3 font-display text-[16px] font-bold">Your pods</h2>
+        {data.pods.length === 0 ? (
+          <p className="text-[13px] text-ink-muted">You're not signed up for any pods right now.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {data.pods.map((p) => (
+              <MyPodCard key={p.entrantId} pod={p} slug={slug ?? ""} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
         <h2 className="mb-3 font-display text-[16px] font-bold">Tournaments</h2>
         {data.tournaments.length === 0 ? (
           <p className="text-[13px] text-ink-muted">This group has no tournaments yet.</p>
@@ -230,7 +291,12 @@ export function PlayerPortalPage() {
             {data.tournaments.map((t) => (
               <Card key={t.id} className="flex items-center justify-between p-4">
                 <div>
-                  <div className="font-display text-[14.5px] font-bold">{t.name}</div>
+                  <Link
+                    to={`/o/${slug}/tournaments/${t.id}`}
+                    className="font-display text-[14.5px] font-bold hover:text-accent-strong"
+                  >
+                    {t.name}
+                  </Link>
                   <div className="text-[11.5px] text-ink-muted">
                     {t.checkedIn ? "You're checked in" : "Not checked in"}
                   </div>

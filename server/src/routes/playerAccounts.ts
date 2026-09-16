@@ -13,6 +13,7 @@ import {
   createPlayerInvite,
   getPlayerInvite,
   isPlayerAccountFailure,
+  leavePod,
   renameOwnPlayer,
   revokePlayerAccount,
   submitPlayerResult,
@@ -353,7 +354,19 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
           pod: { tournament: { orgId: player.orgId } },
           OR: [{ playerId: player.id }, { team: { members: { some: { playerId: player.id } } } }],
         },
-        select: { id: true },
+        select: {
+          id: true,
+          droppedAfterRound: true,
+          pod: {
+            select: {
+              id: true,
+              name: true,
+              tournamentId: true,
+              tournament: { select: { name: true } },
+              _count: { select: { rounds: true } },
+            },
+          },
+        },
       }),
       prisma.match.findMany({
         where: {
@@ -399,10 +412,50 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
       };
     });
 
+    // PI-120 — every pod the player currently has an entrant row in (directly
+    // or via a team), so the portal can list them for quick navigation and a
+    // self-service "leave" action instead of only ever showing the one
+    // currently-active match.
+    const pods = myEntrants.map((e) => ({
+      entrantId: e.id,
+      podId: e.pod.id,
+      podName: e.pod.name,
+      tournamentId: e.pod.tournamentId,
+      tournamentName: e.pod.tournament.name,
+      // Whether round 1 has been generated yet — determines whether leaving
+      // will fully remove them or drop them (see DELETE .../entrant below).
+      started: e.pod._count.rounds > 0,
+      dropped: e.droppedAfterRound !== null,
+    }));
+
     reply.send({
       tournaments: tournaments.map((t) => ({ ...t, checkedIn: checkedInIds.has(t.id) })),
       matches,
+      pods,
     });
+  });
+
+  // PI-120 — self-service "leave this pod". leavePod() picks removal vs drop
+  // automatically based on whether the pod has started; see its own comment.
+  app.delete("/api/player/pods/:id/entrant", { preHandler: requirePlayerAuth }, async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    try {
+      const { podId, dropped } = await leavePod(params.data.id, request.player!.orgId, request.player!.id);
+      await syncPodTokenAwards(podId);
+      reply.send({ dropped });
+    } catch (err) {
+      if (isPlayerAccountFailure(err)) {
+        reply.code(err.code === "not_found" ? 404 : err.code === "round_in_progress" ? 400 : 409).send({
+          error: err.code,
+        });
+        return;
+      }
+      throw err;
+    }
   });
 
   const tournamentIdParams = z.object({ id: z.string().min(1) });
