@@ -28,8 +28,8 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 - **PI-117** — bug fix: inviting a co-organizer whose email already has an account (in a *different* org) wrongly refused with "That email already has an account." Code shipped in v0.15.2, live-verify pending.
 - **PI-118** — bug fix: a pod's public standings leaked who has round 1's bye before pairings are revealed (the bye is auto-scored the instant round 1 is generated). Code shipped in v0.15.2, live-verify pending; a related, lower-severity variant in the weekend Gesamtwertung table and player Hall of Fame pages is a known, deliberately-deferred gap (see its write-up) — confirmed with Tobias not worth fixing now.
 - **PI-119** — bug fix: long entrant names overflowed a `SeatingChart` seat box's border instead of wrapping, spilling into neighboring seats. Code-complete, browser-verify pending.
-- **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Not started.
-- **PI-121** — show an always-visible entrant headcount (and capacity if set) on a pod's Entrants tab. Not started.
+- **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code-complete, browser-verify pending.
+- **PI-121** — show an always-visible entrant headcount (and capacity if set) on a pod's Entrants tab. Code-complete, browser-verify pending.
 
 ## New improvements (backlog)
 
@@ -78,29 +78,26 @@ Reported by Tobias (screenshot, a real 20+ entrant pod): a long name like "Matth
 - [x] Fixed, `tsc -b`/`eslint`/`prettier` clean.
 - [ ] **Not yet browser-verified** — this sandbox has no browser to visually confirm the wrap/no-overflow behavior on a real long name. Tobias should re-check the same pod that showed the bug.
 
-### PI-120 — Player portal: list the player's own pods, and link tournaments to their public page
+### PI-120 — Player portal: list the player's own pods, and link tournaments to their public page ⏳ (code-complete 2026-09-16, browser-verify pending)
 Idea from Tobias (2026-09-15), from the player portal at `/o/<slug>/player`:
 - A list of every pod the player is currently signed up for (an `Entrant` row exists for them, directly or via a team), so they can jump straight to that pod's page instead of hunting for it, and — new capability — leave a pod if needed.
 - Clicking a tournament in the portal's "Tournaments" section should open that tournament's page and show all its pods, the same view the public link already gives (`/o/<slug>/tournaments/:id`, `PublicTournamentPage.tsx`).
 
-**The tournament-link half is cheap:** that public page already exists and already lists every pod. The portal's tournament cards (`PlayerPortalPage.tsx`) just need to link there — no new backend work.
+**Built:**
+- [x] **Tournament links.** `PlayerPortalPage.tsx`'s tournament cards now link their name to `/o/<slug>/tournaments/:id` — the existing public page, no new backend work.
+- [x] **"Your pods" list.** `GET /api/player/portal`'s existing `myEntrants` query (`server/src/routes/playerAccounts.ts`) now also selects each entrant's pod (id/name/tournament id+name/round count) and `droppedAfterRound`, returned as a new `pods` array. A new "Your pods" section (`MyPodCard`) renders one card per pod, linking to its public page.
+- [x] **Self-service leave, per the decided design (drop post-start, remove pre-start).** New `leavePod()` (`services/playerAccounts.ts`) mirrors the organizer-only `DELETE /api/entrants/:id` / `POST /api/entrants/:id/drop` semantics exactly: no rounds yet → hard-deletes the `Entrant` (or the whole `Team`, cascading); round 1+ exists → sets `droppedAfterRound` to the latest round, guarded against `round_in_progress` (only between rounds, same as the organizer path) and `already_dropped`. Wired through a new `DELETE /api/player/pods/:id/entrant` route. The client's confirm dialog previews which outcome to expect (`pod.started`) before the request, and hides the "Leave" button (shows "Dropped" instead) once `pod.dropped` is true.
+- [x] **Tests:** `leavePod` covered in `playerAccounts.test.ts` (real DB) — pre-start removal (individual + whole-team), post-start drop, `round_in_progress`, `already_dropped`, and a non-entrant rejection. `tsc -b`/`eslint`/`prettier` clean on both workspaces.
+- [ ] **Not yet browser-verified** — sandbox has no DB/browser. Tobias should confirm: a pod before round 1 shows "Leave" and fully removes on confirm; a pod between rounds shows "Leave" and drops (entrant stays visible elsewhere as dropped); a pod mid-round surfaces the `round_in_progress` error; tournament links land on the right public page.
+- **Known limitation, not addressed:** a team pod's player leaving/dropping takes the *whole team* with them, same as the organizer path today — no per-member leave. Flagged during scoping as undecided; shipped as-is since it matches existing organizer behavior exactly rather than inventing new semantics.
 
-**The "your pods" list is mostly already computed, just not exposed:** `GET /api/player/portal` (`server/src/routes/playerAccounts.ts`) already queries every `Entrant` row the player has across the org (`myEntrants`/`myEntrantIds`) — today used only internally to figure out `mySide` on an active match. Surfacing it as a real list (pod id/name, tournament, format) is a small addition to that same query's `select` plus the response shape; the client renders it as a new portal section linking to each pod's public page.
-
-**Leaving a pod is a genuinely new capability — design decided (2026-09-15), not yet built:**
-- No player-facing removal exists today. The only self-service leave today is `DELETE /api/player/tournaments/:id/check-in` (PI-100's on-demand check-in), which only works *before* a player has actually been paired into a pod. Two organizer-only mechanisms already exist to reuse: `DELETE /api/entrants/:id` (`pods.ts`) hard-deletes the `Entrant` row (cascading to every `Match` row referencing them, per `onDelete: Cascade`) — only safe with no real results depending on it; `POST /api/entrants/:id/drop` is the non-destructive version, setting `droppedAfterRound` (excludes them from future pairing, keeps all `Match` history intact), guarded against `round_in_progress` (only between rounds, i.e. latest round `COMPLETED` or none yet).
-- **Decided:** the player-facing action should actually be **drop**, not remove, once the pod has started — "remove" was the wrong word for what's actually wanted. Two-tier behavior: **pod not started yet** (`rounds.length === 0`) → real removal (hard-delete the `Entrant` row, same as today's organizer path in that state — nothing to preserve, they were never really "in" it). **Pod already started** (round 1+ exists) → self-drop instead (reuse `POST /api/entrants/:id/drop`'s exact semantics/guard, adapted to a player-auth route) — preserves match history, blocked while a round is `ACTIVE` same as the organizer version, so a player can only drop between rounds. Round 1 *in progress* still means "ask an organizer," matching today's `already_entered` error.
-- Not decided: whether a team pod's player can leave individually (removing/dropping just themselves cascades the *whole team* today, same as the organizer path) — probably needs its own message/confirmation distinguishing "just you" from "your whole team."
-
-- [ ] Not started.
-
-### PI-121 — Show an entrant headcount (and capacity, if set) on the pod's Entrants tab
+### PI-121 — Show an entrant headcount (and capacity, if set) on the pod's Entrants tab ⏳ (code-complete 2026-09-16, browser-verify pending)
 Idea from Tobias (2026-09-16): on a pod's Entrants tab, show how many players/teams are currently added, and the max if one's set — so the organizer doesn't have to count rows or flip to the pod-list view to see it.
 
-**Mostly already there, just not always visible:** `PodPage.tsx` already has a `CapacityNote` component fed `capacity` and `entrants.length` — both `IndividualEntrants` and `TeamEntrants` (the two Entrants-tab renderers) already receive and pass these through. The catch: `CapacityNote` only renders once **at or over** capacity (`if (capacity == null || count < capacity) return null`) — below that, and for every pod with no capacity set at all (i.e. every non-on-demand pod, since `capacity` is documented as "the only sensible value for a scheduled pod" being `null`), the Entrants tab shows no count whatsoever. `PodList.tsx`'s on-demand tab already has the exact "N / M" display pattern to match (`${pod.entrantCount} / ${pod.capacity} ${pod.isTeamEvent ? "teams" : "players"}`) — this is really "put that same always-visible display on the Entrants tab too," not a new concept.
+**Built:** a new always-visible `EntrantHeadcount` component (`PodPage.tsx`) renders above the entrants list in both `IndividualEntrants` and `TeamEntrants` — `"N players"`/`"N teams"` when no capacity is set, `"N / M players"`/`"N / M teams"` when it is (same "N / M" pattern `PodList.tsx`'s on-demand tab already uses). Sits alongside the existing `CapacityNote`, which still shows its own "at/over capacity, you can still add more" warning once relevant — the two aren't mutually exclusive.
 
-- **Scope:** a persistent header line above the entrants list — plain `"N players"` (or `"N teams"`) when `capacity` is null, `"N / M players"` when it's set — replacing or sitting alongside the existing over-capacity warning (that note's "you can still add more" framing stays useful once at/over the cap; the two aren't mutually exclusive).
-- [ ] Not started.
+- [x] Built, `tsc -b`/`eslint`/`prettier` clean.
+- [ ] **Not yet browser-verified** — sandbox has no browser. Tobias should confirm the count shows correctly with and without a capacity set, on both individual and team pods.
 
 ## Project-health backlog (from the 2026-09-06 code audit)
 
