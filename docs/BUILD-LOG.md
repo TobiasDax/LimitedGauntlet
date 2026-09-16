@@ -1,7 +1,7 @@
 # Build log (archived)
 
 > **This is the historical build record, kept for reference — it is no longer the file to read first.**
-> The whole numbered build (Steps 0–12) and most of the post-1.0 backlog (PI-1 … PI-112) below are **done and browser-verified**. One still-open item (PI-116) and a parked idea (PI-62) live in [`ROADMAP.md`](../ROADMAP.md) instead — read that first for current status and the next actual work. Full design rationale lives in [`PLAN.md`](../PLAN.md). This file stays as the detailed "how each piece was built and verified" log.
+> The whole numbered build (Steps 0–12) and most of the post-1.0 backlog (PI-1 … PI-112) below are **done and browser-verified**. A handful of still-open items (PI-119–122) and a parked idea (PI-62) live in [`ROADMAP.md`](../ROADMAP.md) instead — read that first for current status and the next actual work. Full design rationale lives in [`PLAN.md`](../PLAN.md). This file stays as the detailed "how each piece was built and verified" log.
 
 Granular checklist. Full rationale for any step lives in `PLAN.md`.
 
@@ -1344,3 +1344,33 @@ Private RFC1918 destinations remain an intentional product requirement for Home 
 - [x] **Deployed and operationally verified (2026-09-15):** normal HTTPS webhooks still validate certificates and deliver correctly on the live instance.
 
 **Scan context:** revision `57c344b289621ac412e3cdf7ad88f2ab21af163f`; severity medium, confidence high. The scan was static and did not send exploit traffic. `npm audit` also reported two `mysql2` advisories inherited through Prisma tooling, but the application uses PostgreSQL and no attacker-controlled MySQL runtime path was found, so those advisories are not tracked as an exploitable product finding here.
+
+### PI-116 — Show the running app version in the footer, linked to its release notes ✅ (shipped v0.15.1, browser-verified)
+Idea from Tobias (2026-09-15): put the running version number next to the GitHub link in `client/src/components/Footer.tsx`, linking to that version's GitHub release page — easy access to the release notes for whatever's actually deployed, without needing to know the version to look it up.
+
+- [x] **Version reaches the frontend.** `server/src/config.ts` reads `version` from the root `package.json` (the single shared version per PI-22) at startup, resolved relative to `config.ts`'s own file location so it works identically from `tsx` dev and the compiled `server/dist` runtime regardless of `process.cwd()` (same pattern `index.ts` already used for `clientDistPath`). Exposed as `appVersion` on the existing public `GET /api/app-config` endpoint — no new env var, and it can't drift from what's actually built into the image.
+- [x] **Footer change:** `client/src/components/Footer.tsx` renders a `vX.Y.Z` link right after the GitHub link, pointing at `.../releases/tag/vX.Y.Z`, only when `appVersion` has loaded.
+- [x] **Browser-verified:** the version link appears in the footer and resolves to the correct release page on the live instance.
+
+### PI-117 — Bug fix: co-organizer invite wrongly refused for an email with an account in a different org ✅ (shipped v0.15.2, live-verified)
+Reported by Tobias: inviting a co-organizer whose email already has an `OrganizerAccount` — just in some *other* org, not this one — refused with "That email already has an account," even though PI-86 already split accounts from org membership specifically so one person can belong to multiple orgs.
+
+**Root cause:** `POST /api/settings/organizers/invite` (`server/src/routes/settings.ts`) checked only whether *any* `OrganizerAccount` existed for the email and 409'd unconditionally — it never checked whether that account was actually a member of *this* org. This meant the invite (and its `OrganizerInvite` row) was never even created for an existing account, so the accept-invite flow's already-built "you already have an account — log in to accept" path (`GET /api/auth/invite/:token`'s `accountExists` flag, and `AcceptInvitePage.tsx`'s corresponding branch) could never actually be reached in practice.
+
+**Fixed:** the invite route now looks up the existing account (if any) and only refuses (`already_member`) when that account already has an `OrganizerMembership` in *this specific* org. Otherwise it creates the invite exactly as it would for a brand-new email — the invitee gets the same emailed link, and accept-invite already knows to skip the name/password form and just ask them to log in and click "Join", adding a membership without creating a second account.
+
+Deliberately **not** implemented as "silently add them to the org and just notify by email" (closer to Tobias's initial phrasing) — requiring the invitee's own accept click preserves the same consent model every other invite already uses, and reuses PI-86's already-built, previously-dead-code acceptance path instead of adding a new no-consent code path.
+
+- [x] Root cause identified, fix implemented, `tsc -b`/`eslint`/`prettier` clean on both client and server.
+- [x] **Live-verified:** confirmed end-to-end on a real instance.
+
+### PI-118 — Bug fix: a pod's public standings leak who has round 1's bye before pairings are revealed ✅ (shipped v0.15.2, live-verified)
+Reported by Tobias: after seatings are confirmed but before round 1 is revealed/started, a player checking the pod's public standings can already see someone sitting at full points — the bye recipient, since a bye needs no opponent to report a result against and is auto-scored the instant round 1's `Match` rows are created (`podStats.ts`'s `tallyMatches`, unconditional on `entrantBId === null`). Wanted: hide standings the same way PI-80 already hides pairings, revealed together.
+
+**Fixed:** extracted the exact condition PI-80's `redactUnrevealedRound1` already used into a shared, exported `isRound1Unrevealed()` predicate (`server/src/services/pairingsVisibility.ts`), so "hidden" means the same thing everywhere. `GET /api/public/o/:slug/pods/:id/standings` now fetches round 1's `pairingsRevealedAt` first and returns `{ standings: [] }` without ever calling `computePodStandings` when it's unrevealed. `PublicPodPage.tsx` mirrors the per-round `hidden` flag it already computes for the Pairings section to pick the right empty-state copy ("Standings aren't revealed yet…") instead of the misleading "No entrants yet."
+
+Deliberately scoped to the public **pod standings** route only (what was actually reported) — the organizer's own authenticated standings view is untouched, same reveal-blind-vs-reveal-aware split PI-80 already established.
+
+- [x] Shared predicate extracted + tested (`pairingsVisibility.test.ts`), public standings route fixed, client empty-state copy fixed. `tsc -b`/`eslint`/`prettier` clean on both workspaces.
+- [x] **Live-verified:** confirmed the standings stay hidden until reveal and appear immediately once revealed, on a real instance.
+- [x] **Known, narrower related leak — deliberately deferred, confirmed with Tobias (2026-09-15).** The same bye-before-reveal points also flow into the weekend Gesamtwertung table (`computeGesamtwertung`, shared by the public Gesamtwertung route, the organizer's own view, and the spreadsheet export) and a player's individual Hall-of-Fame page (`computePlayerStats`, similarly shared). Fixing those would require threading a "hide unrevealed round 1" option through shared service functions that authenticated/export callers must keep bypassing — more invasive than this pass, and the practical exposure window is much narrower. **Decision: not worth it for now** — the main standings page (what was actually reported) is enough.
