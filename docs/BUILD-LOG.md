@@ -1,7 +1,7 @@
 # Build log (archived)
 
 > **This is the historical build record, kept for reference — it is no longer the file to read first.**
-> The whole numbered build (Steps 0–12) and most of the post-1.0 backlog (PI-1 … PI-112) below are **done and browser-verified**. A handful of still-open items (PI-119–122) and a parked idea (PI-62) live in [`ROADMAP.md`](../ROADMAP.md) instead — read that first for current status and the next actual work. Full design rationale lives in [`PLAN.md`](../PLAN.md). This file stays as the detailed "how each piece was built and verified" log.
+> The whole numbered build (Steps 0–12) and most of the post-1.0 backlog (PI-1 … PI-112) below are **done and browser-verified**. One still-open item (PI-120) and a parked idea (PI-62) live in [`ROADMAP.md`](../ROADMAP.md) instead — read that first for current status and the next actual work. Full design rationale lives in [`PLAN.md`](../PLAN.md). This file stays as the detailed "how each piece was built and verified" log.
 
 Granular checklist. Full rationale for any step lives in `PLAN.md`.
 
@@ -1374,3 +1374,32 @@ Deliberately scoped to the public **pod standings** route only (what was actuall
 - [x] Shared predicate extracted + tested (`pairingsVisibility.test.ts`), public standings route fixed, client empty-state copy fixed. `tsc -b`/`eslint`/`prettier` clean on both workspaces.
 - [x] **Live-verified:** confirmed the standings stay hidden until reveal and appear immediately once revealed, on a real instance.
 - [x] **Known, narrower related leak — deliberately deferred, confirmed with Tobias (2026-09-15).** The same bye-before-reveal points also flow into the weekend Gesamtwertung table (`computeGesamtwertung`, shared by the public Gesamtwertung route, the organizer's own view, and the spreadsheet export) and a player's individual Hall-of-Fame page (`computePlayerStats`, similarly shared). Fixing those would require threading a "hide unrevealed round 1" option through shared service functions that authenticated/export callers must keep bypassing — more invasive than this pass, and the practical exposure window is much narrower. **Decision: not worth it for now** — the main standings page (what was actually reported) is enough.
+
+### PI-119 — Bug fix: long entrant names overflow a seat box's border in `SeatingChart` ✅ (shipped v0.15.3, browser-verified)
+Reported by Tobias (screenshot, a real 20+ entrant pod): a long name like "Matthias Werner-W…" or "Bernhard Frisch" rendered past its seat box's right border, overlapping the neighboring seat instead of staying inside its own box.
+
+**Root cause:** the name `<span>` used Tailwind's `truncate` (single-line, `overflow: hidden` + ellipsis), but never had a `w-full` — and its parent cell is a `flex-col` container with `items-center`, which centers children at their own natural content width rather than stretching them to fill it. Without a defined width to clip against, the span just grew as wide as its full text needed and rendered past its own box's edge; `truncate`'s `overflow: hidden` had nothing to actually clip.
+
+**Fixed:** `client/src/components/SeatingChart.tsx`'s name span now gets `w-full` (so it's genuinely constrained to the seat box's width, sidestepping the `items-center` sizing quirk) and swaps `truncate` for `break-words` (wraps onto a second line, including breaking a single long unbroken word, instead of single-line-and-clip) — matching what was actually asked for ("line breaks and never overflow") rather than an ellipsis cut. `leading-tight` keeps a two-line name from inflating the seat box too much. One shared component, so this fixes both the organizer's Seatings page and the public pod page's seating chart at once.
+
+- [x] Fixed, `tsc -b`/`eslint`/`prettier` clean.
+- [x] **Browser-verified** on the same pod that showed the bug.
+
+### PI-121 — Show an entrant headcount (and capacity, if set) on the pod's Entrants tab ✅ (shipped v0.15.3, browser-verified)
+Idea from Tobias (2026-09-16): on a pod's Entrants tab, show how many players/teams are currently added, and the max if one's set — so the organizer doesn't have to count rows or flip to the pod-list view to see it.
+
+**Built:** a new always-visible `EntrantHeadcount` component (`PodPage.tsx`) renders above the entrants list in both `IndividualEntrants` and `TeamEntrants` — `"N players"`/`"N teams"` when no capacity is set, `"N / M players"`/`"N / M teams"` when it is (same "N / M" pattern `PodList.tsx`'s on-demand tab already uses). Sits alongside the existing `CapacityNote`, which still shows its own "at/over capacity, you can still add more" warning once relevant — the two aren't mutually exclusive.
+
+- [x] Built, `tsc -b`/`eslint`/`prettier` clean.
+- [x] **Browser-verified:** the count shows correctly with and without a capacity set, on both individual and team pods.
+
+### PI-122 — Bug fix: adding entrants stayed enabled after round 1 was paired ✅ (shipped v0.15.3, browser-verified)
+Reported by Tobias: once pairings are generated, adding players to a pod should be deactivated — to add more, the pod needs to be unpaired first (via the existing "Undo pairing" button).
+
+**Root cause:** `canModifyRoster` (`PodPage.tsx`, `rounds.length === 0 || lastRound?.status === "COMPLETED"`) already gates drop/undrop, but the "+ Add players" / "+ Add team" UI was never gated by anything at all — always enabled regardless of round state. Server-side, `POST /api/pods/:id/entrants` (`pods.ts`) had no round check either. Someone added mid-tournament would have 0 matches for every round already generated, breaking the "everyone plays everyone" assumption pairing/standings are built on.
+
+**Fixed:** a new, deliberately **stricter** gate than `canModifyRoster` — `canAddEntrants = rounds.length === 0` — no "between completed rounds" allowance, since a newly-added entrant is never safe once round 1 exists at all, only before it. `IndividualEntrants`/`TeamEntrants` hide the add UI behind it, showing "Round 1 has already been paired — undo the pairing on the Pairings tab to add more" instead. Server-side, the route checks `round.count` for the pod and refuses (`pod_already_paired`) before either the team or individual/bulk add path runs — enforced independently of the UI, not just disabled client-side.
+
+- [x] Fixed both client and server, `tsc -b`/`eslint`/`prettier` clean.
+- [x] **Follow-up, per Tobias:** the mirror-image rule — "Remove" hidden once a pod has started, "Drop" only available once it has (not before). Per-entrant row now shows exactly one of the two, picked by `canAddEntrants`, instead of both simultaneously. Enforced server-side too: `DELETE /api/entrants/:id` now refuses (`pod_already_paired`, reusing the add-side's code) once any round exists — closing the hard-delete/cascade risk this entry originally flagged as unaddressed; `POST /api/entrants/:id/drop` now refuses (`pod_not_started`) when no round exists yet, so a drop can no longer record a meaningless `droppedAfterRound: 0` before the pod has even begun.
+- [x] **Browser-verified:** the add-players/add-team UI is replaced by the explanatory message once round 1 is paired, and works again once the pairing is undone; each entrant row correctly shows Remove before round 1 exists and Drop/Un-drop after, never both.
