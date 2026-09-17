@@ -203,6 +203,46 @@ export async function lookupCardByCollectorNumber(
   return summary;
 }
 
+// PI-133 — pin the exact printing already on file, by Scryfall's own id
+// (`/cards/:id`), instead of re-deriving a printing from name+set. A
+// foil-only edit on a pull that already resolved to a specific printing
+// must re-price *that* printing, never let a name+set search silently pick
+// a different one (e.g. a set with more than one printing of the same
+// name, or Scryfall's fuzzy match landing on a near-miss) — this is the
+// only lookup that can't drift to the wrong card.
+export async function lookupCardById(
+  scryfallId: string,
+  options: { foil?: boolean } = {},
+): Promise<ScryfallCardSummary | null> {
+  const { foil = false } = options;
+  const key = `id:${scryfallId}:${foil ? "foil" : "nonfoil"}`;
+  const cached = getCached<ScryfallCardSummary | null>(key);
+  if (cached !== undefined) return cached;
+
+  const res = await scryfallFetch(`/cards/${encodeURIComponent(scryfallId)}`);
+  if (!res.ok) {
+    // Same transient-vs-permanent distinction as the other lookups: only a
+    // real 404 (this id no longer resolves — vanishingly rare, but Scryfall
+    // ids are stable identifiers, not guaranteed forever) is safe to cache.
+    if (res.status === 404) setCached(key, null, NAMED_TTL_MS);
+    return null;
+  }
+
+  const card = (await res.json()) as ScryfallCardResponse;
+  const { priceEur, foil: resolvedFoil } = resolvePrice(card, foil);
+  const summary: ScryfallCardSummary = {
+    scryfallId: card.id,
+    name: card.name,
+    setCode: card.set,
+    priceEur,
+    foil: resolvedFoil,
+    imageUri: card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal ?? null,
+  };
+
+  setCached(key, summary, NAMED_TTL_MS);
+  return summary;
+}
+
 export interface ScryfallSetSummary {
   code: string;
   name: string;

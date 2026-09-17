@@ -8,6 +8,7 @@ import {
   autocompleteCardNames,
   lookupCardByName,
   lookupCardByCollectorNumber,
+  lookupCardById,
   listMainSets,
 } from "../services/scryfall.js";
 import { inferCardPullAttribution } from "../services/cardPullInference.js";
@@ -213,14 +214,28 @@ export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
     }
 
     if (body.data.setCode !== undefined || body.data.foil !== undefined || body.data.collectorNumber !== undefined) {
-      const card = body.data.collectorNumber
-        ? await lookupCardByCollectorNumber(body.data.setCode ?? pull.setCode ?? "", body.data.collectorNumber, {
-            foil: body.data.foil ?? pull.foil,
-          })
-        : await lookupCardByName(pull.cardName, {
-            setCode: body.data.setCode,
-            foil: body.data.foil ?? pull.foil,
-          });
+      // PI-133 — a request that only touches `foil` isn't changing which
+      // card/printing this pull is; it must re-price the exact printing
+      // already on file, not re-derive one from name+set. Falling through
+      // to lookupCardByName with no setCode (the old behavior whenever
+      // setCode wasn't also resubmitted) let Scryfall pick its own default
+      // printing for the name, silently overwriting a correct pull's set,
+      // scryfallId, and image with an unrelated printing. Only a request
+      // that actually supplies a new setCode/collectorNumber is treated as
+      // an intentional printing change; a pull predating scryfallId falls
+      // back to the setCode-constrained name lookup below.
+      const identityUnchanged = body.data.setCode === undefined && body.data.collectorNumber === undefined;
+      const card =
+        identityUnchanged && pull.scryfallId
+          ? await lookupCardById(pull.scryfallId, { foil: body.data.foil ?? pull.foil })
+          : body.data.collectorNumber
+            ? await lookupCardByCollectorNumber(body.data.setCode ?? pull.setCode ?? "", body.data.collectorNumber, {
+                foil: body.data.foil ?? pull.foil,
+              })
+            : await lookupCardByName(pull.cardName, {
+                setCode: body.data.setCode ?? pull.setCode ?? undefined,
+                foil: body.data.foil ?? pull.foil,
+              });
       if (!card) {
         // Don't clobber a working pull with a failed re-resolution —
         // the name/setCode combination genuinely doesn't exist on
