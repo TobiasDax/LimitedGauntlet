@@ -191,6 +191,51 @@ describe("linkOrProvisionFromSso", () => {
     expect((await prisma.organizerInvite.findUniqueOrThrow({ where: { id: invite.id } })).usedAt).not.toBeNull();
   });
 
+  // PI-124 — the known-subject branch used to consume a pending invite using
+  // whatever email the identity provider reported this login, without ever
+  // checking emailVerified (that check only ran later, in the byEmail
+  // branch). A returning, already-linked account whose provider reports an
+  // unverified email must not be able to claim someone else's invite just by
+  // having that email attached at login time.
+  it("PI-124: a known subject with an unverified email does not consume a pending invite for it", async () => {
+    const orgA = await makeOrg();
+    const orgB = await makeOrg();
+    const email = `unverified-${Math.random()}@example.com`;
+    const sub = uniq("unverified-known");
+    const acc = await prisma.organizerAccount.create({
+      data: {
+        name: "U",
+        email: `holder-${Math.random()}@example.com`,
+        passwordHash: "h",
+        oidcSubject: `google:${sub}`,
+        memberships: { create: { orgId: orgA.id } },
+      },
+    });
+    const invite = await prisma.organizerInvite.create({
+      data: {
+        orgId: orgB.id,
+        email,
+        tokenHash: `hash-${Math.random()}`,
+        invitedById: acc.id,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    const res = await linkOrProvisionFromSso(
+      "google",
+      verified({ subject: sub, email, emailVerified: false }),
+      "https://app.example",
+    );
+    expect(res).toEqual({ status: "ok", organizerId: acc.id, authVersion: acc.authVersion, landOrgId: undefined });
+
+    const memberships = await prisma.organizerMembership.findMany({
+      where: { accountId: acc.id },
+      select: { orgId: true },
+    });
+    expect(memberships.map((m) => m.orgId)).toEqual([orgA.id]);
+    expect((await prisma.organizerInvite.findUniqueOrThrow({ where: { id: invite.id } })).usedAt).toBeNull();
+  });
+
   it("refuses an unverified email", async () => {
     const res = await linkOrProvisionFromSso("google", verified({ emailVerified: false }), "https://app.example");
     expect(res).toEqual({ status: "error", error: "oidc_email_unverified" });

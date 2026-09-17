@@ -26,7 +26,7 @@ The app is **feature-complete and running in production** — latest release **v
 
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
-- **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. PI-123 fixed (live-verify pending); PI-124–128 still open — details and suggested fixes below.
+- **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. PI-123 and PI-124 fixed (live-verify pending); PI-125–128 still open — details and suggested fixes below.
 - **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. All open; details below.
 - **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code shipped in v0.15.3, browser-verify pending.
 
@@ -65,15 +65,15 @@ All eleven items below are **open, not implemented**. Reviewed revision: `dee64d
 - [x] **Regression test** (`realtime.test.ts`) covers string/number/object/null/array acknowledgments, an invalid room name paired with each, and the pre-existing no-ack case — all while a live `process.on("unhandledRejection", ...)` listener asserts zero rejections, and a normal join both during and after the malformed attempts still succeeds on the same socket. Confirmed this test actually fails against the pre-fix code (reproduced the exact `TypeError: ack is not a function`, 8 uncaught) before confirming it passes against the fix.
 - [ ] **Not yet live-verified** — this sandbox has no way to load-test the production Node/container configuration directly. Tobias should confirm normal room joins/updates still work end-to-end on a real deploy.
 
-### PI-124 — Require verified SSO email before consuming any invite (P2 / medium security)
+### PI-124 — Require verified SSO email before consuming any invite (P2 / medium security) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/services/sso.ts`, the existing `oidcSubject` branch, calls `consumePendingInvite` before the later `emailVerified` check. A known SSO subject proves account identity, but does not prove ownership of its current email. Exploitation requires an already-linked account, a pending target invitation, and an identity provider that allows an attacker-controlled unverified email change; the result is organizer membership in the invited organization.
 
-**Suggested fix:** gate invite consumption on a present, verified email in every account-resolution branch, preferably at the shared consumption boundary. Keep authentication by an already-linked subject separate from permission to claim an email-addressed invitation; an unverified email must not create new membership.
+**Fixed:** moved the verified-email guard into `consumePendingInvite()` itself — the one shared boundary every account-resolution branch already calls through — instead of checking it only on the `byEmail` path. It now takes the full identity (not a bare email string) and returns `undefined` immediately if `!identity.email || !identity.emailVerified`, before ever querying for a matching invite. All three call sites (the known-subject branch, and both `byEmail` branches) now go through the same guard automatically.
 
-- [ ] Centralize the verified-email requirement and retain existing invite validity/consumption rules.
-- [ ] Test existing/new subjects with verified, unverified, missing-email, and missing-verification claims. Unverified cases must leave the invitation and membership unchanged; a verified intended recipient must succeed.
-- [ ] Verify with the configured provider that ordinary returning-user login still works without silently granting an invitation.
+- [x] Verified-email requirement centralized at the shared consumption boundary; existing invite validity/consumption rules unchanged.
+- [x] **Regression test** (`sso.test.ts`, real DB): a known subject whose current login reports the invited email but `emailVerified: false` — confirmed the invite stays unconsumed and no membership is created. Confirmed this test fails against the pre-fix code first (reproduced the exact over-grant: `landOrgId` returned, membership created) before confirming the fix closes it. Full server suite: 225/225 passing.
+- [ ] **Not yet live-verified against a real identity provider** — this sandbox has no live OIDC/Discord/Google provider to round-trip against. Tobias should confirm an ordinary returning-user login (verified email, as every real provider normally reports) still works and still grants pending invites exactly as before.
 
 ### PI-125 — Prevent SSO linking from retaining preregistered attacker credentials (P2 / medium security)
 

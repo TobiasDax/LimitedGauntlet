@@ -274,9 +274,22 @@ export type SsoLinkResult =
 // PI-86 — an SSO login for an account that already exists also consumes any
 // pending co-organizer invite for that email: it adds a membership rather
 // than being ignored (the pre-PI-86 bug). Returns the org to land in.
-async function consumePendingInvite(accountId: string, email: string): Promise<string | undefined> {
+//
+// PI-124 — the verified-email check lives here, at the one shared consumption
+// boundary every caller goes through, rather than at each call site. A known
+// SSO subject (the caller already trusts *who* they are) does not prove
+// ownership of whatever email the provider happens to report *this* login —
+// an identity provider that lets a user set an unverified email could
+// otherwise let a returning, already-linked account claim someone else's
+// pending invite just by having that email attached, unverified, at login
+// time. Every account-resolution branch must clear this same bar.
+async function consumePendingInvite(
+  accountId: string,
+  identity: Pick<SsoIdentity, "email" | "emailVerified">,
+): Promise<string | undefined> {
+  if (!identity.email || !identity.emailVerified) return undefined;
   const invite = await prisma.organizerInvite.findFirst({
-    where: { email, usedAt: null, expiresAt: { gt: new Date() } },
+    where: { email: identity.email, usedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
   });
   if (!invite) return undefined;
@@ -300,7 +313,7 @@ export async function linkOrProvisionFromSso(
 
   const bySubject = await prisma.organizerAccount.findUnique({ where: { oidcSubject: subject } });
   if (bySubject) {
-    const landOrgId = identity.email ? await consumePendingInvite(bySubject.id, identity.email) : undefined;
+    const landOrgId = await consumePendingInvite(bySubject.id, identity);
     return { status: "ok", organizerId: bySubject.id, authVersion: bySubject.authVersion, landOrgId };
   }
 
@@ -318,11 +331,11 @@ export async function linkOrProvisionFromSso(
         data: { oidcSubject: subject },
       });
       if (linked.count === 1) {
-        const landOrgId = await consumePendingInvite(byEmail.id, identity.email);
+        const landOrgId = await consumePendingInvite(byEmail.id, identity);
         return { status: "ok", organizerId: byEmail.id, authVersion: byEmail.authVersion, landOrgId };
       }
     } else if (byEmail.oidcSubject === subject) {
-      const landOrgId = await consumePendingInvite(byEmail.id, identity.email);
+      const landOrgId = await consumePendingInvite(byEmail.id, identity);
       return { status: "ok", organizerId: byEmail.id, authVersion: byEmail.authVersion, landOrgId };
     }
     // Account already bound to a different SSO identity (another provider, or the
