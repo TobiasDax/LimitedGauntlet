@@ -2,7 +2,7 @@ import * as oidc from "openid-client";
 import { config, type SsoProviderId } from "../config.js";
 import { prisma } from "../prisma.js";
 import { isEmailConfigured, resolveBaseUrl, sendMail } from "./mailer.js";
-import { createOidcRelinkRequest } from "./oidcRelink.js";
+import { createOidcRelinkRequest, createUnverifiedLocalLinkRequest } from "./oidcRelink.js";
 
 // SSO / social login (PI-42 + PI-43). Up to three providers, each independently
 // optional (config.ts's configuredSsoProviders decides which buttons show):
@@ -304,6 +304,29 @@ async function consumePendingInvite(
   return invite.orgId;
 }
 
+// Shared by both "can't link silently" cases below: creates the pending
+// request, emails the confirmation link when SMTP is configured (the PI-49
+// operator CLI covers the SMTP-less case), and returns the recovery_required
+// result the caller sends back to the client either way.
+async function requireMailboxConfirmation(
+  createRequest: () => Promise<{ request: { id: string }; token: string }>,
+  email: string,
+  origin: string,
+  mailSubject: string,
+  mailText: (url: string) => string,
+  logLabel: string,
+  organizerId: string,
+): Promise<SsoLinkResult> {
+  const { request: relink, token } = await createRequest();
+  const emailSent = isEmailConfigured();
+  if (emailSent) {
+    const url = `${resolveBaseUrl(origin)}/oidc-relink?token=${encodeURIComponent(token)}`;
+    await sendMail({ to: email, subject: mailSubject, text: mailText(url) });
+  }
+  console.warn(logLabel, { organizerId, requestId: relink.id, emailSent });
+  return { status: "recovery_required", emailSent };
+}
+
 export async function linkOrProvisionFromSso(
   provider: SsoProviderId,
   identity: SsoIdentity,
@@ -326,6 +349,23 @@ export async function linkOrProvisionFromSso(
     // Link the subject to the existing account if it isn't already, so future
     // logins match on the stable subject even if the provider email changes.
     if (!byEmail.oidcSubject) {
+      if (byEmail.localEmailVerifiedAt === null) {
+        // PI-125 — local signup never proved this account's owner controls
+        // identity.email; anyone could have preregistered it. Never trust the
+        // match silently — route through the same mailbox-confirmation flow
+        // as a conflicting-identity relink below. Confirming also clears
+        // whatever password is on the account, since it may not be the real
+        // owner's (see oidcRelink.ts's applyOidcRelink).
+        return requireMailboxConfirmation(
+          () => createUnverifiedLocalLinkRequest(byEmail.id, subject, byEmail.email),
+          byEmail.email,
+          origin,
+          "Confirm your LimitedGauntlet SSO link",
+          (url) => `Confirm linking your SSO account within one hour: ${url}`,
+          "Unverified local account requires mailbox confirmation before SSO link",
+          byEmail.id,
+        );
+      }
       const linked = await prisma.organizerAccount.updateMany({
         where: { id: byEmail.id, oidcSubject: null },
         data: { oidcSubject: subject },
@@ -341,18 +381,15 @@ export async function linkOrProvisionFromSso(
     // Account already bound to a different SSO identity (another provider, or the
     // same provider's subject changed) — never a silent rebind; go through the
     // PI-49 mailbox/operator relink.
-    const { request: relink, token } = await createOidcRelinkRequest(byEmail.id, subject, byEmail.email);
-    const emailSent = isEmailConfigured();
-    if (emailSent) {
-      const url = `${resolveBaseUrl(origin)}/oidc-relink?token=${encodeURIComponent(token)}`;
-      await sendMail({
-        to: byEmail.email,
-        subject: "Confirm your LimitedGauntlet SSO relink",
-        text: `Confirm this SSO account relink within one hour: ${url}`,
-      });
-    }
-    console.warn("SSO subject relink required", { organizerId: byEmail.id, requestId: relink.id, emailSent });
-    return { status: "recovery_required", emailSent };
+    return requireMailboxConfirmation(
+      () => createOidcRelinkRequest(byEmail.id, subject, byEmail.email),
+      byEmail.email,
+      origin,
+      "Confirm your LimitedGauntlet SSO relink",
+      (url) => `Confirm this SSO account relink within one hour: ${url}`,
+      "SSO subject relink required",
+      byEmail.id,
+    );
   }
 
   const invite = await prisma.organizerInvite.findFirst({

@@ -3,16 +3,23 @@ import type { Prisma } from "../db.js";
 import { prisma } from "../prisma.js";
 
 const PURPOSE = "SUBJECT_RELINK";
+// PI-125 — a local account that has never proven ownership of its email
+// (services/sso.ts's byEmail branch, when localEmailVerifiedAt is null) goes
+// through this same mailbox-confirmation mechanism instead of being linked
+// instantly, since local signup alone doesn't prove the signer owns the
+// address. Distinguished by purpose so applyOidcRelink knows to also strip
+// the account's existing (possibly attacker-set) password.
+const UNVERIFIED_LOCAL_LINK_PURPOSE = "UNVERIFIED_LOCAL_LINK";
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 
-export async function createOidcRelinkRequest(organizerId: string, pendingSubject: string, email: string) {
+async function createRelinkRequest(organizerId: string, pendingSubject: string, email: string, purpose: string) {
   const token = randomBytes(32).toString("hex");
   const request = await prisma.oidcSubjectRelinkRequest.create({
     data: {
       organizerId,
       pendingSubject,
       email,
-      purpose: PURPOSE,
+      purpose,
       tokenHash: hash(token),
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
     },
@@ -20,13 +27,29 @@ export async function createOidcRelinkRequest(organizerId: string, pendingSubjec
   return { request, token };
 }
 
-type PendingRelinkRequest = { id: string; organizerId: string; pendingSubject: string };
+export async function createOidcRelinkRequest(organizerId: string, pendingSubject: string, email: string) {
+  return createRelinkRequest(organizerId, pendingSubject, email, PURPOSE);
+}
+
+// PI-125 — same mechanism, different purpose: see UNVERIFIED_LOCAL_LINK_PURPOSE.
+export async function createUnverifiedLocalLinkRequest(organizerId: string, pendingSubject: string, email: string) {
+  return createRelinkRequest(organizerId, pendingSubject, email, UNVERIFIED_LOCAL_LINK_PURPOSE);
+}
+
+type PendingRelinkRequest = { id: string; organizerId: string; pendingSubject: string; purpose: string };
 
 // Shared by both confirmation paths: rotates the account's authVersion
 // (revoking every existing session, including realtime subscriptions —
 // see server/src/realtime.ts) and API tokens, and consumes every other
 // outstanding relink request for the account so an older/different pending
 // subject can't be replayed after this one lands.
+//
+// PI-125 — clicking this link proves ownership of the account's email right
+// now, so localEmailVerifiedAt is (re)stamped either way. For the
+// UNVERIFIED_LOCAL_LINK_PURPOSE case specifically, the account's existing
+// password is also cleared: it may have been set by whoever preregistered
+// the address, not the real owner who just proved control of the mailbox —
+// see services/sso.ts's byEmail branch for the full threat model.
 async function applyOidcRelink(tx: Prisma.TransactionClient, request: PendingRelinkRequest): Promise<void> {
   const claimed = await tx.oidcSubjectRelinkRequest.updateMany({
     where: { id: request.id, usedAt: null },
@@ -35,7 +58,12 @@ async function applyOidcRelink(tx: Prisma.TransactionClient, request: PendingRel
   if (claimed.count !== 1) throw new Error("invalid_oidc_relink");
   await tx.organizerAccount.update({
     where: { id: request.organizerId },
-    data: { oidcSubject: request.pendingSubject, authVersion: { increment: 1 } },
+    data: {
+      oidcSubject: request.pendingSubject,
+      authVersion: { increment: 1 },
+      localEmailVerifiedAt: new Date(),
+      ...(request.purpose === UNVERIFIED_LOCAL_LINK_PURPOSE ? { passwordHash: null } : {}),
+    },
   });
   await tx.apiToken.deleteMany({ where: { organizerId: request.organizerId } });
   await tx.oidcSubjectRelinkRequest.updateMany({
@@ -43,6 +71,8 @@ async function applyOidcRelink(tx: Prisma.TransactionClient, request: PendingRel
     data: { usedAt: new Date() },
   });
 }
+
+const KNOWN_PURPOSES: readonly string[] = [PURPOSE, UNVERIFIED_LOCAL_LINK_PURPOSE];
 
 // Mailbox-confirmed path: the caller possesses the raw token from the emailed
 // link, proving control of the account's existing email.
@@ -57,7 +87,7 @@ export async function confirmOidcRelink(token: string): Promise<{ organizerId: s
       !request ||
       request.usedAt ||
       request.expiresAt <= new Date() ||
-      request.purpose !== PURPOSE ||
+      !KNOWN_PURPOSES.includes(request.purpose) ||
       request.email !== request.organizer.email
     ) {
       throw new Error("invalid_oidc_relink");
@@ -86,7 +116,7 @@ export async function confirmOidcRelinkByRequestId(requestId: string): Promise<{
       !request ||
       request.usedAt ||
       request.expiresAt <= new Date() ||
-      request.purpose !== PURPOSE ||
+      !KNOWN_PURPOSES.includes(request.purpose) ||
       request.email !== request.organizer.email
     ) {
       throw new Error("invalid_oidc_relink");
@@ -120,7 +150,12 @@ export async function findPendingOidcRelink(email: string): Promise<
   if (!organizer) return { organizer: null, request: null };
 
   const pending = await prisma.oidcSubjectRelinkRequest.findFirst({
-    where: { organizerId: organizer.id, purpose: PURPOSE, usedAt: null, expiresAt: { gt: new Date() } },
+    where: {
+      organizerId: organizer.id,
+      purpose: { in: [...KNOWN_PURPOSES] },
+      usedAt: null,
+      expiresAt: { gt: new Date() },
+    },
     orderBy: { createdAt: "desc" },
   });
 

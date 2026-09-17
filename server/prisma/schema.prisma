@@ -89,6 +89,15 @@ model OrganizerAccount {
   oidcSubject  String?  @unique
   authVersion  Int      @default(0)
   name         String
+  // PI-125 — when this account's email address was last proven owned by a
+  // real click-through (an accepted co-organizer/player invite, a confirmed
+  // email change, or a confirmed SSO relink) — never set just because local
+  // signup accepted the address. Null means "never verified": SSO linking by
+  // email match must not trust it silently (see services/sso.ts), since local
+  // signup alone lets anyone claim any email. Existing accounts as of this
+  // migration are grandfathered in as verified (backfilled to their
+  // createdAt) — the risk only exists for accounts created going forward.
+  localEmailVerifiedAt DateTime?
   // PI-86 — where a login with more than one membership resumes on next login.
   // Null until they first switch orgs; the middleware falls back to the only /
   // oldest membership. Cleared/ignored if that membership is later removed.

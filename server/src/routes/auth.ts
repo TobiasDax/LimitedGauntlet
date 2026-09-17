@@ -312,7 +312,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       await prisma.$transaction([
-        prisma.organizerAccount.update({ where: { id: change.organizerId }, data: { email: change.newEmail } }),
+        // PI-125 — clicking this link proves ownership of the new address,
+        // so it counts as local email verification too (relevant if this
+        // account's own email was never previously verified — see
+        // services/sso.ts's byEmail branch).
+        prisma.organizerAccount.update({
+          where: { id: change.organizerId },
+          data: { email: change.newEmail, localEmailVerifiedAt: new Date() },
+        }),
         prisma.emailChangeRequest.update({ where: { id: change.id }, data: { usedAt: new Date() } }),
       ]);
       reply.send({ ok: true, email: change.newEmail });
@@ -431,6 +438,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
               email: invite.email,
               name: body.data.name,
               passwordHash,
+              // PI-125 — possessing this invite's token already proves control
+              // of `invite.email` (it was emailed there), unlike open signup
+              // where anyone can type in any address. Safe to mark verified
+              // at creation rather than requiring a second proof later.
+              localEmailVerifiedAt: new Date(),
               memberships: { create: { orgId: invite.orgId } },
             },
           }),
@@ -612,6 +624,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
               email: pending.email,
               passwordHash: null,
               oidcSubject: pending.subject,
+              // PI-125 — pending.email came from an already-verified SSO
+              // identity (checked in the callback before this pending
+              // registration was ever stashed), so this account starts
+              // trustworthy for future SSO linking, unlike open local signup.
+              localEmailVerifiedAt: new Date(),
               memberships: { create: { orgId: organization.id } },
             },
           });

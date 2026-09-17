@@ -1,7 +1,9 @@
 import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { hashPassword, verifyPassword } from "../auth/password.js";
 import { makePrismaClient } from "../db.js";
 import { config } from "../config.js";
 import { configuredSsoProviders } from "../config.js";
+import { confirmOidcRelink, createUnverifiedLocalLinkRequest } from "./oidcRelink.js";
 import { linkOrProvisionFromSso, parseDiscordUser, type SsoIdentity } from "./sso.js";
 
 const prisma = makePrismaClient();
@@ -123,12 +125,21 @@ describe("linkOrProvisionFromSso", () => {
     expect(res).toEqual({ status: "ok", organizerId: acc.id, authVersion: acc.authVersion, landOrgId: undefined });
   });
 
-  it("links an unbound account by verified email, storing the prefixed subject", async () => {
+  it("links an unbound, verified account by email, storing the prefixed subject", async () => {
     const org = await makeOrg();
     const email = `link-${Math.random()}@example.com`;
     const sub = uniq("disc");
+    // localEmailVerifiedAt set — e.g. a grandfathered pre-PI-125 account, or
+    // one created via invite/SSO registration — so the direct link path
+    // applies. See the PI-125 test below for the unverified case.
     const acc = await prisma.organizerAccount.create({
-      data: { name: "B", email, passwordHash: "h", memberships: { create: { orgId: org.id } } },
+      data: {
+        name: "B",
+        email,
+        passwordHash: "h",
+        localEmailVerifiedAt: new Date(),
+        memberships: { create: { orgId: org.id } },
+      },
     });
     const res = await linkOrProvisionFromSso("discord", verified({ subject: sub, email }), "https://app.example");
     expect(res.status).toBe("ok");
@@ -234,6 +245,91 @@ describe("linkOrProvisionFromSso", () => {
     });
     expect(memberships.map((m) => m.orgId)).toEqual([orgA.id]);
     expect((await prisma.organizerInvite.findUniqueOrThrow({ where: { id: invite.id } })).usedAt).toBeNull();
+  });
+
+  // PI-125 — full attacker-preregistration exploit: an attacker signs up
+  // locally with the victim's email (never verified, since local signup
+  // can't prove that), setting a password only the attacker knows. The real
+  // victim later signs in via a real, verified SSO identity for that same
+  // email, with a pending co-organizer invite waiting. Before the fix this
+  // would have linked instantly, leaving the attacker's password (and any
+  // session/API token they'd already created) valid on the now-linked
+  // account. After the fix: no silent link, and only after mailbox
+  // confirmation does the attacker's password/sessions/tokens die and the
+  // victim get their intended access.
+  it("PI-125: attacker preregistration is neutralized by mailbox confirmation, victim keeps intended access", async () => {
+    const orgB = await makeOrg();
+    const email = `victim-${Math.random()}@example.com`;
+    const attackerPassword = "attacker-controls-this-password!";
+    const preregistered = await prisma.organizerAccount.create({
+      data: {
+        name: "Attacker-chosen name",
+        email,
+        passwordHash: await hashPassword(attackerPassword),
+        memberships: { create: { orgId: (await makeOrg()).id } },
+        // localEmailVerifiedAt intentionally omitted: local signup never
+        // proved the attacker controls `email`.
+      },
+    });
+    const attackerToken = await prisma.apiToken.create({
+      data: {
+        organizerId: preregistered.id,
+        orgId: orgB.id,
+        name: "attacker token",
+        tokenHash: `hash-${Math.random()}`,
+      },
+    });
+    const invite = await prisma.organizerInvite.create({
+      data: {
+        orgId: orgB.id,
+        email,
+        tokenHash: `hash-${Math.random()}`,
+        invitedById: preregistered.id,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    // The victim's real, verified SSO login.
+    const sub = uniq("victim-sub");
+    const firstAttempt = await linkOrProvisionFromSso(
+      "google",
+      verified({ subject: sub, email }),
+      "https://app.example",
+    );
+    expect(firstAttempt).toEqual({ status: "recovery_required", emailSent: false });
+
+    // Nothing changed yet: no silent link, attacker's password/token/invite
+    // all still exactly as they were.
+    const stillPreregistered = await prisma.organizerAccount.findUniqueOrThrow({ where: { id: preregistered.id } });
+    expect(stillPreregistered.oidcSubject).toBeNull();
+    expect(await verifyPassword(stillPreregistered.passwordHash!, attackerPassword)).toBe(true);
+    expect(await prisma.apiToken.findUnique({ where: { id: attackerToken.id } })).not.toBeNull();
+    expect((await prisma.organizerInvite.findUniqueOrThrow({ where: { id: invite.id } })).usedAt).toBeNull();
+
+    // The victim clicks the emailed confirmation link.
+    const { token } = await createUnverifiedLocalLinkRequest(preregistered.id, `google:${sub}`, email);
+    await confirmOidcRelink(token);
+
+    const recovered = await prisma.organizerAccount.findUniqueOrThrow({ where: { id: preregistered.id } });
+    expect(recovered.passwordHash).toBeNull(); // old (attacker) password now fails outright
+    expect(recovered.authVersion).toBeGreaterThan(stillPreregistered.authVersion); // old cookies fail (authVersion check)
+    expect(recovered.oidcSubject).toBe(`google:${sub}`);
+    expect(await prisma.apiToken.findUnique({ where: { id: attackerToken.id } })).toBeNull(); // preexisting tokens fail
+
+    // The victim's next real login retains intended access: recognized by
+    // subject now, and the pending invite is finally consumed.
+    const secondAttempt = await linkOrProvisionFromSso(
+      "google",
+      verified({ subject: sub, email }),
+      "https://app.example",
+    );
+    expect(secondAttempt).toEqual({
+      status: "ok",
+      organizerId: preregistered.id,
+      authVersion: recovered.authVersion,
+      landOrgId: orgB.id,
+    });
+    expect((await prisma.organizerInvite.findUniqueOrThrow({ where: { id: invite.id } })).usedAt).not.toBeNull();
   });
 
   it("refuses an unverified email", async () => {

@@ -4,6 +4,7 @@ import {
   confirmOidcRelink,
   confirmOidcRelinkByRequestId,
   createOidcRelinkRequest,
+  createUnverifiedLocalLinkRequest,
   findPendingOidcRelink,
 } from "./oidcRelink.js";
 
@@ -120,5 +121,41 @@ describe("oidcRelink", () => {
     const { request } = await createOidcRelinkRequest(organizer.id, subj("new-subject"), organizer.email);
     await confirmOidcRelinkByRequestId(request.id);
     await expect(confirmOidcRelinkByRequestId(request.id)).rejects.toThrow("invalid_oidc_relink");
+  });
+
+  // PI-125 — the ordinary SUBJECT_RELINK purpose (a real owner rebinding a
+  // different provider) must never touch their existing password. Only the
+  // UNVERIFIED_LOCAL_LINK purpose (a local account that never proved mailbox
+  // ownership) strips it, since that password may not be the real owner's.
+  it("PI-125: only the unverified-local-link purpose clears the account's password on confirm", async () => {
+    const { organizer: ordinary } = await makeOrganizer();
+    await prisma.organizerAccount.update({ where: { id: ordinary.id }, data: { passwordHash: "real-owner-hash" } });
+    const { token: ordinaryToken } = await createOidcRelinkRequest(ordinary.id, subj("ordinary-new"), ordinary.email);
+    await confirmOidcRelink(ordinaryToken);
+    expect((await prisma.organizerAccount.findUniqueOrThrow({ where: { id: ordinary.id } })).passwordHash).toBe(
+      "real-owner-hash",
+    );
+
+    const unique = `${Date.now()}-${Math.random()}`;
+    const org = await prisma.organization.create({ data: { slug: `oidc-relink-${unique}`, name: "Test Org" } });
+    const unverified = await prisma.organizerAccount.create({
+      data: {
+        name: "Preregistered",
+        email: `preregistered-${unique}@example.com`,
+        passwordHash: "attacker-set-hash",
+        // oidcSubject and localEmailVerifiedAt both null — never linked,
+        // never proven owned. Exactly the PI-125 scenario.
+        memberships: { create: { orgId: org.id } },
+      },
+    });
+    const { token: unverifiedToken } = await createUnverifiedLocalLinkRequest(
+      unverified.id,
+      subj("victim-subject"),
+      unverified.email,
+    );
+    await confirmOidcRelink(unverifiedToken);
+    const after = await prisma.organizerAccount.findUniqueOrThrow({ where: { id: unverified.id } });
+    expect(after.passwordHash).toBeNull();
+    expect(after.localEmailVerifiedAt).not.toBeNull();
   });
 });
