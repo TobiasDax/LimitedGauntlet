@@ -72,6 +72,19 @@ const defaultAuthorizationStore: RealtimeAuthorizationStore = {
   },
 };
 
+// PI-123 — the join listener's second argument is untrusted client input, not
+// a value TypeScript can actually guarantee is callable. Only invoke it once
+// runtime-verified as a function, and never let the client's own callback
+// throwing propagate back into the server's event loop.
+function safeAck(ack: unknown, result: { ok: boolean }): void {
+  if (typeof ack !== "function") return;
+  try {
+    (ack as JoinAck)(result);
+  } catch (err) {
+    console.error("Realtime join acknowledgment callback threw", err);
+  }
+}
+
 function parseRoom(room: unknown): { kind: RoomKind; resourceId: string } | null {
   if (typeof room !== "string") return null;
   const match = /^(pod|tournament):([^:]+)$/.exec(room);
@@ -135,20 +148,36 @@ export function initRealtime(httpServer: HttpServer, authorizeRoom: RealtimeRoom
   io = new SocketIOServer(httpServer, { path: "/socket.io" });
 
   io.on("connection", (socket) => {
-    socket.on("join", async (room: unknown, ack?: JoinAck) => {
+    // PI-123 — `ack` is whatever the connected client sent, not necessarily a
+    // function: the `?:` in the old `JoinAck` param type only checked for
+    // undefined, not callability. A string/object/number here made `ack?.(...)`
+    // throw — once in the try block, then again from the catch block's own
+    // `ack?.(...)` call, uncaught, taking the shared HTTP+realtime process down
+    // via Node's default unhandled-rejection behavior. Any anonymous client
+    // reaches this, with any (even invalid) room name.
+    socket.on("join", (room: unknown, ack?: unknown) => {
+      void handleJoin(room, ack).catch((err: unknown) => {
+        // Belt-and-braces: handleJoin already catches everything it can, but
+        // an event listener's returned promise must never reject uncaught.
+        console.error("Unexpected error in realtime join handler", err);
+        safeAck(ack, { ok: false });
+      });
+    });
+
+    async function handleJoin(room: unknown, ack: unknown): Promise<void> {
       try {
         const allowed = await authorizeRoom(room, socket.handshake.headers.cookie);
         if (allowed && typeof room === "string") {
           await socket.join(room);
         }
-        ack?.({ ok: allowed });
+        safeAck(ack, { ok: allowed });
       } catch (err) {
         // A database/session failure must fail closed without taking down the
         // shared socket or revealing whether a resource exists.
         console.error("Realtime room authorization failed", err);
-        ack?.({ ok: false });
+        safeAck(ack, { ok: false });
       }
-    });
+    }
     socket.on("leave", (room: unknown) => {
       if (typeof room === "string") void socket.leave(room);
     });

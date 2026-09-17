@@ -26,7 +26,7 @@ The app is **feature-complete and running in production** — latest release **v
 
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
-- **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. All open; details and suggested fixes below.
+- **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. PI-123 fixed (live-verify pending); PI-124–128 still open — details and suggested fixes below.
 - **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. All open; details below.
 - **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code shipped in v0.15.3, browser-verify pending.
 
@@ -55,15 +55,15 @@ All eleven items below are **open, not implemented**. Reviewed revision: `dee64d
 
 **Suggested order:** fix PI-123 first (P1/high); then PI-124–127 (P2/medium security), coordinating PI-127 with PI-132 so revocation and reconnect behavior agree. Follow with PI-128 (P3/low security) and PI-129–133 (P2 functional priorities). Pair PI-124/125 for account-linking regression coverage and PI-127/131/132 for public-access coverage. These are implementation suggestions; check the current source before applying them. Restore dependencies from the lockfile in the implementation environment before running required checks; keep any dependency upgrades separate.
 
-### PI-123 — Reject malformed Socket.IO acknowledgment arguments (P1 / high security)
+### PI-123 — Reject malformed Socket.IO acknowledgment arguments (P1 / high security) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/realtime.ts`, the `join` listener, accepts an unchecked second argument. Optional calling (`ack?.(...)`) does not establish that it is a function. A malformed argument throws in both the success path and the catch block, leaving an unhandled async rejection. An anonymous client can reach this even with an invalid room. The shared HTTP/realtime process can terminate under the deployed Node default rejection behavior; process termination itself was not exercised in the audit.
 
-**Suggested fix:** treat the acknowledgment argument as untrusted at runtime and invoke it only when `typeof ack === "function"`. Keep failure reporting from throwing a second exception and ensure the event listener's asynchronous work has a final rejection handler. Preserve room authorization and legitimate optional acknowledgments.
+**Fixed:** the `join` handler no longer trusts its second argument's declared type — a new `safeAck()` helper checks `typeof ack === "function"` at runtime before ever calling it, and wraps the call itself in a try/catch so even a misbehaving client-supplied callback can't throw back into the server. The handler's own async body is also wrapped one level up (`void handleJoin(...).catch(...)`) so the event listener's promise can never reject uncaught, regardless of what fails inside. Room authorization and the existing "no ack supplied" fire-and-forget usage are both unchanged.
 
-- [ ] Implement runtime acknowledgment validation and contained error handling.
-- [ ] Add a real Socket.IO regression test for object/string/number acknowledgments, omitted acknowledgments, valid callbacks, invalid rooms, and authorizer failures. Verify no unhandled rejection, unauthorized room join, or process exit; a subsequent valid request must still succeed.
-- [ ] Verify normal room updates against the production Node/container configuration before closing.
+- [x] Runtime acknowledgment validation and contained error handling implemented.
+- [x] **Regression test** (`realtime.test.ts`) covers string/number/object/null/array acknowledgments, an invalid room name paired with each, and the pre-existing no-ack case — all while a live `process.on("unhandledRejection", ...)` listener asserts zero rejections, and a normal join both during and after the malformed attempts still succeeds on the same socket. Confirmed this test actually fails against the pre-fix code (reproduced the exact `TypeError: ack is not a function`, 8 uncaught) before confirming it passes against the fix.
+- [ ] **Not yet live-verified** — this sandbox has no way to load-test the production Node/container configuration directly. Tobias should confirm normal room joins/updates still work end-to-end on a real deploy.
 
 ### PI-124 — Require verified SSO email before consuming any invite (P2 / medium security)
 

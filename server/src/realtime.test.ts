@@ -67,6 +67,56 @@ describe("realtime room authorization", () => {
     }
   });
 
+  // PI-123 — a malformed second "ack" argument (anything not actually a
+  // function) used to throw inside the join handler, then throw AGAIN from
+  // the catch block's own attempt to call it, uncaught — an unhandled
+  // rejection that terminates the shared HTTP+realtime process under Node's
+  // default behavior. Any anonymous client could trigger this with any room
+  // name, valid or not.
+  it("never lets a malformed join acknowledgment crash the process or the socket", async () => {
+    const httpServer = createServer();
+    const socketServer = initRealtime(httpServer, async (room) => room === "pod:allowed");
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const port = (httpServer.address() as AddressInfo).port;
+    const client = createClient(`http://127.0.0.1:${port}`, { path: "/socket.io", transports: ["websocket"] });
+
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => unhandledRejections.push(reason);
+    process.on("unhandledRejection", onUnhandledRejection);
+
+    try {
+      await new Promise<void>((resolve) => client.once("connect", resolve));
+
+      // Socket.IO's client SDK only wires up its ack protocol when the last
+      // emit() argument is an actual function — passing a string/object/number
+      // instead just arrives server-side as a plain second argument, exactly
+      // reproducing what an untyped/malicious client can send over the wire
+      // regardless of what our server's type declarations assumed.
+      for (const malformed of ["not-a-function", 42, { not: "callable" }, null, [1, 2, 3]]) {
+        client.emit("join", "pod:allowed", malformed);
+        client.emit("join", "pod:invalid-room", malformed);
+      }
+      // No ack at all (today's supported "fire and forget" usage) must keep working too.
+      client.emit("join", "pod:allowed");
+
+      // Give the server a moment to process the fire-and-forget emits above.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // The connection must still be alive and able to complete an ordinary,
+      // correctly-formed join — proving neither the socket nor the shared
+      // process was taken down by any of the malformed attempts.
+      const stillWorks = await new Promise<{ ok: boolean }>((resolve) => client.emit("join", "pod:allowed", resolve));
+      expect(stillWorks).toEqual({ ok: true });
+      expect(client.connected).toBe(true);
+
+      expect(unhandledRejections).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandledRejection);
+      client.close();
+      await socketServer.close();
+    }
+  });
+
   it("allows anonymous access to an existing organization without a public lock", async () => {
     const { authorize, decodeSecureSession } = fixture({ locked: false });
     await expect(authorize("pod:pod-1", undefined)).resolves.toBe(true);
