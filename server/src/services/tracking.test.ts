@@ -46,6 +46,35 @@ describe("truncateIp (PI-108)", () => {
     expect(truncateIp("2001:db8:1234::1")).toBe("2001:db8:1234::");
   });
 
+  // PI-129 — naively splitting on ":" and dropping empty strings loses
+  // exactly the zero groups "::" stands for, so a compression that falls
+  // within (not after) the kept /48 prefix silently kept host bits instead:
+  // this exact address used to truncate to "2001:db8:1234::" (treating
+  // "1234" as the third real group), not the correct "2001:db8::".
+  it("correctly expands a compression that falls within the kept /48 prefix (the reported bug)", () => {
+    expect(truncateIp("2001:db8::1234:5678")).toBe("2001:db8::");
+  });
+
+  it("handles compression at either end, and the fully-compressed addresses", () => {
+    expect(truncateIp("::1")).toBe("::"); // loopback — no real prefix to keep
+    expect(truncateIp("2001:db8::")).toBe("2001:db8::"); // already just a prefix
+    expect(truncateIp("::")).toBe("::"); // unspecified address
+  });
+
+  it("equivalent compressed and uncompressed forms produce the same prefix", () => {
+    const compressed = truncateIp("2001:db8::1234:5678");
+    const expanded = truncateIp("2001:0db8:0000:0000:0000:0000:1234:5678");
+    expect(compressed).toBe(expanded);
+  });
+
+  it("strips a zone id before parsing", () => {
+    expect(truncateIp("fe80::1%eth0")).toBe("fe80::");
+  });
+
+  it("falls back to the fully-zeroed address for unparseable IPv6-shaped input, never the raw value", () => {
+    expect(truncateIp("garbage::still:has:a:colon:in:it:here")).toBe("::");
+  });
+
   it("passes through anything that isn't an IP", () => {
     expect(truncateIp("unknown")).toBe("unknown");
   });

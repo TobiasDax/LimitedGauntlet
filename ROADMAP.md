@@ -27,7 +27,7 @@ The app is **feature-complete and running in production** — latest release **v
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
 - **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. All six fixed (live-verify pending) — details below.
-- **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. All open; details below.
+- **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. PI-129 fixed (live-verify pending); PI-130–133 open. Details below.
 - **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code shipped in v0.15.3, browser-verify pending.
 
 ## New improvements (backlog)
@@ -126,15 +126,15 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] Atomic password/`authVersion` update, initiating-session refresh, and realtime reauthorization implemented; API-token policy decided and documented in code.
 - [ ] **Not tested or live-verified** — this logic lives entirely in the route handler (no extracted service function), matching this codebase's convention of not directly unit-testing `routes/*.ts` files; the actual multi-session revocation behavior needs a real HTTP round-trip this sandbox can't do. Tobias should confirm with two active sessions: after one changes the password, the other's next request and any open realtime subscription are rejected; the old password fails everywhere and the new one works; a failed change attempt (wrong current password) leaves every existing session valid.
 
-### PI-129 — Correctly truncate compressed IPv6 addresses (P2 / functional)
+### PI-129 — Correctly truncate compressed IPv6 addresses (P2 / functional) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/services/tracking.ts` splits on colons and removes empty segments before taking a prefix. This loses the zero groups represented by `::`: `2001:db8::1234:5678` becomes `2001:db8:1234::`, retaining misplaced host bits instead of the intended `/48` prefix `2001:db8::`.
 
-**Suggested fix:** parse and expand IPv6 correctly, mask the first 48 bits, then format the normalized network address. Reuse a suitable existing parser if available. Keep IPv4 behavior stable and define handling of IPv4-mapped IPv6, invalid input, and zone identifiers before storage; never fall back to storing an untruncated raw address.
+**Fixed:** new private `expandIPv6Groups` fully expands the `::` compression (wherever it falls — start, middle, end, or the bare `::` all-zero address) into the true 8 groups before any truncation happens, rejecting malformed input (more than one `::`, wrong resulting group count, non-hex groups) rather than guessing. `truncateIp` strips a zone id (`%eth0`) before parsing — meaningless once the address leaves this host — and falls back to the fully-zeroed `"::"` sentinel (never the raw untruncated address) if expansion fails. The kept 3-group `/48` prefix is normalized to canonical form: each group drops leading zeros, and trailing all-zero groups are trimmed before appending `::`, so equivalent addresses (compressed or fully spelled out) always produce byte-identical output.
 
-- [ ] Replace segment filtering with address-aware normalization and masking.
-- [ ] Cover compressed/uncompressed equivalents, compression at either end, loopback, all-zero addresses, mapped addresses, invalid input, and the reported example. Equivalent addresses must produce the same prefix and host bits must not survive.
-- [ ] Check whether retained analytics prefixes require cleanup; corrupted historical prefixes cannot reliably reconstruct the original network.
+- [x] Replaced segment filtering with address-aware expansion, masking, and canonical re-normalization.
+- [x] **Tests** (`tracking.test.ts`): the reported example (`2001:db8::1234:5678` → `2001:db8::`, not the old buggy `2001:db8:1234::`), compression at the start/end/whole-address, loopback (`::1`), the unspecified address (`::`), IPv4/IPv4-mapped-IPv6 (unchanged), a zone id, an unparseable IPv6-shaped input (falls back to `::`, not the raw value), and an explicit compressed-vs-fully-spelled-out equivalence check. All new cases confirmed failing against the pre-fix code first (5 of the new assertions reproduced the bug, including two the original test suite happened not to exercise: canonicalization and the zone-id case), then confirmed passing against the fix. Full server suite: 236/236 passing.
+- [ ] **Not live-verified**: Tobias should confirm real-world IPv6 visitors' analytics prefixes look correct going forward (no easy way to force a specific IPv6 source address in this sandbox). Retained historical prefixes computed by the old buggy code are not reconstructible from the corrupted value and are not touched by this fix — informational only, per the audit's own note that this is low-stakes analytics data.
 
 ### PI-130 — Validate partial CUSTOM pod updates against merged state (P2 / functional)
 
