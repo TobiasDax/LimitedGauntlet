@@ -139,10 +139,30 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
           return;
         }
       }
-      await prisma.organizerAccount.update({
+      // PI-128 — authVersion must move with the password, or an attacker who
+      // already holds a valid session (a stolen cookie, not the password
+      // itself) stays logged in after the real owner "secures" the account.
+      // The middleware compares each request's session authVersion against
+      // the account's current one, so bumping it here revokes every other
+      // session immediately. Refresh *this* browser's own session to the new
+      // value right after so the person who just changed their password
+      // isn't logged out by their own action.
+      const updated = await prisma.organizerAccount.update({
         where: { id: account.id },
-        data: { passwordHash: await hashPassword(body.data.newPassword) },
+        data: { passwordHash: await hashPassword(body.data.newPassword), authVersion: { increment: 1 } },
       });
+      request.session.set("authVersion", updated.authVersion);
+      refreshRealtimeAuthorization();
+      // Deliberately not revoking API tokens here (unlike PI-125's mailbox-
+      // confirmed recovery flow, which does): a token is a separate bearer
+      // credential never derived from the password, and this route already
+      // required knowing the *current* password to reach this point — the
+      // threat this closes is a stolen session cookie, not a compromised
+      // token. Revoking tokens on every routine password change would be a
+      // disruptive false positive for anyone automating against the API
+      // (e.g. this project's own mcp/ server). If token compromise is
+      // actually suspected, revoking them is a separate, deliberate action
+      // (Settings → API Tokens).
       reply.send({ ok: true });
     },
   );

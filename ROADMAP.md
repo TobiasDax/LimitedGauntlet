@@ -26,7 +26,7 @@ The app is **feature-complete and running in production** — latest release **v
 
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
-- **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. PI-123–127 fixed (live-verify pending); PI-128 still open — details and suggested fix below.
+- **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. All six fixed (live-verify pending) — details below.
 - **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. All open; details below.
 - **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code shipped in v0.15.3, browser-verify pending.
 
@@ -115,15 +115,16 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] **Tests** (real DB / mocked session codec): `realtime.test.ts` — a grant recorded at a stale version is denied, and a legacy array-shaped grant is denied (both confirmed failing against the pre-fix code first, before confirming the fix closes them); the existing "unlocked" test updated to the new grant shape. Full server suite: 231/231 passing. Migration verified against the real schema with the exact CI drift check: no difference detected.
 - [ ] **HTTP-side change not route-tested** — matches this codebase's convention (routes aren't directly unit-tested); verified by code review + typecheck, mirroring the realtime-side logic that *is* under test. **Not yet live-verified**: Tobias should confirm in two browsers — unlock both, rotate the password, then confirm both old grants require a fresh unlock (HTTP reads and room joins alike); also check disable/re-enable and organization isolation (an unlock for org A never satisfies org B's check).
 
-### PI-128 — Revoke old organizer sessions on password change (P3 / low security)
+### PI-128 — Revoke old organizer sessions on password change (P3 / low security) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** the password-change route in `server/src/routes/settings.ts` updates `passwordHash` only. Middleware checks `authVersion`, which stays unchanged, so an attacker already holding an organizer session remains authorized after a password change.
 
-**Suggested fix:** atomically increment `authVersion` with the password update. If the initiating browser should remain logged in, refresh only its session to the new version after success. Apply revocation to realtime authorization/connections too. Explicitly define whether password changes also revoke API tokens, and provide a clear recovery action if token revocation is separate; coordinate with PI-125.
+**Fixed:** `authVersion: { increment: 1 }` now lands in the same `prisma.organizerAccount.update()` call as the new `passwordHash` — one atomic write, so a failed update (wrong current password, a thrown error) never bumps the version on its own. The initiating browser's own session is refreshed to the new `authVersion` immediately after, so the person who just changed their password isn't logged out by their own action; `refreshRealtimeAuthorization()` (already imported, already used by the two public-lock routes) reauthorizes realtime connections the same way.
 
-- [ ] Implement atomic password/session-version changes and the initiating-session behavior.
-- [ ] Test two active sessions: after one changes the password, the other's protected requests and socket access must fail. Verify the old password fails and the new password works.
-- [ ] Verify failed password changes leave the version unchanged and document/test the API-token recovery policy.
+**API-token decision (explicit, per the audit's ask):** password changes do **not** revoke API tokens. A token is a separate bearer credential never derived from the password — this route already required knowing the *current* password to reach this point, so the threat being closed is a stolen session cookie, not a compromised token. Revoking every token on a routine password change would be a disruptive false positive for anyone automating against the API (this project's own `mcp/` server included). If token compromise is actually suspected, revoking one is already a separate, deliberate action from Settings → API Tokens.
+
+- [x] Atomic password/`authVersion` update, initiating-session refresh, and realtime reauthorization implemented; API-token policy decided and documented in code.
+- [ ] **Not tested or live-verified** — this logic lives entirely in the route handler (no extracted service function), matching this codebase's convention of not directly unit-testing `routes/*.ts` files; the actual multi-session revocation behavior needs a real HTTP round-trip this sandbox can't do. Tobias should confirm with two active sessions: after one changes the password, the other's next request and any open realtime subscription are rejected; the old password fails everywhere and the new one works; a failed change attempt (wrong current password) leaves every existing session valid.
 
 ### PI-129 — Correctly truncate compressed IPv6 addresses (P2 / functional)
 
