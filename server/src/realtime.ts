@@ -21,7 +21,7 @@ interface RealtimeAuthorizationStore {
   findRoomOrganization(
     kind: RoomKind,
     resourceId: string,
-  ): Promise<{ id: string; publicPasswordHash: string | null } | null>;
+  ): Promise<{ id: string; publicPasswordHash: string | null; publicLockVersion: number } | null>;
   // Also checks the session's authVersion against the account's current one —
   // the same invalidation `requireAuth`/`requireSessionAuth` (auth/middleware.ts)
   // apply to HTTP requests, so an OIDC subject relink (PI-49) or any other
@@ -41,13 +41,17 @@ const defaultAuthorizationStore: RealtimeAuthorizationStore = {
     if (kind === "pod") {
       const pod = await prisma.pod.findUnique({
         where: { id: resourceId },
-        select: { tournament: { select: { organization: { select: { id: true, publicPasswordHash: true } } } } },
+        select: {
+          tournament: {
+            select: { organization: { select: { id: true, publicPasswordHash: true, publicLockVersion: true } } },
+          },
+        },
       });
       return pod?.tournament.organization ?? null;
     }
     const tournament = await prisma.tournament.findUnique({
       where: { id: resourceId },
-      select: { organization: { select: { id: true, publicPasswordHash: true } } },
+      select: { organization: { select: { id: true, publicPasswordHash: true, publicLockVersion: true } } },
     });
     return tournament?.organization ?? null;
   },
@@ -110,8 +114,22 @@ export function createRealtimeRoomAuthorizer(
     const session = sessionCodec.decodeSecureSession(cookie);
     if (!session) return false;
 
-    const unlockedOrgIds = session.get<unknown>("publicUnlocked");
-    if (Array.isArray(unlockedOrgIds) && unlockedOrgIds.includes(organization.id)) return true;
+    // PI-127 — a version-tagged grant, same shape and same reasoning as
+    // routes/public.ts's getUnlockedOrgVersions(): rotating or disabling/
+    // re-enabling the password must not leave an already-open (or freshly
+    // reconnected) realtime subscription authorized on the old grant. A
+    // legacy array-shaped session (from before this change) fails the
+    // `typeof`/`Array.isArray` check below and correctly falls through to
+    // requiring a fresh unlock.
+    const unlockedVersions = session.get<unknown>("publicUnlocked");
+    if (
+      unlockedVersions &&
+      typeof unlockedVersions === "object" &&
+      !Array.isArray(unlockedVersions) &&
+      (unlockedVersions as Record<string, number>)[organization.id] === organization.publicLockVersion
+    ) {
+      return true;
+    }
 
     const organizerId = session.get<unknown>("organizerId");
     if (typeof organizerId === "string") {

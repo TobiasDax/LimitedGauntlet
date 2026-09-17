@@ -73,15 +73,25 @@ async function publicRedactorByTournament(tournamentId: string): Promise<Redacto
   return buildRedactor(t ? await getHiddenPlayerAliases(t.orgId) : new Map<string, string>());
 }
 
-// Which org ids this visitor has unlocked (PI-27), stored in the encrypted
-// session cookie. A visitor with no session yet simply has none.
-function getUnlockedOrgIds(request: FastifyRequest): string[] {
+// Which orgs this visitor has unlocked (PI-27) and at what lock generation,
+// stored in the encrypted session cookie. A visitor with no session yet
+// simply has none.
+//
+// PI-127 — this used to be a bare orgId[]: unlocking never expired, so
+// rotating or disabling/re-enabling the password left every previously-
+// unlocked visitor with standing access. Now a map of orgId -> the
+// publicLockVersion active at unlock time; a grant only counts if that
+// still matches the org's current version. A session holding the old
+// array shape (from before this change) parses to {} below, so every
+// existing grant correctly requires a fresh unlock rather than being
+// silently trusted.
+function getUnlockedOrgVersions(request: FastifyRequest): Record<string, number> {
   const raw = request.session.get("publicUnlocked");
-  return Array.isArray(raw) ? raw : [];
+  return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
 }
 
-function isUnlocked(request: FastifyRequest, orgId: string): boolean {
-  return getUnlockedOrgIds(request).includes(orgId);
+function isUnlocked(request: FastifyRequest, organization: { id: string; publicLockVersion: number }): boolean {
+  return getUnlockedOrgVersions(request)[organization.id] === organization.publicLockVersion;
 }
 
 // The unauthenticated read-only surface: shareable links replacing the
@@ -102,7 +112,7 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     if (!slug) return;
     const organization = await findPublicOrganization(slug);
     if (!organization || !organization.publicPasswordHash) return; // missing → 404 in handler; unlocked → open
-    if (isUnlocked(request, organization.id)) return;
+    if (isUnlocked(request, organization)) return;
     // A logged-in player of this org has already authenticated to it (PI-52),
     // so the public-page password isn't a second gate for them — they read the
     // same public surface through these routes as the portal links to.
@@ -125,7 +135,7 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
     const locked = !!organization.publicPasswordHash;
-    reply.send({ locked, unlocked: !locked || isUnlocked(request, organization.id) });
+    reply.send({ locked, unlocked: !locked || isUnlocked(request, organization) });
   });
 
   // Verify the public password and mark this org unlocked for the visitor's
@@ -154,10 +164,8 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
         reply.code(401).send({ error: "invalid_password" });
         return;
       }
-      const current = getUnlockedOrgIds(request);
-      if (!current.includes(organization.id)) {
-        request.session.set("publicUnlocked", [...current, organization.id]);
-      }
+      const current = getUnlockedOrgVersions(request);
+      request.session.set("publicUnlocked", { ...current, [organization.id]: organization.publicLockVersion });
       reply.send({ ok: true });
     },
   );

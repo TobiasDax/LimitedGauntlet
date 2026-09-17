@@ -26,7 +26,7 @@ The app is **feature-complete and running in production** — latest release **v
 
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
-- **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. PI-123–126 fixed (live-verify pending); PI-127–128 still open — details and suggested fixes below.
+- **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. PI-123–127 fixed (live-verify pending); PI-128 still open — details and suggested fix below.
 - **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. All open; details below.
 - **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code shipped in v0.15.3, browser-verify pending.
 
@@ -103,15 +103,17 @@ New `scrubOnDemandWithdrawalSnapshots()` (`onDemandWithdrawal.ts`) retroactively
 - [x] **Tests** (real DB): `onDemandWithdrawal.test.ts` — the scrub replaces the target player's name while leaving an unrelated player's entry and `playerId` untouched, and no-ops cleanly with no matching record. `playerPrivacy.test.ts` — full integration: a real on-demand withdrawal recorded, then `anonymisePlayer()` called, confirming the stored JSON now shows the anonymized name. Full server suite: 230/230 passing.
 - [ ] **Public route change not route-tested** — matches this codebase's convention (`routes/*.ts` files aren't directly unit-tested, only the service layer is); verified by code review + typecheck instead. **Not yet live-verified**: Tobias should confirm the public pod page's rounds response never includes `onDemandWithdrawals` for a pod that had an on-demand withdrawal, and that "undo pairing" still correctly restores an anonymized player.
 
-### PI-127 — Invalidate public unlock grants when the lock changes (P2 / medium security)
+### PI-127 — Invalidate public unlock grants when the lock changes (P2 / medium security) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/routes/public.ts` stores unlocked organization IDs in the session. HTTP and realtime access checks do not bind these grants to the current password. A previously unlocked visitor retains access after password rotation or disable/re-enable while their cookie is still valid.
 
-**Suggested fix:** persist an organization lock generation/version, update it atomically with relevant lock changes, and store the generation with each session grant. Require matching generations in both HTTP and realtime authorization; legacy grants without a generation should require a fresh unlock. Reauthorize active sockets when access changes. Retain separately validated organizer/player access and coordinate reconnect behavior with PI-132.
+**Fixed:** new `Organization.publicLockVersion` (migration `20260917145750_organization_public_lock_version`, default 0), incremented on every change to `publicPasswordHash` — set, rotated, or cleared (`PUT`/`DELETE /api/settings/public-lock`) — via one atomic `{ increment: 1 }` alongside the hash update. The session's `publicUnlocked` grant changed shape from a bare `orgId[]` to `Record<orgId, versionAtUnlockTime>`; both `routes/public.ts`'s HTTP check and `realtime.ts`'s Socket.IO authorizer now require the stored version to match the org's *current* `publicLockVersion`, not just that the org id is present. A session holding the old array shape reads as `{}` under the new check, so it correctly falls through to requiring a fresh unlock — exactly the "legacy grants without a generation" case the suggested fix called for, with no separate migration-flag needed.
 
-- [ ] Implement the schema migration, versioned grants, and shared HTTP/realtime validation.
-- [ ] Test two browsers: unlock both, rotate the password, then confirm old grants fail for both HTTP reads and room joins until a fresh unlock. Also cover disable/re-enable, legacy cookies, and organization isolation.
-- [ ] Verify already-connected unauthorized sockets stop receiving protected updates immediately; authorized organizer/player sessions continue through their own access rules.
+Reauthorizing already-open sockets was already handled before this fix (`refreshRealtimeAuthorization()` calls `disconnectSockets(true)` on both settings routes) — PI-127 only needed to make sure a *reconnect* attempt with the old grant is correctly refused, which it now is. Whether a legitimately-authorized client actually *recovers* after that forced disconnect (reconnects and resumes updates on its own) is a separate, already-tracked functional gap — see PI-132.
+
+- [x] Schema migration, versioned grants, and shared version-check logic implemented in both the HTTP (`public.ts`) and realtime (`realtime.ts`) authorization paths.
+- [x] **Tests** (real DB / mocked session codec): `realtime.test.ts` — a grant recorded at a stale version is denied, and a legacy array-shaped grant is denied (both confirmed failing against the pre-fix code first, before confirming the fix closes them); the existing "unlocked" test updated to the new grant shape. Full server suite: 231/231 passing. Migration verified against the real schema with the exact CI drift check: no difference detected.
+- [ ] **HTTP-side change not route-tested** — matches this codebase's convention (routes aren't directly unit-tested); verified by code review + typecheck, mirroring the realtime-side logic that *is* under test. **Not yet live-verified**: Tobias should confirm in two browsers — unlock both, rotate the password, then confirm both old grants require a fresh unlock (HTTP reads and room joins alike); also check disable/re-enable and organization isolation (an unlock for org A never satisfies org B's check).
 
 ### PI-128 — Revoke old organizer sessions on password change (P3 / low security)
 

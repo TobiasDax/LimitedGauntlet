@@ -69,9 +69,13 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
     const publicPasswordHash = await hashPassword(body.data.password);
+    // PI-127 — bump the lock generation on every change (set, rotate, or
+    // clear below) so every previously-granted unlock — HTTP session or
+    // realtime subscription — stops applying, even if the cookie itself is
+    // still otherwise valid.
     await prisma.organization.update({
       where: { id: request.organizer!.orgId },
-      data: { publicPasswordHash },
+      data: { publicPasswordHash, publicLockVersion: { increment: 1 } },
     });
     refreshRealtimeAuthorization();
     reply.send({ publicLockEnabled: true });
@@ -81,7 +85,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   app.delete("/api/settings/public-lock", async (request, reply) => {
     await prisma.organization.update({
       where: { id: request.organizer!.orgId },
-      data: { publicPasswordHash: null },
+      data: { publicPasswordHash: null, publicLockVersion: { increment: 1 } },
     });
     refreshRealtimeAuthorization();
     reply.send({ publicLockEnabled: false });

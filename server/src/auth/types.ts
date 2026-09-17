@@ -19,8 +19,15 @@ declare module "@fastify/secure-session" {
     playerIdentityId?: string;
     playerAuthVersion?: number;
     playerOrgId?: string;
-    // Org ids whose public-page password lock (PI-27) this visitor has entered.
-    publicUnlocked?: string[];
+    // Orgs whose public-page password lock (PI-27) this visitor has entered,
+    // mapped to the lock's publicLockVersion at the time — PI-127: a grant
+    // only counts while that version still matches the org's current one,
+    // so rotating or disabling/re-enabling the password invalidates every
+    // standing grant instead of leaving it valid forever. (Before PI-127
+    // this was a bare string[] of org ids with no expiry at all — a session
+    // holding that old shape is read as {} by the code that consumes this,
+    // so it correctly requires a fresh unlock rather than being trusted.)
+    publicUnlocked?: Record<string, number>;
     // In-flight SSO login (PI-42 / PI-43): which provider, plus PKCE/state/nonce
     // stashed between the redirect to the provider and the callback. Cleared
     // once the callback runs. `oidc` is the pre-PI-43 shape, still read for one

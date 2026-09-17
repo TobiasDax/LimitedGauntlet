@@ -14,6 +14,7 @@ function fixture(options?: {
   organizerMatches?: boolean;
   playerMatches?: boolean;
   resourceExists?: boolean;
+  lockVersion?: number;
 }) {
   const parseCookie = vi.fn(() => ({ session: "encoded" }));
   const decodeSecureSession = vi.fn(() =>
@@ -22,7 +23,11 @@ function fixture(options?: {
   const findRoomOrganization = vi.fn(async () =>
     options?.resourceExists === false
       ? null
-      : { id: "org-1", publicPasswordHash: options?.locked === false ? null : "hash" },
+      : {
+          id: "org-1",
+          publicPasswordHash: options?.locked === false ? null : "hash",
+          publicLockVersion: options?.lockVersion ?? 0,
+        },
   );
   const organizerSessionValid = vi.fn(async () => options?.organizerMatches ?? false);
   const playerSessionValid = vi.fn(async () => options?.playerMatches ?? false);
@@ -130,8 +135,18 @@ describe("realtime room authorization", () => {
   });
 
   it("allows a locked room after that organization was publicly unlocked", async () => {
-    const { authorize } = fixture({ sessionValues: { publicUnlocked: ["org-1"] } });
+    const { authorize } = fixture({ sessionValues: { publicUnlocked: { "org-1": 0 } } });
     await expect(authorize("pod:pod-1", "session=good")).resolves.toBe(true);
+  });
+
+  // PI-127 — a grant recorded at an old lock version must not authorize once
+  // the org's password has since changed (rotated, or disabled/re-enabled).
+  it("denies a grant recorded at a stale lock version, and a legacy array-shaped grant", async () => {
+    const stale = fixture({ sessionValues: { publicUnlocked: { "org-1": 0 } }, lockVersion: 1 });
+    await expect(stale.authorize("pod:pod-1", "session=good")).resolves.toBe(false);
+
+    const legacy = fixture({ sessionValues: { publicUnlocked: ["org-1"] } });
+    await expect(legacy.authorize("pod:pod-1", "session=good")).resolves.toBe(false);
   });
 
   it("allows a current organizer only for their own locked organization", async () => {
@@ -144,7 +159,7 @@ describe("realtime room authorization", () => {
   });
 
   it("denies a session whose authVersion no longer matches the account (e.g. after an OIDC relink)", async () => {
-    const store = { id: "org-1", publicPasswordHash: "hash" };
+    const store = { id: "org-1", publicPasswordHash: "hash", publicLockVersion: 0 };
     const findRoomOrganization = vi.fn(async () => store);
     // Simulates the DB check in the default store: only authVersion 3 is current.
     const organizerSessionValid = vi.fn(
@@ -193,7 +208,11 @@ describe("realtime room authorization", () => {
     const authorize = createRealtimeRoomAuthorizer(
       { parseCookie: () => ({}), decodeSecureSession: () => null },
       {
-        findRoomOrganization: async () => ({ id: "org-1", publicPasswordHash: locked ? "hash" : null }),
+        findRoomOrganization: async () => ({
+          id: "org-1",
+          publicPasswordHash: locked ? "hash" : null,
+          publicLockVersion: 0,
+        }),
         organizerSessionValid: async () => false,
         playerSessionValid: async () => false,
       },

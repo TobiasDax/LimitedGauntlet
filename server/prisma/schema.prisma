@@ -25,6 +25,14 @@ model Organization {
   // password once to view any /o/<slug>/... page — an opt-in, off-by-default
   // exception to "public pages stay open", set only by the organizer.
   publicPasswordHash String?
+  // PI-127 — bumped every time publicPasswordHash changes (set, rotated, or
+  // cleared). A visitor's unlock grant (session, or a realtime authorization)
+  // records the version active when they unlocked; a mismatch means the lock
+  // changed since and the grant no longer applies, even though the session
+  // cookie itself is still otherwise valid. Without this, rotating or
+  // disabling/re-enabling the password left every previously-unlocked visitor
+  // (and every already-open realtime subscription) with standing access.
+  publicLockVersion  Int      @default(0)
   // Opt-in per org (PI-72), default off. When true, players earn "tokens" from
   // playing pods (participation + a standing bonus), organizers can hand-adjust
   // balances, and a Tokens tab / balance appear on the player pages. When false
