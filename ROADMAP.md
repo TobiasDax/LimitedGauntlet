@@ -27,7 +27,7 @@ The app is **feature-complete and running in production** — latest release **v
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
 - **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. All six fixed (live-verify pending) — details below.
-- **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. PI-129 fixed (live-verify pending); PI-130–133 open. Details below.
+- **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. PI-129 and PI-130 fixed (live-verify pending); PI-131–133 open. Details below.
 - **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code shipped in v0.15.3, browser-verify pending.
 
 ## New improvements (backlog)
@@ -136,14 +136,14 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] **Tests** (`tracking.test.ts`): the reported example (`2001:db8::1234:5678` → `2001:db8::`, not the old buggy `2001:db8:1234::`), compression at the start/end/whole-address, loopback (`::1`), the unspecified address (`::`), IPv4/IPv4-mapped-IPv6 (unchanged), a zone id, an unparseable IPv6-shaped input (falls back to `::`, not the raw value), and an explicit compressed-vs-fully-spelled-out equivalence check. All new cases confirmed failing against the pre-fix code first (5 of the new assertions reproduced the bug, including two the original test suite happened not to exercise: canonicalization and the zone-id case), then confirmed passing against the fix. Full server suite: 236/236 passing.
 - [ ] **Not live-verified**: Tobias should confirm real-world IPv6 visitors' analytics prefixes look correct going forward (no easy way to force a specific IPv6 source address in this sandbox). Retained historical prefixes computed by the old buggy code are not reconstructible from the corrupted value and are not touched by this fix — informational only, per the audit's own note that this is low-stakes analytics data.
 
-### PI-130 — Validate partial CUSTOM pod updates against merged state (P2 / functional)
+### PI-130 — Validate partial CUSTOM pod updates against merged state (P2 / functional) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** the pod PATCH route in `server/src/routes/pods.ts` passes only submitted fields to `constructedFormatError` while falling back to the stored outer format. Valid edits such as renaming an existing custom constructed format can fail because other required values already stored on the pod are omitted from the patch.
 
-**Suggested fix:** build the proposed state by combining existing format fields with explicitly supplied patch values, then validate that state before writing. Preserve the distinction between an omitted field and an explicit null/clear, and apply the same normalization to validation and persistence.
+**Fixed:** `PATCH /api/pods/:id` now builds the merged `constructedFormat`/`constructedFormatCustom` state `constructedFormatError` actually validates against: `"key" in body.data ? body.data[key] : existing[key]` for each field, falling back to the pod's stored value only when the field is genuinely omitted from the patch. An explicit `null` in the patch (a deliberate clear) still reads as `null`, never falls back to the stored value — the same omitted-vs-cleared distinction `podUpdateSchema`'s own comment already established for persistence, now honored by validation too. `format` was already merged this way (`body.data.format ?? existing.format`) before this fix; only the two `constructedFormat*` fields were missing it. Persistence itself was never the bug — the Prisma update already only writes submitted keys — so no change was needed there.
 
-- [ ] Validate the effective `format`, `constructedFormat`, and `constructedFormatCustom` together.
-- [ ] Test custom-name-only changes, switching to CUSTOM with an existing name, unrelated-field patches, explicit clears, and transitions away from CUSTOM. Valid partial edits must succeed; genuinely incomplete resulting states must still fail.
+- [x] Validate the effective `format`, `constructedFormat`, and `constructedFormatCustom` together, respecting omitted-vs-explicit-null.
+- [ ] **Not route-tested** — matches this codebase's convention (no `routes/*.ts` file has ever had a direct unit test; `constructedFormatError` and the merge logic live entirely in the route handler, not a `services/*.ts` function). Verified by code review + typecheck. **Not yet live-verified**: Tobias should confirm a custom-name-only rename on an existing CUSTOM pod now succeeds, switching to CUSTOM with a name in the same patch still works, unrelated-field-only patches are unaffected, an explicit `constructedFormat: null` clear still works, and a genuinely incomplete resulting state (e.g. clearing `constructedFormat` while `constructedFormatCustom` is still set) is still correctly rejected.
 
 ### PI-131 — Report public unlock status consistently for authenticated players (P2 / functional)
 

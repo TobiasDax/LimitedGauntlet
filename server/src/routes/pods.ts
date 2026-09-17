@@ -309,7 +309,25 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const constructedError = constructedFormatError(body.data.format ?? existing.format, body.data);
+    // PI-130 — validate against the *merged* state a partial PATCH would
+    // actually produce, not just the submitted fields in isolation. A
+    // rename-only patch on an already-CUSTOM pod (`{ constructedFormatCustom:
+    // "New Name" }`, omitting the unchanged `constructedFormat`) used to fail
+    // constructedFormatError's "custom requires CUSTOM" check because the
+    // omitted field read as `undefined` there instead of falling back to the
+    // pod's already-stored "CUSTOM". `"key" in body.data` (rather than `??`)
+    // distinguishes "omitted" (fall back to existing) from an explicit
+    // `null` (an intentional clear) — the same distinction this schema's own
+    // comment above already established for persistence; validation must
+    // honor it too.
+    const mergedConstructedFormat =
+      "constructedFormat" in body.data ? body.data.constructedFormat : existing.constructedFormat;
+    const mergedConstructedFormatCustom =
+      "constructedFormatCustom" in body.data ? body.data.constructedFormatCustom : existing.constructedFormatCustom;
+    const constructedError = constructedFormatError(body.data.format ?? existing.format, {
+      constructedFormat: mergedConstructedFormat,
+      constructedFormatCustom: mergedConstructedFormatCustom,
+    });
     if (constructedError) {
       reply.code(400).send({ error: constructedError });
       return;
