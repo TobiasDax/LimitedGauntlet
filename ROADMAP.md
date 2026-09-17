@@ -26,6 +26,8 @@ The app is **feature-complete and running in production** — latest release **v
 
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
+- **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. All open; details and suggested fixes below.
+- **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. All open; details below.
 - **PI-116** — show the running app version in the footer, linked to its GitHub release page: shipped in v0.15.1, browser-verify pending.
 - **PI-117** — bug fix: inviting a co-organizer whose email already has an account (in a *different* org) wrongly refused with "That email already has an account." Code shipped in v0.15.2, live-verify pending.
 - **PI-118** — bug fix: a pod's public standings leaked who has round 1's bye before pairings are revealed (the bye is auto-scored the instant round 1 is generated). Code shipped in v0.15.2, live-verify pending; a related, lower-severity variant in the weekend Gesamtwertung table and player Hall of Fame pages is a known, deliberately-deferred gap (see its write-up) — confirmed with Tobias not worth fixing now.
@@ -112,6 +114,121 @@ Reported by Tobias: once pairings are generated, adding players to a pod should 
 - [x] Fixed both client and server, `tsc -b`/`eslint`/`prettier` clean.
 - [x] **Follow-up (2026-09-16), closing the gap flagged above:** Tobias asked for the mirror-image rule too — "Remove" hidden once a pod has started, "Drop" only available once it has (not before). Per-entrant row now shows exactly one of the two, picked by `canAddEntrants`, instead of both simultaneously. Enforced server-side as well: `DELETE /api/entrants/:id` now refuses (`pod_already_paired`, reusing the add-side's code) once any round exists — closing the exact hard-delete/cascade risk this entry originally flagged as unaddressed; `POST /api/entrants/:id/drop` now refuses (`pod_not_started`) when no round exists yet, so a drop can no longer record a meaningless `droppedAfterRound: 0` before the pod has even begun.
 - [ ] **Not yet browser-verified** — sandbox has no DB/browser, and no route-level tests exist for `pods.ts` (matches this codebase's established convention — only service-layer functions get real-DB tests). Tobias should confirm: generate round 1, confirm the add-players/add-team UI is replaced by the explanatory message, then undo the pairing and confirm adding works again; also confirm each entrant row shows Remove before round 1 exists and Drop/Un-drop after, never both.
+
+## Security and bug backlog (from the 2026-09-17 code audit)
+
+All eleven items below are **open, not implemented**. Reviewed revision: `dee64d8b3a254d12440c6bb34f2def17ae648825`; security scan ID: `7169d6c8-b7ff-4951-a628-121abddf4249`. This was a partial source audit, not a complete assurance review. Targeted harnesses reproduced PI-123, PI-124, PI-126, PI-127, PI-129, and PI-130 using current source with mocked dependencies; the remaining items were identified by source inspection. No live service was exercised. Thirty-six existing tests passed; missing local dependencies blocked lint and loading the realtime test suite. Full integration testing and a dependency advisory scan remain outstanding.
+
+**Suggested order:** fix PI-123 first (P1/high); then PI-124–127 (P2/medium security), coordinating PI-127 with PI-132 so revocation and reconnect behavior agree. Follow with PI-128 (P3/low security) and PI-129–133 (P2 functional priorities). Pair PI-124/125 for account-linking regression coverage and PI-127/131/132 for public-access coverage. These are implementation suggestions; check the current source before applying them. Restore dependencies from the lockfile in the implementation environment before running required checks; keep any dependency upgrades separate.
+
+### PI-123 — Reject malformed Socket.IO acknowledgment arguments (P1 / high security)
+
+**Problem:** `server/src/realtime.ts`, the `join` listener, accepts an unchecked second argument. Optional calling (`ack?.(...)`) does not establish that it is a function. A malformed argument throws in both the success path and the catch block, leaving an unhandled async rejection. An anonymous client can reach this even with an invalid room. The shared HTTP/realtime process can terminate under the deployed Node default rejection behavior; process termination itself was not exercised in the audit.
+
+**Suggested fix:** treat the acknowledgment argument as untrusted at runtime and invoke it only when `typeof ack === "function"`. Keep failure reporting from throwing a second exception and ensure the event listener's asynchronous work has a final rejection handler. Preserve room authorization and legitimate optional acknowledgments.
+
+- [ ] Implement runtime acknowledgment validation and contained error handling.
+- [ ] Add a real Socket.IO regression test for object/string/number acknowledgments, omitted acknowledgments, valid callbacks, invalid rooms, and authorizer failures. Verify no unhandled rejection, unauthorized room join, or process exit; a subsequent valid request must still succeed.
+- [ ] Verify normal room updates against the production Node/container configuration before closing.
+
+### PI-124 — Require verified SSO email before consuming any invite (P2 / medium security)
+
+**Problem:** `server/src/services/sso.ts`, the existing `oidcSubject` branch, calls `consumePendingInvite` before the later `emailVerified` check. A known SSO subject proves account identity, but does not prove ownership of its current email. Exploitation requires an already-linked account, a pending target invitation, and an identity provider that allows an attacker-controlled unverified email change; the result is organizer membership in the invited organization.
+
+**Suggested fix:** gate invite consumption on a present, verified email in every account-resolution branch, preferably at the shared consumption boundary. Keep authentication by an already-linked subject separate from permission to claim an email-addressed invitation; an unverified email must not create new membership.
+
+- [ ] Centralize the verified-email requirement and retain existing invite validity/consumption rules.
+- [ ] Test existing/new subjects with verified, unverified, missing-email, and missing-verification claims. Unverified cases must leave the invitation and membership unchanged; a verified intended recipient must succeed.
+- [ ] Verify with the configured provider that ordinary returning-user login still works without silently granting an invitation.
+
+### PI-125 — Prevent SSO linking from retaining preregistered attacker credentials (P2 / medium security)
+
+**Problem:** local signup in `server/src/routes/auth.ts` accepts an unverified email and creates a usable password/session. The `byEmail` branch in `server/src/services/sso.ts` later links a verified SSO identity to that account without replacing its password or invalidating sessions. With public signup and local login enabled, an attacker can preregister an unused victim email, then retain access after the victim signs in through SSO and receives organization membership.
+
+**Suggested fix:** represent local email verification explicitly and prevent unverified local accounts from becoming trusted SSO-linked accounts solely through an email match. For an existing unverified match, use a deliberate recovery/linking flow that proves mailbox ownership, removes the untrusted password, revokes sessions and API tokens, and only then attaches the SSO subject and consumes invites. Define a migration policy for existing accounts whose ownership was never verified; do not mark all historical addresses verified automatically. Preserve legitimate verified account linking and avoid silently merging organization data.
+
+- [ ] Specify and implement verification state, safe linking/recovery, and the existing-account migration policy.
+- [ ] Reproduce attacker signup → victim verified SSO login with a pending invite. After secure recovery, the old password, old cookie, and preexisting API tokens must fail; the victim must retain intended access.
+- [ ] Cover already-linked subjects, verified local accounts, concurrent linking attempts, and disabled-signup/local-login configurations. Check memberships are neither duplicated nor silently reassigned.
+
+### PI-126 — Exclude withdrawal snapshots from public responses and anonymize retained copies (P2 / medium security)
+
+**Problem:** `server/src/services/onDemandWithdrawal.ts` stores original player IDs/names in `Round.onDemandWithdrawals`. The public rounds route in `server/src/routes/public.ts` returns full round records through a helper that only removes unrevealed matches. Visitors authorized for the public page can therefore read original names despite name hiding, unrevealed pairings, or later player anonymization.
+
+**Suggested fix:** construct an explicit public round response with only client-required fields, excluding internal withdrawal/undo snapshots regardless of reveal state. Extend player anonymization to scrub personal data from existing snapshots. Preserve organizer undo behavior without restoring erased identity data; handle historical JSON shapes deliberately.
+
+- [ ] Add a public response allowlist and audit other serializers of the same snapshot field.
+- [ ] Scrub retained snapshot names/identifiers as required by the anonymization contract, including existing data when anonymization has already occurred; plan safe cleanup for records that cannot be matched confidently.
+- [ ] Test public responses before/after reveal, with hidden names, after on-demand withdrawal, and after anonymization. Internal snapshots and erased names must never appear. Verify organizer undo remains functional and cannot resurrect erased identity data.
+
+### PI-127 — Invalidate public unlock grants when the lock changes (P2 / medium security)
+
+**Problem:** `server/src/routes/public.ts` stores unlocked organization IDs in the session. HTTP and realtime access checks do not bind these grants to the current password. A previously unlocked visitor retains access after password rotation or disable/re-enable while their cookie is still valid.
+
+**Suggested fix:** persist an organization lock generation/version, update it atomically with relevant lock changes, and store the generation with each session grant. Require matching generations in both HTTP and realtime authorization; legacy grants without a generation should require a fresh unlock. Reauthorize active sockets when access changes. Retain separately validated organizer/player access and coordinate reconnect behavior with PI-132.
+
+- [ ] Implement the schema migration, versioned grants, and shared HTTP/realtime validation.
+- [ ] Test two browsers: unlock both, rotate the password, then confirm old grants fail for both HTTP reads and room joins until a fresh unlock. Also cover disable/re-enable, legacy cookies, and organization isolation.
+- [ ] Verify already-connected unauthorized sockets stop receiving protected updates immediately; authorized organizer/player sessions continue through their own access rules.
+
+### PI-128 — Revoke old organizer sessions on password change (P3 / low security)
+
+**Problem:** the password-change route in `server/src/routes/settings.ts` updates `passwordHash` only. Middleware checks `authVersion`, which stays unchanged, so an attacker already holding an organizer session remains authorized after a password change.
+
+**Suggested fix:** atomically increment `authVersion` with the password update. If the initiating browser should remain logged in, refresh only its session to the new version after success. Apply revocation to realtime authorization/connections too. Explicitly define whether password changes also revoke API tokens, and provide a clear recovery action if token revocation is separate; coordinate with PI-125.
+
+- [ ] Implement atomic password/session-version changes and the initiating-session behavior.
+- [ ] Test two active sessions: after one changes the password, the other's protected requests and socket access must fail. Verify the old password fails and the new password works.
+- [ ] Verify failed password changes leave the version unchanged and document/test the API-token recovery policy.
+
+### PI-129 — Correctly truncate compressed IPv6 addresses (P2 / functional)
+
+**Problem:** `server/src/services/tracking.ts` splits on colons and removes empty segments before taking a prefix. This loses the zero groups represented by `::`: `2001:db8::1234:5678` becomes `2001:db8:1234::`, retaining misplaced host bits instead of the intended `/48` prefix `2001:db8::`.
+
+**Suggested fix:** parse and expand IPv6 correctly, mask the first 48 bits, then format the normalized network address. Reuse a suitable existing parser if available. Keep IPv4 behavior stable and define handling of IPv4-mapped IPv6, invalid input, and zone identifiers before storage; never fall back to storing an untruncated raw address.
+
+- [ ] Replace segment filtering with address-aware normalization and masking.
+- [ ] Cover compressed/uncompressed equivalents, compression at either end, loopback, all-zero addresses, mapped addresses, invalid input, and the reported example. Equivalent addresses must produce the same prefix and host bits must not survive.
+- [ ] Check whether retained analytics prefixes require cleanup; corrupted historical prefixes cannot reliably reconstruct the original network.
+
+### PI-130 — Validate partial CUSTOM pod updates against merged state (P2 / functional)
+
+**Problem:** the pod PATCH route in `server/src/routes/pods.ts` passes only submitted fields to `constructedFormatError` while falling back to the stored outer format. Valid edits such as renaming an existing custom constructed format can fail because other required values already stored on the pod are omitted from the patch.
+
+**Suggested fix:** build the proposed state by combining existing format fields with explicitly supplied patch values, then validate that state before writing. Preserve the distinction between an omitted field and an explicit null/clear, and apply the same normalization to validation and persistence.
+
+- [ ] Validate the effective `format`, `constructedFormat`, and `constructedFormatCustom` together.
+- [ ] Test custom-name-only changes, switching to CUSTOM with an existing name, unrelated-field patches, explicit clears, and transitions away from CUSTOM. Valid partial edits must succeed; genuinely incomplete resulting states must still fail.
+
+### PI-131 — Report public unlock status consistently for authenticated players (P2 / functional)
+
+**Problem:** public-route authorization in `server/src/routes/public.ts` permits a valid player session for its own organization, but the status response computes `unlocked` only from the lock/password grant. `client/src/components/PublicLayout.tsx` consequently shows the password screen to players whom the server already permits.
+
+**Suggested fix:** derive status and protected-route access from a shared access decision that includes valid same-organization player sessions and existing organizer/password-grant rules. Keep session validity checks and organization scoping intact; coordinate the password-grant branch with PI-127.
+
+- [ ] Share the access decision between status and route authorization.
+- [ ] Test anonymous locked/unlocked visitors, valid same-org players, other-org players, expired/revoked player sessions, and organizers. Status must agree with actual access.
+- [ ] Browser-verify a player opening a protected public pod from the portal without entering the public password, and verify logout restores the lock screen.
+
+### PI-132 — Restore realtime updates after public-lock changes (P2 / functional)
+
+**Problem:** `server/src/realtime.ts` calls `disconnectSockets(true)` when the public lock changes. Socket.IO does not automatically reconnect after an explicit server disconnect, and `client/src/lib/socket.ts` / `client/src/features/pods/usePodRealtime.ts` do not recover from it. Open pages stop receiving updates until reloaded.
+
+**Suggested fix:** coordinate a lock-change/reconnect flow with PI-127. Reconnect when appropriate, refresh the server access decision, rejoin authorized rooms, and refetch current page data to cover missed events. Denied clients must enter the unlock flow without repeatedly reconnecting or receiving protected events. Prefer disconnecting only affected organization connections if practical.
+
+- [ ] Implement bounded reconnect/rejoin behavior with authorization checks and recovery of missed state.
+- [ ] In two browsers, change the lock while pages are open. Authorized users must resume updates without a reload; revoked visitors must stop receiving updates and be prompted to unlock.
+- [ ] Cover rotation, disable/re-enable, ordinary transport interruption, repeated lock changes, and unrelated organizations. Verify no retry loop or duplicate event handlers.
+
+### PI-133 — Preserve card printing during foil-only edits (P2 / functional)
+
+**Problem:** `server/src/routes/cardPulls.ts` resolves the card using `body.data.setCode` without falling back to the stored printing when that field is omitted. A `{ foil: true }` patch can therefore select Scryfall's default printing and overwrite the saved set, ID, image, and price.
+
+**Suggested fix:** when the card identity is unchanged, resolve foil availability/pricing against the saved exact `scryfallId` where possible, retaining printing metadata. Use the existing set as a constrained fallback for legacy records, with explicit handling if the printing cannot be resolved. Only select a different printing when the request actually changes card identity; keep any price-refresh behavior deliberate.
+
+- [ ] Separate identity changes from finish-only edits and preserve saved printing metadata.
+- [ ] Mock multiple printings of the same name and verify a foil-only edit keeps the original printing/set/image while selecting its appropriate finish price. Cover missing foil price, legacy records without an ID, and explicit card/set changes.
+- [ ] Browser-verify foil toggling on a non-default printing and confirm the saved card remains the selected printing.
 
 ## Project-health backlog (from the 2026-09-06 code audit)
 
