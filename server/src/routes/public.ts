@@ -339,7 +339,27 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     // Matches are stripped server-side, not just hidden client-side — this
     // is the untrusted-device path (a player's own phone), so there's no
     // client to trust here.
-    reply.send({ rounds: redactUnrevealedRound1(rounds) });
+    //
+    // PI-126 — an explicit allowlist, not the raw Prisma row: Round also
+    // carries onDemandWithdrawals (PI-100), an internal snapshot of the
+    // original player IDs/names auto-withdrawn from other on-demand pods,
+    // kept only so an organizer's "undo pairing" can restore them. It has no
+    // public purpose (the client only ever reads it on the authenticated
+    // PairingsPage, to show an organizer-facing warning) and must never
+    // reach an untrusted device — including a since-hidden or anonymized
+    // player's name, regardless of reveal state.
+    reply.send({
+      rounds: redactUnrevealedRound1(rounds).map((r) => ({
+        id: r.id,
+        podId: r.podId,
+        roundNumber: r.roundNumber,
+        startedAt: r.startedAt,
+        endsAt: r.endsAt,
+        status: r.status,
+        pairingsRevealedAt: r.pairingsRevealedAt,
+        matches: r.matches,
+      })),
+    });
   });
 
   // PI-79/80 — the seating chart is intentionally public *before* the

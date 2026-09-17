@@ -168,7 +168,7 @@ export async function withdrawFromOtherOnDemandPods(
   return { affectedPodIds: byPod.map((p) => p.podId) };
 }
 
-function isRecord(value: unknown): value is OnDemandWithdrawalRecord {
+export function isOnDemandWithdrawalRecord(value: unknown): value is OnDemandWithdrawalRecord {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -177,11 +177,47 @@ function isRecord(value: unknown): value is OnDemandWithdrawalRecord {
   );
 }
 
+// PI-126 — anonymisePlayer() (playerPrivacy.ts) scrubs the Player row itself,
+// but never touched this separate JSON snapshot: a withdrawal recorded before
+// anonymization keeps the player's real name in `individuals[].displayName`
+// indefinitely. playerId is deliberately left alone (restoreOnDemandWithdrawals
+// still needs it to find and re-add the right roster row on an "undo
+// pairing") — only the human-readable name changes.
+export async function scrubOnDemandWithdrawalSnapshots(
+  orgId: string,
+  playerId: string,
+  scrubbedName: string,
+): Promise<void> {
+  const rounds = await prisma.round.findMany({
+    where: { pod: { tournament: { orgId } } },
+    select: { id: true, onDemandWithdrawals: true },
+  });
+  for (const round of rounds) {
+    const record = round.onDemandWithdrawals;
+    if (!isOnDemandWithdrawalRecord(record)) continue;
+    let changed = false;
+    const byPod = record.byPod.map((p) => ({
+      ...p,
+      individuals: p.individuals.map((ind) => {
+        if (ind.playerId !== playerId || ind.displayName === scrubbedName) return ind;
+        changed = true;
+        return { ...ind, displayName: scrubbedName };
+      }),
+    }));
+    if (!changed) continue;
+    const updated: OnDemandWithdrawalRecord = { version: 1, byPod };
+    await prisma.round.update({
+      where: { id: round.id },
+      data: { onDemandWithdrawals: updated as unknown as Prisma.InputJsonValue },
+    });
+  }
+}
+
 // Best-effort re-add when a pod's round 1 is un-paired (PI-56). Never throws —
 // a target pod may be gone, may have started since, or the player may already
 // be back in it. Returns the pods it actually changed, for realtime events.
 export async function restoreOnDemandWithdrawals(raw: unknown): Promise<{ restoredPodIds: string[] }> {
-  if (!isRecord(raw)) return { restoredPodIds: [] };
+  if (!isOnDemandWithdrawalRecord(raw)) return { restoredPodIds: [] };
   const restored: string[] = [];
 
   for (const entry of raw.byPod) {

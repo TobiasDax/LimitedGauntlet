@@ -1,4 +1,5 @@
 import { prisma } from "../prisma.js";
+import { scrubOnDemandWithdrawalSnapshots } from "./onDemandWithdrawal.js";
 
 // GDPR data-subject-rights plumbing for roster players (PI-104 anonymise,
 // PI-107 hide-from-public). The DB-touching logic lives here so it can be
@@ -70,6 +71,14 @@ export async function anonymisePlayer(orgId: string, playerId: string): Promise<
       data: { note: null },
     }),
   ]);
+
+  // PI-126 — a withdrawal recorded before this anonymization still has the
+  // real name in its JSON snapshot (Round.onDemandWithdrawals); the update
+  // above only touches the Player row itself. Best-effort, outside the main
+  // transaction (small, independent JSON updates — nothing here needs to be
+  // atomic with the anonymization itself, and a partial failure here must
+  // never roll back the erasure that already succeeded).
+  await scrubOnDemandWithdrawalSnapshots(orgId, player.id, label);
 
   return { id: player.id, displayName: label, alreadyAnonymised: false };
 }

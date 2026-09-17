@@ -26,7 +26,7 @@ The app is **feature-complete and running in production** — latest release **v
 
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
-- **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. PI-123–125 fixed (live-verify pending); PI-126–128 still open — details and suggested fixes below.
+- **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. PI-123–126 fixed (live-verify pending); PI-127–128 still open — details and suggested fixes below.
 - **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. All open; details below.
 - **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code shipped in v0.15.3, browser-verify pending.
 
@@ -90,15 +90,18 @@ All eleven items below are **open, not implemented**. Reviewed revision: `dee64d
 - [x] **Coverage:** already-linked subjects and verified local accounts (existing tests, updated fixture), the new unverified-email case, and the distinction between the two relink purposes (password cleared only for the unverified-local case, never for an ordinary identity conflict) — `oidcRelink.test.ts`. Concurrent-linking and disabled-signup/local-login configuration cases were not specifically added (existing atomicity guards — `updateMany`/`usedAt` count-checks — are unchanged and already covered generically elsewhere). Full server suite: 227/227 passing. Migration verified against the real schema with the exact CI drift check (`prisma migrate diff --exit-code`): no difference detected.
 - [ ] **Not yet live-verified against a real identity provider** — this sandbox has no live OIDC/Discord/Google provider. Tobias should confirm a real preregistration-then-SSO scenario end-to-end, and that ordinary verified account linking (existing organizers) is unaffected.
 
-### PI-126 — Exclude withdrawal snapshots from public responses and anonymize retained copies (P2 / medium security)
+### PI-126 — Exclude withdrawal snapshots from public responses and anonymize retained copies (P2 / medium security) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/services/onDemandWithdrawal.ts` stores original player IDs/names in `Round.onDemandWithdrawals`. The public rounds route in `server/src/routes/public.ts` returns full round records through a helper that only removes unrevealed matches. Visitors authorized for the public page can therefore read original names despite name hiding, unrevealed pairings, or later player anonymization.
 
-**Suggested fix:** construct an explicit public round response with only client-required fields, excluding internal withdrawal/undo snapshots regardless of reveal state. Extend player anonymization to scrub personal data from existing snapshots. Preserve organizer undo behavior without restoring erased identity data; handle historical JSON shapes deliberately.
+**Fixed:** `GET /api/public/o/:slug/pods/:id/rounds` now maps each round to an explicit allowlist (`id`/`podId`/`roundNumber`/`startedAt`/`endsAt`/`status`/`pairingsRevealedAt`/`matches`) instead of returning the raw Prisma row, dropping `onDemandWithdrawals` unconditionally — regardless of reveal state, name-hiding, or anonymization. Audited the other two public routes that touch `Round` (`seating`, `standings`): both already reduce to their own narrow shapes and never carried this field. No client change needed — `onDemandWithdrawals` is optional on the client's `Round` type and only ever read by the organizer-only `PairingsPage.tsx`.
 
-- [ ] Add a public response allowlist and audit other serializers of the same snapshot field.
-- [ ] Scrub retained snapshot names/identifiers as required by the anonymization contract, including existing data when anonymization has already occurred; plan safe cleanup for records that cannot be matched confidently.
-- [ ] Test public responses before/after reveal, with hidden names, after on-demand withdrawal, and after anonymization. Internal snapshots and erased names must never appear. Verify organizer undo remains functional and cannot resurrect erased identity data.
+New `scrubOnDemandWithdrawalSnapshots()` (`onDemandWithdrawal.ts`) retroactively fixes already-stored snapshots: `anonymisePlayer()` (`playerPrivacy.ts`) now calls it after scrubbing the `Player` row, replacing that player's `displayName` in any `Round.onDemandWithdrawals` JSON in the org. `playerId` is deliberately left alone — `restoreOnDemandWithdrawals` (the organizer's "undo pairing" path) still needs it to find and re-add the right roster row, and an anonymized player's row still exists (just scrubbed), so undo keeps working correctly afterward.
+
+- [x] Public response allowlist added; the two other public `Round`-touching routes audited and confirmed already safe.
+- [x] Existing-snapshot scrub implemented and wired into `anonymisePlayer()`.
+- [x] **Tests** (real DB): `onDemandWithdrawal.test.ts` — the scrub replaces the target player's name while leaving an unrelated player's entry and `playerId` untouched, and no-ops cleanly with no matching record. `playerPrivacy.test.ts` — full integration: a real on-demand withdrawal recorded, then `anonymisePlayer()` called, confirming the stored JSON now shows the anonymized name. Full server suite: 230/230 passing.
+- [ ] **Public route change not route-tested** — matches this codebase's convention (`routes/*.ts` files aren't directly unit-tested, only the service layer is); verified by code review + typecheck instead. **Not yet live-verified**: Tobias should confirm the public pod page's rounds response never includes `onDemandWithdrawals` for a pod that had an on-demand withdrawal, and that "undo pairing" still correctly restores an anonymized player.
 
 ### PI-127 — Invalidate public unlock grants when the lock changes (P2 / medium security)
 

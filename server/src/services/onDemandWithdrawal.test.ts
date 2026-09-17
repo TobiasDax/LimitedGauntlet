@@ -4,6 +4,8 @@ import {
   findOnDemandConflicts,
   withdrawFromOtherOnDemandPods,
   restoreOnDemandWithdrawals,
+  scrubOnDemandWithdrawalSnapshots,
+  type OnDemandWithdrawalRecord,
 } from "./onDemandWithdrawal.js";
 
 const prisma = makePrismaClient();
@@ -199,5 +201,39 @@ describe("restoreOnDemandWithdrawals", () => {
   it("tolerates a malformed / empty record", async () => {
     expect(await restoreOnDemandWithdrawals(null)).toEqual({ restoredPodIds: [] });
     expect(await restoreOnDemandWithdrawals({ nope: true })).toEqual({ restoredPodIds: [] });
+  });
+});
+
+// PI-126 — anonymisePlayer() (playerPrivacy.ts) calls this after scrubbing the
+// Player row itself, since that update never touches this separate JSON
+// snapshot on Round.
+describe("scrubOnDemandWithdrawalSnapshots", () => {
+  it("replaces the scrubbed player's display name in a stored withdrawal record, keeping playerId intact", async () => {
+    const { org, tournament, player } = await setup();
+    const [alice, bob] = await Promise.all([player("alice"), player("bob")]);
+    const podA = await makePod(tournament.id, "A");
+    const podB = await makePod(tournament.id, "B");
+    await addPlayer(podA.id, alice.id);
+    await addPlayer(podA.id, bob.id);
+    await addPlayer(podB.id, alice.id);
+    await addPlayer(podB.id, bob.id);
+
+    const { roundId } = await runWithdraw(podA.id);
+
+    await scrubOnDemandWithdrawalSnapshots(org.id, alice.id, "Anonymised player abc123");
+
+    const after = await prisma.round.findUniqueOrThrow({ where: { id: roundId } });
+    const record = after.onDemandWithdrawals as unknown as OnDemandWithdrawalRecord;
+    const names = record.byPod.flatMap((p) => p.individuals);
+    const aliceEntry = names.find((n) => n.playerId === alice.id);
+    const bobEntry = names.find((n) => n.playerId === bob.id);
+    expect(aliceEntry?.displayName).toBe("Anonymised player abc123");
+    expect(bobEntry?.displayName).toContain("bob"); // untouched
+  });
+
+  it("is a no-op when the player has no recorded withdrawal", async () => {
+    const { org, player } = await setup();
+    const alice = await player("alice");
+    await expect(scrubOnDemandWithdrawalSnapshots(org.id, alice.id, "Anonymised")).resolves.toBeUndefined();
   });
 });

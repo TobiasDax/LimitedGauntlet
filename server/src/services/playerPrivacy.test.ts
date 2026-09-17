@@ -1,5 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { makePrismaClient } from "../db.js";
+import type { OnDemandWithdrawalRecord } from "./onDemandWithdrawal.js";
+import { withdrawFromOtherOnDemandPods } from "./onDemandWithdrawal.js";
 import { anonymisePlayer, getHiddenPlayerAliases, rosterNameTaken, setPlayerPublicHidden } from "./playerPrivacy.js";
 import { computePodStandings } from "./standings.js";
 import { getPlayerTokenBalance } from "./tokens.js";
@@ -131,6 +133,31 @@ describe("anonymisePlayer (PI-104)", () => {
       data: { slug: `pp-other-${Date.now()}-${Math.random().toString(36).slice(2)}`, name: "Other" },
     });
     expect(await anonymisePlayer(other.id, alice.id)).toBeNull();
+  });
+
+  // PI-126 — anonymisePlayer() must also scrub any already-recorded on-demand
+  // withdrawal snapshot (Round.onDemandWithdrawals), a separate JSON field
+  // the main update never touches on its own.
+  it("scrubs the player's name from an existing on-demand withdrawal snapshot", async () => {
+    const { org, tournament, alice } = await setup();
+    const podStarting = await prisma.pod.create({
+      data: { tournamentId: tournament.id, name: "Starting", format: "DRAFT", sequenceOrder: 1, isOnDemand: true },
+    });
+    const podOther = await prisma.pod.create({
+      data: { tournamentId: tournament.id, name: "Other", format: "DRAFT", sequenceOrder: 2, isOnDemand: true },
+    });
+    await prisma.entrant.create({ data: { podId: podStarting.id, playerId: alice.id } });
+    await prisma.entrant.create({ data: { podId: podOther.id, playerId: alice.id } });
+    const round1 = await prisma.round.create({ data: { podId: podStarting.id, roundNumber: 1 } });
+    await prisma.$transaction((tx) => withdrawFromOtherOnDemandPods(tx, podStarting.id, round1.id));
+
+    const result = await anonymisePlayer(org.id, alice.id);
+    expect(result).not.toBeNull();
+
+    const after = await prisma.round.findUniqueOrThrow({ where: { id: round1.id } });
+    const record = after.onDemandWithdrawals as unknown as OnDemandWithdrawalRecord;
+    const entry = record.byPod.flatMap((p) => p.individuals).find((i) => i.playerId === alice.id);
+    expect(entry?.displayName).toBe(result!.displayName);
   });
 });
 
