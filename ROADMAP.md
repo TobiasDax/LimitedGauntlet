@@ -27,7 +27,7 @@ The app is **feature-complete and running in production** — latest release **v
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
 - **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. All six fixed (live-verify pending) — details below.
-- **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. PI-129 and PI-130 fixed (live-verify pending); PI-131–133 open. Details below.
+- **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. PI-129–131 fixed (live-verify pending); PI-132–133 open. Details below.
 - **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code shipped in v0.15.3, browser-verify pending.
 
 ## New improvements (backlog)
@@ -145,15 +145,14 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] Validate the effective `format`, `constructedFormat`, and `constructedFormatCustom` together, respecting omitted-vs-explicit-null.
 - [ ] **Not route-tested** — matches this codebase's convention (no `routes/*.ts` file has ever had a direct unit test; `constructedFormatError` and the merge logic live entirely in the route handler, not a `services/*.ts` function). Verified by code review + typecheck. **Not yet live-verified**: Tobias should confirm a custom-name-only rename on an existing CUSTOM pod now succeeds, switching to CUSTOM with a name in the same patch still works, unrelated-field-only patches are unaffected, an explicit `constructedFormat: null` clear still works, and a genuinely incomplete resulting state (e.g. clearing `constructedFormat` while `constructedFormatCustom` is still set) is still correctly rejected.
 
-### PI-131 — Report public unlock status consistently for authenticated players (P2 / functional)
+### PI-131 — Report public unlock status consistently for authenticated players (P2 / functional) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** public-route authorization in `server/src/routes/public.ts` permits a valid player session for its own organization, but the status response computes `unlocked` only from the lock/password grant. `client/src/components/PublicLayout.tsx` consequently shows the password screen to players whom the server already permits.
 
-**Suggested fix:** derive status and protected-route access from a shared access decision that includes valid same-organization player sessions and existing organizer/password-grant rules. Keep session validity checks and organization scoping intact; coordinate the password-grant branch with PI-127.
+**Fixed:** new shared `isPubliclyAccessible(request, organization)` in `public.ts` — `true` when there's no lock, a matching-version unlock grant (PI-127), or a valid same-org player session (`hasValidPlayerSession`, PI-52) — is now the one access decision both the gating `preHandler` hook and `GET /api/public/o/:slug/lock`'s `unlocked` field call. Previously the status route only ever checked the password-grant branch; the `preHandler`'s player-session bypass existed but the status endpoint the client actually renders from didn't know about it. `PublicLayout.tsx` needed no change — it already just renders based on `lock.unlocked`, so fixing the server's status response fixes the client symptom end-to-end.
 
-- [ ] Share the access decision between status and route authorization.
-- [ ] Test anonymous locked/unlocked visitors, valid same-org players, other-org players, expired/revoked player sessions, and organizers. Status must agree with actual access.
-- [ ] Browser-verify a player opening a protected public pod from the portal without entering the public password, and verify logout restores the lock screen.
+- [x] Access decision shared between status (`GET .../lock`) and route authorization (`preHandler`).
+- [ ] **Not route-tested** — matches this codebase's convention (no `routes/*.ts` file has a direct unit test; `hasValidPlayerSession` itself already has service-level coverage in `playerAccounts.test.ts` from when it was introduced). Verified by code review + typecheck. **Not yet live-verified**: Tobias should confirm a logged-in player of a locked org sees the content (not the password prompt) at both `/o/:slug/...` public pages and via the status check the layout renders from; an anonymous visitor and a player of a *different* org still see the prompt; and an expired/logged-out player session correctly reverts to locked.
 
 ### PI-132 — Restore realtime updates after public-lock changes (P2 / functional)
 

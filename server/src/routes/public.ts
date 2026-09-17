@@ -94,6 +94,21 @@ function isUnlocked(request: FastifyRequest, organization: { id: string; publicL
   return getUnlockedOrgVersions(request)[organization.id] === organization.publicLockVersion;
 }
 
+// PI-131 — the single access decision both the preHandler gate below and the
+// GET .../lock status route must agree on. A valid same-org player session
+// (PI-52) already bypasses the gate — the player has authenticated to this
+// org through a different door — so the status response must report
+// `unlocked: true` for them too, or the client shows a password prompt the
+// server would never actually enforce.
+async function isPubliclyAccessible(
+  request: FastifyRequest,
+  organization: { id: string; publicLockVersion: number; publicPasswordHash: string | null },
+): Promise<boolean> {
+  if (!organization.publicPasswordHash) return true;
+  if (isUnlocked(request, organization)) return true;
+  return hasValidPlayerSession(request, organization.id);
+}
+
 // The unauthenticated read-only surface: shareable links replacing the
 // old Outline docs. An unguessable id plus a public org slug is the
 // access control here, same trust model as the rest of the app's public
@@ -111,12 +126,11 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     const slug = (request.params as { slug?: string }).slug;
     if (!slug) return;
     const organization = await findPublicOrganization(slug);
-    if (!organization || !organization.publicPasswordHash) return; // missing → 404 in handler; unlocked → open
-    if (isUnlocked(request, organization)) return;
+    if (!organization) return; // missing → 404 in handler
     // A logged-in player of this org has already authenticated to it (PI-52),
     // so the public-page password isn't a second gate for them — they read the
     // same public surface through these routes as the portal links to.
-    if (await hasValidPlayerSession(request, organization.id)) return;
+    if (await isPubliclyAccessible(request, organization)) return;
     reply.code(401).send({ error: "locked" });
   });
 
@@ -135,7 +149,7 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
     const locked = !!organization.publicPasswordHash;
-    reply.send({ locked, unlocked: !locked || isUnlocked(request, organization) });
+    reply.send({ locked, unlocked: await isPubliclyAccessible(request, organization) });
   });
 
   // Verify the public password and mark this org unlocked for the visitor's
