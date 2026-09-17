@@ -27,7 +27,7 @@ The app is **feature-complete and running in production** — latest release **v
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
 - **PI-123–128** — security findings from the 2026-09-17 audit: malformed realtime acknowledgments, SSO invite verification/account linking, withdrawal snapshot privacy, public-lock grant revocation, and password-change session revocation. All six fixed (live-verify pending) — details below.
-- **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. PI-129–131 fixed (live-verify pending); PI-132–133 open. Details below.
+- **PI-129–133** — functional findings from the same audit: IPv6 truncation, partial CUSTOM pod updates, player public-lock status, realtime recovery after lock changes, and foil-only card edits. PI-129–132 fixed (live-verify pending); PI-133 open. Details below.
 - **PI-120** — player portal: list the player's own pods (with self-service leave) and link tournaments to their public page. Code shipped in v0.15.3, browser-verify pending.
 
 ## New improvements (backlog)
@@ -154,15 +154,14 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] Access decision shared between status (`GET .../lock`) and route authorization (`preHandler`).
 - [ ] **Not route-tested** — matches this codebase's convention (no `routes/*.ts` file has a direct unit test; `hasValidPlayerSession` itself already has service-level coverage in `playerAccounts.test.ts` from when it was introduced). Verified by code review + typecheck. **Not yet live-verified**: Tobias should confirm a logged-in player of a locked org sees the content (not the password prompt) at both `/o/:slug/...` public pages and via the status check the layout renders from; an anonymous visitor and a player of a *different* org still see the prompt; and an expired/logged-out player session correctly reverts to locked.
 
-### PI-132 — Restore realtime updates after public-lock changes (P2 / functional)
+### PI-132 — Restore realtime updates after public-lock changes (P2 / functional) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/realtime.ts` calls `disconnectSockets(true)` when the public lock changes. Socket.IO does not automatically reconnect after an explicit server disconnect, and `client/src/lib/socket.ts` / `client/src/features/pods/usePodRealtime.ts` do not recover from it. Open pages stop receiving updates until reloaded.
 
-**Suggested fix:** coordinate a lock-change/reconnect flow with PI-127. Reconnect when appropriate, refresh the server access decision, rejoin authorized rooms, and refetch current page data to cover missed events. Denied clients must enter the unlock flow without repeatedly reconnecting or receiving protected events. Prefer disconnecting only affected organization connections if practical.
+**Fixed:** `socket.ts`'s shared connection now listens for its own `disconnect` event and calls `socket.connect()` whenever the reason is `"io server disconnect"` — the one disconnect reason the client SDK deliberately does *not* auto-retry (it assumes a server-initiated disconnect is intentional and final, which `refreshRealtimeAuthorization()`'s `disconnectSockets(true)` isn't — it's a "go re-check yourself" signal, not a ban). `usePodRealtime`'s existing `connect` listener already rejoined its room on any (re)connection; it now passes an ack callback to `join` and reacts to the result: `{ ok: false }` (the visitor's old unlock grant no longer matches a rotated lock version) invalidates the `["public", "lock"]` query so `PublicLayout` re-prompts instead of the tab going silently dark forever, while a successful *reconnect* rejoin (not the page's very first join — its own initial queries already have current data) refetches this pod/tournament's queries once to cover whatever broadcasts were missed during the gap.
 
-- [ ] Implement bounded reconnect/rejoin behavior with authorization checks and recovery of missed state.
-- [ ] In two browsers, change the lock while pages are open. Authorized users must resume updates without a reload; revoked visitors must stop receiving updates and be prompted to unlock.
-- [ ] Cover rotation, disable/re-enable, ordinary transport interruption, repeated lock changes, and unrelated organizations. Verify no retry loop or duplicate event handlers.
+- [x] Reconnect-after-server-disconnect in `socket.ts`; ack-aware rejoin-and-recover (or re-prompt) in `usePodRealtime.ts`.
+- [ ] **Not tested** — the client has no test infrastructure at all (no test runner configured, zero `*.test.ts` files anywhere in `client/`), so this is verified by code review + typecheck only, same posture as every other client-side change this session. **Not yet live-verified**: Tobias should open a protected public pod in two browsers, rotate/disable/re-enable the lock while both are open, and confirm the still-authorized one resumes live updates without a reload while the now-revoked one stops receiving events and shows the unlock prompt on its next interaction; also check an ordinary transport blip (e.g. brief network loss) still reconnects and rejoins normally, and that repeated lock changes don't accumulate duplicate event listeners or trigger a reconnect loop.
 
 ### PI-133 — Preserve card printing during foil-only edits (P2 / functional)
 
