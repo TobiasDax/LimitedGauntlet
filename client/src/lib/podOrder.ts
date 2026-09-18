@@ -50,16 +50,27 @@ export interface DateGroup<T> {
   pods: T[];
 }
 
-// PI-83: groups already-sorted pods by date, preserving incoming order
-// within and across groups. Caller decides whether to actually render
+// PI-83: groups pods by date, ordered by each date's first appearance in the
+// incoming order. Merges every pod sharing a date into one group even when
+// they aren't adjacent in the incoming order — once podsManuallyReordered is
+// true, sortForDisplay sorts by sequenceOrder rather than date, so pods with
+// the same date routinely land non-contiguously. Emitting a separate group
+// per non-adjacent run used to give the same date two sibling divs with the
+// same React key, which corrupts reconciliation across renders (e.g.
+// switching PodList's tab). Caller decides whether to actually render
 // dividers (only worth it once there's more than one distinct date).
 export function groupByDate<T extends OrderablePod>(pods: T[]): DateGroup<T>[] {
   const groups: DateGroup<T>[] = [];
+  const byDate = new Map<string | null, DateGroup<T>>();
   for (const pod of pods) {
     const key = pod.date ?? null;
-    const last = groups[groups.length - 1];
-    if (last && last.date === key) last.pods.push(pod);
-    else groups.push({ date: key, pods: [pod] });
+    const existing = byDate.get(key);
+    if (existing) existing.pods.push(pod);
+    else {
+      const group: DateGroup<T> = { date: key, pods: [pod] };
+      byDate.set(key, group);
+      groups.push(group);
+    }
   }
   return groups;
 }
