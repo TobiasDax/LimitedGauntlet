@@ -30,6 +30,7 @@ export function GesamtwertungPage() {
         pods={data.pods}
         rows={data.gesamtwertung}
         playerLinkTo={(id) => `/hall-of-fame/players/${id}`}
+        podLinkTo={(podId) => `/pods/${podId}`}
       />
     </div>
   );

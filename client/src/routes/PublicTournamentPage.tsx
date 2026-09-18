@@ -67,6 +67,7 @@ export function PublicTournamentPage() {
           pods={gwData.pods}
           rows={gwData.gesamtwertung}
           playerLinkTo={(id) => `/o/${slug}/hall-of-fame/players/${id}`}
+          podLinkTo={(podId) => `/o/${slug}/tournaments/${id}/pods/${podId}`}
         />
       ) : (
         <p className="text-ink-muted">Loading…</p>

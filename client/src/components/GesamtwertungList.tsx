@@ -12,12 +12,14 @@ export function GesamtwertungList({
   pods,
   rows,
   playerLinkTo,
+  podLinkTo,
 }: {
   pods: GesamtwertungPod[];
   rows: GesamtwertungRow[];
   // Same pattern as HallOfFamePage/PublicHallOfFamePage — only the route
   // prefix differs between the authed and public callers.
   playerLinkTo: (playerId: string) => string;
+  podLinkTo: (podId: string) => string;
 }) {
   if (rows.length === 0) {
     return <p className="text-ink-muted">No one has played a pod yet.</p>;
@@ -81,15 +83,16 @@ export function GesamtwertungList({
                   const points = row.perPod[pod.id];
                   const attended = points !== undefined;
                   return (
-                    <div
+                    <Link
                       key={pod.id}
+                      to={podLinkTo(pod.id)}
                       title={pod.name}
-                      className={`grid h-[26px] min-w-[26px] place-items-center rounded border border-border px-1 text-[11px] tabular-nums ${
+                      className={`grid h-[26px] min-w-[26px] place-items-center rounded border border-border px-1 text-[11px] tabular-nums transition-colors hover:border-accent hover:text-ink ${
                         attended && points > 0 ? "bg-surface-raised text-ink-secondary" : "text-ink-muted"
                       }`}
                     >
                       {attended ? points : "–"}
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
