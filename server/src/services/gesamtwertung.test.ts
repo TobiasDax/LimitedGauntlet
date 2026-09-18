@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { makePrismaClient } from "../db.js";
-import { computeGesamtwertung, countTournamentParticipants } from "./gesamtwertung.js";
+import { computeGesamtwertung, countTournamentParticipants, sortForGesamtwertung } from "./gesamtwertung.js";
 
 const prisma = makePrismaClient();
 
@@ -267,5 +267,64 @@ describe("countTournamentParticipants", () => {
       },
     ];
     expect(countTournamentParticipants(pods)).toBe(2);
+  });
+});
+
+describe("sortForGesamtwertung", () => {
+  // Real-shaped case that motivated this: a manually-reordered tournament
+  // where a pod added later (Table Test, seq 27) is dated *before* pods
+  // added earlier (the SE#3 pods, seq 23-26, dated the next day) — the pip
+  // legend previously followed raw sequenceOrder and displayed Table Test
+  // after SE#3 despite being scheduled for the prior day.
+  const scheduled = (id: string, sequenceOrder: number, date: string, startTime: string | null = null) => ({
+    id,
+    sequenceOrder,
+    isOnDemand: false,
+    date: new Date(date),
+    startTime,
+    actualStartedAt: null,
+  });
+  const onDemand = (id: string, sequenceOrder: number, actualStartedAt: string | null) => ({
+    id,
+    sequenceOrder,
+    isOnDemand: true,
+    date: null,
+    startTime: null,
+    actualStartedAt: actualStartedAt ? new Date(actualStartedAt) : null,
+  });
+
+  it("orders scheduled pods by date/time regardless of sequenceOrder", () => {
+    const pods = [
+      scheduled("se3-alpha", 23, "2026-09-27", "10:30"),
+      scheduled("table-test", 27, "2026-09-26", "12:11"),
+      scheduled("me", 19, "2026-09-26", "10:00"),
+    ];
+    expect(sortForGesamtwertung(pods).map((p) => p.id)).toEqual(["me", "table-test", "se3-alpha"]);
+  });
+
+  it("sorts same-date pods by start time, undated-scheduled last by sequenceOrder", () => {
+    const pods = [
+      scheduled("later", 5, "2026-09-26", "18:15"),
+      scheduled("earlier", 2, "2026-09-26", "10:00"),
+      { ...scheduled("undated-a", 3, "2026-09-26"), date: null },
+      { ...scheduled("undated-b", 1, "2026-09-26"), date: null },
+    ];
+    expect(sortForGesamtwertung(pods).map((p) => p.id)).toEqual(["earlier", "later", "undated-b", "undated-a"]);
+  });
+
+  it("places every on-demand pod after every scheduled pod, ordered by actual start time", () => {
+    const pods = [
+      onDemand("od-second", 10, "2026-09-25T14:00:00Z"),
+      scheduled("sched", 1, "2026-09-26"),
+      onDemand("od-first", 8, "2026-09-25T09:00:00Z"),
+    ];
+    expect(sortForGesamtwertung(pods).map((p) => p.id)).toEqual(["sched", "od-first", "od-second"]);
+  });
+
+  it("falls back to sequenceOrder for an on-demand pod with no actualStartedAt", () => {
+    const pods = [onDemand("no-start", 2, null), onDemand("started", 1, "2026-09-25T09:00:00Z")];
+    // A started pod always sorts before one with no recorded start time,
+    // even if its sequenceOrder is higher.
+    expect(sortForGesamtwertung(pods).map((p) => p.id)).toEqual(["started", "no-start"]);
   });
 });

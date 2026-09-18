@@ -52,6 +52,50 @@ export function countTournamentParticipants(pods: PodForParticipation[]): number
   return ids.size;
 }
 
+export interface PodForGesamtwertungOrder {
+  id: string;
+  sequenceOrder: number;
+  isOnDemand: boolean;
+  date: Date | null;
+  startTime: string | null;
+  actualStartedAt: Date | null;
+}
+
+// Orders the Gesamtwertung table's pip columns: scheduled pods first, by
+// date then start time (matching the "Scheduled" tab's own sort), followed
+// by on-demand pods ordered by when they actually started — on-demand
+// pods have no planned date/time to sort by, so their real start order is
+// the only meaningful signal, and being scheduling afterthoughts they read
+// better trailing the planned weekend than interleaved into it. A missing
+// sort key (no date, or an on-demand pod that somehow has no
+// actualStartedAt) falls back to sequenceOrder, same as sortForDisplay's
+// client-side equivalent for the never-manually-reordered case.
+export function sortForGesamtwertung<T extends PodForGesamtwertungOrder>(pods: T[]): T[] {
+  const scheduled = pods
+    .filter((p) => !p.isOnDemand)
+    .sort((a, b) => {
+      if (a.date && b.date) {
+        const byDate = a.date.getTime() - b.date.getTime();
+        if (byDate !== 0) return byDate;
+        return (a.startTime ?? "").localeCompare(b.startTime ?? "");
+      }
+      if (a.date && !b.date) return -1;
+      if (!a.date && b.date) return 1;
+      return a.sequenceOrder - b.sequenceOrder;
+    });
+
+  const onDemand = pods
+    .filter((p) => p.isOnDemand)
+    .sort((a, b) => {
+      if (a.actualStartedAt && b.actualStartedAt) return a.actualStartedAt.getTime() - b.actualStartedAt.getTime();
+      if (a.actualStartedAt && !b.actualStartedAt) return -1;
+      if (!a.actualStartedAt && b.actualStartedAt) return 1;
+      return a.sequenceOrder - b.sequenceOrder;
+    });
+
+  return [...scheduled, ...onDemand];
+}
+
 // The weekend "overall" table: for each player attending the tournament,
 // sum their match points across every pod they played (team pods credit
 // the FULL team score to each member, not divided — confirmed against
@@ -73,7 +117,7 @@ export async function computeGesamtwertung(tournamentId: string): Promise<Gesamt
 
   // A pod that hasn't started (SETUP, no rounds) contributes nothing — no
   // eventsPlayed credit, and it doesn't get a column in the table (PI-99).
-  const playedPods = pods.filter(podIsPlayed);
+  const playedPods = sortForGesamtwertung(pods.filter(podIsPlayed));
 
   const totals = new Map<string, number>();
   const eventsPlayed = new Map<string, number>();

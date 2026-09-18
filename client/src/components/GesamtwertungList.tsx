@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import type { GesamtwertungPod, GesamtwertungRow } from "../lib/types";
 
 export function rankBadgeClasses(rank: number): string {
@@ -7,7 +8,17 @@ export function rankBadgeClasses(rank: number): string {
   return "border-border-strong text-ink-secondary";
 }
 
-export function GesamtwertungList({ pods, rows }: { pods: GesamtwertungPod[]; rows: GesamtwertungRow[] }) {
+export function GesamtwertungList({
+  pods,
+  rows,
+  playerLinkTo,
+}: {
+  pods: GesamtwertungPod[];
+  rows: GesamtwertungRow[];
+  // Same pattern as HallOfFamePage/PublicHallOfFamePage — only the route
+  // prefix differs between the authed and public callers.
+  playerLinkTo: (playerId: string) => string;
+}) {
   if (rows.length === 0) {
     return <p className="text-ink-muted">No one has played a pod yet.</p>;
   }
@@ -42,7 +53,12 @@ export function GesamtwertungList({ pods, rows }: { pods: GesamtwertungPod[]; ro
                 </div>
 
                 <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="font-display text-[17px] font-bold">{row.player.displayName}</span>
+                  <Link
+                    to={playerLinkTo(row.playerId)}
+                    className="truncate font-display text-[17px] font-bold hover:text-accent-strong"
+                  >
+                    {row.player.displayName}
+                  </Link>
                   <span className="text-[12px] text-ink-muted">
                     {row.eventsPlayed} of {pods.length} pod{pods.length === 1 ? "" : "s"} played
                   </span>
@@ -83,7 +99,11 @@ export function GesamtwertungList({ pods, rows }: { pods: GesamtwertungPod[]; ro
       </div>
 
       {pods.length > 0 && (
-        <p className="mt-4 text-[11.5px] text-ink-muted">Pips, left to right: {pods.map((p) => p.name).join(" · ")}</p>
+        <p className="mt-4 text-[11.5px] text-ink-muted">
+          Pips, left to right: {pods.map((p) => p.name).join(" · ")}
+          <br />
+          Only pods that have started appear here — a pod still in setup gets a column once its first round begins.
+        </p>
       )}
     </>
   );

@@ -63,7 +63,11 @@ export function PublicTournamentPage() {
       <h2 className="font-display mb-1 text-[22px] font-bold">Tournament Standings</h2>
       <p className="mb-6 text-[13px] text-ink-secondary">Ranked by average points per pod played, not raw total.</p>
       {gwData ? (
-        <GesamtwertungList pods={gwData.pods} rows={gwData.gesamtwertung} />
+        <GesamtwertungList
+          pods={gwData.pods}
+          rows={gwData.gesamtwertung}
+          playerLinkTo={(id) => `/o/${slug}/hall-of-fame/players/${id}`}
+        />
       ) : (
         <p className="text-ink-muted">Loading…</p>
       )}

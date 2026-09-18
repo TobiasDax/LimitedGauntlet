@@ -26,7 +26,11 @@ export function GesamtwertungPage() {
         Ranked by average points per pod played, not raw total — nobody's penalized for missing an event.
       </ScreenDek>
 
-      <GesamtwertungList pods={data.pods} rows={data.gesamtwertung} />
+      <GesamtwertungList
+        pods={data.pods}
+        rows={data.gesamtwertung}
+        playerLinkTo={(id) => `/hall-of-fame/players/${id}`}
+      />
     </div>
   );
 }
