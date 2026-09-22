@@ -137,13 +137,15 @@ Built early — it is the escape hatch if the webhook path misbehaves in product
 
 **Perpetual-grant semantics to carry into HI-3**: on a `SERIES` org, `subscriptionExpiresAt = null` means *never lapses*, not *already lapsed*. The activity check must read it that way.
 
-### HI-9 — Client UI ⏳
+### HI-9 — Client UI ◐ (landing page done; rest pending)
 - [ ] Tier indicator in org settings.
 - [ ] Gated controls show an upsell prompt rather than vanishing silently.
 - [ ] Pricing/upgrade page.
 - [ ] Date-immutability explanation plus config-driven support contact link.
 - [ ] Subscription management links out to the processor's hosted customer portal.
-- [ ] Every hosted-only element hidden entirely when the billing flag is off.
+- [x] `GET /api/app-config` now exposes `hostedEntitlements` (and `supportEmail`, null unless hosted), so the client can tell the two deployments apart. Everything tier-related hangs off that one flag.
+- [x] Org-less landing content on `OrganizationsPage`: a self-hosted install is told its organization has everything and nothing to pay for; tiers and upgrade copy render only on the hosted branch. Deliberately no prices in the repo yet — they arrive with HI-7.
+- [ ] Browser-verify both branches (self-hosted default, and with `HOSTED_ENTITLEMENTS=true`).
 
 ### HI-10 — Grandfathering and rollout ✅ (code-complete 2026-09-22, rehearsal pending)
 - [x] `admin-entitlements.js grandfather` — previews every affected org, then applies *exactly that list* so nothing created mid-confirmation is swept in. Safe to re-run; skips orgs already on SERIES.

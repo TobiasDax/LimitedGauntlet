@@ -174,6 +174,11 @@ export const config = {
   // the entitlement columns are inert data on a self-hosted database.
   hostedEntitlements: {
     enforced: process.env.HOSTED_ENTITLEMENTS === "true",
+    // Where someone is pointed for things only the operator can do — notably
+    // changing tournament dates the hosted tiers lock (HI-5). Blank on a
+    // self-hosted deployment, which must never surface the hosted operator's
+    // address for a restriction that doesn't even apply there.
+    supportEmail: process.env.HOSTED_SUPPORT_EMAIL ?? "",
   },
   // PI-108 — how the visitor IP is forwarded to the analytics collector
   //   (only relevant when TRACKING_* is configured).

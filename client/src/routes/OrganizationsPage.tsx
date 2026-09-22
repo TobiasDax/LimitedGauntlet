@@ -2,6 +2,62 @@ import { useState } from "react";
 import { ApiError } from "../lib/api";
 import { useMe, useSwitchOrg, useSignupStatus, useCreateOrganization } from "../features/auth/useAuth";
 import { Button, Card, Field, FormError, TextField } from "../components/ui";
+import { useAppConfig } from "../features/config/useAppConfig";
+
+// HI-9 — what a logged-in account with no organization yet is shown.
+//
+// The same page serves both kinds of deployment, and the difference is not
+// cosmetic: a self-hosted install is running the complete app, so it shows
+// what an organization gives you and nothing else. Tiers, quotas and anything
+// purchasable render only when the deployment actually runs hosted
+// entitlements. Keep every hosted-only element inside the `hosted` branch —
+// a self-hoster should never see a plan, a limit, or a price.
+function GettingStarted({ onCreate }: { onCreate: () => void }) {
+  const { data: appConfig } = useAppConfig();
+  const hosted = appConfig?.hostedEntitlements === true;
+
+  return (
+    <Card className="mb-6 p-5">
+      <div className="font-display mb-1 text-[16px] font-bold">Create your organization</div>
+      <p className="mb-4 text-[13px] text-ink-secondary">
+        An organization holds your player roster and every tournament you run. Creating one is the first step —
+        tournaments, pods, pairings and standings all live inside it.
+      </p>
+
+      {hosted ? (
+        <div className="mb-4 flex flex-col gap-3">
+          <div className="border-border rounded-md border p-4">
+            <div className="text-[14px] font-semibold">Free organization</div>
+            <p className="mt-1 text-[13px] text-ink-secondary">
+              One tournament with one pod, for a single event of up to a week. You set its dates when you create it, and
+              they are fixed from then on. Everything stays readable for a month after the tournament ends.
+            </p>
+            <p className="mt-2 text-[12px] text-ink-muted">
+              Each account gets one free organization. Nothing is used up until you create it.
+            </p>
+          </div>
+          <div className="border-border rounded-md border border-dashed p-4">
+            <div className="text-[14px] font-semibold">Need more than one event?</div>
+            <p className="mt-1 text-[13px] text-ink-secondary">
+              A single tournament can be unlocked for unlimited pods, or a subscription removes the limits entirely —
+              unlimited tournaments, editable dates, co-organizers, webhooks, exports and API access. You can start free
+              and upgrade later; upgrading your free tournament hands the free slot back.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <p className="mb-4 text-[13px] text-ink-secondary">
+          This is a self-hosted install, so your organization has everything: unlimited tournaments and pods,
+          co-organizers, webhooks, exports and API access, with no limits and nothing to pay for.
+        </p>
+      )}
+
+      <Button variant="primary" onClick={onCreate}>
+        Create organization
+      </Button>
+    </Card>
+  );
+}
 
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const slugify = (s: string) =>
@@ -62,6 +118,8 @@ export function OrganizationsPage() {
           ))}
         </div>
       )}
+
+      {orgs.length === 0 && !showCreate && <GettingStarted onCreate={() => setShowCreate(true)} />}
 
       <div className="border-border border-t pt-5 text-[13px] text-ink-muted">
         Joining an organization someone else runs is by invitation — they send you a link.

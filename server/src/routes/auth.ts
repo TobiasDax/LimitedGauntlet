@@ -153,6 +153,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // is served. The footer links it when true; the content itself comes
       // from GET /api/legal, not from here.
       legalPageEnabled: config.legal.pageEnabled,
+      // HI-9 — whether this deployment runs hosted tiers. False on every
+      // self-hosted install, and the client hides every tier, quota and
+      // upgrade affordance when it is: a self-hoster is running the complete
+      // app and must never be shown a plan to buy.
+      hostedEntitlements: config.hostedEntitlements.enforced,
+      // Only meaningful alongside the above; blank otherwise.
+      supportEmail: config.hostedEntitlements.enforced ? config.hostedEntitlements.supportEmail || null : null,
       // Configured SSO providers to render a button for (PI-42 / PI-43),
       // in display order — [] means password-only.
       ssoProviders: configuredSsoProviders(),

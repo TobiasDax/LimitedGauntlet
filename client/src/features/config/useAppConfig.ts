@@ -31,6 +31,15 @@ export interface AppConfig {
   localLoginDisabled?: boolean;
   // null/undefined = analytics unconfigured on this deployment.
   tracking?: TrackingConfig | null;
+  // HI-9 — true only on a deployment running hosted tiers. Every tier, quota
+  // and upgrade affordance in the UI hangs off this: a self-hosted install
+  // (the default, and the overwhelmingly common case) leaves it false and
+  // shows none of it, because it is running the complete app with nothing to
+  // buy. Treat a missing value as false.
+  hostedEntitlements?: boolean;
+  // Contact for things only the operator can do, e.g. changing tournament
+  // dates the hosted tiers lock. Null unless hostedEntitlements is true.
+  supportEmail?: string | null;
 }
 
 // Public, no-auth config the frontend chrome needs on every page (incl.
