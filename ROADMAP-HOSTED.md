@@ -106,9 +106,9 @@ Thin guard calls only; no logic here.
 - [x] 7-day maximum span enforced on create and on any date-changing update.
 - [ ] Pod start/finish window enforcement, including the mid-round hard close.
 
-### HI-6 — Free signup flow ⏳
-- [ ] Combined org + tournament creation with mandatory start/end times.
-- [ ] One-free-org-per-Discord-identity check at creation.
+### HI-6 — Free signup flow ◐ (one-free-org rule done; combined flow pending)
+- [ ] Combined org + tournament creation. Blocked on HI-9: the flow is mostly a client-side signup change, and the server already requires tournament dates.
+- [x] One-free-org-per-account check (`canCreateFreeOrganization`), wired into the multi-org creation route. The two signup routes are deliberately untouched: a brand-new account's first org is legitimately free. Paid orgs are unrestricted.
 
 ### HI-7 — Payment integration ⛔ (blocked on processor account setup)
 - [ ] Checkout initiation route passing the org id as processor metadata.

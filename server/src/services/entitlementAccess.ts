@@ -70,6 +70,25 @@ export async function isOrgDataAccessible(orgId: string, now: Date = new Date())
   return isDataAccessible(state, end, now);
 }
 
+/**
+ * HI-6 / rule 8 — one free org per account. An account that already holds a
+ * free-tier org cannot spin up another to dodge the lifetime cap; paid orgs
+ * are unrestricted. Someone determined enough to make a second Discord account
+ * still can, which is an accepted ceiling rather than a hole to plug.
+ *
+ * Membership is a fair proxy for ownership here: co-organizers are a
+ * subscription capability, so a free org has exactly one member — the person
+ * who created it.
+ */
+export async function canCreateFreeOrganization(accountId: string): Promise<boolean> {
+  if (!isEntitlementEnforcementActive()) return true;
+
+  const existingFree = await prisma.organization.count({
+    where: { entitlementTier: "FREE", memberships: { some: { accountId } } },
+  });
+  return existingFree === 0;
+}
+
 /** Capability check for a route that has an orgId but no loaded state. */
 export async function orgAllows(orgId: string, capability: Capability, now: Date = new Date()): Promise<boolean> {
   if (!isEntitlementEnforcementActive()) return true;

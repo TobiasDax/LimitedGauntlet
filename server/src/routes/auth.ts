@@ -10,6 +10,7 @@ import { beginSso, completeSso, isProviderConfigured, linkOrProvisionFromSso } f
 import { confirmOidcRelink } from "../services/oidcRelink.js";
 import { fireAndForget, sendAdminWebhookEvent } from "../services/webhooks.js";
 import { refreshRealtimeAuthorization } from "../realtime.js";
+import { canCreateFreeOrganization, ENTITLEMENT_REQUIRED } from "../services/entitlementAccess.js";
 
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -733,6 +734,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       const accountId = request.identity!.id;
+      // HI-6 / rule 8 — one free org per account. The signup paths above are
+      // untouched: a brand-new account's first org is legitimately free.
+      if (!(await canCreateFreeOrganization(accountId))) {
+        reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "free_org_limit" });
+        return;
+      }
       let organization;
       try {
         organization = await prisma.organization.create({

@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { makePrismaClient } from "../db.js";
 import {
   applyPassToTournament,
+  canCreateFreeOrganization,
   canCreatePod,
   canCreateTournament,
   claimTournamentCoverage,
@@ -187,6 +188,51 @@ describe("canCreatePod", () => {
     });
 
     expect(await canCreatePod(tournament.id)).toBe(true);
+  });
+});
+
+describe("canCreateFreeOrganization", () => {
+  async function makeAccount() {
+    counter += 1;
+    return prisma.organizerAccount.create({
+      data: { name: "Organizer", email: `org-${Date.now()}-${counter}@example.test`, passwordHash: null },
+    });
+  }
+
+  async function join(accountId: string, orgId: string) {
+    return prisma.organizerMembership.create({ data: { accountId, orgId } });
+  }
+
+  it("allows a first org", async () => {
+    const account = await makeAccount();
+    expect(await canCreateFreeOrganization(account.id)).toBe(true);
+  });
+
+  it("refuses a second free org for the same account", async () => {
+    const account = await makeAccount();
+    const org = await makeOrg();
+    await join(account.id, org.id);
+
+    expect(await canCreateFreeOrganization(account.id)).toBe(false);
+  });
+
+  // Paid orgs are unrestricted — someone running a subscribed org can still
+  // start a new free one.
+  it("ignores orgs that are on a subscription", async () => {
+    const account = await makeAccount();
+    const org = await makeOrg({ entitlementTier: "SERIES" });
+    await join(account.id, org.id);
+
+    expect(await canCreateFreeOrganization(account.id)).toBe(true);
+  });
+
+  it("imposes no limit when enforcement is off", async () => {
+    config.hostedEntitlements.enforced = false;
+    const account = await makeAccount();
+    const org = await makeOrg();
+    await join(account.id, org.id);
+
+    expect(await canCreateFreeOrganization(account.id)).toBe(true);
   });
 });
 
