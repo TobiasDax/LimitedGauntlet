@@ -1,6 +1,13 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { makePrismaClient } from "../db.js";
-import { extendRetention, getOrgEntitlementSummary, grantTier, setTournamentDates } from "./entitlementsAdmin.js";
+import {
+  extendRetention,
+  findOrgsToGrandfather,
+  getOrgEntitlementSummary,
+  grandfatherOrgs,
+  grantTier,
+  setTournamentDates,
+} from "./entitlementsAdmin.js";
 
 const prisma = makePrismaClient();
 
@@ -185,6 +192,47 @@ describe("setTournamentDates", () => {
     await expect(
       setTournamentDates("no-such-tournament", new Date("2026-10-02"), new Date("2026-10-04")),
     ).rejects.toThrow("tournament_not_found");
+  });
+});
+
+describe("grandfathering", () => {
+  it("finds an org that predates enforcement and skips one already on SERIES", async () => {
+    const legacy = await makeOrg();
+    const subscribed = await makeOrg({ entitlementTier: "SERIES" });
+
+    const candidates = await findOrgsToGrandfather();
+    const slugs = candidates.map((c) => c.slug);
+
+    expect(slugs).toContain(legacy.slug);
+    expect(slugs).not.toContain(subscribed.slug);
+  });
+
+  it("grants perpetual SERIES to exactly the listed orgs, with a ledger entry each", async () => {
+    const legacy = await makeOrg();
+    const untouched = await makeOrg();
+
+    const applied = await grandfatherOrgs(
+      [{ orgId: legacy.id, slug: legacy.slug, name: legacy.name, createdAt: legacy.createdAt }],
+      "rollout",
+    );
+
+    expect(applied).toBe(1);
+
+    const stored = await prisma.organization.findUniqueOrThrow({ where: { id: legacy.id } });
+    expect(stored.entitlementTier).toBe("SERIES");
+    expect(stored.subscriptionExpiresAt).toBeNull();
+
+    const events = await prisma.billingEvent.findMany({ where: { orgId: legacy.id } });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ source: "OPERATOR", tier: "SERIES", note: "rollout" });
+
+    // Applying the previewed list must not sweep in an org that wasn't on it.
+    const other = await prisma.organization.findUniqueOrThrow({ where: { id: untouched.id } });
+    expect(other.entitlementTier).toBe("FREE");
+  });
+
+  it("is a no-op on an empty list", async () => {
+    expect(await grandfatherOrgs([])).toBe(0);
   });
 });
 

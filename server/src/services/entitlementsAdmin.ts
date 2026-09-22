@@ -153,6 +153,53 @@ export async function extendRetention(slug: string, months: number, note?: strin
   return summarise(org.id);
 }
 
+export type GrandfatherCandidate = { orgId: string; slug: string; name: string; createdAt: Date };
+
+/**
+ * HI-10 — orgs that predate entitlement enforcement and should keep working
+ * exactly as they did. Anything already on SERIES is left alone, so this is
+ * safe to re-run.
+ */
+export async function findOrgsToGrandfather(createdBefore: Date = new Date()): Promise<GrandfatherCandidate[]> {
+  const orgs = await prisma.organization.findMany({
+    where: { createdAt: { lt: createdBefore }, entitlementTier: { not: "SERIES" } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, slug: true, name: true, createdAt: true },
+  });
+  return orgs.map((o) => ({ orgId: o.id, slug: o.slug, name: o.name, createdAt: o.createdAt }));
+}
+
+/**
+ * Grant every pre-existing org a perpetual SERIES entitlement, so switching
+ * enforcement on cannot retroactively restrict anyone who signed up while the
+ * app was unrestricted. Each one gets its own ledger entry, making the reason
+ * auditable per org rather than an unexplained bulk UPDATE.
+ */
+export async function grandfatherOrgs(
+  candidates: GrandfatherCandidate[],
+  note = "grandfathered before entitlement enforcement",
+): Promise<number> {
+  if (candidates.length === 0) return 0;
+
+  await prisma.$transaction([
+    prisma.organization.updateMany({
+      where: { id: { in: candidates.map((c) => c.orgId) } },
+      data: { entitlementTier: "SERIES", subscriptionExpiresAt: null },
+    }),
+    prisma.billingEvent.createMany({
+      data: candidates.map((c) => ({
+        orgId: c.orgId,
+        source: "OPERATOR" as const,
+        tier: "SERIES" as const,
+        paidMonths: 0,
+        note,
+      })),
+    }),
+  ]);
+
+  return candidates.length;
+}
+
 export type TournamentDateChange = {
   tournamentId: string;
   name: string;

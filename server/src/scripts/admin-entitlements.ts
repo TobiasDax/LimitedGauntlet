@@ -15,7 +15,9 @@ import type { EntitlementTier } from "../db.js";
 import { prisma } from "../prisma.js";
 import {
   extendRetention,
+  findOrgsToGrandfather,
   getOrgEntitlementSummary,
+  grandfatherOrgs,
   grantTier,
   setTournamentDates,
   type OrgEntitlementSummary,
@@ -28,6 +30,7 @@ const USAGE = `Usage:
   admin-entitlements.js grant-tier <org-slug> <${TIERS.join("|")}> [--months N] [--note "..."] [--yes]
   admin-entitlements.js extend-retention <org-slug> --months N [--note "..."] [--yes]
   admin-entitlements.js set-dates <tournament-id> --start <date> --end <date> [--yes]
+  admin-entitlements.js grandfather [--note "..."] [--yes]
 
 Notes:
   grant-tier SERIES without --months grants it perpetually (no expiry) — the
@@ -149,6 +152,34 @@ async function runExtendRetention(args: string[]): Promise<void> {
   printSummary(await extendRetention(slug, months, note));
 }
 
+async function runGrandfather(args: string[]): Promise<void> {
+  const note = flag(args, "note");
+  const candidates = await findOrgsToGrandfather();
+
+  if (candidates.length === 0) {
+    console.log("Nothing to do — every organization is already on SERIES.");
+    return;
+  }
+
+  console.log(`${candidates.length} organization(s) would be granted perpetual SERIES:`);
+  for (const c of candidates) {
+    console.log(`  ${c.slug.padEnd(30)} ${c.name} (created ${c.createdAt.toISOString().slice(0, 10)})`);
+  }
+  console.log("");
+  console.log("Run this before switching HOSTED_ENTITLEMENTS on, so nobody who signed up while");
+  console.log("the app was unrestricted is retroactively restricted. Safe to re-run.");
+
+  if (!args.includes("--yes") && !(await confirm('Type "yes" to apply: '))) {
+    console.log("Aborted. No changes made.");
+    return;
+  }
+
+  // Applies exactly the list just shown, so an org created between the preview
+  // and the confirmation isn't swept in unseen.
+  const applied = await grandfatherOrgs(candidates, note);
+  console.log(`Grandfathered ${applied} organization(s).`);
+}
+
 async function runSetDates(args: string[]): Promise<void> {
   const [tournamentId] = args;
   if (!tournamentId) throw new Error(USAGE);
@@ -195,6 +226,8 @@ async function main() {
       return runGrantTier(args);
     case "extend-retention":
       return runExtendRetention(args);
+    case "grandfather":
+      return runGrandfather(args);
     case "set-dates":
       return runSetDates(args);
     default:

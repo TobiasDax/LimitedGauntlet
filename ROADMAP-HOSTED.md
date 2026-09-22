@@ -85,31 +85,32 @@ Capability gating only. Quantitative limits (lifetime caps, the 7-day window, re
 
 Defaults leave self-hosted rows inert: a row reading `entitlementTier = FREE` restricts nothing, because `can()` never reaches the lookup with the flag off.
 
-### HI-3 — Entitlement rules and tests ⏳
-- [ ] Effective-tier resolution from ledger + org state + now.
-- [ ] Cumulative-paid-months computation and org-wide retention expiry.
-- [ ] `isOrgDataAccessible()` shared decision function.
-- [ ] Caps: free lifetime tournament/pod, pass-scoped tournament, 7-day duration.
-- [ ] Real-DB service tests covering each rule, including boundaries (expiry exactly at now, lapsed-then-resubscribed, pass applied to existing vs. new tournament).
+### HI-3 — Entitlement rules and tests ✅ (code-complete 2026-09-22)
+- [x] Effective-tier resolution, with a perpetual grant (null expiry) reading as never lapsing.
+- [x] Cumulative-paid-months retention and a single org-wide expiry.
+- [x] `isOrgDataAccessible()` in `entitlementAccess.ts`, plus `claimTournamentCoverage` / `applyPassToTournament` for rule 3.
+- [x] Caps: free lifetime tournament/pod, pass-scoped tournament, 7-day duration.
+- [x] 20 pure rule tests + 20 real-DB tests covering those boundaries. **Creating a tournament spends the free slot before a pass**, so buying one never silently burns it.
 
-### HI-4 — Enforcement at call sites ⏳
+### HI-4 — Enforcement at call sites ✅ (code-complete 2026-09-22)
 Thin guard calls only; no logic here.
-- [ ] Tournament creation, pod creation.
-- [ ] Co-organizer invite (1 TO on free/pass).
-- [ ] Webhook CRUD, SMTP-backed sends, bulk export, Excel export, API tokens.
-- [ ] Read paths gated by `isOrgDataAccessible()`: organizer routes, public routes, realtime authorization, MCP tools.
-- [ ] Verify GDPR/player-data paths are explicitly *not* gated.
+- [x] Tournament creation (limit + span), pod creation (free-tier cap).
+- [x] Co-organizer invite (1 TO on free/pass).
+- [x] Webhook *creation*, player-invite email, bulk export, Excel export, API token *creation*. Listing and deleting stay open so a downgrade never strands something the org can't see or remove; the invite still returns a shareable link when its email is gated.
+- [x] Organizer route groups via a shared `requireOrgDataAccessible` preHandler, and the public routes *ahead of* the password prompt — offering to unlock expired content would be a lie.
+- [ ] Realtime authorization and the MCP tools still need the same gate.
+- [x] GDPR paths confirmed ungated: player data export and the removal-request notice are untouched.
 
-### HI-5 — Date immutability and duration cap ⏳
-- [ ] Reject start/end edits on `FREE`/`TOURNAMENT_PASS` once set (server-enforced, flag-gated).
-- [ ] Enforce the 7-day maximum span on those tiers.
+### HI-5 — Date immutability and duration cap ✅ (code-complete 2026-09-22)
+- [x] Date edits rejected on `FREE`/`TOURNAMENT_PASS` (402 `dates_locked`).
+- [x] 7-day maximum span enforced on create and on any date-changing update.
 - [ ] Pod start/finish window enforcement, including the mid-round hard close.
 
 ### HI-6 — Free signup flow ⏳
 - [ ] Combined org + tournament creation with mandatory start/end times.
 - [ ] One-free-org-per-Discord-identity check at creation.
 
-### HI-7 — Payment integration ⏳
+### HI-7 — Payment integration ⛔ (blocked on processor account setup)
 - [ ] Checkout initiation route passing the org id as processor metadata.
 - [ ] Signed webhook receiver: one-time purchase and subscription lifecycle events → ledger write → derived-state recompute.
 - [ ] Idempotency on processor event id; verify replayed deliveries are no-ops.
@@ -137,8 +138,8 @@ Built early — it is the escape hatch if the webhook path misbehaves in product
 - [ ] Subscription management links out to the processor's hosted customer portal.
 - [ ] Every hosted-only element hidden entirely when the billing flag is off.
 
-### HI-10 — Grandfathering and rollout ⏳
-- [ ] Migrate existing hosted orgs to their grandfathered state.
+### HI-10 — Grandfathering and rollout ✅ (code-complete 2026-09-22, rehearsal pending)
+- [x] `admin-entitlements.js grandfather` — previews every affected org, then applies *exactly that list* so nothing created mid-confirmation is swept in. Safe to re-run; skips orgs already on SERIES.
 - [ ] Rehearse on a copy of hosted data before touching production.
 - [ ] Reconciliation backstop (periodic re-poll of processor subscription state) — optional, post-v1.
 
