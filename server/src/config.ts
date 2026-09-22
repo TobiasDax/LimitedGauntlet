@@ -165,6 +165,16 @@ export const config = {
   //   "full":    Fastify's default request log, which includes remoteAddress.
   //   "off":     no access log at all (error + application logs still print).
   requestLog: envEnum("REQUEST_LOG", ["minimal", "full", "off"] as const, "minimal"),
+  // HI-1 — hosted-instance entitlements (tiers, quotas, paid features).
+  // OFF unless HOSTED_ENTITLEMENTS=true, and nothing in this repo's
+  // docker-compose.yml, .env.example or self-hosting docs ever sets it: a
+  // self-hosted deployment is the complete app, with every capability
+  // available and no tier ever consulted. See services/entitlements.ts —
+  // every check short-circuits on this flag *before* reading any tier, so
+  // the entitlement columns are inert data on a self-hosted database.
+  hostedEntitlements: {
+    enforced: process.env.HOSTED_ENTITLEMENTS === "true",
+  },
   // PI-108 — how the visitor IP is forwarded to the analytics collector
   //   (only relevant when TRACKING_* is configured).
   //   "truncated" (default): last IPv4 octet / IPv6 host bits zeroed — Umami

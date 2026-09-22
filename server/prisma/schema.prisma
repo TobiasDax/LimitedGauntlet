@@ -39,8 +39,24 @@ model Organization {
   // the whole feature is invisible and no tokens are awarded — existing ledger
   // rows are kept (not deleted) so re-enabling restores them.
   tokensEnabled Boolean @default(false)
+  // HI-2 — hosted-instance entitlement state. Entirely inert unless
+  // HOSTED_ENTITLEMENTS is on (see config.ts and services/entitlements.ts):
+  // a self-hosted deployment never reads any of these, so their values on a
+  // self-hosted database are meaningless rather than restrictive.
+  entitlementTier EntitlementTier @default(FREE)
+  // When an active SERIES subscription lapses. Null on the other tiers.
+  subscriptionExpiresAt DateTime?
+  // Total months ever paid, across every subscription period. Drives the
+  // post-lapse retention window, which is cumulative and uncapped by design.
+  cumulativePaidMonths Int @default(0)
+  // Operator goodwill — extends data access beyond what was actually paid for.
+  retentionOverrideUntil DateTime?
+  // The lifetime free-tournament slot. Set back to false when that tournament
+  // is later upgraded with a one-time pass, which returns the free slot.
+  freeTournamentUsed Boolean @default(false)
   createdAt DateTime @default(now())
 
+  billingEvents BillingEvent[]
   memberships OrganizerMembership[]
   players     Player[]
   tournaments Tournament[]
@@ -366,13 +382,66 @@ model Tournament {
   // that point on. False (auto-sort by date/time) until the reorder endpoint
   // is used for real.
   podsManuallyReordered Boolean @default(false)
+  // HI-2 — which entitlement covers this tournament on the hosted instance:
+  // FREE for the org's lifetime free slot, TOURNAMENT_PASS for one bought
+  // with a one-time pass. Null means it needs no per-tournament entitlement
+  // (covered by an active SERIES subscription, or enforcement is off).
+  coveringEntitlement EntitlementTier?
   createdAt DateTime         @default(now())
 
   organization Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
   players      TournamentPlayer[]
   pods         Pod[]
+  billingEvents BillingEvent[]
 
   @@index([orgId])
+}
+
+// HI-2 — append-only ledger of everything that ever granted an entitlement:
+// processor payments and operator CLI grants alike, so there is a single audit
+// trail for "why does this org have what it has". The derived fields on
+// Organization are a cache recomputed from these rows, never the source of
+// truth for how much was paid.
+model BillingEvent {
+  id    String @id @default(cuid())
+  orgId String
+  // The payment processor's own event id. Unique, so a redelivered webhook
+  // is a no-op rather than a double grant. Null for operator grants, which
+  // have no processor event — Postgres permits many nulls in a unique index.
+  processorEventId String? @unique
+  source BillingEventSource
+  tier   EntitlementTier
+  // Paid amount in minor units (cents). Null for an operator grant.
+  amountCents Int?
+  currency    String?
+  // Subscription period this payment covers. Null for a one-time pass.
+  periodStart DateTime?
+  periodEnd   DateTime?
+  // How many months of subscription this event contributes to the org's
+  // cumulativePaidMonths. Zero for a one-time pass or a pure retention grant.
+  paidMonths Int @default(0)
+  // The tournament a one-time pass was applied to, when this event is a pass.
+  tournamentId String?
+  // Why an operator made this grant.
+  note      String?
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tournament   Tournament?  @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([tournamentId])
+}
+
+enum BillingEventSource {
+  PROCESSOR
+  OPERATOR
+}
+
+enum EntitlementTier {
+  FREE
+  TOURNAMENT_PASS
+  SERIES
 }
 
 model TournamentPlayer {
