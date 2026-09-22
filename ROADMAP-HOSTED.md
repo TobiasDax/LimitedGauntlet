@@ -160,6 +160,29 @@ Built early — it is the escape hatch if the webhook path misbehaves in product
 - Commit messages and PR descriptions stay technical. No pricing or commercial rationale in repo history.
 - Same verification posture as `main`: the dev sandbox cannot run the app, so items are typechecked and service-tested here, then browser-verified on a real deployment before being considered done.
 
+## Deploying with entitlements on
+
+`HOSTED_ENTITLEMENTS` is deliberately absent from `docker-compose.yml`,
+`docker-compose.image.yml` and `.env.example` — that absence *is* the
+self-hosted guarantee. Neither compose file uses `env_file:`, so a variable
+only reaches the container when it is listed under `environment:`. Putting
+`HOSTED_ENTITLEMENTS=true` in `.env` therefore does nothing on its own.
+
+The hosted deployment injects it through its own (private, not in this repo)
+`docker-compose.override.yml`:
+
+```yaml
+services:
+  app:
+    environment:
+      HOSTED_ENTITLEMENTS: ${HOSTED_ENTITLEMENTS:-}
+      HOSTED_SUPPORT_EMAIL: ${HOSTED_SUPPORT_EMAIL:-}
+```
+
+With that in place the values come from `.env` as usual. A self-hosted
+deployment has no such override, so the flag cannot be switched on by
+accident — which is the point.
+
 ## Next steps
 
 Ordered by what blocks what. Everything below HI-7 can proceed in parallel.
