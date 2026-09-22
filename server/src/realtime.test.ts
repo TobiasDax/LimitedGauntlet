@@ -1,8 +1,10 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { io as createClient } from "socket.io-client";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { createRealtimeRoomAuthorizer, emitPodEvent, initRealtime } from "./realtime.js";
+import { config } from "./config.js";
+import { makePrismaClient } from "./db.js";
 
 function session(values: Record<string, unknown>) {
   return { get: <T>(key: string) => values[key] as T | undefined };
@@ -15,6 +17,7 @@ function fixture(options?: {
   playerMatches?: boolean;
   resourceExists?: boolean;
   lockVersion?: number;
+  orgId?: string;
 }) {
   const parseCookie = vi.fn(() => ({ session: "encoded" }));
   const decodeSecureSession = vi.fn(() =>
@@ -24,7 +27,7 @@ function fixture(options?: {
     options?.resourceExists === false
       ? null
       : {
-          id: "org-1",
+          id: options?.orgId ?? "org-1",
           publicPasswordHash: options?.locked === false ? null : "hash",
           publicLockVersion: options?.lockVersion ?? 0,
         },
@@ -221,5 +224,60 @@ describe("realtime room authorization", () => {
     await expect(authorize("pod:pod-1", undefined)).resolves.toBe(true);
     locked = true;
     await expect(authorize("pod:pod-1", undefined)).resolves.toBe(false);
+  });
+});
+
+describe("realtime retention gate (HI-4)", () => {
+  const prisma = makePrismaClient();
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const daysFromNow = (n: number) => new Date(Date.now() + n * MS_PER_DAY);
+
+  afterAll(async () => {
+    config.hostedEntitlements.enforced = false;
+    await prisma.$disconnect();
+  });
+
+  async function orgWithTournamentEnding(daysAgo: number) {
+    const org = await prisma.organization.create({
+      data: { slug: `rt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: "Realtime Org" },
+    });
+    await prisma.tournament.create({
+      data: {
+        orgId: org.id,
+        name: "Weekend",
+        startDate: daysFromNow(-daysAgo - 2),
+        endDate: daysFromNow(-daysAgo),
+      },
+    });
+    return org;
+  }
+
+  // Without this, an org with no public password would keep streaming live
+  // updates for content every HTTP route already refuses to serve.
+  it("refuses a room join once retention has expired, even on an unlocked org", async () => {
+    const org = await orgWithTournamentEnding(60);
+    config.hostedEntitlements.enforced = true;
+
+    const { authorize } = fixture({ locked: false, orgId: org.id });
+
+    expect(await authorize(`pod:${org.id}`, undefined)).toBe(false);
+  });
+
+  it("still allows the join while the org is inside its retention window", async () => {
+    const org = await orgWithTournamentEnding(2);
+    config.hostedEntitlements.enforced = true;
+
+    const { authorize } = fixture({ locked: false, orgId: org.id });
+
+    expect(await authorize(`pod:${org.id}`, undefined)).toBe(true);
+  });
+
+  it("does not consult retention at all when enforcement is off", async () => {
+    const org = await orgWithTournamentEnding(900);
+    config.hostedEntitlements.enforced = false;
+
+    const { authorize } = fixture({ locked: false, orgId: org.id });
+
+    expect(await authorize(`pod:${org.id}`, undefined)).toBe(true);
   });
 });

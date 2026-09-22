@@ -2,6 +2,7 @@ import type { Server as HttpServer } from "node:http";
 import type { FastifyInstance } from "fastify";
 import { Server as SocketIOServer } from "socket.io";
 import { prisma } from "./prisma.js";
+import { isOrgDataAccessible } from "./services/entitlementAccess.js";
 
 let io: SocketIOServer | null = null;
 
@@ -106,6 +107,14 @@ export function createRealtimeRoomAuthorizer(
 
     const organization = await store.findRoomOrganization(parsedRoom.kind, parsedRoom.resourceId);
     if (!organization) return false;
+
+    // HI-4 — an expired retention window closes the live feed too, and ahead
+    // of every access branch below: otherwise an org with no public password
+    // would keep streaming updates for content the HTTP routes already refuse.
+    // Costs nothing when enforcement is off — the check short-circuits on the
+    // flag before it queries anything.
+    if (!(await isOrgDataAccessible(organization.id))) return false;
+
     if (!organization.publicPasswordHash) return true;
     if (!cookieHeader) return false;
 

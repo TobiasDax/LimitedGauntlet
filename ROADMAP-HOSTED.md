@@ -98,7 +98,8 @@ Thin guard calls only; no logic here.
 - [x] Co-organizer invite (1 TO on free/pass).
 - [x] Webhook *creation*, player-invite email, bulk export, Excel export, API token *creation*. Listing and deleting stay open so a downgrade never strands something the org can't see or remove; the invite still returns a shareable link when its email is gated.
 - [x] Organizer route groups via a shared `requireOrgDataAccessible` preHandler, and the public routes *ahead of* the password prompt — offering to unlock expired content would be a lie.
-- [ ] Realtime authorization and the MCP tools still need the same gate.
+- [x] Realtime authorization gates room joins on the same check, ahead of every access branch — an unlocked org would otherwise keep streaming updates for content the HTTP routes already refuse.
+- [x] MCP needs no separate gate: it is an HTTP client, and `requireAuth` falls back to bearer auth, so its calls pass through the same preHandler.
 - [x] GDPR paths confirmed ungated: player data export and the removal-request notice are untouched.
 
 ### HI-5 — Date immutability and duration cap ✅ (code-complete 2026-09-22)
