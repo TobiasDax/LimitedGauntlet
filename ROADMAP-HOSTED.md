@@ -42,7 +42,11 @@ function can(org, capability) {
 ## Product rules
 
 1. **Free lifetime cap.** One tournament, one pod, ever — not "one at a time."
-2. **Free signup is a combined flow.** Creating a free org must also create its tournament. This is the only place in the app where org and tournament creation are not separate steps. Note `Tournament.startDate`/`endDate` are already non-nullable in the schema, so "dates are mandatory" is existing behaviour on every tier — the free-tier additions are the combined flow and the duration cap, not the dates themselves.
+2. **Registration is decoupled from org creation.** Signing up creates an account and nothing else — it never burns the free tournament slot. An account with no org can reach its profile/settings, an info page, and the upgrade flow, and can create its one free org from there. *Creating the free org* is the combined step that also creates its first tournament with its dates locked in, and that is the moment the slot is spent.
+
+   Chosen over showing warning text before registration: needing a warning to excuse a surprise is weaker than removing the surprise. It is also the cheaper change — org-less accounts already work end to end (`resolveLoginOrg` returns null, `requireAuth` answers `org_selection_required`, `ProtectedRoute` routes to `/organizations`, and `OrganizationsPage` exists). Only signup currently bundles the two.
+
+   Note `Tournament.startDate`/`endDate` are already non-nullable, so "dates are mandatory" is existing behaviour on every tier — the free-tier additions are the combined org+tournament step and the duration cap, not the dates themselves.
 3. **Pass application is a user choice.** Buying a pass presents two options: (a) upgrade the existing free tournament to paid and get the free slot back, or (b) keep the free tournament and unlock an additional paid one. Either path leaves the org with one free + one paid tournament. This is why pass entitlements are *tournament-scoped* rather than an org-level tier.
 4. **The 7-day window is start-date to end-date.** Pods may only be started *or finished* inside it. Hard close — a pod cannot start or finish outside the window, including mid-round.
 5. **Date immutability** applies to `FREE` and `TOURNAMENT_PASS` only. The UI must clearly explain the restriction and link to a support contact for manual changes, which the operator fulfils via the admin CLI. `SERIES` dates stay freely editable.
@@ -107,8 +111,10 @@ Thin guard calls only; no logic here.
 - [x] 7-day maximum span enforced on create and on any date-changing update.
 - [ ] Pod start/finish window enforcement, including the mid-round hard close.
 
-### HI-6 — Free signup flow ◐ (one-free-org rule done; combined flow pending)
-- [ ] Combined org + tournament creation. Blocked on HI-9: the flow is mostly a client-side signup change, and the server already requires tournament dates.
+### HI-6 — Account/org decoupling ◐ (one-free-org rule done; decoupling pending)
+- [ ] Stop signup creating an org, so registration lands in the existing org-less state.
+- [ ] Combined org + tournament creation on the org-creation step (not signup), spending the free slot there.
+- [ ] Once signup no longer creates an org, drop the signup-route exemption below — every org creation then flows through the one guarded route.
 - [x] One-free-org-per-account check (`canCreateFreeOrganization`), wired into the multi-org creation route. The two signup routes are deliberately untouched: a brand-new account's first org is legitimately free. Paid orgs are unrestricted.
 
 ### HI-7 — Payment integration ⛔ (blocked on processor account setup)
