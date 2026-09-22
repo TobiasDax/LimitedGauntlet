@@ -81,7 +81,7 @@ Capability gating only. Quantitative limits (lifetime caps, the 7-day window, re
 - [x] `Tournament`: `coveringEntitlement` (null = covered by an active subscription, or enforcement off).
 - [x] `BillingEvent` ledger + `BillingEventSource` enum; `processorEventId` unique and nullable so operator grants share the same audit trail as processor payments.
 - [x] Migration `20260922100000_hosted_entitlements` generated offline via `prisma migrate diff --from-schema/--to-schema`; `prisma validate` clean; client regenerated.
-- [ ] **Needs a database**: apply the migration and confirm the CI drift check (`prisma migrate diff --exit-code`) reports no difference.
+- [x] Applied against a real database and verified with the CI drift check (`prisma migrate diff --from-migrations --to-schema --exit-code`): **no difference detected**.
 
 Defaults leave self-hosted rows inert: a row reading `entitlementTier = FREE` restricts nothing, because `can()` never reaches the lookup with the flag off.
 
@@ -125,8 +125,7 @@ Built early — it is the escape hatch if the webhook path misbehaves in product
 - [x] `show` — current entitlement state for an org.
 - [x] Every grant writes a `BillingEvent` with source `OPERATOR`, so goodwill and payments share one audit trail.
 - [x] `scripts/admin-entitlements.ts` follows the PI-49 operator-CLI pattern: preview the exact change, require a typed `yes` unless `--yes`, no HTTP route.
-- [x] `entitlementsAdmin.test.ts` written — 15 real-DB cases covering perpetual vs. fixed-period grants, extend-from-future-expiry, lapsed restart, downgrade, month validation, retention accumulation, date changes, and the over-long span the override is allowed to make.
-- [ ] **Needs a database**: run `npm run --workspace server test` to execute those tests for the first time.
+- [x] `entitlementsAdmin.test.ts` — 17 real-DB cases covering perpetual vs. fixed-period grants, extend-from-future-expiry, lapsed restart, downgrade, month validation, retention accumulation, date changes, and the over-long span the override is allowed to make. **All passing**; full server suite 266/266 (26/26 files) with these added.
 
 **Perpetual-grant semantics to carry into HI-3**: on a `SERIES` org, `subscriptionExpiresAt = null` means *never lapses*, not *already lapsed*. The activity check must read it that way.
 
