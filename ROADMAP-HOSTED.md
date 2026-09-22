@@ -159,3 +159,36 @@ Built early — it is the escape hatch if the webhook path misbehaves in product
 - No tagging or release from this branch; the release pipeline runs after merge only.
 - Commit messages and PR descriptions stay technical. No pricing or commercial rationale in repo history.
 - Same verification posture as `main`: the dev sandbox cannot run the app, so items are typechecked and service-tested here, then browser-verified on a real deployment before being considered done.
+
+## Next steps
+
+Ordered by what blocks what. Everything below HI-7 can proceed in parallel.
+
+### 1. Verify what already exists (no new code needed)
+
+- [ ] **Browser-verify the landing page both ways.** Default (self-hosted) should describe an unlimited organization and show no tier, quota or price anywhere. Then set `HOSTED_ENTITLEMENTS=true` and confirm the free-tier and upgrade cards appear. This is the one place a mistake is publicly embarrassing — a self-hoster seeing a paywall.
+- [ ] **Exercise the admin CLI against a real database**: `show`, `grant-tier` (with and without `--months`), `extend-retention`, `set-dates`, and `grandfather` in its preview-then-abort form.
+- [ ] **Sanity-check enforcement end to end** on a scratch org with `HOSTED_ENTITLEMENTS=true`: create a tournament, try a second (402 `tournament_limit`), add a second pod (402 `pod_limit`), try editing dates (402 `dates_locked`), then `grant-tier … SERIES` and confirm all four now succeed.
+
+### 2. Operator setup (blocks HI-7 — nothing here is a code change)
+
+- [ ] Create the payment-processor account and store; define two products: a one-time pass, and a subscription with monthly and annual variants. Enable test mode.
+- [ ] Record the API key and webhook signing secret in the hosted deployment's `.env` — never in this repo.
+- [ ] Set `HOSTED_SUPPORT_EMAIL` on the hosted deployment (the contact shown beside locked dates; blank elsewhere).
+- [ ] Decide the published prices and where they render. They are deliberately absent from this repo — the UI copy and the processor's product config both need them.
+
+### 3. Remaining code
+
+- [ ] **HI-6** — stop signup creating an org; move combined org + tournament creation onto the org-creation step; then drop the signup-route exemption in `canCreateFreeOrganization` so every org creation flows through one guarded path.
+- [ ] **HI-7** — checkout initiation (org id as metadata), signed webhook receiver writing the ledger, the rule 3 pass-application choice, and optionally the reconciliation poll.
+- [ ] **HI-9 (rest)** — tier badge in settings, upsell prompts on gated controls, a pricing page, the date-immutability note with its support link, and the customer-portal link.
+
+### 4. Rollout, in this order
+
+The order matters: grandfathering **must** precede enforcement, or every existing org is retroactively restricted the moment the flag flips.
+
+1. [ ] Merge to `main` and deploy with `HOSTED_ENTITLEMENTS` **unset**. Everything stays inert; confirm nothing about the running app changed.
+2. [ ] Run `admin-entitlements.js grandfather` against the hosted database. Read the preview list before confirming.
+3. [ ] Spot-check with `admin-entitlements.js show <slug>` that existing orgs now read `SERIES` with `(perpetual)`.
+4. [ ] Only then set `HOSTED_ENTITLEMENTS=true` and restart.
+5. [ ] Re-verify a self-hosted image built from the same commit is still completely unrestricted.
