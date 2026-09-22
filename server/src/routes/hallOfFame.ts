@@ -2,12 +2,15 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
+import { requireOrgDataAccessible } from "../auth/entitlementGate.js";
 import { computeHallOfFameOverview, computePlayerStats } from "../services/playerStats.js";
 
 const idParams = z.object({ id: z.string().min(1) });
 
 export async function hallOfFameRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
+  // HI-4 — refuse reads once the retention window has run out.
+  app.addHook("preHandler", requireOrgDataAccessible);
 
   // All-time player standings across every tournament in the org, plus
   // headline stats, most-played pairings, and the biggest pulls — the

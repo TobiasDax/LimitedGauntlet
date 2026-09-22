@@ -15,6 +15,7 @@
 // processor payments and operator goodwill in one audit trail.
 import type { EntitlementTier } from "../db.js";
 import { prisma } from "../prisma.js";
+import { addMonths } from "./entitlements.js";
 
 export type OrgEntitlementSummary = {
   orgId: string;
@@ -30,12 +31,6 @@ export type OrgEntitlementSummary = {
   freeTournamentUsed: boolean;
   tournamentCount: number;
 };
-
-function addMonths(from: Date, months: number): Date {
-  const result = new Date(from);
-  result.setMonth(result.getMonth() + months);
-  return result;
-}
 
 function assertPositiveMonths(months: number): void {
   if (!Number.isInteger(months) || months <= 0) {

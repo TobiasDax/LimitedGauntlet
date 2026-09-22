@@ -4,6 +4,7 @@ import { prisma } from "../prisma.js";
 import { requireSessionAuth } from "../auth/middleware.js";
 import { requirePlayerAuth } from "../auth/playerMiddleware.js";
 import { isEmailConfigured, resolveBaseUrl, sendMail } from "../services/mailer.js";
+import { orgAllows } from "../services/entitlementAccess.js";
 import { emitPodEvent, emitTournamentEvent } from "../realtime.js";
 import { inferCardPullAttribution } from "../services/cardPullInference.js";
 import { getPlayerTokenLedger, isTokensEnabled, syncPodTokenAwards } from "../services/tokens.js";
@@ -85,7 +86,11 @@ export async function playerAccountRoutes(app: FastifyInstance): Promise<void> {
       );
       const acceptUrl = `${resolveBaseUrl(requestOrigin(request))}/player/accept-invite?token=${encodeURIComponent(token)}`;
       let emailSent = false;
-      if (isEmailConfigured()) {
+      // HI-4 — sending the invite by mail is a subscription capability, but
+      // inviting is not: an unsubscribed org still gets the accept link back
+      // and can pass it on itself, exactly as any deployment without SMTP
+      // configured already does. Nothing is lost, only the convenience.
+      if (isEmailConfigured() && (await orgAllows(request.organizer!.orgId, "email"))) {
         try {
           await sendMail({
             to: body.data.email,

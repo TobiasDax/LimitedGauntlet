@@ -3,11 +3,13 @@ import { Prisma } from "../db.js";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
+import { requireOrgDataAccessible } from "../auth/entitlementGate.js";
 import { findOwnedTournament, findOwnedPod, findOwnedEntrant } from "../services/ownership.js";
 import { computePodStandings } from "../services/standings.js";
 import { getLatestRound } from "../services/pairing.js";
 import { emitPodEvent } from "../realtime.js";
 import { syncPodTokenAwards, zStandingBonuses } from "../services/tokens.js";
+import { canCreatePod, ENTITLEMENT_REQUIRED } from "../services/entitlementAccess.js";
 
 // A pod's tokenStandingBonuses is a nullable Json column: an explicit `null`
 // (organizer cleared the override → inherit the tournament) must become
@@ -175,6 +177,8 @@ async function getPlayerIdsAlreadyInPod(podId: string): Promise<Set<string>> {
 
 export async function podRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
+  // HI-4 — refuse reads once the retention window has run out.
+  app.addHook("preHandler", requireOrgDataAccessible);
 
   app.get("/api/tournaments/:id/pods", async (request, reply) => {
     const params = idParams.safeParse(request.params);
@@ -205,6 +209,14 @@ export async function podRoutes(app: FastifyInstance): Promise<void> {
     const tournament = await findOwnedTournament(params.data.id, request.organizer!.orgId);
     if (!tournament) {
       reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    // HI-4 — the free tier's lifetime pod cap. A pass-covered tournament and
+    // any active subscription run unlimited pods; self-hosted never reaches
+    // the check at all.
+    if (!(await canCreatePod(tournament.id))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "pod_limit" });
       return;
     }
 

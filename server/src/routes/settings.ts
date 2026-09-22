@@ -12,6 +12,7 @@ import { ImportInProgressError } from "../services/importLock.js";
 import { generateWebhookSecret, sendTestWebhookEvent } from "../services/webhooks.js";
 import { refreshRealtimeAuthorization } from "../realtime.js";
 import { syncPodTokenAwards } from "../services/tokens.js";
+import { ENTITLEMENT_REQUIRED, orgAllows } from "../services/entitlementAccess.js";
 
 const publicLockSchema = z.object({ password: z.string().min(4).max(200) });
 const passwordChangeSchema = z.object({
@@ -369,6 +370,11 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
       const orgId = request.organizer!.orgId;
+      // HI-4 — the unsubscribed tiers are single-organizer.
+      if (!(await orgAllows(orgId, "organizer.invite"))) {
+        reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "organizer.invite" });
+        return;
+      }
       // PI-86 split accounts from org membership, so an email already having
       // an OrganizerAccount (in some other org) is not itself a reason to
       // refuse — only already being a member of *this* org is. Letting the
@@ -455,6 +461,14 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     const sections: ExportSections = anySelected
       ? { data: has("data"), hallOfFame: has("hallOfFame"), treasureVault: has("treasureVault") }
       : { data: true, hallOfFame: true, treasureVault: true };
+
+    // HI-4 — organizer-facing bulk export only. A *player's* own GDPR data
+    // export is a data-subject right and is never gated on any tier: see
+    // services/playerDataExport.ts, deliberately left untouched here.
+    if (!(await orgAllows(request.organizer!.orgId, "export.bulk"))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "export.bulk" });
+      return;
+    }
 
     const payload = await buildOrgExport(request.organizer!.orgId, sections);
     reply
@@ -564,6 +578,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     const body = createWebhookSchema.safeParse(request.body);
     if (!body.success) {
       reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    // HI-4 — gate creating one, not listing or deleting: an org that drops a
+    // tier keeps seeing and removing what it already configured.
+    if (!(await orgAllows(request.organizer!.orgId, "webhooks"))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "webhooks" });
       return;
     }
     const webhook = await prisma.organizationWebhook.create({

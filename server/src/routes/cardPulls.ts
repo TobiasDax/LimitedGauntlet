@@ -3,6 +3,7 @@ import type { Prisma } from "../db.js";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
+import { requireOrgDataAccessible } from "../auth/entitlementGate.js";
 import { findOwnedPod, findOwnedTournament, findOwnedCardPull } from "../services/ownership.js";
 import {
   autocompleteCardNames,
@@ -45,6 +46,8 @@ function toPlainPull(pull: { priceEur: unknown; [k: string]: unknown }) {
 
 export async function cardPullRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
+  // HI-4 — refuse reads once the retention window has run out.
+  app.addHook("preHandler", requireOrgDataAccessible);
 
   app.get("/api/scryfall/autocomplete", async (request, reply) => {
     const query = autocompleteQuerySchema.safeParse(request.query);

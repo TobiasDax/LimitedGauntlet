@@ -11,6 +11,7 @@ import { computeSeatings, computeSplitSeatings } from "../services/seatings.js";
 import { redactUnrevealedRound1, isRound1Unrevealed } from "../services/pairingsVisibility.js";
 import { buildRedactor, type Redactor } from "../services/publicVisibility.js";
 import { getHiddenPlayerAliases } from "../services/playerPrivacy.js";
+import { ENTITLEMENT_REQUIRED, isOrgDataAccessible } from "../services/entitlementAccess.js";
 
 const tournamentParams = z.object({ slug: z.string().min(1), id: z.string().min(1) });
 const podParams = z.object({ slug: z.string().min(1), id: z.string().min(1) });
@@ -127,6 +128,14 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     if (!slug) return;
     const organization = await findPublicOrganization(slug);
     if (!organization) return; // missing → 404 in handler
+    // HI-4 — an expired retention window closes the public pages too, and
+    // ahead of the password check: the content is gone for everyone, so
+    // offering an unlock prompt for it would just be a lie. The rows are
+    // untouched and come straight back on upgrade (rule 7).
+    if (!(await isOrgDataAccessible(organization.id))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "data_expired" });
+      return;
+    }
     // A logged-in player of this org has already authenticated to it (PI-52),
     // so the public-page password isn't a second gate for them — they read the
     // same public surface through these routes as the portal links to.

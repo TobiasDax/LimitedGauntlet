@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Prisma } from "../db.js";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
+import { requireOrgDataAccessible } from "../auth/entitlementGate.js";
 import { findOwnedPod, findOwnedRound, findOwnedMatch } from "../services/ownership.js";
 import { generatePairings, getActiveEntrants, getLatestRound, PairingError } from "../services/pairing.js";
 import { fillTables, validateTableShape, MIN_TABLE_SIZE, type FillPair } from "../services/tableFill.js";
@@ -129,6 +130,8 @@ async function afterOnDemandWithdraw(
 
 export async function roundRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
+  // HI-4 — refuse reads once the retention window has run out.
+  app.addHook("preHandler", requireOrgDataAccessible);
 
   app.get("/api/pods/:id/rounds", async (request, reply) => {
     const params = idParams.safeParse(request.params);

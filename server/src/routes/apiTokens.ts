@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireSessionAuth } from "../auth/middleware.js";
 import { generateApiToken } from "../auth/apiToken.js";
+import { ENTITLEMENT_REQUIRED, orgAllows } from "../services/entitlementAccess.js";
 
 const idParams = z.object({ id: z.string().min(1) });
 // PI-86 — a token acts in one org. `orgId` optional: defaults to the active
@@ -48,6 +49,14 @@ export async function apiTokenRoutes(app: FastifyInstance): Promise<void> {
         reply.code(403).send({ error: "not_a_member" });
         return;
       }
+    }
+
+    // HI-4 — programmatic access is a subscription capability. Listing and
+    // revoking existing tokens stay open, so a downgrade never strands a
+    // token the org can no longer see or remove.
+    if (!(await orgAllows(orgId, "apiTokens"))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "apiTokens" });
+      return;
     }
 
     const { plaintext, hash } = generateApiToken();

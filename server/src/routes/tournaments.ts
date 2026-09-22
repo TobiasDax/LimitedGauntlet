@@ -2,11 +2,20 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
+import { requireOrgDataAccessible } from "../auth/entitlementGate.js";
 import { findOwnedTournament } from "../services/ownership.js";
 import { computePlayerPairHistory } from "../services/weekendHistory.js";
 import { computeGesamtwertung, countTournamentParticipants } from "../services/gesamtwertung.js";
 import { buildTournamentWorkbook } from "../services/tournamentSpreadsheet.js";
 import { zStandingBonuses, syncPodTokenAwards } from "../services/tokens.js";
+import {
+  canCreateTournament,
+  claimTournamentCoverage,
+  ENTITLEMENT_REQUIRED,
+  orgAllows,
+  orgAllowsTournamentSpan,
+  orgMaxTournamentDays,
+} from "../services/entitlementAccess.js";
 
 const tournamentCreateSchema = z.object({
   name: z.string().trim().min(1).max(150),
@@ -41,6 +50,8 @@ const podOrderSchema = z.object({
 
 export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
+  // HI-4 — refuse reads once the retention window has run out.
+  app.addHook("preHandler", requireOrgDataAccessible);
 
   app.get("/api/tournaments", async (request, reply) => {
     const tournaments = await prisma.tournament.findMany({
@@ -56,9 +67,34 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       reply.code(400).send({ error: "invalid_input", issues: parsed.error.issues });
       return;
     }
+
+    const orgId = request.organizer!.orgId;
+
+    // HI-4 — both checks are no-ops unless the deployment opted into hosted
+    // entitlements, so a self-hosted instance falls straight through.
+    if (!(await canCreateTournament(orgId))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "tournament_limit" });
+      return;
+    }
+    if (!(await orgAllowsTournamentSpan(orgId, parsed.data.startDate, parsed.data.endDate))) {
+      reply
+        .code(402)
+        .send({
+          error: ENTITLEMENT_REQUIRED,
+          reason: "tournament_duration",
+          maxDays: await orgMaxTournamentDays(orgId),
+        });
+      return;
+    }
+
     const tournament = await prisma.tournament.create({
-      data: { ...parsed.data, orgId: request.organizer!.orgId },
+      data: { ...parsed.data, orgId },
     });
+    // Consumes the free slot or an unused pass. Throws only if a concurrent
+    // create beat this one to the last entitlement, which the 402 above
+    // normally prevents.
+    await claimTournamentCoverage(orgId, tournament.id);
+
     reply.code(201).send({ tournament });
   });
 
@@ -98,8 +134,38 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
+    const orgId = request.organizer!.orgId;
+
+    // HI-5 — dates are immutable on the unsubscribed tiers. The UI explains
+    // this and points at a support contact; an operator fulfils the change
+    // with scripts/admin-entitlements.js set-dates.
+    const changesDates = body.data.startDate !== undefined || body.data.endDate !== undefined;
+    if (changesDates && !(await orgAllows(orgId, "tournament.editDates"))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "dates_locked" });
+      return;
+    }
+    if (changesDates) {
+      const existing = await findOwnedTournament(params.data.id, orgId);
+      if (!existing) {
+        reply.code(404).send({ error: "not_found" });
+        return;
+      }
+      const startDate = body.data.startDate ?? existing.startDate;
+      const endDate = body.data.endDate ?? existing.endDate;
+      if (!(await orgAllowsTournamentSpan(orgId, startDate, endDate))) {
+        reply
+          .code(402)
+          .send({
+            error: ENTITLEMENT_REQUIRED,
+            reason: "tournament_duration",
+            maxDays: await orgMaxTournamentDays(orgId),
+          });
+        return;
+      }
+    }
+
     const { count } = await prisma.tournament.updateMany({
-      where: { id: params.data.id, orgId: request.organizer!.orgId },
+      where: { id: params.data.id, orgId },
       data: body.data,
     });
     if (count === 0) {
@@ -283,6 +349,10 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
     const params = idParams.safeParse(request.params);
     if (!params.success) {
       reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    if (!(await orgAllows(request.organizer!.orgId, "export.excel"))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "export.excel" });
       return;
     }
     const tournament = await findOwnedTournament(params.data.id, request.organizer!.orgId);

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
+import { requireOrgDataAccessible } from "../auth/entitlementGate.js";
 import {
   getPlayerTokenLedger,
   isTokensEnabled,
@@ -47,6 +48,8 @@ function publicPlayer<
 
 export async function playerRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
+  // HI-4 — refuse reads once the retention window has run out.
+  app.addHook("preHandler", requireOrgDataAccessible);
 
   app.get("/api/players", async (request, reply) => {
     const rows = await prisma.player.findMany({
