@@ -28,16 +28,26 @@ export function SeatingChart({
   seatByEntrantId,
   entrantById,
   entrantCount,
-  showByeBadge = true,
+  showByeBadge = false,
 }: {
   seatByEntrantId: Map<string, number>;
   entrantById: Map<string, Entrant>;
   entrantCount: number;
+  // Whether this chart may identify the round-1 bye.
+  //
+  // Defaults to false because the seating chart is the one thing shown to a
+  // whole room *before* pairings are revealed — a labelled, differently
+  // styled seat would announce who is sitting out round 1 to everybody,
+  // which is the same early leak PI-118 closed on public standings (a bye is
+  // auto-scored the instant round 1 is generated). Callers pass true only
+  // once round 1's pairings are actually revealed, so the two surface
+  // together.
+  //
   // PI-115 — a single physical table within a split pod is real seats only
   // (no artificially-doubled slot), so an odd table size never implies an
   // empty/bye chair the way a whole unsplit pod's does. Split-table callers
-  // pass false to suppress the badge entirely, since the pod-wide bye
-  // entrant (there's only ever one) may or may not even sit at this table.
+  // leave this off regardless, since the pod-wide bye entrant (there's only
+  // ever one) may or may not even sit at this table.
   showByeBadge?: boolean;
 }) {
   const tableCount = Math.ceil(entrantCount / 2);
