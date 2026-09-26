@@ -4,7 +4,9 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.16.4**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.16.5**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+
+**v0.16.5:** a pairing-correctness fix found in a real 42-entrant event. PI-138 — pods above the exact-solver's size limit pair via a greedy fallback that never backtracks, so the last two entrants left could be a pair who had already met, and it emitted that repeat silently; within-pod repeats are a documented hard rule. Greedy now repairs a forced repeat by exchanging partners with another pair, and raises `PairingError` if it genuinely cannot, exactly as the exact solver already did. PI-139 — manual pairing and swap never checked within-pod history at all; both now warn (never block) when they create a rematch. **Browser-verify pending.**
 
 **v0.16.4:** two bug fixes reported by Tobias from a real pod. PI-136 — the seating chart identified who had round 1's bye (a labelled, differently-styled seat) on the page projected for the room, before pairings were revealed. PI-137 — a pod whose round 1 was generated for seatings but never started counted as *played*, so its auto-scored bye handed the entrant a Hall of Fame crown, a win in player stats, Gesamtwertung points, and a row in the player data export. Both code-complete with regression tests confirmed failing against the previous behaviour first — **browser-verify pending**.
 
@@ -39,6 +41,24 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 _New feature requests go here. Keep each one self-contained enough to pick up cold in a future session, then move it to `docs/BUILD-LOG.md` once it's shipped **and** browser-verified._
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
+
+### PI-138 — Greedy pairing emitted a silent repeat opponent ⏳ (fixed 2026-09-26, browser-verify pending)
+Reported by Tobias (2026-09-26) from the live `app.` instance: a 42-entrant SEALED pod re-paired two players in round 6 who had already met in round 3. Confirmed against the real data — at that moment every player still had 26–29 legal partners out of 31, and a repeat-free perfect matching demonstrably existed, so nothing about the round forced it.
+
+A pod over `EXACT_MATCHING_POOL_LIMIT` (18) skips the backtracking exact solver entirely, so greedy paired every round of that pod. Greedy skips illegal partners while scanning, so the hard-avoid holds until the very end — then the final entrant has exactly one candidate left, and if they had met, `findIndex` returned -1 and the code fell through to index 0, pairing the repeat anyway. The prior comment defended this as "only when a player has already faced everyone left below them", which was wrong: it is greedy's own earlier choices, with no backtracking to undo them.
+
+- [x] A forced repeat is now repaired by exchanging partners with another pair. Both recombinations are checked in full before either is applied, so a repair can never trade one repeat for another.
+- [x] If no repair exists, `solveGreedy` returns null and the caller raises `PairingError` — the same "use manual pairing to resolve this round" path the exact solver's null already took. A hard rule no longer degrades to a soft one silently.
+- [x] **Test** (`pairing.test.ts`): a soak rather than a fixture, deliberately — pool order comes from an unordered `findMany`, so which two entrants end up last cannot be pinned down, and two hand-built collisions passed against the broken code before this was understood. Nine rounds of a 22-entrant pod measured 5/5 pods repeating without the repair and 0/5 with it; the test fails at round 6, same as production. Server suite 245/245.
+- [ ] **Not browser-verified**: Tobias should run a large pod (20+) through several rounds on a live instance and confirm no rematch appears. The existing Reality Fracture pod is unaffected — this changes future pairings only; its round 6 rematch is still recorded and can be corrected with a swap.
+
+### PI-139 — Manual pairing and swap created rematches silently ⏳ (fixed 2026-09-26, browser-verify pending)
+Found while investigating PI-138: neither `POST /pods/:id/rounds/manual` nor `POST /rounds/:id/swap` consulted within-pod history, so an organizer could recreate by hand exactly the repeat the engine treats as a hard rule, with nothing said.
+
+- [x] New shared `findRepeatPairings(podId, roundNumber, pairs)` (`services/pairing.ts`); both routes return the offending pairs as `repeatWarnings`.
+- [x] `PairingsPage` shows a warning banner after a swap, naming who already played, and noting the swap was applied.
+- [x] Deliberately a warning, not a block: an organizer overriding the engine is legitimate, and a round may genuinely have no repeat-free arrangement left. The goal is only that an accidental rematch doesn't reach the table unnoticed.
+- [ ] **Not browser-verified**: Tobias should confirm the banner appears on a swap that recreates a prior pairing, and stays absent otherwise.
 
 ### PI-136 — Seating chart revealed round 1's bye ⏳ (fixed 2026-09-26, browser-verify pending)
 Reported by Tobias (2026-09-26) from a real 39-entrant pod. The seat holding the bye rendered with a dashed border, a sunken background and a "Round 1 bye" label — on `SeatingsPage` (the page an organizer projects while the room finds its seats) and on `PublicPodPage`. A bye is auto-scored the instant round 1 is generated, so this announced who was sitting out before pairings were revealed: the same early-leak class as PI-118, one surface further on.
