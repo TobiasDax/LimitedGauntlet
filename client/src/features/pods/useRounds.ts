@@ -62,11 +62,25 @@ export interface ManualPairInput {
   tableSizes?: number[];
 }
 
+// A pairing an organizer created by hand that puts two entrants together who
+// have already met in this pod. Never blocks the action — an organizer may be
+// overriding the engine deliberately, or the round may have no repeat-free
+// arrangement left — but the UI surfaces it so an accidental repeat doesn't
+// reach the table unnoticed.
+export interface RepeatWarning {
+  entrantAId: string;
+  entrantBId: string;
+}
+
 export function useManualPairRound(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ pairs, onDemandResolution, tableSizes }: ManualPairInput) =>
-      api.post<{ round: Round }>(`/pods/${podId}/rounds/manual`, { pairs, onDemandResolution, tableSizes }),
+      api.post<{ round: Round; repeatWarnings?: RepeatWarning[] }>(`/pods/${podId}/rounds/manual`, {
+        pairs,
+        onDemandResolution,
+        tableSizes,
+      }),
     onSuccess: () => invalidatePod(queryClient, podId),
   });
 }
@@ -82,7 +96,8 @@ export interface SwapPairingInput {
 export function useSwapPairing(podId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ roundId, ...body }: SwapPairingInput) => api.post<{ ok: true }>(`/rounds/${roundId}/swap`, body),
+    mutationFn: ({ roundId, ...body }: SwapPairingInput) =>
+      api.post<{ ok: true; repeatWarnings?: RepeatWarning[] }>(`/rounds/${roundId}/swap`, body),
     onSuccess: () => invalidatePod(queryClient, podId),
   });
 }
