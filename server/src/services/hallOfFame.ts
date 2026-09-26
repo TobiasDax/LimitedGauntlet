@@ -27,7 +27,7 @@ export async function computeHallOfFame(orgId: string): Promise<HallOfFameRow[]>
   const pods = await prisma.pod.findMany({
     where: { tournament: { orgId }, excludeFromStats: false },
     include: {
-      rounds: { select: { id: true } },
+      rounds: { select: { id: true, status: true } },
       entrants: { include: { team: { include: { members: true } } } },
       tournament: { select: { id: true, name: true } },
     },

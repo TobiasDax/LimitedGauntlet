@@ -31,7 +31,7 @@ interface EntrantForParticipation {
 
 interface PodForParticipation {
   status: PodStatus;
-  rounds: readonly unknown[];
+  rounds: readonly { status: string }[];
   entrants: EntrantForParticipation[];
 }
 
@@ -109,7 +109,7 @@ export async function computeGesamtwertung(tournamentId: string): Promise<Gesamt
       where: { tournamentId },
       orderBy: { sequenceOrder: "asc" },
       include: {
-        rounds: { select: { id: true } },
+        rounds: { select: { id: true, status: true } },
         entrants: { include: { team: { include: { members: true } } } },
       },
     }),
