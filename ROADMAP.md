@@ -42,7 +42,7 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
-### PI-141 — Public routes publish whole DB rows ⏳ (found 2026-09-28, not started)
+### PI-141 — Public routes publish whole DB rows ⏳ (fixed 2026-09-28, browser-verify pending)
 **Prerequisite for PI-140.** Three places in `routes/public.ts` spread a raw Prisma row into the public response:
 
 - `:265` — `...tournament`, and `findPublicTournament` (`services/ownership.ts`) has no `select`
@@ -51,8 +51,11 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 So every column on `Tournament` and `Pod` is published by default, and **any new column is public the moment its migration runs** — no code change, nothing failing. Nothing sensitive leaks today (every current column is public-ish), which is exactly why it has gone unnoticed. This is PI-126's bug class — it fixed the same pattern for `Round.onDemandWithdrawals` — generalised to the two models that never got the treatment.
 
-- [ ] Replace each spread with an explicit allowlist of published fields, the shape PI-126 used for rounds.
-- [ ] Test that a newly added column does not appear in any public response (assert the exact key set, so the test fails when someone adds a field rather than hoping they remember).
+- [x] `publicTournamentFields()` / `publicPodFields()` in `services/publicVisibility.ts` — exhaustive allowlists, not omit-lists — applied at all three sites. Placed in a service rather than the route so they fall under this repo's "services are tested, routes are code-reviewed" convention.
+- [x] The published field set is byte-for-byte what was public before, so nothing about the public pages moved. Only the *default* changed: a new column now publishes nothing until it is added here deliberately.
+- [x] **Tests** (`publicVisibility.test.ts`): the exact key set is pinned for both models, so adding a column makes the test fail and forces a decision instead of leaking silently; plus a direct case proving an `internalNotes`-shaped column added to the row never reaches the output. Server suite 248/248.
+- [x] Caught while building: the tournament page's pods carry a nested `rounds` summary (PI-58) that is not part of the Pod row, so the allowlist stripped the public progress labels. Now carried through explicitly.
+- [ ] **Not browser-verified**: Tobias should load a public tournament page and a public pod page and confirm nothing visibly changed — pod progress labels, timers, capacity cues and token displays in particular.
 
 ### PI-140 — Internal notes for a tournament (organizer-only) ⏳ (idea from Tobias 2026-09-28, not started)
 An organizer-only free-text field for notes the TOs keep between themselves — a table restart, a late player, a ruling, anything that shouldn't be on a public page. Shown as its own tab.

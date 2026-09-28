@@ -9,7 +9,7 @@ import { computePodStandings } from "../services/standings.js";
 import { computeHallOfFameOverview, computePlayerStats, type HeadToHeadEntry } from "../services/playerStats.js";
 import { computeSeatings, computeSplitSeatings } from "../services/seatings.js";
 import { redactUnrevealedRound1, isRound1Unrevealed } from "../services/pairingsVisibility.js";
-import { buildRedactor, type Redactor } from "../services/publicVisibility.js";
+import { buildRedactor, publicPodFields, publicTournamentFields, type Redactor } from "../services/publicVisibility.js";
 import { getHiddenPlayerAliases } from "../services/playerPrivacy.js";
 
 const tournamentParams = z.object({ slug: z.string().min(1), id: z.string().min(1) });
@@ -257,12 +257,20 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
     ]);
 
     const playersPlayed = countTournamentParticipants(podsWithEntrants);
-    const pods = podsWithEntrants.map(({ entrants, ...pod }) => ({ ...pod, entrantCount: entrants.length }));
+    // PI-141 — explicit allowlist, not a spread of the raw row. `rounds` is
+    // carried through deliberately: PI-58 nests a round-number/status summary
+    // here so the client can derive a pod's progress label, and it is not part
+    // of the Pod row itself.
+    const pods = podsWithEntrants.map(({ entrants, rounds, ...pod }) => ({
+      ...publicPodFields(pod),
+      rounds,
+      entrantCount: entrants.length,
+    }));
 
     reply.send({
       organization: { id: organization.id, slug: organization.slug, name: organization.name },
       tournament: {
-        ...tournament,
+        ...publicTournamentFields(tournament),
         pods,
         players: players.map((tp) => ({ ...tp, player: shapePublicPlayer(tp.player, redactor) })),
         playersPlayed,
@@ -339,7 +347,9 @@ export async function publicRoutes(app: FastifyInstance): Promise<void> {
       }),
       publicRedactorByTournament(pod.tournamentId),
     ]);
-    reply.send({ pod: { ...pod, entrants: entrants.map((e) => redactEntrant(e, redactor)) } });
+    reply.send({
+      pod: { ...publicPodFields(pod), entrants: entrants.map((e) => redactEntrant(e, redactor)) },
+    });
   });
 
   app.get("/api/public/o/:slug/pods/:id/rounds", async (request, reply) => {
