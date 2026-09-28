@@ -42,6 +42,28 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
+### PI-140 — Internal notes tab per pod (organizer-only) ⏳ (idea from Tobias 2026-09-28, not started)
+An organizer-only free-text field on a pod, shown as its own tab, for notes the TOs keep between themselves during an event — a table restart, a late player, a ruling, anything that shouldn't be on a public page.
+
+**Shape decided with Tobias (2026-09-28):** a *single editable notes field*, mirroring how `Tournament.description` works today — not a threaded comment log with per-entry authors. One nullable column, no new table.
+
+**Note:** `Pod` has no text field at all today (only `Tournament` has `description`), so this is a pod's first. There is therefore no public pod description to mirror it against — if a *public* pod blurb is ever wanted, it's the same shape and should be added deliberately, not as a side effect of this.
+
+**To build:**
+- [ ] `Pod.internalNotes String?` (+ migration). Optionally `internalNotesEditedById` / `internalNotesEditedAt` so a co-organizer can see who last touched it — cheap, and useful once an org has more than one TO.
+- [ ] Read/write through the existing organizer pod routes (`GET /api/pods/:id`, `PATCH /api/pods/:id`), which already require org membership. No new auth surface.
+- [ ] A "Notes" tab on the organizer's pod page, alongside Entrants/Pairings.
+
+**Must not leak — the whole point of the feature:**
+- [ ] Never selected by any route in `routes/public.ts`. Those handlers reduce to explicit shapes already (cf. PI-126), so this means *not adding it*, and confirming no `include`/spread carries it.
+- [ ] Never in webhook payloads (`services/webhooks.ts`).
+- [ ] Never in the player self-service data export (`services/playerDataExport.ts`).
+- [ ] Add a test asserting the public pod response has no `internalNotes` key, in the same spirit as PI-126's allowlist.
+
+**Two judgement calls worth making explicitly when this is built:**
+- **Org export:** should be included. The JSON org export is the backup/round-trip format, it is organizer-facing already, and dropping the field would silently lose data on a restore.
+- **GDPR:** free text about players *is* personal data, and a note naming someone falls in scope of a real data-subject access request. Keeping it out of the self-service player export is the right call (it is org-internal working material, not something to auto-publish to the player), but the org export must therefore be able to produce it. Worth a line in `docs/gdpr.md` so a deployer knows notes are covered by a DSAR and shouldn't be used for anything they wouldn't stand behind.
+
 ### PI-138 — Greedy pairing emitted a silent repeat opponent ⏳ (fixed 2026-09-26, browser-verify pending)
 Reported by Tobias (2026-09-26) from the live `app.` instance: a 42-entrant SEALED pod re-paired two players in round 6 who had already met in round 3. Confirmed against the real data — at that moment every player still had 26–29 legal partners out of 31, and a repeat-free perfect matching demonstrably existed, so nothing about the round forced it.
 
