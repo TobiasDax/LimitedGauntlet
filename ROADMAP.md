@@ -42,27 +42,38 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
-### PI-140 — Internal notes tab per pod (organizer-only) ⏳ (idea from Tobias 2026-09-28, not started)
-An organizer-only free-text field on a pod, shown as its own tab, for notes the TOs keep between themselves during an event — a table restart, a late player, a ruling, anything that shouldn't be on a public page.
+### PI-141 — Public routes publish whole DB rows ⏳ (found 2026-09-28, not started)
+**Prerequisite for PI-140.** Three places in `routes/public.ts` spread a raw Prisma row into the public response:
 
-**Shape decided with Tobias (2026-09-28):** a *single editable notes field*, mirroring how `Tournament.description` works today — not a threaded comment log with per-entry authors. One nullable column, no new table.
+- `:265` — `...tournament`, and `findPublicTournament` (`services/ownership.ts`) has no `select`
+- `:342` — `...pod`, same for `findPublicPod`
+- `:260` — each pod inside the tournament page
 
-**Note:** `Pod` has no text field at all today (only `Tournament` has `description`), so this is a pod's first. There is therefore no public pod description to mirror it against — if a *public* pod blurb is ever wanted, it's the same shape and should be added deliberately, not as a side effect of this.
+So every column on `Tournament` and `Pod` is published by default, and **any new column is public the moment its migration runs** — no code change, nothing failing. Nothing sensitive leaks today (every current column is public-ish), which is exactly why it has gone unnoticed. This is PI-126's bug class — it fixed the same pattern for `Round.onDemandWithdrawals` — generalised to the two models that never got the treatment.
+
+- [ ] Replace each spread with an explicit allowlist of published fields, the shape PI-126 used for rounds.
+- [ ] Test that a newly added column does not appear in any public response (assert the exact key set, so the test fails when someone adds a field rather than hoping they remember).
+
+### PI-140 — Internal notes for a tournament (organizer-only) ⏳ (idea from Tobias 2026-09-28, not started)
+An organizer-only free-text field for notes the TOs keep between themselves — a table restart, a late player, a ruling, anything that shouldn't be on a public page. Shown as its own tab.
+
+**Scope corrected by Tobias (2026-09-28): tournament level, not pod.** Descriptions live on `Tournament`, so internal notes belong beside `Tournament.description` as a true private mirror of it. (The original write-up put this on `Pod`, which has no text field at all.)
+
+**Shape decided (2026-09-28):** a *single editable notes field*, mirroring how `description` already works — not a threaded comment log with per-entry authors. One nullable column, no new table.
 
 **To build:**
-- [ ] `Pod.internalNotes String?` (+ migration). Optionally `internalNotesEditedById` / `internalNotesEditedAt` so a co-organizer can see who last touched it — cheap, and useful once an org has more than one TO.
-- [ ] Read/write through the existing organizer pod routes (`GET /api/pods/:id`, `PATCH /api/pods/:id`), which already require org membership. No new auth surface.
-- [ ] A "Notes" tab on the organizer's pod page, alongside Entrants/Pairings.
+- [ ] `Tournament.internalNotes String?` (+ migration). Optionally `internalNotesEditedById` / `internalNotesEditedAt` so a co-organizer can see who last touched it — cheap, and useful once an org has more than one TO.
+- [ ] Read/write through the existing organizer routes: `GET /api/tournaments/:id` and `PATCH /api/tournaments/:id` (add the field to `tournamentUpdateSchema`). Both already require org membership, so no new auth surface.
+- [ ] A "Notes" tab on the organizer's tournament page.
+- [ ] Include it in the org export (`services/orgExport.ts`, alongside `description`) — that export is the backup/round-trip format, so omitting it would silently lose the notes on a restore.
 
 **Must not leak — the whole point of the feature:**
-- [ ] Never selected by any route in `routes/public.ts`. Those handlers reduce to explicit shapes already (cf. PI-126), so this means *not adding it*, and confirming no `include`/spread carries it.
+- [ ] **Do PI-141 first.** Because the public tournament route spreads the raw row, adding this column leaks it publicly on day one unless the allowlist lands first. This ordering is the single thing not to get wrong.
 - [ ] Never in webhook payloads (`services/webhooks.ts`).
 - [ ] Never in the player self-service data export (`services/playerDataExport.ts`).
-- [ ] Add a test asserting the public pod response has no `internalNotes` key, in the same spirit as PI-126's allowlist.
+- [ ] Test that the public tournament response has no `internalNotes` key.
 
-**Two judgement calls worth making explicitly when this is built:**
-- **Org export:** should be included. The JSON org export is the backup/round-trip format, it is organizer-facing already, and dropping the field would silently lose data on a restore.
-- **GDPR:** free text about players *is* personal data, and a note naming someone falls in scope of a real data-subject access request. Keeping it out of the self-service player export is the right call (it is org-internal working material, not something to auto-publish to the player), but the org export must therefore be able to produce it. Worth a line in `docs/gdpr.md` so a deployer knows notes are covered by a DSAR and shouldn't be used for anything they wouldn't stand behind.
+**GDPR:** free text about players *is* personal data, and a note naming someone falls in scope of a real subject access request. Keeping it out of the self-service player export is right — it is org-internal working material, not something to auto-publish to the player — but the org export must therefore be able to produce it. Worth a line in `docs/gdpr.md` so a deployer knows notes are discoverable and shouldn't be used for anything they wouldn't stand behind.
 
 ### PI-138 — Greedy pairing emitted a silent repeat opponent ⏳ (fixed 2026-09-26, browser-verify pending)
 Reported by Tobias (2026-09-26) from the live `app.` instance: a 42-entrant SEALED pod re-paired two players in round 6 who had already met in round 3. Confirmed against the real data — at that moment every player still had 26–29 legal partners out of 31, and a repeat-free perfect matching demonstrably existed, so nothing about the round forced it.
