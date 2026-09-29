@@ -4,7 +4,9 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.16.6**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.17.0**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+
+**v0.17.0:** PI-143 — an automatic pre-deploy database backup. A one-shot `db-backup` Compose service dumps the database (compressed `pg_dump`, to a bind-mounted `./backups`, 20 retained) before the app container starts and therefore before `prisma migrate deploy` runs. It fires once per `docker compose up`, is fail-closed (a failed dump blocks startup, so nothing migrates without a fresh backup), and is on by default in both compose files. Compose-only — the app image is unchanged from v0.16.6.
 
 **v0.16.6:** organizer-only internal notes on a tournament, and the public-response hardening it needed first. PI-141 — the public routes spread raw Prisma rows, so every column on `Tournament`/`Pod` was published by default and any new one would go public the moment its migration ran; replaced with explicit field allowlists (`services/publicVisibility.ts`), tests pinning the exact key set. PI-140 — a private free-text field per tournament, the counterpart to the public description, sharing one tabbed Markdown editor with it; excluded from every public surface by construction thanks to PI-141, and from the player self-service export, but included in the org export and in scope of an Art. 15 request (`docs/gdpr.md`). PI-142 — both fields autosave (on blur + a slow debounce) with no Save button, an in-place cache update to stay clear of the rate limit, retry-on-failure, and a one-level Revert. All three browser-verified.
 
@@ -44,7 +46,7 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
-### PI-143 — Automatic pre-deploy database backup ⏳ (built 2026-09-29, deploy-verify pending)
+### PI-143 — Automatic pre-deploy database backup ✅ (v0.17.0, deploy-verify pending)
 Idea from Tobias (2026-09-29): snapshot the database before a version change touches it, as an automatic safety net ahead of migrations.
 
 Built as a one-shot `db-backup` Compose service (Option B of the two considered — see below), in both `docker-compose.yml` and `docker-compose.image.yml`:
