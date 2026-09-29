@@ -44,6 +44,17 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
+### PI-143 — Automatic pre-deploy database backup ⏳ (built 2026-09-29, deploy-verify pending)
+Idea from Tobias (2026-09-29): snapshot the database before a version change touches it, as an automatic safety net ahead of migrations.
+
+Built as a one-shot `db-backup` Compose service (Option B of the two considered — see below), in both `docker-compose.yml` and `docker-compose.image.yml`:
+- [x] Reuses the `postgres:16-alpine` image `db` already runs, so `pg_dump` always matches the server major and the app image is untouched (Option A — adding `postgresql-client-16` to the `node:22-slim` runtime — would have needed the PGDG apt repo to avoid a v15/v16 skew, and a writable mount on the `read_only` app container).
+- [x] `app` gains `depends_on: { db-backup: { condition: service_completed_successfully } }`, so it runs to completion **before the app starts**, hence before the entrypoint's `prisma migrate deploy`. Fires once per `docker compose up` (every deploy) but not on crash-loop restarts, since Compose doesn't re-run a satisfied one-shot — a close match to "before version changes" with no Prisma pending-migration gate needed.
+- [x] **Fail-closed** (Tobias's call): a failed dump leaves the condition unmet and the app won't start, so no migration ever runs without a fresh backup.
+- [x] `pg_dump -Fc` to bind-mounted `./backups`, keeping the 20 newest; `./backups/` gitignored (live player data). Shell vars in the inline command are `$$`-escaped so Compose interpolates only the `${...}` from `.env`.
+- [x] **On by default for everyone** (Tobias's call) — ships in both public compose files; `docs/deployment.md` documents it, the `pg_restore` rollback command, and how to remove it.
+- [ ] **Not deploy-verified**: Tobias should confirm on a real `docker compose up` that a dump lands in `./backups/`, that a deliberately-broken dump blocks app startup (fail-closed), and that the documented `pg_restore` actually restores.
+
 ### PI-142 — Autosave the tournament description / internal notes ✅ (v0.16.6)
 Idea from Tobias (2026-09-29): drop the Save button and have both fields save themselves, which also removes PI-140's drop-the-draft-on-tab-switch behaviour by making drafts impossible.
 

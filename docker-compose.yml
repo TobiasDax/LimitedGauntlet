@@ -59,6 +59,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-backup:
+        condition: service_completed_successfully
     restart: unless-stopped
     # Hardening: unprivileged (the image runs as the `node` user), no way to
     # regain privileges, no Linux capabilities, read-only root filesystem
@@ -112,6 +114,49 @@ services:
     # is the one hardening flag that's safe to apply here.
     security_opt:
       - "no-new-privileges:true"
+    networks:
+      - backend
+
+  # PI-143 — one-shot pre-deploy database backup. `app` depends on this with
+  # condition: service_completed_successfully, so it runs to completion BEFORE
+  # the app starts — and therefore before the app entrypoint's
+  # `prisma migrate deploy`. It fires once per `docker compose up` (every
+  # deploy / version change) but NOT on a crash-loop restart, since Compose
+  # doesn't re-run a one-shot whose dependency is already satisfied. If the dump
+  # fails the condition is never met and the app won't start, so no migration
+  # ever runs without a fresh backup on disk first (fail-closed, on purpose).
+  #
+  # Reuses the postgres:16-alpine image `db` already runs, so pg_dump always
+  # matches the server major and the app image is untouched. Writes a compressed
+  # custom-format archive to the bind-mounted ./backups, keeping the 20 newest.
+  # Restore one with:
+  #   docker compose run --rm --entrypoint sh db-backup -c \
+  #     'pg_restore --clean --if-exists -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB" /backups/<file>.dump'
+  db-backup:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-limitedgauntlet}
+      POSTGRES_DB: ${POSTGRES_DB:-limitedgauntlet}
+      # pg_dump reads the password here; never on the command line.
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    # Override the postgres image's server-starting entrypoint with a shell.
+    # $$ keeps Compose from interpolating the script's own shell variables —
+    # only the ${...} in `environment:` above is read from .env.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        out="/backups/pre-deploy-$$(date +%Y%m%d-%H%M%S).dump"
+        echo "[db-backup] dumping to $$out"
+        pg_dump -Fc -h db -U "$$POSTGRES_USER" "$$POSTGRES_DB" > "$$out"
+        ls -1t /backups/pre-deploy-*.dump | tail -n +21 | xargs -r rm -f
+        echo "[db-backup] done; kept the 20 most recent dumps"
+    restart: "no"
     networks:
       - backend
 
