@@ -4,7 +4,9 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.16.5**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.16.6**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+
+**v0.16.6:** organizer-only internal notes on a tournament, and the public-response hardening it needed first. PI-141 — the public routes spread raw Prisma rows, so every column on `Tournament`/`Pod` was published by default and any new one would go public the moment its migration ran; replaced with explicit field allowlists (`services/publicVisibility.ts`), tests pinning the exact key set. PI-140 — a private free-text field per tournament, the counterpart to the public description, sharing one tabbed Markdown editor with it; excluded from every public surface by construction thanks to PI-141, and from the player self-service export, but included in the org export and in scope of an Art. 15 request (`docs/gdpr.md`). PI-142 — both fields autosave (on blur + a slow debounce) with no Save button, an in-place cache update to stay clear of the rate limit, retry-on-failure, and a one-level Revert. All three browser-verified.
 
 **v0.16.5:** a pairing-correctness fix found in a real 42-entrant event. PI-138 — pods above the exact-solver's size limit pair via a greedy fallback that never backtracks, so the last two entrants left could be a pair who had already met, and it emitted that repeat silently; within-pod repeats are a documented hard rule. Greedy now repairs a forced repeat by exchanging partners with another pair, and raises `PairingError` if it genuinely cannot, exactly as the exact solver already did. PI-139 — manual pairing and swap never checked within-pod history at all; both now warn (never block) when they create a rematch. **Browser-verify pending.**
 
@@ -42,7 +44,7 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
-### PI-142 — Autosave the tournament description / internal notes ⏳ (built 2026-09-29, browser-verify pending)
+### PI-142 — Autosave the tournament description / internal notes ✅ (v0.16.6)
 Idea from Tobias (2026-09-29): drop the Save button and have both fields save themselves, which also removes PI-140's drop-the-draft-on-tab-switch behaviour by making drafts impossible.
 
 **It does solve that cleanly** — with nothing uncommitted, switching tabs has nothing to lose or misroute. The costs below are what need deciding first.
@@ -75,7 +77,7 @@ Idea from Tobias (2026-09-29): drop the Save button and have both fields save th
 - Concurrent editing by two organizers is still last-write-wins, now more reachable since every pause is a write — needs per-field versioning to fix properly, out of scope here.
 - The edit stamp becomes "who typed last", not "who authored the note".
 
-### PI-141 — Public routes publish whole DB rows ⏳ (fixed 2026-09-28, browser-verify pending)
+### PI-141 — Public routes publish whole DB rows ✅ (v0.16.6)
 **Prerequisite for PI-140.** Three places in `routes/public.ts` spread a raw Prisma row into the public response:
 
 - `:265` — `...tournament`, and `findPublicTournament` (`services/ownership.ts`) has no `select`
@@ -90,7 +92,7 @@ So every column on `Tournament` and `Pod` is published by default, and **any new
 - [x] Caught while building: the tournament page's pods carry a nested `rounds` summary (PI-58) that is not part of the Pod row, so the allowlist stripped the public progress labels. Now carried through explicitly.
 - [ ] **Not browser-verified**: Tobias should load a public tournament page and a public pod page and confirm nothing visibly changed — pod progress labels, timers, capacity cues and token displays in particular.
 
-### PI-140 — Internal notes for a tournament (organizer-only) ⏳ (built 2026-09-29, browser-verify pending)
+### PI-140 — Internal notes for a tournament (organizer-only) ✅ (v0.16.6)
 An organizer-only free-text field for notes the TOs keep between themselves — a table restart, a late player, a ruling, anything that shouldn't be on a public page. Shown as its own tab.
 
 **Scope corrected by Tobias (2026-09-28): tournament level, not pod.** Descriptions live on `Tournament`, so internal notes belong beside `Tournament.description` as a true private mirror of it. (The original write-up put this on `Pod`, which has no text field at all.)
