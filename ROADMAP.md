@@ -42,7 +42,7 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
-### PI-142 — Autosave the tournament description / internal notes ⏳ (scoped 2026-09-29, not started)
+### PI-142 — Autosave the tournament description / internal notes ⏳ (built 2026-09-29, browser-verify pending)
 Idea from Tobias (2026-09-29): drop the Save button and have both fields save themselves, which also removes PI-140's drop-the-draft-on-tab-switch behaviour by making drafts impossible.
 
 **It does solve that cleanly** — with nothing uncommitted, switching tabs has nothing to lose or misroute. The costs below are what need deciding first.
@@ -61,11 +61,19 @@ Idea from Tobias (2026-09-29): drop the Save button and have both fields save th
 
 **7. Minor:** `internalNotesEditedAt`/`ById` would update on every autosave, so the attribution becomes "who typed last", not "who wrote this note".
 
-**Recommended shape (cheapest thing that solves the actual problem):**
-- **Save on blur**, plus a slow (3–5s) debounce purely as crash/wifi insurance — not per keystroke. Switching tabs blurs, so the PI-140 hazard disappears; cost is ~1 request per editing session, so the rate limit is a non-issue.
-- **Stop invalidating the whole tournament query on these saves** — update the cached field in place instead, which also removes the clobber-while-typing risk.
-- **Replace the button with a status line** ("Saving…" / "Saved" / "Not saved — retrying"), since without a button that is the only way to know it worked.
-- **Keep an explicit revert** to replace Cancel.
+**Built (2026-09-29), the recommended shape:**
+- [x] Save on **blur**, plus a 3s debounce while typing purely as crash/wifi insurance — not per keystroke. Switching tabs blurs, so the PI-140 tab-switch hazard is gone: there is no uncommitted draft to drop or misroute.
+- [x] New `useAutosaveTournamentText` updates the detail cache **in place** instead of invalidating — so a refetch can't overwrite the textarea mid-type, and each save is one PATCH rather than a PATCH plus a full-tournament reload (the rate-limit concern). The edit stamp is set from the current user client-side, since the PATCH response is the bare row without the resolved editor name.
+- [x] The mutation **retries** (`retry: 2`) and, on failure, the text stays in the box with a `Not saved — will retry` status and an explicit **Retry** button — no Save button means a flaky-wifi failure must never lose the text silently.
+- [x] Status line replaces the Save button: `Saving…` / `Unsaved changes` / `Saved` / `Not saved — will retry` (aria-live).
+- [x] **Revert** replaces Cancel: restores the snapshot taken when editing began — a one-level undo of the current session. Documented limit: a value already autosaved over is gone (no server-side history).
+- [x] Kept a rendered resting state (RichText) with an Edit affordance, rather than a permanently-raw textarea, so the Markdown still renders when not editing. Done/Revert use `onMouseDown` preventDefault so clicking them doesn't fire the textarea's blur-save and race a second write.
+- [x] Client builds, typechecks, lints clean. No tests — client has no test infrastructure (consistent with every prior client-only change).
+- [ ] **Not browser-verified**: Tobias should confirm typing then clicking away saves; the status line tracks; Revert restores the pre-edit value; a dropped connection shows the error state and recovers on Retry; and switching tabs mid-edit no longer loses anything.
+
+**Not addressed (unchanged from the scope, conscious omissions):**
+- Concurrent editing by two organizers is still last-write-wins, now more reachable since every pause is a write — needs per-field versioning to fix properly, out of scope here.
+- The edit stamp becomes "who typed last", not "who authored the note".
 
 ### PI-141 — Public routes publish whole DB rows ⏳ (fixed 2026-09-28, browser-verify pending)
 **Prerequisite for PI-140.** Three places in `routes/public.ts` spread a raw Prisma row into the public response:
