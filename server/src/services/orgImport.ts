@@ -175,6 +175,8 @@ const tournamentSchema = z
     endDate: isoDate,
     location: z.string().max(200).nullable().optional(),
     description: z.string().max(10_000).nullable().optional(),
+    // PI-140 — optional so an export predating internal notes still imports.
+    internalNotes: z.string().max(10_000).nullable().optional(),
     status: z.nativeEnum(TournamentStatus),
     ...tournamentTokenFields,
     // Optional so exports predating PI-82 still import.
@@ -479,6 +481,7 @@ async function importOrgDataInTransaction(
         endDate: new Date(t.endDate),
         location: t.location ?? null,
         description: t.description ?? null,
+        internalNotes: t.internalNotes ?? null,
         status: t.status,
         tokenParticipation: t.tokenParticipation ?? 0,
         tokenStandingBonuses: t.tokenStandingBonuses ?? Prisma.DbNull,

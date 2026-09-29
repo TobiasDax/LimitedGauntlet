@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   useTournament,
@@ -6,7 +6,12 @@ import {
   tournamentStatusLabel,
   type TournamentDetail,
 } from "../features/tournaments/useTournament";
-import { useUpdateTournament, useDeleteTournament, useReorderPods } from "../features/tournaments/useTournaments";
+import {
+  useUpdateTournament,
+  useAutosaveTournamentText,
+  useDeleteTournament,
+  useReorderPods,
+} from "../features/tournaments/useTournaments";
 import { useCreatePod, podFormatLabel } from "../features/pods/usePods";
 import { useMe } from "../features/auth/useAuth";
 import { useTournamentRealtime } from "../features/tournaments/useTournamentRealtime";
@@ -131,57 +136,218 @@ function DeleteTournamentButton({ tournament }: { tournament: TournamentDetail }
   );
 }
 
-function DescriptionSection({ tournament }: { tournament: TournamentDetail }) {
-  const update = useUpdateTournament(tournament.id);
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(tournament.description ?? "");
+// PI-140 — the tournament's two free-text fields share one tabbed panel, so
+// they don't both occupy the page at once. The public description and the
+// organizers' private notes are the same *kind* of thing — Markdown blurbs
+// about this weekend — so they get the same editor; only who can read them
+// differs, which is what the tab labels and the private-tab note carry.
+//
+// Tab styling mirrors PodTabs (the Entrants/Pairings/Standings row) so the
+// two feel like the same control. Local state rather than routes, though:
+// these are two panes of one page, not two pages.
+const notesTabs = [
+  { key: "description", label: "Description" },
+  { key: "internal", label: "Internal notes" },
+] as const;
+type NotesTabKey = (typeof notesTabs)[number]["key"];
 
-  if (!editing) {
-    return (
-      <div className="mb-6">
-        {tournament.description ? (
-          <RichText text={tournament.description} />
-        ) : (
-          <p className="text-[13px] text-ink-muted">No description yet.</p>
-        )}
-        <button
-          onClick={() => {
-            setText(tournament.description ?? "");
-            setEditing(true);
-          }}
-          className="mt-1.5 text-[12px] tracking-wide text-link uppercase hover:text-link-strong"
-        >
-          {tournament.description ? "Edit description" : "+ Add description"}
-        </button>
-      </div>
-    );
-  }
+const AUTOSAVE_DEBOUNCE_MS = 3000;
+
+// Normalise a textarea's contents to what the field stores: trimmed, and
+// empty becomes null (so "  " and "" and null are all the same saved state).
+const normaliseNotes = (raw: string): string | null => raw.trim() || null;
+
+// PI-142 — the editing pane for one of the two fields. Autosaves instead of
+// offering a Save button: on blur, and on a slow debounce while typing as
+// crash/wifi insurance (not per keystroke — see useAutosaveTournamentText for
+// why the request rate matters). `saved` is the last value confirmed on the
+// server, kept current by the hook's in-place cache update, so it never
+// writes back into the textarea mid-type. `initial` is the snapshot from when
+// editing began — Revert restores it, the one-level undo that replaces the old
+// Cancel (there is no server-side history, so a value already autosaved over
+// is gone; Revert only rescues the current editing session).
+function NotesEditor({
+  tournamentId,
+  field,
+  saved,
+  placeholder,
+  onDone,
+}: {
+  tournamentId: string;
+  field: "description" | "internalNotes";
+  saved: string | null;
+  placeholder: string;
+  onDone: () => void;
+}) {
+  const autosave = useAutosaveTournamentText(tournamentId);
+  const [text, setText] = useState(saved ?? "");
+  const initialRef = useRef(saved);
+  const savedRef = useRef(saved);
+  savedRef.current = saved;
+
+  const dirty = normaliseNotes(text) !== saved;
+
+  // Fire a save only when the buffer actually differs from what the server
+  // already has, so blur and the debounce can both call this freely.
+  const flush = () => {
+    const next = normaliseNotes(text);
+    if (next === savedRef.current) return;
+    autosave.mutate({ field, value: next });
+  };
+
+  // Slow debounce: insurance against a crash or a closed laptop mid-edit, not
+  // the primary save path. Blur is. Re-armed on every keystroke.
+  useEffect(() => {
+    if (!dirty) return;
+    const timer = setTimeout(flush, AUTOSAVE_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, dirty]);
+
+  const status = autosave.isPending
+    ? "Saving…"
+    : autosave.isError
+      ? "Not saved — will retry"
+      : dirty
+        ? "Unsaved changes"
+        : "Saved";
 
   return (
-    <div className="mb-6 flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <Textarea
         rows={6}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={
-          "Venue notes, format explainer, schedule…\n\nMarkdown supported: # headings, - lists, **bold**, *italic*, tables, [links](https://…)."
-        }
+        onBlur={flush}
+        placeholder={placeholder}
       />
       <p className="text-[12px] text-ink-muted">
         Supports Markdown — headings, lists, <strong>bold</strong>/<em>italic</em>/<u>underline</u>, tables, and links.
+        Saves automatically.
       </p>
-      <div className="flex gap-2">
+      <div className="flex items-center gap-3">
+        {/* preventDefault on mousedown keeps focus in the textarea, so the
+            button click does NOT trigger the textarea's onBlur first — that
+            would fire a second save of the pre-click text and could reorder
+            with this one over the wire. The button owns the save instead. */}
         <Button
           variant="primary"
-          disabled={update.isPending}
-          onClick={() => update.mutate({ description: text.trim() || null }, { onSuccess: () => setEditing(false) })}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            flush();
+            onDone();
+          }}
         >
-          {update.isPending ? "Saving…" : "Save"}
+          Done
         </Button>
-        <Button variant="ghost" onClick={() => setEditing(false)}>
-          Cancel
-        </Button>
+        <button
+          type="button"
+          disabled={text === (initialRef.current ?? "")}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            setText(initialRef.current ?? "");
+            if (normaliseNotes(initialRef.current ?? "") !== savedRef.current) {
+              autosave.mutate({ field, value: initialRef.current });
+            }
+          }}
+          className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-strong disabled:opacity-40"
+        >
+          Revert
+        </button>
+        <span className={`text-[11.5px] ${autosave.isError ? "text-critical" : "text-ink-muted"}`} aria-live="polite">
+          {status}
+        </span>
+        {autosave.isError && (
+          <button
+            type="button"
+            onClick={flush}
+            className="text-[11.5px] tracking-wide text-link uppercase hover:text-link-strong"
+          >
+            Retry
+          </button>
+        )}
       </div>
+    </div>
+  );
+}
+
+function TournamentNotesSection({ tournament }: { tournament: TournamentDetail }) {
+  const [tab, setTab] = useState<NotesTabKey>("description");
+  const [editing, setEditing] = useState(false);
+
+  const isInternal = tab === "internal";
+  const value = isInternal ? (tournament.internalNotes ?? null) : (tournament.description ?? null);
+
+  // Leaving edit mode on a tab switch is now safe rather than lossy: autosave
+  // already persisted the text (the editor flushes on blur, and switching
+  // tabs blurs it), so there is no draft to drop or misroute.
+  const switchTab = (key: NotesTabKey) => {
+    setTab(key);
+    setEditing(false);
+  };
+
+  const editedLine =
+    isInternal && tournament.internalNotesEditedAt
+      ? `Last edited ${new Date(tournament.internalNotesEditedAt).toLocaleString()}${
+          tournament.internalNotesEditedByName ? ` by ${tournament.internalNotesEditedByName}` : ""
+        }`
+      : null;
+
+  return (
+    <div className="mb-6">
+      <div className="mb-3 flex gap-1 border-b border-border text-[12.5px] tracking-wide uppercase">
+        {notesTabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => switchTab(t.key)}
+            className={`px-3 py-2 ${tab === t.key ? "border-b-2 border-accent font-semibold text-ink" : "text-ink-muted hover:text-ink"}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {isInternal && <p className="mb-2 text-[12px] text-ink-muted">Organizers only — never shown on public pages.</p>}
+
+      {editing ? (
+        // key: force a fresh editor when the tab changes, so its buffer and
+        // Revert snapshot re-seed from the other field rather than carrying over.
+        <NotesEditor
+          key={tab}
+          tournamentId={tournament.id}
+          field={isInternal ? "internalNotes" : "description"}
+          saved={value}
+          placeholder={
+            isInternal
+              ? "Rulings, table restarts, who turned up late…\n\nMarkdown supported: # headings, - lists, **bold**, *italic*, tables, [links](https://…)."
+              : "Venue notes, format explainer, schedule…\n\nMarkdown supported: # headings, - lists, **bold**, *italic*, tables, [links](https://…)."
+          }
+          onDone={() => setEditing(false)}
+        />
+      ) : (
+        <>
+          {value ? (
+            <RichText text={value} />
+          ) : (
+            <p className="text-[13px] text-ink-muted">
+              {isInternal ? "No internal notes yet." : "No description yet."}
+            </p>
+          )}
+          {editedLine && <p className="mt-1.5 text-[11.5px] text-ink-muted">{editedLine}</p>}
+          <button
+            onClick={() => setEditing(true)}
+            className="mt-1.5 text-[12px] tracking-wide text-link uppercase hover:text-link-strong"
+          >
+            {value
+              ? isInternal
+                ? "Edit notes"
+                : "Edit description"
+              : isInternal
+                ? "+ Add notes"
+                : "+ Add description"}
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -507,7 +673,7 @@ export function TournamentPage() {
       </div>
       {editingTournament && <EditTournamentForm tournament={tournament} onDone={() => setEditingTournament(false)} />}
 
-      <DescriptionSection tournament={tournament} />
+      <TournamentNotesSection tournament={tournament} />
 
       {tournament.playersPlayed > 0 && (
         <div className="mb-6 flex gap-5">

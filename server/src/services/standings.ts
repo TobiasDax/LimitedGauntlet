@@ -2,19 +2,36 @@ import type { PodStatus } from "../db.js";
 import { prisma } from "../prisma.js";
 import { computeAllPodStats } from "./podStats.js";
 
+// "Does this pod have pairings yet?" — true once round 1 exists, whether or
+// not it has started. Used where generated pairings are the thing that makes
+// an action unsafe: silently pulling an entrant out of an on-demand pod whose
+// pairings are already laid out would invalidate them (see
+// onDemandWithdrawal.ts). Deliberately *not* the gate for statistics — see
+// podIsPlayed below.
+export function podHasPairings(pod: { status: PodStatus; rounds: readonly unknown[] }): boolean {
+  return pod.rounds.length > 0 || pod.status === "COMPLETED";
+}
+
 // "Has this pod actually been played?" — the shared gate for every stat that
 // means participation or performance rather than roster assignment. A pod
-// counts once it's underway (at least one round has been generated — you
-// can't pair a pod without starting it) or finished (`status === COMPLETED`,
-// which also covers points-only imported historical pods that never had
-// Round rows). A pod still in SETUP with entrants pre-assigned but no rounds
-// does NOT count — treating "has an entrant row" as "played" was PI-99's
-// bug: not-yet-started pods reading as "N players played", a SETUP main
-// event minting a phantom champion, and empty Gesamtwertung columns.
-// Mirrors the frontend's `podProgressStatus()` "Setup" test. Canceled pods
-// are already excluded upstream via `excludeFromStats` (PI-84).
-export function podIsPlayed(pod: { status: PodStatus; rounds: readonly unknown[] }): boolean {
-  return pod.rounds.length > 0 || pod.status === "COMPLETED";
+// counts once a round has actually started, or once it's finished
+// (`status === COMPLETED`, which also covers points-only imported historical
+// pods that never had Round rows).
+//
+// Generating round 1 is NOT enough. This used to test `rounds.length > 0` on
+// the assumption that "you can't pair a pod without starting it" — which
+// stopped being true when seatings (PI-79/80) began generating round 1 purely
+// so players can find their seats, well before anyone plays. Because a bye is
+// auto-scored the moment round 1 is generated, that made an unstarted pod
+// award its bye entrant a win: a phantom champion with a crown in the Hall of
+// Fame, and a win in their player stats, for a pod nobody had played yet.
+// (Same root cause as PI-118's standings leak, one layer further on.)
+//
+// A pod still in SETUP with entrants pre-assigned but no rounds does not count
+// either — treating "has an entrant row" as "played" was PI-99's bug.
+// Canceled pods are already excluded upstream via `excludeFromStats` (PI-84).
+export function podIsPlayed(pod: { status: PodStatus; rounds: readonly { status: string }[] }): boolean {
+  return pod.status === "COMPLETED" || pod.rounds.some((round) => round.status !== "PENDING");
 }
 
 export interface StandingsRow {

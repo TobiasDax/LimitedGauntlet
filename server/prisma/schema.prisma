@@ -367,6 +367,22 @@ model Tournament {
   // contain URLs / [label](url) links (e.g. to Outline pages); rendered
   // safely as text-plus-links on the client, never as raw HTML.
   description String?
+  // PI-140 — the private counterpart to `description`: notes the organizers
+  // keep between themselves (a table restart, a late player, a ruling). Never
+  // published. The public routes allowlist what they serve (PI-141), so this
+  // field is excluded by construction rather than by remembering to omit it —
+  // see services/publicVisibility.ts, whose tests pin that exact key set.
+  //
+  // Free text about players is personal data: a note naming someone is in
+  // scope of a subject access request, which is why the org export carries it
+  // (docs/gdpr.md). It is deliberately NOT in the player self-service export —
+  // that is org-internal working material, not something to auto-publish to
+  // the player.
+  internalNotes String?
+  // Who last saved the notes, and when — so a co-organizer can see whether
+  // what they are reading is current. Null until first saved.
+  internalNotesEditedAt   DateTime?
+  internalNotesEditedById String?
   status    TournamentStatus @default(PLANNING)
   // Default token rewards for this tournament's pods (PI-72; only in effect when
   // Organization.tokensEnabled). `tokenParticipation` is the flat award for

@@ -132,6 +132,11 @@ export interface ExportTournament {
   endDate: string;
   location: string | null;
   description: string | null;
+  // PI-140 — organizer-only notes. Included because this export is the
+  // backup/round-trip format: omitting them would silently lose the notes on
+  // a restore. Also what makes them producible for a subject access request
+  // (docs/gdpr.md) — deliberately unlike the player self-service export.
+  internalNotes: string | null;
   status: TournamentStatus;
   tokenParticipation: number;
   tokenStandingBonuses: ExportStandingBonus[] | null;
@@ -270,6 +275,7 @@ async function buildStructuralData(orgId: string): Promise<ExportData> {
       endDate: t.endDate.toISOString(),
       location: t.location,
       description: t.description,
+      internalNotes: t.internalNotes,
       status: t.status,
       tokenParticipation: t.tokenParticipation,
       tokenStandingBonuses: toStandingBonuses(t.tokenStandingBonuses),

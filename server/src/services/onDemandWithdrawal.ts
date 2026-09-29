@@ -1,6 +1,6 @@
 import type { Prisma } from "../db.js";
 import { prisma } from "../prisma.js";
-import { podIsPlayed } from "./standings.js";
+import { podHasPairings } from "./standings.js";
 
 // PI-100 — on-demand side events. When an on-demand pod's round 1 is generated,
 // every entrant in it is (optionally, the organizer chooses at the modal) pulled
@@ -99,8 +99,10 @@ async function conflictingSiblings(
 
   const out: { pod: PodWithEntrants; entrants: PodWithEntrants["entrants"] }[] = [];
   for (const sibling of siblings) {
-    // `podIsPlayed` wants `{ status, rounds }` — sibling carries both.
-    if (podIsPlayed(sibling)) continue;
+    // Pairings already generated means pulling this entrant out would
+    // invalidate them — `podHasPairings`, not `podIsPlayed`: an unstarted pod
+    // with round 1 laid out is exactly the case that must be left alone.
+    if (podHasPairings(sibling)) continue;
     const hits = sibling.entrants.filter((e) => playerIdsOfEntrant(e).some((id) => busy.playerIds.has(id)));
     if (hits.length > 0) out.push({ pod: sibling, entrants: hits });
   }
@@ -228,7 +230,7 @@ export async function restoreOnDemandWithdrawals(raw: unknown): Promise<{ restor
         entrants: { include: { team: { select: { members: { select: { playerId: true } } } } } },
       },
     });
-    if (!pod || podIsPlayed(pod)) continue;
+    if (!pod || podHasPairings(pod)) continue;
 
     const present = new Set<string>();
     for (const e of pod.entrants) {

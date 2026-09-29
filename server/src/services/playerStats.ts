@@ -286,13 +286,17 @@ export async function computeHallOfFameOverview(orgId: string): Promise<HallOfFa
     computeHallOfFame(orgId),
     buildLedger(orgId),
     prisma.tournament.count({ where: { orgId } }),
-    // "Pods played" — only pods that have started (≥1 round) or finished
-    // (COMPLETED, incl. points-only imports with no Round rows). PI-99.
+    // "Pods played" — the SQL-level twin of podIsPlayed (standings.ts); keep
+    // the two in step. A round that merely exists is not enough: seatings
+    // generate round 1 before anyone plays, so `rounds: { some: {} }` counted
+    // pods nobody had started. Must be a round that has actually left PENDING,
+    // or a COMPLETED pod (which also covers points-only imports that never had
+    // Round rows at all). PI-99.
     prisma.pod.count({
       where: {
         tournament: { orgId },
         excludeFromStats: false,
-        OR: [{ status: "COMPLETED" }, { rounds: { some: {} } }],
+        OR: [{ status: "COMPLETED" }, { rounds: { some: { status: { not: "PENDING" } } } }],
       },
     }),
     prisma.cardPull.findMany({

@@ -37,6 +37,10 @@ const tournamentUpdateSchema = z.object({
   // Default token rewards (PI-72) — stored regardless of Organization.tokensEnabled.
   tokenParticipation: z.number().int().min(0).optional(),
   tokenStandingBonuses: zStandingBonuses.optional(),
+  // PI-140 — organizer-only notes. Nullable so they can be cleared back to
+  // empty, same as `description` above. Same generous cap: these accumulate
+  // over a weekend.
+  internalNotes: z.string().trim().max(10000).nullable().optional(),
 });
 
 const idParams = z.object({ id: z.string().min(1) });
@@ -77,13 +81,11 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
     if (!(await orgAllowsTournamentSpan(orgId, parsed.data.startDate, parsed.data.endDate))) {
-      reply
-        .code(402)
-        .send({
-          error: ENTITLEMENT_REQUIRED,
-          reason: "tournament_duration",
-          maxDays: await orgMaxTournamentDays(orgId),
-        });
+      reply.code(402).send({
+        error: ENTITLEMENT_REQUIRED,
+        reason: "tournament_duration",
+        maxDays: await orgMaxTournamentDays(orgId),
+      });
       return;
     }
 
@@ -123,7 +125,19 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
     }
     const playersPlayed = countTournamentParticipants(tournament.pods);
     const pods = tournament.pods.map(({ entrants, ...pod }) => ({ ...pod, entrantCount: entrants.length }));
-    reply.send({ tournament: { ...tournament, pods, playersPlayed } });
+    // PI-140 — resolve the notes editor to a name for display. Looked up
+    // separately rather than via a relation: the id is a plain column (no FK),
+    // so a co-organizer who has since been removed leaves the notes readable
+    // with their attribution simply unresolved instead of breaking the page.
+    const notesEditor = tournament.internalNotesEditedById
+      ? await prisma.organizerAccount.findUnique({
+          where: { id: tournament.internalNotesEditedById },
+          select: { name: true },
+        })
+      : null;
+    reply.send({
+      tournament: { ...tournament, pods, playersPlayed, internalNotesEditedByName: notesEditor?.name ?? null },
+    });
   });
 
   app.patch("/api/tournaments/:id", async (request, reply) => {
@@ -153,20 +167,26 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
       const startDate = body.data.startDate ?? existing.startDate;
       const endDate = body.data.endDate ?? existing.endDate;
       if (!(await orgAllowsTournamentSpan(orgId, startDate, endDate))) {
-        reply
-          .code(402)
-          .send({
-            error: ENTITLEMENT_REQUIRED,
-            reason: "tournament_duration",
-            maxDays: await orgMaxTournamentDays(orgId),
-          });
+        reply.code(402).send({
+          error: ENTITLEMENT_REQUIRED,
+          reason: "tournament_duration",
+          maxDays: await orgMaxTournamentDays(orgId),
+        });
         return;
       }
     }
 
+    // PI-140 — stamp who last touched the notes, and when, but only when this
+    // request actually changes them: an unrelated PATCH (a rename, a status
+    // change) must not rewrite the attribution.
+    const notesEdit =
+      body.data.internalNotes !== undefined
+        ? { internalNotesEditedAt: new Date(), internalNotesEditedById: request.organizer!.id }
+        : {};
+
     const { count } = await prisma.tournament.updateMany({
       where: { id: params.data.id, orgId },
-      data: body.data,
+      data: { ...body.data, ...notesEdit },
     });
     if (count === 0) {
       reply.code(404).send({ error: "not_found" });

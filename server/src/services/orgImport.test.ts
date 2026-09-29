@@ -192,3 +192,79 @@ describe("privacy-flag export → import round-trip (PI-104/107/110)", () => {
     expect(parseOrgExport(envelope({ players: ["Alice"], tournaments: [] }))).toMatchObject({ ok: true });
   });
 });
+
+describe("internal notes export → import round-trip (PI-140)", () => {
+  // The org export is the backup format, so notes have to survive it — losing
+  // them on a restore would be silent data loss. It is also what makes them
+  // producible for a subject access request, deliberately unlike the player
+  // self-service export (docs/gdpr.md).
+  it("carries internalNotes across an import", async () => {
+    const u = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const src = await prisma.organization.create({ data: { slug: `in-src-${u}`, name: "Src" } });
+    await prisma.tournament.create({
+      data: {
+        orgId: src.id,
+        name: "Noted Weekend",
+        startDate: new Date("2026-10-02T00:00:00.000Z"),
+        endDate: new Date("2026-10-04T00:00:00.000Z"),
+        description: "Public blurb",
+        internalNotes: "Table 4 restarted; Ben got a R1 loss for arriving late.",
+      },
+    });
+    // A tournament that never had notes must round-trip as null, not "".
+    await prisma.tournament.create({
+      data: {
+        orgId: src.id,
+        name: "Quiet Weekend",
+        startDate: new Date("2026-11-06T00:00:00.000Z"),
+        endDate: new Date("2026-11-08T00:00:00.000Z"),
+      },
+    });
+
+    const exported = await buildOrgExport(src.id, { data: true, hallOfFame: false, treasureVault: false });
+    const noted = exported.data!.tournaments.find((t) => t.name === "Noted Weekend")!;
+    expect(noted.internalNotes).toBe("Table 4 restarted; Ben got a R1 loss for arriving late.");
+
+    const parsed = parseOrgExport(exported);
+    expect(parsed.ok).toBe(true);
+
+    const dest = await prisma.organization.create({ data: { slug: `in-dst-${u}`, name: "Dst" } });
+    await importOrgData(dest.id, parsed.data!);
+
+    const destNoted = await prisma.tournament.findFirstOrThrow({
+      where: { orgId: dest.id, name: "Noted Weekend" },
+    });
+    const destQuiet = await prisma.tournament.findFirstOrThrow({
+      where: { orgId: dest.id, name: "Quiet Weekend" },
+    });
+    expect(destNoted.internalNotes).toBe("Table 4 restarted; Ben got a R1 loss for arriving late.");
+    expect(destNoted.description).toBe("Public blurb");
+    expect(destQuiet.internalNotes).toBeNull();
+  });
+
+  // An export taken before this field existed must still import.
+  it("accepts an export with no internalNotes key", async () => {
+    const parsed = parseOrgExport({
+      ...envelope({
+        players: [],
+        tournaments: [
+          {
+            name: "Legacy Weekend",
+            startDate: "2026-10-02T00:00:00.000Z",
+            endDate: "2026-10-04T00:00:00.000Z",
+            location: null,
+            description: null,
+            status: "COMPLETED",
+            tokenParticipation: 0,
+            tokenStandingBonuses: null,
+            podsManuallyReordered: false,
+            players: [],
+            pods: [],
+          },
+        ],
+      }),
+      hallOfFame: [],
+    });
+    expect(parsed.ok).toBe(true);
+  });
+});

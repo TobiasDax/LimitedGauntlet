@@ -183,6 +183,8 @@ export function PublicPodPage() {
               seatByEntrantId={seatByEntrantId}
               entrantById={entrantById}
               entrantCount={pod.entrants.length}
+              // Same reveal condition as the pairings and standings above.
+              showByeBadge={!!round1?.pairingsRevealedAt}
             />
           )}
         </section>

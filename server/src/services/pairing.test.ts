@@ -324,4 +324,61 @@ describe("generatePairings", () => {
       expect(opponentsSeen.get(e.id)!.size).toBe(4);
     }
   });
+
+  // Reproduces a real production failure: a 42-entrant pod where round 6
+  // re-paired two players who had already met in round 3, while every player
+  // still had 26+ legal partners available.
+  //
+  // The cause is structural to greedy, not a lack of options. Greedy skips
+  // illegal partners while scanning, so the fallback only bites at the very
+  // end: when one entrant remains and they have already been faced, there is
+  // nothing left to skip to. Greedy never backtracks, so that tail collision
+  // is forced however many legal partners existed earlier — and it surfaces
+  // only once enough history has accumulated, which is why it took until
+  // round 6 of a real event to appear.
+  //
+  // Written as a soak rather than a hand-built fixture on purpose: the pool
+  // order comes from an unordered findMany, so which two entrants end up last
+  // is not something a fixture can pin down. Nine rounds of a 22-entrant pod
+  // is a reliable detector — measured at 5/5 pods repeating without the
+  // repair, and 0/5 with it.
+  it("never repeats an opponent across a long greedy pod (tail-collision repair)", async () => {
+    const SIZE = 22;
+    const ROUNDS = 9;
+    const { org, tournament } = await createOrgAndTournament();
+    const players = await createPlayers(
+      org.id,
+      Array.from({ length: SIZE }, (_, i) => `Soak${i + 1}`),
+    );
+    const pod = await createPod(tournament.id, { name: "Long Greedy Pod", roundCount: ROUNDS });
+    for (const p of players) {
+      await prisma.entrant.create({ data: { podId: pod.id, playerId: p.id } });
+    }
+
+    const seen = new Set<string>();
+    for (let round = 1; round <= ROUNDS; round++) {
+      const suggestion = await generatePairings(pod.id, round);
+
+      for (const pair of suggestion.pairs) {
+        if (!pair.entrantBId) continue;
+        const key = [pair.entrantAId, pair.entrantBId].sort().join("|");
+        expect(seen.has(key), `round ${round} repeated a pairing from an earlier round`).toBe(false);
+        seen.add(key);
+      }
+
+      const created = await prisma.round.create({ data: { podId: pod.id, roundNumber: round, status: "ACTIVE" } });
+      await prisma.match.createMany({
+        data: suggestion.pairs.map((pair, index) => ({
+          roundId: created.id,
+          tableNumber: index + 1,
+          entrantAId: pair.entrantAId,
+          entrantBId: pair.entrantBId,
+          result: pair.entrantBId ? ("A_WINS" as const) : ("PENDING" as const),
+          gamesWonA: pair.entrantBId ? 2 : 0,
+          reportedAt: pair.entrantBId ? new Date() : null,
+        })),
+      });
+      await prisma.round.update({ where: { id: created.id }, data: { status: "COMPLETED" } });
+    }
+  }, 60000);
 });

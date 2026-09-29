@@ -12,6 +12,7 @@ import {
   useSwapPairing,
   useUnpairRound,
   roundErrorMessage,
+  type RepeatWarning,
 } from "../features/pods/useRounds";
 import type { DroppedSelection } from "../features/pods/useRounds";
 import { entrantDisplayName } from "../lib/entrant";
@@ -278,6 +279,10 @@ function RoundCard({
   const completeRound = useCompleteRound(podId);
   const extendRound = useExtendRound(podId);
   const swapPairing = useSwapPairing(podId);
+  // A swap can put two entrants together who have already met. The server
+  // allows it — an organizer may be doing it on purpose — but says so, and
+  // this keeps that visible until the next swap replaces or clears it.
+  const [repeatWarnings, setRepeatWarnings] = useState<RepeatWarning[]>([]);
   const unpairRound = useUnpairRound(podId);
   const revealPairings = useRevealPairings(podId);
   const [selectedSlot, setSelectedSlot] = useState<SwapSlot | null>(null);
@@ -312,7 +317,10 @@ function RoundCard({
         matchBId: slot.matchId,
         sideB: slot.side,
       },
-      { onSettled: () => setSelectedSlot(null) },
+      {
+        onSuccess: (result) => setRepeatWarnings(result.repeatWarnings ?? []),
+        onSettled: () => setSelectedSlot(null),
+      },
     );
   };
 
@@ -410,6 +418,25 @@ function RoundCard({
 
       {completeRound.isError && <FormError>{roundErrorMessage(completeRound.error)}</FormError>}
       {swapPairing.isError && <FormError>{roundErrorMessage(swapPairing.error)}</FormError>}
+      {repeatWarnings.length > 0 && (
+        <div
+          role="alert"
+          className="border-warning/40 bg-warning-wash mt-3 rounded-md border px-4 py-3 text-[13px] text-ink"
+        >
+          <div className="font-semibold">
+            {repeatWarnings.length === 1 ? "This pairing is a rematch" : "These pairings are rematches"}
+          </div>
+          <ul className="mt-1 list-disc pl-5 text-ink-secondary">
+            {repeatWarnings.map((w) => (
+              <li key={`${w.entrantAId}-${w.entrantBId}`}>
+                {entrantDisplayName(entrantById.get(w.entrantAId)!)} vs{" "}
+                {entrantDisplayName(entrantById.get(w.entrantBId)!)} — already played earlier in this pod.
+              </li>
+            ))}
+          </ul>
+          <div className="mt-1 text-ink-muted">The swap was applied. Swap again if this wasn't intended.</div>
+        </div>
+      )}
       {unpairRound.isError && <FormError>{roundErrorMessage(unpairRound.error)}</FormError>}
       {revealPairings.isError && <FormError>{roundErrorMessage(revealPairings.error)}</FormError>}
     </div>

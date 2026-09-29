@@ -5,7 +5,13 @@ import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { requireOrgDataAccessible } from "../auth/entitlementGate.js";
 import { findOwnedPod, findOwnedRound, findOwnedMatch } from "../services/ownership.js";
-import { generatePairings, getActiveEntrants, getLatestRound, PairingError } from "../services/pairing.js";
+import {
+  generatePairings,
+  getActiveEntrants,
+  getLatestRound,
+  PairingError,
+  findRepeatPairings,
+} from "../services/pairing.js";
 import { fillTables, validateTableShape, MIN_TABLE_SIZE, type FillPair } from "../services/tableFill.js";
 import { inferCardPullAttribution } from "../services/cardPullInference.js";
 import { syncPodTokenAwards } from "../services/tokens.js";
@@ -340,7 +346,12 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
         });
       });
     }
-    reply.code(201).send({ round });
+    // Warn, don't block: an organizer pairing by hand may have no repeat-free
+    // arrangement left, or may be overriding the engine on purpose. The round
+    // stands either way — this just makes an accidental repeat visible.
+    const repeatWarnings = await findRepeatPairings(pod.id, nextRoundNumber, body.data.pairs);
+
+    reply.code(201).send({ round, repeatWarnings });
   });
 
   app.post("/api/rounds/:id/swap", async (request, reply) => {
@@ -389,7 +400,16 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     ]);
 
     emitPodEvent(round.podId, "pairings-updated", { roundId: round.id });
-    reply.send({ ok: true });
+
+    // A swap moves two entrants between tables, so it can create a repeat in
+    // either of the touched matches — re-check the round as it now stands.
+    const updated = await prisma.match.findMany({
+      where: { roundId: round.id },
+      select: { entrantAId: true, entrantBId: true },
+    });
+    const repeatWarnings = await findRepeatPairings(round.podId, round.roundNumber, updated);
+
+    reply.send({ ok: true, repeatWarnings });
   });
 
   // Undo a round's pairing entirely (PI-56) — only while it's still

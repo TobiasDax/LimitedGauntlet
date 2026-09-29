@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import type { StandingBonusRow, Tournament, TournamentStatus } from "../../lib/types";
+import { useMe } from "../auth/useAuth";
+import type { TournamentDetail } from "./useTournament";
 
 export function useTournaments() {
   return useQuery({
@@ -33,6 +35,8 @@ export interface UpdateTournamentInput {
   endDate?: string;
   location?: string | null;
   description?: string | null;
+  // PI-140 — organizer-only notes; null clears them.
+  internalNotes?: string | null;
   status?: TournamentStatus;
   tokenParticipation?: number;
   tokenStandingBonuses?: StandingBonusRow[];
@@ -45,6 +49,46 @@ export function useUpdateTournament(id: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tournaments", id] });
       void queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+    },
+  });
+}
+
+// PI-142 — autosave for the tournament's two Markdown text fields
+// (description / internal notes). Deliberately NOT useUpdateTournament:
+//
+//   - It updates the detail cache *in place* instead of invalidating. A
+//     refetch landing while the organizer is still typing would overwrite the
+//     textarea; and with saves firing on blur + a slow debounce, invalidating
+//     the whole tournament query each time would multiply requests against the
+//     global 200/min/IP limit (worse behind a shared venue NAT).
+//   - It retries, because there is no Save button to press again: a save that
+//     fails on flaky venue wifi must not drop the text silently.
+//
+// The edit stamp is set from the current user (whom we know client-side)
+// rather than re-fetched — the PATCH response is the bare row and doesn't
+// carry the resolved editor name that only the GET route computes.
+export function useAutosaveTournamentText(id: string) {
+  const queryClient = useQueryClient();
+  const { data: me } = useMe();
+  const editorName = me?.identity?.name ?? me?.organizer?.name ?? null;
+
+  return useMutation({
+    mutationFn: (input: { field: "description" | "internalNotes"; value: string | null }) =>
+      api.patch<{ tournament: Tournament }>(`/tournaments/${id}`, { [input.field]: input.value }),
+    retry: 2,
+    onSuccess: (_res, input) => {
+      queryClient.setQueryData<{ tournament: TournamentDetail }>(["tournaments", id], (prev) => {
+        if (!prev) return prev;
+        const patch =
+          input.field === "internalNotes"
+            ? {
+                internalNotes: input.value,
+                internalNotesEditedAt: new Date().toISOString(),
+                internalNotesEditedByName: editorName,
+              }
+            : { description: input.value };
+        return { tournament: { ...prev.tournament, ...patch } };
+      });
     },
   });
 }

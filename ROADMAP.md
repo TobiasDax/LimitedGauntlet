@@ -4,7 +4,15 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.16.0**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.17.0**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+
+**v0.17.0:** PI-143 — an automatic pre-deploy database backup. A one-shot `db-backup` Compose service dumps the database (compressed `pg_dump`, to a bind-mounted `./backups`, 20 retained) before the app container starts and therefore before `prisma migrate deploy` runs. It fires once per `docker compose up`, is fail-closed (a failed dump blocks startup, so nothing migrates without a fresh backup), and is on by default in both compose files. Compose-only — the app image is unchanged from v0.16.6.
+
+**v0.16.6:** organizer-only internal notes on a tournament, and the public-response hardening it needed first. PI-141 — the public routes spread raw Prisma rows, so every column on `Tournament`/`Pod` was published by default and any new one would go public the moment its migration ran; replaced with explicit field allowlists (`services/publicVisibility.ts`), tests pinning the exact key set. PI-140 — a private free-text field per tournament, the counterpart to the public description, sharing one tabbed Markdown editor with it; excluded from every public surface by construction thanks to PI-141, and from the player self-service export, but included in the org export and in scope of an Art. 15 request (`docs/gdpr.md`). PI-142 — both fields autosave (on blur + a slow debounce) with no Save button, an in-place cache update to stay clear of the rate limit, retry-on-failure, and a one-level Revert. All three browser-verified.
+
+**v0.16.5:** a pairing-correctness fix found in a real 42-entrant event. PI-138 — pods above the exact-solver's size limit pair via a greedy fallback that never backtracks, so the last two entrants left could be a pair who had already met, and it emitted that repeat silently; within-pod repeats are a documented hard rule. Greedy now repairs a forced repeat by exchanging partners with another pair, and raises `PairingError` if it genuinely cannot, exactly as the exact solver already did. PI-139 — manual pairing and swap never checked within-pod history at all; both now warn (never block) when they create a rematch. **Browser-verify pending.**
+
+**v0.16.4:** two bug fixes reported by Tobias from a real pod. PI-136 — the seating chart identified who had round 1's bye (a labelled, differently-styled seat) on the page projected for the room, before pairings were revealed. PI-137 — a pod whose round 1 was generated for seatings but never started counted as *played*, so its auto-scored bye handed the entrant a Hall of Fame crown, a win in player stats, Gesamtwertung points, and a row in the player data export. Both code-complete with regression tests confirmed failing against the previous behaviour first — **browser-verify pending**.
 
 **v0.16.0:** all eleven findings (PI-123–133) from the 2026-09-17 external security/functional audit. Security: PI-123 (a malformed Socket.IO join acknowledgment could crash the whole server process), PI-124 (SSO could consume a pending co-organizer invite against an unverified email), PI-125 (an attacker preregistering an account with a victim's email could hijack their first SSO login), PI-126 (on-demand withdrawal snapshots leaked a player's real name in public responses and survived anonymization), PI-127 (a public-lock unlock grant outlived password rotation/disable), and PI-128 (a password change didn't revoke other active organizer sessions). Functional: PI-129 (compressed IPv6 addresses truncated to the wrong analytics prefix), PI-130 (a CUSTOM pod's name-only rename could be wrongly rejected), PI-131 (a logged-in player could see the public password prompt for content the server already permitted them), PI-132 (realtime updates stayed dead after a public-lock change forced a reconnect), and PI-133 (a foil-only card-pull edit could silently swap to a different printing). All code-complete, typechecked, and covered by real-DB service-layer tests where this codebase's testing convention allows (route-level HTTP/realtime/client behavior is code-reviewed only, per that same convention) — **browser/live-verify pending** on every item; see each PI's ROADMAP write-up (moved to the build log once verified) for the exact verification checklist.
 
@@ -37,6 +45,125 @@ Only genuinely-open work lives here. Everything shipped **and** browser-verified
 _New feature requests go here. Keep each one self-contained enough to pick up cold in a future session, then move it to `docs/BUILD-LOG.md` once it's shipped **and** browser-verified._
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
+
+### PI-143 — Automatic pre-deploy database backup ✅ (v0.17.0)
+Idea from Tobias (2026-09-29): snapshot the database before a version change touches it, as an automatic safety net ahead of migrations.
+
+Built as a one-shot `db-backup` Compose service (Option B of the two considered — see below), in both `docker-compose.yml` and `docker-compose.image.yml`:
+- [x] Reuses the `postgres:16-alpine` image `db` already runs, so `pg_dump` always matches the server major and the app image is untouched (Option A — adding `postgresql-client-16` to the `node:22-slim` runtime — would have needed the PGDG apt repo to avoid a v15/v16 skew, and a writable mount on the `read_only` app container).
+- [x] `app` gains `depends_on: { db-backup: { condition: service_completed_successfully } }`, so it runs to completion **before the app starts**, hence before the entrypoint's `prisma migrate deploy`. Fires once per `docker compose up` (every deploy) but not on crash-loop restarts, since Compose doesn't re-run a satisfied one-shot — a close match to "before version changes" with no Prisma pending-migration gate needed.
+- [x] **Fail-closed** (Tobias's call): a failed dump leaves the condition unmet and the app won't start, so no migration ever runs without a fresh backup.
+- [x] `pg_dump -Fc` to bind-mounted `./backups`, keeping the 20 newest; `./backups/` gitignored (live player data). Shell vars in the inline command are `$$`-escaped so Compose interpolates only the `${...}` from `.env`.
+- [x] **On by default for everyone** (Tobias's call) — ships in both public compose files; `docs/deployment.md` documents it, the `pg_restore` rollback command, and how to remove it.
+- [x] **Deploy-verified on the live instance (2026-09-29):** `docker compose up -d` ran `db-backup` to exit 0 before `app` started and wrote `pre-deploy-<ts>.dump` to `./backups/`; `pg_restore -l` confirmed a valid CUSTOM archive (174 TOC entries, full schema, pg_dump 16.15 against server 16.15 — exact version match). The success-path gating (app starts only on the dependency's clean exit) exercises the fail-closed wiring; the deliberately-broken-dump case was not run against live by choice.
+
+### PI-142 — Autosave the tournament description / internal notes ✅ (v0.16.6)
+Idea from Tobias (2026-09-29): drop the Save button and have both fields save themselves, which also removes PI-140's drop-the-draft-on-tab-switch behaviour by making drafts impossible.
+
+**It does solve that cleanly** — with nothing uncommitted, switching tabs has nothing to lose or misroute. The costs below are what need deciding first.
+
+**1. It removes Cancel, and there is no undo.** Today "Cancel" means *discard what I just typed*. Autosave commits every change, so mangling the **public** description has no way back. Worth replacing with an explicit "revert to last saved" (keep the pre-edit value in component state and offer one restore), or accepting the loss deliberately.
+
+**2. The rate limit is the real constraint.** `index.ts` registers a global limit of **200 requests/minute per IP**. `useUpdateTournament` currently invalidates both `["tournaments", id]` and `["tournaments"]` on success, so each save costs a PATCH plus 1–2 refetches. At a 1s keystroke debounce that is roughly 3 requests/second from a *single* editor — and two organizers behind one venue NAT share the bucket. Per-keystroke autosave is not viable without also stopping the broad invalidation on autosaves.
+
+**3. A refetch mid-typing can clobber the textarea.** The success handler refetches the tournament; if that response lands while the organizer is still typing, naive state syncing overwrites their input. Any autosave has to either not invalidate on save, or reconcile rather than replace.
+
+**4. Venue wifi is flaky, and there would be no Save button to retry with.** A failed save must keep the text in the box, show a clear unsaved state, and retry — otherwise notes vanish silently at exactly the moment they matter. This is more important here than in a typical app.
+
+**5. Concurrent editing gets worse.** PATCH is last-write-wins on the whole field. Today the Save button makes that a discrete, visible act; with autosave two TOs editing the same notes during an event would overwrite each other continuously. Out of scope to fix properly (that needs per-field versioning or a merge), but it moves from "unlikely" to "likely" and should be a conscious call.
+
+**6. The Markdown preview needs a resting state.** The field cannot be both a live textarea and rendered Markdown. Either keep an Edit affordance and only drop Save/Cancel, or accept a permanently raw textarea and lose the rendered view.
+
+**7. Minor:** `internalNotesEditedAt`/`ById` would update on every autosave, so the attribution becomes "who typed last", not "who wrote this note".
+
+**Built (2026-09-29), the recommended shape:**
+- [x] Save on **blur**, plus a 3s debounce while typing purely as crash/wifi insurance — not per keystroke. Switching tabs blurs, so the PI-140 tab-switch hazard is gone: there is no uncommitted draft to drop or misroute.
+- [x] New `useAutosaveTournamentText` updates the detail cache **in place** instead of invalidating — so a refetch can't overwrite the textarea mid-type, and each save is one PATCH rather than a PATCH plus a full-tournament reload (the rate-limit concern). The edit stamp is set from the current user client-side, since the PATCH response is the bare row without the resolved editor name.
+- [x] The mutation **retries** (`retry: 2`) and, on failure, the text stays in the box with a `Not saved — will retry` status and an explicit **Retry** button — no Save button means a flaky-wifi failure must never lose the text silently.
+- [x] Status line replaces the Save button: `Saving…` / `Unsaved changes` / `Saved` / `Not saved — will retry` (aria-live).
+- [x] **Revert** replaces Cancel: restores the snapshot taken when editing began — a one-level undo of the current session. Documented limit: a value already autosaved over is gone (no server-side history).
+- [x] Kept a rendered resting state (RichText) with an Edit affordance, rather than a permanently-raw textarea, so the Markdown still renders when not editing. Done/Revert use `onMouseDown` preventDefault so clicking them doesn't fire the textarea's blur-save and race a second write.
+- [x] Client builds, typechecks, lints clean. No tests — client has no test infrastructure (consistent with every prior client-only change).
+- [ ] **Not browser-verified**: Tobias should confirm typing then clicking away saves; the status line tracks; Revert restores the pre-edit value; a dropped connection shows the error state and recovers on Retry; and switching tabs mid-edit no longer loses anything.
+
+**Not addressed (unchanged from the scope, conscious omissions):**
+- Concurrent editing by two organizers is still last-write-wins, now more reachable since every pause is a write — needs per-field versioning to fix properly, out of scope here.
+- The edit stamp becomes "who typed last", not "who authored the note".
+
+### PI-141 — Public routes publish whole DB rows ✅ (v0.16.6)
+**Prerequisite for PI-140.** Three places in `routes/public.ts` spread a raw Prisma row into the public response:
+
+- `:265` — `...tournament`, and `findPublicTournament` (`services/ownership.ts`) has no `select`
+- `:342` — `...pod`, same for `findPublicPod`
+- `:260` — each pod inside the tournament page
+
+So every column on `Tournament` and `Pod` is published by default, and **any new column is public the moment its migration runs** — no code change, nothing failing. Nothing sensitive leaks today (every current column is public-ish), which is exactly why it has gone unnoticed. This is PI-126's bug class — it fixed the same pattern for `Round.onDemandWithdrawals` — generalised to the two models that never got the treatment.
+
+- [x] `publicTournamentFields()` / `publicPodFields()` in `services/publicVisibility.ts` — exhaustive allowlists, not omit-lists — applied at all three sites. Placed in a service rather than the route so they fall under this repo's "services are tested, routes are code-reviewed" convention.
+- [x] The published field set is byte-for-byte what was public before, so nothing about the public pages moved. Only the *default* changed: a new column now publishes nothing until it is added here deliberately.
+- [x] **Tests** (`publicVisibility.test.ts`): the exact key set is pinned for both models, so adding a column makes the test fail and forces a decision instead of leaking silently; plus a direct case proving an `internalNotes`-shaped column added to the row never reaches the output. Server suite 248/248.
+- [x] Caught while building: the tournament page's pods carry a nested `rounds` summary (PI-58) that is not part of the Pod row, so the allowlist stripped the public progress labels. Now carried through explicitly.
+- [ ] **Not browser-verified**: Tobias should load a public tournament page and a public pod page and confirm nothing visibly changed — pod progress labels, timers, capacity cues and token displays in particular.
+
+### PI-140 — Internal notes for a tournament (organizer-only) ✅ (v0.16.6)
+An organizer-only free-text field for notes the TOs keep between themselves — a table restart, a late player, a ruling, anything that shouldn't be on a public page. Shown as its own tab.
+
+**Scope corrected by Tobias (2026-09-28): tournament level, not pod.** Descriptions live on `Tournament`, so internal notes belong beside `Tournament.description` as a true private mirror of it. (The original write-up put this on `Pod`, which has no text field at all.)
+
+**Shape decided (2026-09-28):** a *single editable notes field*, mirroring how `description` already works — not a threaded comment log with per-entry authors. One nullable column, no new table.
+
+**Built:**
+- [x] `Tournament.internalNotes`, `internalNotesEditedAt`, `internalNotesEditedById` (migration `20260929100000_tournament_internal_notes`; additive, drift check clean). The editor id is a plain column, not an FK — a co-organizer who is later removed leaves the notes readable with the attribution simply unresolved.
+- [x] Read/write through the existing organizer routes. `PATCH` stamps the editor **only when the request actually changes the notes**, so an unrelated edit (a rename, a status change) can't rewrite the attribution. `GET` resolves the editor id to a name for display.
+- [x] Rendered on the organizer's tournament page in a **tabbed panel shared with the public description** (Tobias, 2026-09-29), so the two don't both occupy the page at once. Tab styling mirrors `PodTabs` (the Entrants/Pairings/Standings row) so it reads as the same control; local state rather than routes, since these are two panes of one page. Switching tabs mid-edit drops the draft rather than risking it being saved into the other field — which in one direction would mean publishing private notes.
+- [x] **Same Markdown editor as the description** (Tobias, 2026-09-29): identical `Textarea` + `RichText` rendering and the same Markdown hint. An earlier pass rendered notes as plain text to avoid surprise reformatting mid-event; overruled — they are the same kind of blurb, and only *who can read them* should differ. Both fields now share one editor, so they cannot drift apart.
+- [x] Included in the org export and import (optional in the import schema, so an export predating the field still restores). Round-trip test covers a tournament with notes, one without (must stay null, not `""`), and a legacy export with no key at all.
+
+**Leak surfaces — all verified:**
+- [x] **Public pages:** excluded *by construction* thanks to PI-141 landing first — `publicTournamentFields()` copies a fixed list, so the new column was never published at any point. `publicVisibility.test.ts` already asserts an `internalNotes`-shaped column is dropped.
+- [x] **Webhooks:** `services/webhooks.ts` selects only `tournament: { select: { name: true } }` — narrow by construction, no raw row.
+- [x] **Player self-service export:** `services/playerDataExport.ts` selects only `name/startDate/endDate`. Deliberately excluded (see GDPR note below), and structurally unable to carry it regardless.
+
+This is the ordering paying off: had PI-140 been built first, the field would have been public the moment the migration ran.
+
+- [x] **GDPR** documented in `docs/gdpr.md` §3.3: notes are excluded from public pages and the self-service export, but *are* in scope of an Art. 15 request, which is why the whole-org export carries them. Includes the two practical warnings for organizers — write notes you'd be willing to show the person, and don't record Art. 9 special-category data in them.
+- [ ] **Not browser-verified**: Tobias should confirm the section saves, clears back to empty, shows the "last edited by" line, and — the one that matters — that the notes appear nowhere on the public tournament page.
+
+### PI-138 — Greedy pairing emitted a silent repeat opponent ⏳ (fixed 2026-09-26, browser-verify pending)
+Reported by Tobias (2026-09-26) from the live `app.` instance: a 42-entrant SEALED pod re-paired two players in round 6 who had already met in round 3. Confirmed against the real data — at that moment every player still had 26–29 legal partners out of 31, and a repeat-free perfect matching demonstrably existed, so nothing about the round forced it.
+
+A pod over `EXACT_MATCHING_POOL_LIMIT` (18) skips the backtracking exact solver entirely, so greedy paired every round of that pod. Greedy skips illegal partners while scanning, so the hard-avoid holds until the very end — then the final entrant has exactly one candidate left, and if they had met, `findIndex` returned -1 and the code fell through to index 0, pairing the repeat anyway. The prior comment defended this as "only when a player has already faced everyone left below them", which was wrong: it is greedy's own earlier choices, with no backtracking to undo them.
+
+- [x] A forced repeat is now repaired by exchanging partners with another pair. Both recombinations are checked in full before either is applied, so a repair can never trade one repeat for another.
+- [x] If no repair exists, `solveGreedy` returns null and the caller raises `PairingError` — the same "use manual pairing to resolve this round" path the exact solver's null already took. A hard rule no longer degrades to a soft one silently.
+- [x] **Test** (`pairing.test.ts`): a soak rather than a fixture, deliberately — pool order comes from an unordered `findMany`, so which two entrants end up last cannot be pinned down, and two hand-built collisions passed against the broken code before this was understood. Nine rounds of a 22-entrant pod measured 5/5 pods repeating without the repair and 0/5 with it; the test fails at round 6, same as production. Server suite 245/245.
+- [ ] **Not browser-verified**: Tobias should run a large pod (20+) through several rounds on a live instance and confirm no rematch appears. The existing Reality Fracture pod is unaffected — this changes future pairings only; its round 6 rematch is still recorded and can be corrected with a swap.
+
+### PI-139 — Manual pairing and swap created rematches silently ⏳ (fixed 2026-09-26, browser-verify pending)
+Found while investigating PI-138: neither `POST /pods/:id/rounds/manual` nor `POST /rounds/:id/swap` consulted within-pod history, so an organizer could recreate by hand exactly the repeat the engine treats as a hard rule, with nothing said.
+
+- [x] New shared `findRepeatPairings(podId, roundNumber, pairs)` (`services/pairing.ts`); both routes return the offending pairs as `repeatWarnings`.
+- [x] `PairingsPage` shows a warning banner after a swap, naming who already played, and noting the swap was applied.
+- [x] Deliberately a warning, not a block: an organizer overriding the engine is legitimate, and a round may genuinely have no repeat-free arrangement left. The goal is only that an accidental rematch doesn't reach the table unnoticed.
+- [ ] **Not browser-verified**: Tobias should confirm the banner appears on a swap that recreates a prior pairing, and stays absent otherwise.
+
+### PI-136 — Seating chart revealed round 1's bye ⏳ (fixed 2026-09-26, browser-verify pending)
+Reported by Tobias (2026-09-26) from a real 39-entrant pod. The seat holding the bye rendered with a dashed border, a sunken background and a "Round 1 bye" label — on `SeatingsPage` (the page an organizer projects while the room finds its seats) and on `PublicPodPage`. A bye is auto-scored the instant round 1 is generated, so this announced who was sitting out before pairings were revealed: the same early-leak class as PI-118, one surface further on.
+
+- [x] `SeatingChart`'s `showByeBadge` now defaults to **false** instead of true, so a caller that forgets the prop stays silent rather than leaking.
+- [x] Both unsplit callers pass `showByeBadge={!!round1.pairingsRevealedAt}` — the same condition the pairings and standings already use, so all three reveal together. Split-table charts were already passing false (PI-115) and are unchanged.
+- [x] No layout tell: the empty chair in an odd pod sits adjacent to seat 1 by design, not beside the bye seat. The only residual is that someone who knows the MTG convention could work out the bye lands on seat `ceil(N/2)` — inherent to publishing a convention-based seating chart.
+- [ ] **Not browser-verified**: Tobias should confirm on an odd-sized pod that the bye seat is visually identical to every other seat before reveal, and that the badge returns once round 1's pairings are revealed.
+
+### PI-137 — Unstarted pods counted as played ⏳ (fixed 2026-09-26, browser-verify pending)
+Reported by Tobias (2026-09-26), same pod as PI-136: the Hall of Fame showed a win and a champion's crown for the bye entrant of a pod nobody had played.
+
+`podIsPlayed` (`services/standings.ts`) tested `rounds.length > 0`, on the documented assumption that "you can't pair a pod without starting it". Seatings (PI-79/80) broke that assumption — round 1 is generated purely so players can find their seats, long before anyone plays — and because a bye is auto-scored the moment round 1 exists, the unstarted pod credited its bye entrant a win across every consumer: Hall of Fame (crown + `podsPlayed`), player stats, Gesamtwertung, and the player data export.
+
+- [x] Split into two honest predicates rather than bending one. `podIsPlayed` now requires a round to have actually left `PENDING`, or the pod to be `COMPLETED` (which keeps points-only legacy imports with no Round rows counting). `podHasPairings` keeps the old meaning under an accurate name for `onDemandWithdrawal.ts`, which asks a genuinely different question — "are pairings already laid out, so removing someone would invalidate them?" — where a generated-but-unstarted round should still answer yes.
+- [x] Fixed the same rule encoded as a Prisma filter in `playerStats.ts` (`rounds: { some: {} }`), which the typechecker could not reach and which would otherwise have kept miscounting "pods played" after the predicate was fixed.
+- [x] **Tests** (`hallOfFame.test.ts`, `gesamtwertung.test.ts`): an odd pod with round 1 generated in `PENDING` and an auto-scored bye yields no crown and no pods-played for anyone; participant counting ignores a `PENDING`-round pod. Both confirmed failing against the previous behaviour first (the Hall of Fame one reproduced the exact phantom crown; the participant count returned 5 instead of 3). Full server suite: 244/244.
+- [ ] **Not browser-verified**: Tobias should confirm the Hall of Fame and player stats for the affected pod no longer show the phantom win/crown, and that they appear as normal once the pod is actually under way.
 
 ### PI-134 — Gesamtwertung pip legend: order by date/time, on-demand pods last ⏳ (fixed 2026-09-18, browser-verify pending)
 Reported by Tobias (2026-09-18), from the public tournament page's "Pips, left to right" legend under the Gesamtwertung table (`GesamtwertungList.tsx`).

@@ -167,6 +167,10 @@ export function SeatingsPage() {
             seatByEntrantId={seatByEntrantId}
             entrantById={entrantById}
             entrantCount={pod.entrants.length}
+            // This page is what gets projected for the room while everyone
+            // finds their seat, so it must not announce the bye before the
+            // organizer reveals round 1.
+            showByeBadge={!!round1.pairingsRevealedAt}
           />
           <p className="text-[13px] text-ink-secondary">
             Seatings are generated. Head to the{" "}

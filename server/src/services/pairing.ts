@@ -60,6 +60,30 @@ export function getLatestRound(podId: string) {
   return prisma.round.findFirst({ where: { podId }, orderBy: { roundNumber: "desc" } });
 }
 
+// Which of these proposed pairings put two entrants together who have already
+// met earlier in this pod. The auto-pairing engine treats a within-pod repeat
+// as a hard rule, but an organizer pairing by hand (or swapping two seats) can
+// still create one — deliberately or by accident. Those paths are not blocked:
+// an organizer overriding the engine is a legitimate act, and the round may
+// genuinely have no repeat-free arrangement left. They are warned instead, so
+// an accidental repeat doesn't reach the table unnoticed the way the greedy
+// fallback's used to.
+export async function findRepeatPairings(
+  podId: string,
+  roundNumber: number,
+  pairs: ReadonlyArray<{ entrantAId: string; entrantBId: string | null }>,
+): Promise<Array<{ entrantAId: string; entrantBId: string }>> {
+  const { opponents } = await computePodStats(podId, roundNumber);
+  const repeats: Array<{ entrantAId: string; entrantBId: string }> = [];
+  for (const pair of pairs) {
+    if (!pair.entrantBId) continue;
+    if (opponents.get(pair.entrantAId)?.has(pair.entrantBId)) {
+      repeats.push({ entrantAId: pair.entrantAId, entrantBId: pair.entrantBId });
+    }
+  }
+  return repeats;
+}
+
 export async function generatePairings(podId: string, roundNumber: number): Promise<PairingSuggestion> {
   const pod = await prisma.pod.findUniqueOrThrow({ where: { id: podId } });
 
@@ -158,26 +182,66 @@ export async function generatePairings(podId: string, roundNumber: number): Prom
   // the exact solve: walk the pool in order (points desc, or the round-1
   // shuffle), pairing each still-unpaired entrant with the nearest later
   // entrant they haven't already faced in this pod. Honours the within-pod
-  // hard-avoid (skips Infinity-cost partners), but drops the global-optimum
-  // guarantee and the round-1 soft-avoid weighting — standard Swiss
-  // behaviour. Only accepts a within-pod repeat when a player has already
-  // faced everyone left below them, which is the same situation that would
-  // make the exact solve return null anyway.
-  function solveGreedy(poolInfos: EntrantInfo[]): Matching {
+  // hard-avoid, but drops the global-optimum guarantee and the round-1
+  // soft-avoid weighting — standard Swiss behaviour.
+  //
+  // Greedy never backtracks, so it can paint itself into a corner: by the
+  // final pair there is exactly one candidate left, and if those two have
+  // already met, the repeat is forced no matter how many legal partners
+  // existed earlier. That is not a genuinely unpairable round — it is
+  // greedy's own earlier choices. (Observed in production: a 42-entrant pod
+  // where round 6's last two had met in round 3, while every player still
+  // had 26+ legal partners available.)
+  //
+  // So a forced repeat is repaired rather than accepted: find any other pair
+  // whose partners can be exchanged to make both pairs legal. On a pool with
+  // this much remaining history that virtually always succeeds, and it is
+  // O(pairs) per repair. If it genuinely cannot be repaired, return null —
+  // the caller then raises PairingError exactly as the exact solver's null
+  // does, so the organizer is told to pair manually instead of being handed
+  // a silent repeat.
+  function solveGreedy(poolInfos: EntrantInfo[]): Matching | null {
     const byId = new Map(poolInfos.map((e) => [e.id, e]));
     const remaining = poolInfos.map((e) => e.id);
     const pairs: Array<[string, string]> = [];
-    let cost = 0;
     while (remaining.length > 0) {
       const first = remaining.shift()!;
       const a = byId.get(first)!;
       let idx = remaining.findIndex((id) => Number.isFinite(pairCost(a, byId.get(id)!)));
+      // No legal partner left below this entrant — take the next one and let
+      // the repair pass below sort it out.
       if (idx === -1) idx = 0;
       const [partner] = remaining.splice(idx, 1);
-      const c = pairCost(a, byId.get(partner!)!);
-      cost += Number.isFinite(c) ? c : 0;
       pairs.push([first, partner!]);
     }
+
+    const legal = (x: string, y: string) => Number.isFinite(pairCost(byId.get(x)!, byId.get(y)!));
+
+    for (let i = 0; i < pairs.length; i++) {
+      const [a, b] = pairs[i]!;
+      if (legal(a, b)) continue;
+
+      let repaired = false;
+      for (let j = 0; j < pairs.length && !repaired; j++) {
+        if (i === j) continue;
+        const [x, y] = pairs[j]!;
+        // Both recombinations are checked in full before either is applied,
+        // so a repair can never trade one repeat for another.
+        if (legal(a, x) && legal(b, y)) {
+          pairs[i] = [a, x];
+          pairs[j] = [b, y];
+          repaired = true;
+        } else if (legal(a, y) && legal(b, x)) {
+          pairs[i] = [a, y];
+          pairs[j] = [b, x];
+          repaired = true;
+        }
+      }
+      if (!repaired) return null;
+    }
+
+    let cost = 0;
+    for (const [a, b] of pairs) cost += pairCost(byId.get(a)!, byId.get(b)!);
     return { pairs, cost };
   }
 

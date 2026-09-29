@@ -243,14 +243,26 @@ describe("countTournamentParticipants", () => {
 
   it("counts distinct players only in pods that have started or finished (PI-99)", () => {
     const pods = [
-      // started (has a round) — counts
-      { status: "IN_PROGRESS" as const, rounds: [{ id: "r1" }], entrants: [entrant("alice"), entrant("bob")] },
+      // started (a round has actually begun) — counts
+      {
+        status: "IN_PROGRESS" as const,
+        rounds: [{ id: "r1", status: "ACTIVE" }],
+        entrants: [entrant("alice"), entrant("bob")],
+      },
       // points-only import (COMPLETED, no rounds) — counts
       { status: "COMPLETED" as const, rounds: [], entrants: [entrant("bob"), entrant("carol")] },
       // SETUP, no rounds — ignored, so `dave` is never counted
       { status: "SETUP" as const, rounds: [], entrants: [entrant("dave"), entrant("alice")] },
+      // Seatings generated but nobody has played: round 1 exists in PENDING.
+      // `erin` must not be counted as a participant on the strength of a
+      // seating chart alone.
+      {
+        status: "PAIRING" as const,
+        rounds: [{ id: "r2", status: "PENDING" }],
+        entrants: [entrant("erin"), entrant("frank")],
+      },
     ];
-    expect(countTournamentParticipants(pods)).toBe(3); // alice, bob, carol — not dave
+    expect(countTournamentParticipants(pods)).toBe(3); // alice, bob, carol — not dave or erin
   });
 
   it("returns 0 when every pod is still in SETUP", () => {

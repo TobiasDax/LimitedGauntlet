@@ -11,6 +11,10 @@ build/
 # placed into docs/screenshots) — never a permanent home for anything.
 /temp/
 
+# PI-143 — the pre-deploy database dumps the db-backup service writes. These
+# are full copies of live data (player names, results): never commit them.
+/backups/
+
 # Scratch release notes — drafted per release, fed to `gh release edit -F`,
 # then deleted. The published GitHub Release is the permanent copy.
 /RELEASE_NOTES_v*.md

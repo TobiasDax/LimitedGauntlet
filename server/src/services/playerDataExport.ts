@@ -103,7 +103,7 @@ export async function buildPlayerDataExport(orgId: string, playerId: string): Pr
             format: true,
             date: true,
             status: true,
-            rounds: { select: { id: true } },
+            rounds: { select: { id: true, status: true } },
             tournament: { select: { name: true, startDate: true, endDate: true } },
           },
         },

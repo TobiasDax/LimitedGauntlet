@@ -139,6 +139,22 @@ Both return a readable JSON file covering that one player's roster entry,
 tournament check-ins, pods and finishes, every match with opponent and score,
 card-pull attributions, and (when tokens are on) their token ledger.
 
+**Organizer internal notes (`PI-140`).** A tournament can carry private notes
+that only that org's organizers ever see — they are excluded from every public
+page by construction (the public routes serve an allowlist, `PI-141`), and from
+the player self-service export above, because they are internal working
+material rather than something to publish back to the player automatically.
+
+They are **not** outside the scope of a request, though. Free text about a
+person is personal data, so notes naming someone belong in the answer to an
+Art. 15 request. The whole-org export (§3.2) deliberately includes them, which
+is where an organizer should look when compiling one. Two practical
+consequences worth telling your organizers:
+
+- write notes you would be willing to show the person they are about;
+- a note is not a place to record anything you would not otherwise be
+  entitled to hold (health, and the other Art. 9 categories, especially).
+
 ### 3.4 Player self-service rectification — `PI-106` ✅
 
 **Art. 16.** A logged-in player can now correct their own display name from the
