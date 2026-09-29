@@ -21,6 +21,21 @@ export function SettingsPage() {
       <ScreenTitle>Settings</ScreenTitle>
       <ScreenDek>Settings for {me?.organization?.name ?? "this organization"}. Your login lives on Profile.</ScreenDek>
 
+      {/* HI-9 — plan badge, only on a hosted (entitlements-enforced) instance.
+          Self-hosted has no tiers, so it never renders. */}
+      {me?.entitlement?.enforced && (
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface-sunken px-3 py-1 text-[12px]">
+          <span className="tracking-wide text-ink-muted uppercase">Plan</span>
+          <span className="font-semibold text-ink">
+            {me.entitlement.tier === "SERIES"
+              ? "Series subscription"
+              : me.entitlement.tier === "TOURNAMENT_PASS"
+                ? "Tournament pass"
+                : "Free"}
+          </span>
+        </div>
+      )}
+
       <SettingsSection
         title="Public page access"
         description={

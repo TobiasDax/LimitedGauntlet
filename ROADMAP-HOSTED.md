@@ -138,12 +138,13 @@ Built early — it is the escape hatch if the webhook path misbehaves in product
 
 **Perpetual-grant semantics to carry into HI-3**: on a `SERIES` org, `subscriptionExpiresAt = null` means *never lapses*, not *already lapsed*. The activity check must read it that way.
 
-### HI-9 — Client UI ◐ (landing page done; rest pending)
-- [ ] Tier indicator in org settings.
-- [ ] Gated controls show an upsell prompt rather than vanishing silently.
-- [ ] Pricing/upgrade page.
-- [ ] Date-immutability explanation plus config-driven support contact link.
-- [ ] Subscription management links out to the processor's hosted customer portal.
+### HI-9 — Client UI ◐ (badge + date-lock note + entitlement exposure done; pricing/portal/upsell blocked on HI-7)
+- [x] **Tier indicator in org settings** — a "Plan: Free / Tournament pass / Series subscription" badge on the Settings page, shown only when entitlements are enforced (never on self-hosted). Reads the effective tier from `/auth/me`.
+- [x] **Entitlement state exposed to the client** (`/auth/me` now returns `entitlement: { enforced, tier, canEditTournamentDates }`, derived server-side so the UI never re-implements the rules — a lapsed subscription reads as FREE).
+- [x] **Date-immutability explanation + config-driven support link** — the tournament edit form, when dates are locked (hosted, unsubscribed), shows the dates read-only with an explanation and a `mailto:` to `SUPPORT_EMAIL` (falls back to "contact the organizer" when unset), instead of date fields that 402 on save. The form also omits the date fields from the PATCH when locked, so it can't trip the server guard.
+- [ ] **Gated controls show an upsell prompt** — deferred: the natural target of an upsell is the pricing page, which is blocked (below). The one concrete gated control with a real dead-end today — locked dates — is handled by the explanation above; a general 402→upsell sweep pairs better with the pricing page.
+- [ ] **Pricing/upgrade page** — blocked on HI-7 (Stripe Managed Payments checkout) and on prices, which are deliberately not in the repo. Can't build a real one without both.
+- [ ] **Subscription management → hosted customer portal** — blocked on HI-7: the portal URL comes from Stripe.
 - [x] `GET /api/app-config` now exposes `hostedEntitlements` (and `supportEmail`, null unless hosted), so the client can tell the two deployments apart. Everything tier-related hangs off that one flag.
 - [x] Org-less landing content on `OrganizationsPage`: a self-hosted install is told its organization has everything and nothing to pay for; tiers and upgrade copy render only on the hosted branch. Deliberately no prices in the repo yet — they arrive with HI-7.
 - [ ] Browser-verify both branches (self-hosted default, and with `HOSTED_ENTITLEMENTS=true`).

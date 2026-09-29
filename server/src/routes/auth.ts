@@ -15,7 +15,39 @@ import {
   claimTournamentCoverage,
   ENTITLEMENT_REQUIRED,
 } from "../services/entitlementAccess.js";
-import { isEntitlementEnforcementActive, UNSUBSCRIBED_MAX_TOURNAMENT_DAYS } from "../services/entitlements.js";
+import {
+  allows,
+  effectiveTier,
+  type EntitlementState,
+  isEntitlementEnforcementActive,
+  UNSUBSCRIBED_MAX_TOURNAMENT_DAYS,
+} from "../services/entitlements.js";
+
+// HI-9 — the org's entitlement state as the client needs it, derived so the
+// UI never re-implements the rules: the current *effective* tier (a lapsed
+// subscription reads as FREE) and the one capability the UI branches on today
+// (editing tournament dates). `enforced` is false on self-hosted, where every
+// flag is permissive. Returns null for an org-less identity.
+function entitlementSummary(org: {
+  entitlementTier: EntitlementState["tier"];
+  subscriptionExpiresAt: Date | null;
+  cumulativePaidMonths: number;
+  retentionOverrideUntil: Date | null;
+  freeTournamentUsed: boolean;
+}) {
+  const state: EntitlementState = {
+    tier: org.entitlementTier,
+    subscriptionExpiresAt: org.subscriptionExpiresAt,
+    cumulativePaidMonths: org.cumulativePaidMonths,
+    retentionOverrideUntil: org.retentionOverrideUntil,
+    freeTournamentUsed: org.freeTournamentUsed,
+  };
+  return {
+    enforced: isEntitlementEnforcementActive(),
+    tier: effectiveTier(state),
+    canEditTournamentDates: allows(state, "tournament.editDates"),
+  };
+}
 
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -690,6 +722,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       publicLockEnabled: !!organization.publicPasswordHash,
       tokensEnabled: organization.tokensEnabled,
       organizerCount,
+      entitlement: entitlementSummary(organization),
       // PI-42 follow-up — drives Settings → Account: an SSO-only account
       // (never set a local password) shows "Set password" instead of
       // "Change password", and skips the current-password field on the
@@ -757,13 +790,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         }
         const spanDays = (endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000);
         if (spanDays > UNSUBSCRIBED_MAX_TOURNAMENT_DAYS) {
-          reply
-            .code(402)
-            .send({
-              error: ENTITLEMENT_REQUIRED,
-              reason: "tournament_duration",
-              maxDays: UNSUBSCRIBED_MAX_TOURNAMENT_DAYS,
-            });
+          reply.code(402).send({
+            error: ENTITLEMENT_REQUIRED,
+            reason: "tournament_duration",
+            maxDays: UNSUBSCRIBED_MAX_TOURNAMENT_DAYS,
+          });
           return;
         }
       }

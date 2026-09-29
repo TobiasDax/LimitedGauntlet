@@ -14,6 +14,7 @@ import {
 } from "../features/tournaments/useTournaments";
 import { useCreatePod, podFormatLabel } from "../features/pods/usePods";
 import { useMe } from "../features/auth/useAuth";
+import { useAppConfig } from "../features/config/useAppConfig";
 import { useTournamentRealtime } from "../features/tournaments/useTournamentRealtime";
 import { Button, Card, Eyebrow, Field, FormError, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
 import { RichText } from "../components/RichText";
@@ -29,6 +30,7 @@ const tournamentStatuses: TournamentStatus[] = ["PLANNING", "ACTIVE", "COMPLETED
 function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDetail; onDone: () => void }) {
   const update = useUpdateTournament(tournament.id);
   const { data: me } = useMe();
+  const { data: appConfig } = useAppConfig();
   const [name, setName] = useState(tournament.name);
   const [startDate, setStartDate] = useState(tournament.startDate.slice(0, 10));
   const [endDate, setEndDate] = useState(tournament.endDate.slice(0, 10));
@@ -36,6 +38,15 @@ function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDeta
   const [status, setStatus] = useState<TournamentStatus>(tournament.status);
   const [tokenParticipation, setTokenParticipation] = useState(tournament.tokenParticipation);
   const [tokenBonuses, setTokenBonuses] = useState<StandingBonusRow[]>(tournament.tokenStandingBonuses ?? []);
+
+  // HI-5/HI-9 — on the hosted unsubscribed tiers a tournament's dates are
+  // fixed once set; the server rejects an edit. Rather than show date fields
+  // that 402 on save, show the dates read-only with an explanation and a
+  // support contact (the sanctioned way to change them, via the operator CLI).
+  // `canEditTournamentDates === false` only when entitlements are enforced and
+  // this org isn't subscribed; it's true/undefined everywhere else.
+  const datesLocked = me?.entitlement?.canEditTournamentDates === false;
+  const supportEmail = appConfig?.supportEmail ?? null;
 
   return (
     <Card className="mb-6 p-6">
@@ -46,8 +57,9 @@ function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDeta
           update.mutate(
             {
               name,
-              startDate,
-              endDate,
+              // Omit dates entirely when locked — sending them at all (even
+              // unchanged) trips the server's dates_locked guard.
+              ...(datesLocked ? {} : { startDate, endDate }),
               location: location.trim() || null,
               status,
               ...(me?.tokensEnabled ? { tokenParticipation, tokenStandingBonuses: tokenBonuses } : {}),
@@ -59,14 +71,40 @@ function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDeta
         <Field label="Name">
           <TextField required value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Start date">
-            <TextField type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-          </Field>
-          <Field label="End date">
-            <TextField type="date" required value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-          </Field>
-        </div>
+        {datesLocked ? (
+          <div className="border-border rounded-md border border-dashed p-4">
+            <div className="text-[12px] font-semibold tracking-wide text-ink-secondary uppercase">Dates</div>
+            <p className="mt-1 text-[14px] text-ink">
+              {tournament.startDate.slice(0, 10)} → {tournament.endDate.slice(0, 10)}
+            </p>
+            <p className="mt-2 text-[12px] text-ink-muted">
+              A tournament's dates are fixed once set on this plan.{" "}
+              {supportEmail ? (
+                <>
+                  Need them changed?{" "}
+                  <a
+                    href={`mailto:${supportEmail}?subject=${encodeURIComponent(`Tournament date change: ${tournament.name}`)}`}
+                    className="text-link underline hover:text-link-strong"
+                  >
+                    Contact support
+                  </a>
+                  .
+                </>
+              ) : (
+                "Contact the organizer running this instance to change them."
+              )}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Start date">
+              <TextField type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </Field>
+            <Field label="End date">
+              <TextField type="date" required value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </Field>
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Location" hint="Optional">
             <TextField value={location} onChange={(e) => setLocation(e.target.value)} />

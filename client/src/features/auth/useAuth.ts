@@ -28,6 +28,15 @@ export interface MeResponse {
   // How many organizers this org has (PI-34) — drives Settings' "delete my
   // account" vs "leave organization" wording.
   organizerCount?: number;
+  // HI-9 — the active org's entitlement state, derived server-side so the UI
+  // never re-implements the rules. Absent for an org-less identity. `enforced`
+  // is false on self-hosted (every flag permissive); `tier` is the current
+  // effective tier (a lapsed subscription reads as FREE).
+  entitlement?: {
+    enforced: boolean;
+    tier: "FREE" | "TOURNAMENT_PASS" | "SERIES";
+    canEditTournamentDates: boolean;
+  };
   // Whether this account has ever set a local password (PI-42). false = SSO
   // only. Drives the Profile page. Treat undefined as "has one".
   hasPassword?: boolean;
