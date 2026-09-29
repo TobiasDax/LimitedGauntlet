@@ -42,6 +42,31 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
+### PI-142 — Autosave the tournament description / internal notes ⏳ (scoped 2026-09-29, not started)
+Idea from Tobias (2026-09-29): drop the Save button and have both fields save themselves, which also removes PI-140's drop-the-draft-on-tab-switch behaviour by making drafts impossible.
+
+**It does solve that cleanly** — with nothing uncommitted, switching tabs has nothing to lose or misroute. The costs below are what need deciding first.
+
+**1. It removes Cancel, and there is no undo.** Today "Cancel" means *discard what I just typed*. Autosave commits every change, so mangling the **public** description has no way back. Worth replacing with an explicit "revert to last saved" (keep the pre-edit value in component state and offer one restore), or accepting the loss deliberately.
+
+**2. The rate limit is the real constraint.** `index.ts` registers a global limit of **200 requests/minute per IP**. `useUpdateTournament` currently invalidates both `["tournaments", id]` and `["tournaments"]` on success, so each save costs a PATCH plus 1–2 refetches. At a 1s keystroke debounce that is roughly 3 requests/second from a *single* editor — and two organizers behind one venue NAT share the bucket. Per-keystroke autosave is not viable without also stopping the broad invalidation on autosaves.
+
+**3. A refetch mid-typing can clobber the textarea.** The success handler refetches the tournament; if that response lands while the organizer is still typing, naive state syncing overwrites their input. Any autosave has to either not invalidate on save, or reconcile rather than replace.
+
+**4. Venue wifi is flaky, and there would be no Save button to retry with.** A failed save must keep the text in the box, show a clear unsaved state, and retry — otherwise notes vanish silently at exactly the moment they matter. This is more important here than in a typical app.
+
+**5. Concurrent editing gets worse.** PATCH is last-write-wins on the whole field. Today the Save button makes that a discrete, visible act; with autosave two TOs editing the same notes during an event would overwrite each other continuously. Out of scope to fix properly (that needs per-field versioning or a merge), but it moves from "unlikely" to "likely" and should be a conscious call.
+
+**6. The Markdown preview needs a resting state.** The field cannot be both a live textarea and rendered Markdown. Either keep an Edit affordance and only drop Save/Cancel, or accept a permanently raw textarea and lose the rendered view.
+
+**7. Minor:** `internalNotesEditedAt`/`ById` would update on every autosave, so the attribution becomes "who typed last", not "who wrote this note".
+
+**Recommended shape (cheapest thing that solves the actual problem):**
+- **Save on blur**, plus a slow (3–5s) debounce purely as crash/wifi insurance — not per keystroke. Switching tabs blurs, so the PI-140 hazard disappears; cost is ~1 request per editing session, so the rate limit is a non-issue.
+- **Stop invalidating the whole tournament query on these saves** — update the cached field in place instead, which also removes the clobber-while-typing risk.
+- **Replace the button with a status line** ("Saving…" / "Saved" / "Not saved — retrying"), since without a button that is the only way to know it worked.
+- **Keep an explicit revert** to replace Cancel.
+
 ### PI-141 — Public routes publish whole DB rows ⏳ (fixed 2026-09-28, browser-verify pending)
 **Prerequisite for PI-140.** Three places in `routes/public.ts` spread a raw Prisma row into the public response:
 
