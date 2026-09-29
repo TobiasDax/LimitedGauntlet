@@ -131,84 +131,66 @@ function DeleteTournamentButton({ tournament }: { tournament: TournamentDetail }
   );
 }
 
-function DescriptionSection({ tournament }: { tournament: TournamentDetail }) {
+// PI-140 — the tournament's two free-text fields share one tabbed panel, so
+// they don't both occupy the page at once. The public description and the
+// organizers' private notes are the same *kind* of thing — Markdown blurbs
+// about this weekend — so they get the same editor; only who can read them
+// differs, which is what the tab labels and the private-tab note carry.
+//
+// Tab styling mirrors PodTabs (the Entrants/Pairings/Standings row) so the
+// two feel like the same control. Local state rather than routes, though:
+// these are two panes of one page, not two pages.
+const notesTabs = [
+  { key: "description", label: "Description" },
+  { key: "internal", label: "Internal notes" },
+] as const;
+type NotesTabKey = (typeof notesTabs)[number]["key"];
+
+function TournamentNotesSection({ tournament }: { tournament: TournamentDetail }) {
   const update = useUpdateTournament(tournament.id);
+  const [tab, setTab] = useState<NotesTabKey>("description");
   const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(tournament.description ?? "");
+  const [text, setText] = useState("");
 
-  if (!editing) {
-    return (
-      <div className="mb-6">
-        {tournament.description ? (
-          <RichText text={tournament.description} />
-        ) : (
-          <p className="text-[13px] text-ink-muted">No description yet.</p>
-        )}
-        <button
-          onClick={() => {
-            setText(tournament.description ?? "");
-            setEditing(true);
-          }}
-          className="mt-1.5 text-[12px] tracking-wide text-link uppercase hover:text-link-strong"
-        >
-          {tournament.description ? "Edit description" : "+ Add description"}
-        </button>
-      </div>
-    );
-  }
+  const isInternal = tab === "internal";
+  const value = isInternal ? (tournament.internalNotes ?? null) : (tournament.description ?? null);
 
-  return (
-    <div className="mb-6 flex flex-col gap-2">
-      <Textarea
-        rows={6}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder={
-          "Venue notes, format explainer, schedule…\n\nMarkdown supported: # headings, - lists, **bold**, *italic*, tables, [links](https://…)."
-        }
-      />
-      <p className="text-[12px] text-ink-muted">
-        Supports Markdown — headings, lists, <strong>bold</strong>/<em>italic</em>/<u>underline</u>, tables, and links.
-      </p>
-      <div className="flex gap-2">
-        <Button
-          variant="primary"
-          disabled={update.isPending}
-          onClick={() => update.mutate({ description: text.trim() || null }, { onSuccess: () => setEditing(false) })}
-        >
-          {update.isPending ? "Saving…" : "Save"}
-        </Button>
-        <Button variant="ghost" onClick={() => setEditing(false)}>
-          Cancel
-        </Button>
-      </div>
-    </div>
-  );
-}
+  const startEditing = () => {
+    setText(value ?? "");
+    setEditing(true);
+  };
 
-// PI-140 — the private counterpart to DescriptionSection. Same shape (one
-// editable free-text field), deliberately different framing: the heading and
-// border say "organizers only" because the whole value of the field is that
-// the writer can trust it is not public. It never reaches a public page —
-// the public routes allowlist what they serve (PI-141) — but the UI has to
-// make that legible, or nobody will write anything candid in it.
-function InternalNotesSection({ tournament }: { tournament: TournamentDetail }) {
-  const update = useUpdateTournament(tournament.id);
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(tournament.internalNotes ?? "");
+  // Switching tabs mid-edit would otherwise save the text into whichever
+  // field is now selected — drop the draft instead of writing it to the
+  // wrong one (and, worse, publishing private notes).
+  const switchTab = (key: NotesTabKey) => {
+    setTab(key);
+    setEditing(false);
+    setText("");
+  };
 
   const editedLine =
-    tournament.internalNotesEditedAt &&
-    `Last edited ${new Date(tournament.internalNotesEditedAt).toLocaleString()}${
-      tournament.internalNotesEditedByName ? ` by ${tournament.internalNotesEditedByName}` : ""
-    }`;
+    isInternal && tournament.internalNotesEditedAt
+      ? `Last edited ${new Date(tournament.internalNotesEditedAt).toLocaleString()}${
+          tournament.internalNotesEditedByName ? ` by ${tournament.internalNotesEditedByName}` : ""
+        }`
+      : null;
 
   return (
-    <div className="border-border mb-6 rounded-md border border-dashed p-4">
-      <div className="mb-2 flex items-baseline gap-2">
-        <h2 className="text-[11.5px] font-semibold tracking-wide text-ink-muted uppercase">Internal notes</h2>
-        <span className="text-[11.5px] text-ink-muted">Organizers only — never shown on public pages</span>
+    <div className="mb-6">
+      <div className="mb-3 flex gap-1 border-b border-border text-[12.5px] tracking-wide uppercase">
+        {notesTabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => switchTab(t.key)}
+            className={`px-3 py-2 ${tab === t.key ? "border-b-2 border-accent font-semibold text-ink" : "text-ink-muted hover:text-ink"}`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
+
+      {isInternal && <p className="mb-2 text-[12px] text-ink-muted">Organizers only — never shown on public pages.</p>}
 
       {editing ? (
         <div className="flex flex-col gap-2">
@@ -216,14 +198,25 @@ function InternalNotesSection({ tournament }: { tournament: TournamentDetail }) 
             rows={6}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={"Rulings, table restarts, who turned up late…\n\nOnly organizers of this org can read this."}
+            placeholder={
+              isInternal
+                ? "Rulings, table restarts, who turned up late…\n\nMarkdown supported: # headings, - lists, **bold**, *italic*, tables, [links](https://…)."
+                : "Venue notes, format explainer, schedule…\n\nMarkdown supported: # headings, - lists, **bold**, *italic*, tables, [links](https://…)."
+            }
           />
+          <p className="text-[12px] text-ink-muted">
+            Supports Markdown — headings, lists, <strong>bold</strong>/<em>italic</em>/<u>underline</u>, tables, and
+            links.
+          </p>
           <div className="flex gap-2">
             <Button
               variant="primary"
               disabled={update.isPending}
               onClick={() =>
-                update.mutate({ internalNotes: text.trim() || null }, { onSuccess: () => setEditing(false) })
+                update.mutate(
+                  isInternal ? { internalNotes: text.trim() || null } : { description: text.trim() || null },
+                  { onSuccess: () => setEditing(false) },
+                )
               }
             >
               {update.isPending ? "Saving…" : "Save"}
@@ -235,23 +228,25 @@ function InternalNotesSection({ tournament }: { tournament: TournamentDetail }) 
         </div>
       ) : (
         <>
-          {tournament.internalNotes ? (
-            // Plain text, not RichText: these are working notes, and rendering
-            // them as Markdown would invite pasting something that reformats
-            // oddly mid-event. whitespace-pre-wrap keeps the line breaks.
-            <p className="text-[13px] whitespace-pre-wrap text-ink">{tournament.internalNotes}</p>
+          {value ? (
+            <RichText text={value} />
           ) : (
-            <p className="text-[13px] text-ink-muted">No internal notes yet.</p>
+            <p className="text-[13px] text-ink-muted">
+              {isInternal ? "No internal notes yet." : "No description yet."}
+            </p>
           )}
           {editedLine && <p className="mt-1.5 text-[11.5px] text-ink-muted">{editedLine}</p>}
           <button
-            onClick={() => {
-              setText(tournament.internalNotes ?? "");
-              setEditing(true);
-            }}
+            onClick={startEditing}
             className="mt-1.5 text-[12px] tracking-wide text-link uppercase hover:text-link-strong"
           >
-            {tournament.internalNotes ? "Edit notes" : "+ Add notes"}
+            {value
+              ? isInternal
+                ? "Edit notes"
+                : "Edit description"
+              : isInternal
+                ? "+ Add notes"
+                : "+ Add description"}
           </button>
         </>
       )}
@@ -580,9 +575,7 @@ export function TournamentPage() {
       </div>
       {editingTournament && <EditTournamentForm tournament={tournament} onDone={() => setEditingTournament(false)} />}
 
-      <DescriptionSection tournament={tournament} />
-
-      <InternalNotesSection tournament={tournament} />
+      <TournamentNotesSection tournament={tournament} />
 
       {tournament.playersPlayed > 0 && (
         <div className="mb-6 flex gap-5">
