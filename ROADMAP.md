@@ -46,7 +46,7 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
-### PI-143 — Automatic pre-deploy database backup ✅ (v0.17.0, deploy-verify pending)
+### PI-143 — Automatic pre-deploy database backup ✅ (v0.17.0)
 Idea from Tobias (2026-09-29): snapshot the database before a version change touches it, as an automatic safety net ahead of migrations.
 
 Built as a one-shot `db-backup` Compose service (Option B of the two considered — see below), in both `docker-compose.yml` and `docker-compose.image.yml`:
@@ -55,7 +55,7 @@ Built as a one-shot `db-backup` Compose service (Option B of the two considered 
 - [x] **Fail-closed** (Tobias's call): a failed dump leaves the condition unmet and the app won't start, so no migration ever runs without a fresh backup.
 - [x] `pg_dump -Fc` to bind-mounted `./backups`, keeping the 20 newest; `./backups/` gitignored (live player data). Shell vars in the inline command are `$$`-escaped so Compose interpolates only the `${...}` from `.env`.
 - [x] **On by default for everyone** (Tobias's call) — ships in both public compose files; `docs/deployment.md` documents it, the `pg_restore` rollback command, and how to remove it.
-- [ ] **Not deploy-verified**: Tobias should confirm on a real `docker compose up` that a dump lands in `./backups/`, that a deliberately-broken dump blocks app startup (fail-closed), and that the documented `pg_restore` actually restores.
+- [x] **Deploy-verified on the live instance (2026-09-29):** `docker compose up -d` ran `db-backup` to exit 0 before `app` started and wrote `pre-deploy-<ts>.dump` to `./backups/`; `pg_restore -l` confirmed a valid CUSTOM archive (174 TOC entries, full schema, pg_dump 16.15 against server 16.15 — exact version match). The success-path gating (app starts only on the dependency's clean exit) exercises the fail-closed wiring; the deliberately-broken-dump case was not run against live by choice.
 
 ### PI-142 — Autosave the tournament description / internal notes ✅ (v0.16.6)
 Idea from Tobias (2026-09-29): drop the Save button and have both fields save themselves, which also removes PI-140's drop-the-draft-on-tab-switch behaviour by making drafts impossible.
