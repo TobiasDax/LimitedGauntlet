@@ -57,9 +57,10 @@ export function useSignupStatus() {
   });
 }
 
+// HI-6 — signup creates an account only; the org is a separate step. So no
+// org fields here, and the response lands org-less (activeOrgId: null), which
+// ProtectedRoute routes to the org chooser.
 export interface SignupInput {
-  orgName: string;
-  orgSlug: string;
   organizerName: string;
   organizerEmail: string;
   organizerPassword: string;
@@ -104,12 +105,23 @@ export function useSwitchOrg() {
   });
 }
 
-// PI-86 — an existing organizer creates another org for themselves (adds a
-// membership, not a new account). Distinct from useSignup. Full reload for the
-// same reason as useSwitchOrg — you land in a fresh, empty tenant.
+// PI-86 / HI-6 — the sole org-creation path: an authenticated identity (fresh
+// from registration, or an existing organizer adding another) creates an org.
+// On the hosted free tier it also creates the org's first tournament, so the
+// `tournament*` fields are sent when entitlements are on (see OrganizationsPage
+// for the conditional form). Full reload for the same reason as useSwitchOrg —
+// you land in a fresh tenant.
+export interface CreateOrganizationInput {
+  orgName: string;
+  orgSlug: string;
+  tournamentName?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 export function useCreateOrganization() {
   return useMutation({
-    mutationFn: (input: { orgName: string; orgSlug: string }) => api.post<MeResponse>("/auth/organizations", input),
+    mutationFn: (input: CreateOrganizationInput) => api.post<MeResponse>("/auth/organizations", input),
     onSuccess: () => window.location.assign("/"),
   });
 }
@@ -280,8 +292,7 @@ export function useOidcPending() {
 export function useCompleteOidcRegistration() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { orgName: string; orgSlug: string; organizerName: string }) =>
-      api.post<MeResponse>("/auth/oidc/complete-registration", input),
+    mutationFn: (input: { organizerName: string }) => api.post<MeResponse>("/auth/oidc/complete-registration", input),
     onSuccess: (data) => {
       queryClient.setQueryData(["me"], data);
     },

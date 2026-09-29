@@ -10,13 +10,20 @@ import { beginSso, completeSso, isProviderConfigured, linkOrProvisionFromSso } f
 import { confirmOidcRelink } from "../services/oidcRelink.js";
 import { fireAndForget, sendAdminWebhookEvent } from "../services/webhooks.js";
 import { refreshRealtimeAuthorization } from "../realtime.js";
-import { canCreateFreeOrganization, ENTITLEMENT_REQUIRED } from "../services/entitlementAccess.js";
+import {
+  canCreateFreeOrganization,
+  claimTournamentCoverage,
+  ENTITLEMENT_REQUIRED,
+} from "../services/entitlementAccess.js";
+import { isEntitlementEnforcementActive, UNSUBSCRIBED_MAX_TOURNAMENT_DAYS } from "../services/entitlements.js";
 
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+// HI-6 — registration creates an account only, never an org. The org (and,
+// on the hosted free tier, its first tournament) is created as a separate,
+// deliberate step via POST /api/auth/organizations — so registering never
+// silently spends the account's one free org / free tournament.
 const signupSchema = z.object({
-  orgName: z.string().trim().min(1).max(100),
-  orgSlug: z.string().trim().min(3).max(40).regex(slugPattern, "lowercase letters, numbers, and hyphens only"),
   organizerName: z.string().trim().min(1).max(100),
   organizerEmail: z.string().trim().toLowerCase().email(),
   organizerPassword: z.string().min(8).max(200),
@@ -37,12 +44,24 @@ const acceptInviteSchema = z.object({
 });
 
 // Finishing an OIDC-bootstrapped registration (PI-42): the email/subject come
-// from the verified session, so the client only supplies the org details + the
-// organizer's display name.
+// from the verified session, so the client supplies only the organizer's
+// display name. HI-6 — no org here either; the account lands org-less and
+// creates its org via the dedicated route.
 const completeOidcRegistrationSchema = z.object({
+  organizerName: z.string().trim().min(1).max(100),
+});
+
+// HI-6 — the sole org-creation path now. `tournament*` fields drive the
+// hosted free tier's combined org + first-tournament creation; they are
+// required when entitlements are enforced and ignored when they aren't
+// (self-hosted creates the org here and adds tournaments separately, as
+// before). Decision (2026-09-29): combined creation is free-tier only.
+const createOrgSchema = z.object({
   orgName: z.string().trim().min(1).max(100),
   orgSlug: z.string().trim().min(3).max(40).regex(slugPattern, "lowercase letters, numbers, and hyphens only"),
-  organizerName: z.string().trim().min(1).max(100),
+  tournamentName: z.string().trim().min(1).max(150).optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
 });
 
 const oidcRelinkSchema = z.object({ token: z.string().min(1).max(200) });
@@ -119,9 +138,9 @@ function isUniqueConstraintError(err: unknown, target: string): boolean {
   );
 }
 
-// PI-75 — fired from both ways a brand-new org gets created (plain signup
-// and the OIDC-bootstrapped flow below), never from accept-invite (that
-// joins an existing org, which was already notified when it was created).
+// PI-75 — fired when a brand-new org is created. Since HI-6 that is one
+// place: POST /api/auth/organizations (registration no longer creates orgs).
+// Never from accept-invite (that joins an existing org, already notified).
 // No-op when ADMIN_WEBHOOK_URL isn't configured.
 function notifyAdminOfNewOrg(organization: { name: string; slug: string }, creatorEmail: string): void {
   if (!config.adminWebhook) return;
@@ -194,42 +213,25 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         reply.code(400).send({ error: "invalid_input", issues: parsed.error.issues });
         return;
       }
-      const { orgName, orgSlug, organizerName, organizerEmail, organizerPassword } = parsed.data;
+      const { organizerName, organizerEmail, organizerPassword } = parsed.data;
 
       const passwordHash = await hashPassword(organizerPassword);
 
       try {
-        const { organization, organizer } = await prisma.$transaction(async (tx) => {
-          const organization = await tx.organization.create({
-            data: { name: orgName, slug: orgSlug },
-          });
-          const organizer = await tx.organizerAccount.create({
-            data: {
-              name: organizerName,
-              email: organizerEmail,
-              passwordHash,
-              memberships: { create: { orgId: organization.id } },
-            },
-          });
-          return { organization, organizer };
+        // HI-6 — account only, no org. The identity session is established so
+        // the client lands on the org chooser (ProtectedRoute routes an
+        // org-less identity there) to create its org as a deliberate step.
+        const organizer = await prisma.organizerAccount.create({
+          data: { name: organizerName, email: organizerEmail, passwordHash },
         });
 
         establishSession(request, organizer);
-        notifyAdminOfNewOrg(organization, organizer.email);
-        await enterOrg(request, organizer.id, organization.id);
         reply.code(201).send({
-          organization: { id: organization.id, slug: organization.slug, name: organization.name },
-          organizer: { id: organizer.id, name: organizer.name, email: organizer.email },
-          organizations: [{ id: organization.id, slug: organization.slug, name: organization.name }],
-          activeOrgId: organization.id,
-          publicLockEnabled: false,
-          organizerCount: 1, // a brand-new org can't have co-organizers yet
+          identity: identityPayload(organizer),
+          organizations: [],
+          activeOrgId: null,
         });
       } catch (err) {
-        if (isUniqueConstraintError(err, "slug")) {
-          reply.code(409).send({ error: "slug_taken" });
-          return;
-        }
         if (isUniqueConstraintError(err, "email")) {
           reply.code(409).send({ error: "email_taken" });
           return;
@@ -621,46 +623,32 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         reply.code(400).send({ error: "invalid_input", issues: parsed.error.issues });
         return;
       }
-      const { orgName, orgSlug, organizerName } = parsed.data;
+      const { organizerName } = parsed.data;
 
       try {
-        const { organization, organizer } = await prisma.$transaction(async (tx) => {
-          const organization = await tx.organization.create({ data: { name: orgName, slug: orgSlug } });
-          const organizer = await tx.organizerAccount.create({
-            data: {
-              name: organizerName,
-              email: pending.email,
-              passwordHash: null,
-              oidcSubject: pending.subject,
-              // PI-125 — pending.email came from an already-verified SSO
-              // identity (checked in the callback before this pending
-              // registration was ever stashed), so this account starts
-              // trustworthy for future SSO linking, unlike open local signup.
-              localEmailVerifiedAt: new Date(),
-              memberships: { create: { orgId: organization.id } },
-            },
-          });
-          return { organization, organizer };
+        // HI-6 — account only, no org (same decoupling as password signup).
+        const organizer = await prisma.organizerAccount.create({
+          data: {
+            name: organizerName,
+            email: pending.email,
+            passwordHash: null,
+            oidcSubject: pending.subject,
+            // PI-125 — pending.email came from an already-verified SSO
+            // identity (checked in the callback before this pending
+            // registration was ever stashed), so this account starts
+            // trustworthy for future SSO linking, unlike open local signup.
+            localEmailVerifiedAt: new Date(),
+          },
         });
 
         request.session.set("oidcPending", undefined);
         establishSession(request, organizer);
-        notifyAdminOfNewOrg(organization, organizer.email);
-        await enterOrg(request, organizer.id, organization.id);
         reply.code(201).send({
           identity: identityPayload(organizer),
-          organizations: [{ id: organization.id, slug: organization.slug, name: organization.name }],
-          activeOrgId: organization.id,
-          organizer: { id: organizer.id, orgId: organization.id, name: organizer.name, email: organizer.email },
-          organization: { id: organization.id, slug: organization.slug, name: organization.name },
-          publicLockEnabled: false,
-          organizerCount: 1,
+          organizations: [],
+          activeOrgId: null,
         });
       } catch (err) {
-        if (isUniqueConstraintError(err, "slug")) {
-          reply.code(409).send({ error: "slug_taken" });
-          return;
-        }
         // The email/subject were free when the callback checked, but a race (or
         // a second concurrent setup) could collide — surface it rather than 500.
         if (isUniqueConstraintError(err, "email") || isUniqueConstraintError(err, "oidcSubject")) {
@@ -726,32 +714,78 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     "/api/auth/organizations",
     { preHandler: requireOrganizerIdentity, config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } },
     async (request, reply) => {
-      if (!config.allowSignup) {
-        reply.code(403).send({ error: "signup_disabled" });
-        return;
-      }
-      const parsed = z
-        .object({
-          orgName: z.string().trim().min(1).max(100),
-          orgSlug: z.string().trim().min(3).max(40).regex(slugPattern, "lowercase letters, numbers, and hyphens only"),
-        })
-        .safeParse(request.body);
+      const parsed = createOrgSchema.safeParse(request.body);
       if (!parsed.success) {
         reply.code(400).send({ error: "invalid_input", issues: parsed.error.issues });
         return;
       }
       const accountId = request.identity!.id;
-      // HI-6 / rule 8 — one free org per account. The signup paths above are
-      // untouched: a brand-new account's first org is legitimately free.
+
+      // HI-6 — the first org an authenticated identity creates is the
+      // completion of registration and must work even when open signup is
+      // off (the hosted instance is SSO-only with ALLOW_SIGNUP off). Only
+      // *additional* orgs are the signup-like affordance ALLOW_SIGNUP gates.
+      const existingMemberships = await listMemberships(accountId);
+      if (existingMemberships.length > 0 && !config.allowSignup) {
+        reply.code(403).send({ error: "signup_disabled" });
+        return;
+      }
+
+      // rule 8 — one free org per account.
       if (!(await canCreateFreeOrganization(accountId))) {
         reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "free_org_limit" });
         return;
       }
+
+      // HI-6 — free-tier combined creation: when entitlements are enforced,
+      // creating the org also creates its one tournament (the moment the free
+      // slot is spent), so the dates are locked in up front. Required here;
+      // ignored entirely when enforcement is off.
+      const enforced = isEntitlementEnforcementActive();
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
+      if (enforced) {
+        if (!parsed.data.tournamentName || !parsed.data.startDate || !parsed.data.endDate) {
+          reply.code(400).send({ error: "tournament_required" });
+          return;
+        }
+        startDate = parsed.data.startDate;
+        endDate = parsed.data.endDate;
+        if (endDate < startDate) {
+          reply.code(400).send({ error: "invalid_date_range" });
+          return;
+        }
+        const spanDays = (endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000);
+        if (spanDays > UNSUBSCRIBED_MAX_TOURNAMENT_DAYS) {
+          reply
+            .code(402)
+            .send({
+              error: ENTITLEMENT_REQUIRED,
+              reason: "tournament_duration",
+              maxDays: UNSUBSCRIBED_MAX_TOURNAMENT_DAYS,
+            });
+          return;
+        }
+      }
+
       let organization;
+      let tournamentId: string | null = null;
       try {
-        organization = await prisma.organization.create({
-          data: { name: parsed.data.orgName, slug: parsed.data.orgSlug, memberships: { create: { accountId } } },
+        const result = await prisma.$transaction(async (tx) => {
+          const org = await tx.organization.create({
+            data: { name: parsed.data.orgName, slug: parsed.data.orgSlug, memberships: { create: { accountId } } },
+          });
+          let tId: string | null = null;
+          if (enforced) {
+            const t = await tx.tournament.create({
+              data: { orgId: org.id, name: parsed.data.tournamentName!, startDate: startDate!, endDate: endDate! },
+            });
+            tId = t.id;
+          }
+          return { org, tId };
         });
+        organization = result.org;
+        tournamentId = result.tId;
       } catch (err) {
         if (isUniqueConstraintError(err, "slug")) {
           reply.code(409).send({ error: "slug_taken" });
@@ -759,6 +793,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         }
         throw err;
       }
+
+      // Spend the free slot on the just-created tournament. Runs its own
+      // transaction, so it follows the create above rather than nesting.
+      if (enforced && tournamentId) {
+        await claimTournamentCoverage(organization.id, tournamentId);
+      }
+
       notifyAdminOfNewOrg(organization, request.identity!.email);
       const entered = await enterOrg(request, accountId, organization.id);
       const organizations = await listMemberships(accountId);
@@ -766,6 +807,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         identity: request.identity,
         organizations,
         activeOrgId: organization.id,
+        tournamentId,
         organizer: {
           id: accountId,
           orgId: organization.id,

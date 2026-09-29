@@ -75,12 +75,20 @@ const slugify = (s: string) =>
 export function OrganizationsPage() {
   const { data: me } = useMe();
   const { data: signupStatus } = useSignupStatus();
+  const { data: appConfig } = useAppConfig();
   const switchOrg = useSwitchOrg();
   const createOrg = useCreateOrganization();
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
+  // HI-6 — the hosted free tier creates the org's first tournament in the same
+  // step (that's when the free slot is spent). These fields only show, and are
+  // only required/sent, when entitlements are enforced.
+  const hosted = appConfig?.hostedEntitlements === true;
+  const [tournamentName, setTournamentName] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   if (!me) return null;
   const orgs = me.organizations ?? [];
@@ -88,9 +96,15 @@ export function OrganizationsPage() {
   const createError =
     createOrg.error instanceof ApiError && createOrg.error.message === "slug_taken"
       ? "That URL is already taken — pick another."
-      : createOrg.isError
-        ? "Something went wrong."
-        : null;
+      : createOrg.error instanceof ApiError && createOrg.error.message === "tournament_duration"
+        ? "A free tournament can span at most 7 days — shorten the dates."
+        : createOrg.error instanceof ApiError && createOrg.error.message === "invalid_date_range"
+          ? "The end date can't be before the start date."
+          : createOrg.error instanceof ApiError && createOrg.error.message === "free_org_limit"
+            ? "You've already used your free organization."
+            : createOrg.isError
+              ? "Something went wrong."
+              : null;
 
   return (
     <div className="mx-auto max-w-[520px]">
@@ -148,7 +162,11 @@ export function OrganizationsPage() {
               e.preventDefault();
               const finalSlug = slug || slugify(name);
               if (!slugPattern.test(finalSlug)) return;
-              createOrg.mutate({ orgName: name.trim(), orgSlug: finalSlug });
+              createOrg.mutate({
+                orgName: name.trim(),
+                orgSlug: finalSlug,
+                ...(hosted ? { tournamentName: tournamentName.trim(), startDate, endDate } : {}),
+              });
             }}
           >
             <Field label="Name">
@@ -175,9 +193,39 @@ export function OrganizationsPage() {
                 />
               </div>
             </Field>
+
+            {hosted && (
+              // The org's first (free) tournament. Dates are fixed once set on
+              // the free tier, so they're chosen here up front.
+              <div className="border-border mt-1 flex flex-col gap-3 rounded-md border border-dashed p-4">
+                <div className="text-[12px] font-semibold tracking-wide text-ink-secondary uppercase">
+                  Your first tournament
+                </div>
+                <p className="text-[12px] text-ink-muted">
+                  Your free organization includes one tournament. Its dates are fixed once set (up to 7 days), so pick
+                  them now — you can add more by upgrading later.
+                </p>
+                <Field label="Tournament name">
+                  <TextField required value={tournamentName} onChange={(e) => setTournamentName(e.target.value)} />
+                </Field>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Field label="Start date">
+                    <TextField type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  </Field>
+                  <Field label="End date">
+                    <TextField type="date" required value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                  </Field>
+                </div>
+              </div>
+            )}
+
             {createError && <FormError>{createError}</FormError>}
             <div className="flex gap-2">
-              <Button type="submit" variant="primary" disabled={!name || createOrg.isPending}>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={!name || (hosted && (!tournamentName || !startDate || !endDate)) || createOrg.isPending}
+              >
                 {createOrg.isPending ? "Creating…" : "Create"}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>

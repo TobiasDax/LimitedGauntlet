@@ -111,11 +111,12 @@ Thin guard calls only; no logic here.
 - [x] 7-day maximum span enforced on create and on any date-changing update.
 - [ ] Pod start/finish window enforcement, including the mid-round hard close.
 
-### HI-6 — Account/org decoupling ◐ (one-free-org rule done; decoupling pending)
-- [ ] Stop signup creating an org, so registration lands in the existing org-less state.
-- [ ] Combined org + tournament creation on the org-creation step (not signup), spending the free slot there.
-- [ ] Once signup no longer creates an org, drop the signup-route exemption below — every org creation then flows through the one guarded route.
-- [x] One-free-org-per-account check (`canCreateFreeOrganization`), wired into the multi-org creation route. The two signup routes are deliberately untouched: a brand-new account's first org is legitimately free. Paid orgs are unrestricted.
+### HI-6 — Account/org decoupling ✅ (code-complete 2026-09-29, browser-verify pending)
+- [x] **Registration creates an account only.** Both `/api/auth/signup` (password) and `/api/auth/oidc/complete-registration` (SSO) now create a passwordless-or-password account with no org/membership and return org-less (`activeOrgId: null`); `ProtectedRoute` already routes that to the org chooser. Client signup + OIDC-setup forms dropped their org fields accordingly.
+- [x] **Org creation is the sole guarded path** (`POST /api/auth/organizations`), now reached by first-org creation too. Decision 1 fix: the blunt `allowSignup` gate would have locked SSO users out of their first org (hosted runs `allowSignup` off) — replaced with "first org allowed for any authenticated identity; *additional* orgs still need `allowSignup`". The `canCreateFreeOrganization` (rule 8) check applies uniformly now; the old signup-route exemption is gone because signup no longer makes orgs.
+- [x] **Combined org + first-tournament creation, free-tier only** (decision 3). When entitlements are enforced, creating the org also creates its one tournament (name + dates, ≤7-day span validated) in a transaction, then `claimTournamentCoverage` spends the free slot — the moment the free tournament is committed. When enforcement is off (self-hosted, decision 2), org creation stays a plain one-org step and tournaments are added separately as before. Client create-org form shows the tournament fields only when `appConfig.hostedEntitlements`.
+- [x] One-free-org-per-account check (`canCreateFreeOrganization`) — done earlier, now on the uniform path.
+- [ ] **Not browser-verified**: Tobias should confirm on a live hosted instance: password + SSO registration land on the org chooser; creating the free org requires tournament name/dates, rejects a >7-day span, and spends the free slot (a second tournament is then blocked); a self-hosted instance (entitlements off) creates an org with no tournament step; and an SSO user can create their first org with `ALLOW_SIGNUP` off.
 
 ### HI-7 — Payment integration ⛔ (blocked on processor account setup)
 - [ ] Checkout initiation route passing the org id as processor metadata.

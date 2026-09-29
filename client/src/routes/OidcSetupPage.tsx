@@ -4,26 +4,15 @@ import { useOidcPending, useCompleteOidcRegistration } from "../features/auth/us
 import { Button, Card, Field, FormError, TextField } from "../components/ui";
 import { ApiError } from "../lib/api";
 
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-// Org-setup screen after a first SSO login with no existing account (PI-42).
-// The verified email/subject live in the session; here the new organizer only
-// names their org and themselves. No account exists yet if there's nothing
-// pending, so we bounce back to /login.
+// Account-setup screen after a first SSO login with no existing account
+// (PI-42). HI-6 — this now finishes the *account* only (just the display
+// name); the org is created afterward on the chooser, so registering doesn't
+// commit an org/free tournament. Bounces to /login if nothing's pending.
 export function OidcSetupPage() {
   const { data: pending, isLoading } = useOidcPending();
   const complete = useCompleteOidcRegistration();
   const navigate = useNavigate();
 
-  const [orgName, setOrgName] = useState("");
-  const [orgSlug, setOrgSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
   const [organizerName, setOrganizerName] = useState("");
 
   // Prefill the display name from the IdP once it loads.
@@ -42,8 +31,8 @@ export function OidcSetupPage() {
     <div className="mx-auto max-w-[420px] py-16">
       <h1 className="font-display mb-1 text-[26px] font-bold">Finish setting up</h1>
       <p className="mb-8 text-[14px] text-ink-secondary">
-        Signed in as <span className="text-ink">{pending.email}</span>. Name your organization to get started — this is
-        the last step.
+        Signed in as <span className="text-ink">{pending.email}</span>. Confirm your name — you'll set up your
+        organization next.
       </p>
 
       <Card className="p-6">
@@ -51,31 +40,10 @@ export function OidcSetupPage() {
           className="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
-            complete.mutate({ orgName, orgSlug, organizerName }, { onSuccess: () => navigate("/") });
+            // Org-less on success → the chooser prompts to create the org.
+            complete.mutate({ organizerName }, { onSuccess: () => navigate("/") });
           }}
         >
-          <Field label="Organization name" hint="e.g. your playgroup's name">
-            <TextField
-              required
-              value={orgName}
-              onChange={(e) => {
-                setOrgName(e.target.value);
-                if (!slugTouched) setOrgSlug(slugify(e.target.value));
-              }}
-            />
-          </Field>
-          <Field label="URL slug" hint="Used in shareable links — lowercase, numbers, hyphens">
-            <TextField
-              required
-              pattern="[a-z0-9]+(-[a-z0-9]+)*"
-              minLength={3}
-              value={orgSlug}
-              onChange={(e) => {
-                setSlugTouched(true);
-                setOrgSlug(slugify(e.target.value));
-              }}
-            />
-          </Field>
           <Field label="Your name">
             <TextField required value={organizerName} onChange={(e) => setOrganizerName(e.target.value)} />
           </Field>
@@ -83,9 +51,7 @@ export function OidcSetupPage() {
           {complete.isError && (
             <FormError>
               {complete.error instanceof ApiError && complete.error.status === 409
-                ? complete.error.message === "slug_taken"
-                  ? "That URL slug is already taken — try a different one."
-                  : "An account for your identity already exists — try logging in again."
+                ? "An account for your identity already exists — try logging in again."
                 : complete.error instanceof ApiError && complete.error.message === "no_pending_registration"
                   ? "Your SSO session expired. Please sign in again."
                   : "Something went wrong. Try again."}
@@ -93,7 +59,7 @@ export function OidcSetupPage() {
           )}
 
           <Button type="submit" variant="primary" disabled={complete.isPending}>
-            {complete.isPending ? "Creating…" : "Create organization"}
+            {complete.isPending ? "Saving…" : "Continue"}
           </Button>
         </form>
       </Card>

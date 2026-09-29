@@ -6,18 +6,7 @@ import { SsoButtons } from "../components/SsoButtons";
 import { Button, Card, Field, FormError, TextField } from "../components/ui";
 import { ApiError } from "../lib/api";
 
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 export function SignupPage() {
-  const [orgName, setOrgName] = useState("");
-  const [orgSlug, setOrgSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
   const [organizerName, setOrganizerName] = useState("");
   const [organizerEmail, setOrganizerEmail] = useState("");
   const [organizerPassword, setOrganizerPassword] = useState("");
@@ -28,9 +17,10 @@ export function SignupPage() {
 
   return (
     <div className="mx-auto max-w-[420px] py-16">
-      <h1 className="font-display mb-1 text-[26px] font-bold">Create your organization</h1>
+      <h1 className="font-display mb-1 text-[26px] font-bold">Create your account</h1>
       <p className="mb-8 text-[14px] text-ink-secondary">
-        One organization per playgroup — your roster and tournaments live under it.
+        {/* HI-6 — registration is account-only now; the org is the next step. */}
+        Register first — you'll set up your organization right after, so nothing's committed until you do.
       </p>
 
       {appConfig?.localLoginDisabled ? (
@@ -56,33 +46,13 @@ export function SignupPage() {
             onSubmit={(e) => {
               e.preventDefault();
               signup.mutate(
-                { orgName, orgSlug, organizerName, organizerEmail, organizerPassword },
+                { organizerName, organizerEmail, organizerPassword },
+                // Org-less on success → ProtectedRoute sends them to the org
+                // chooser to create their organization as the next step.
                 { onSuccess: () => navigate("/") },
               );
             }}
           >
-            <Field label="Organization name" hint="e.g. your playgroup's name">
-              <TextField
-                required
-                value={orgName}
-                onChange={(e) => {
-                  setOrgName(e.target.value);
-                  if (!slugTouched) setOrgSlug(slugify(e.target.value));
-                }}
-              />
-            </Field>
-            <Field label="URL slug" hint="Used in shareable links — lowercase, numbers, hyphens">
-              <TextField
-                required
-                pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                minLength={3}
-                value={orgSlug}
-                onChange={(e) => {
-                  setSlugTouched(true);
-                  setOrgSlug(slugify(e.target.value));
-                }}
-              />
-            </Field>
             <Field label="Your name">
               <TextField required value={organizerName} onChange={(e) => setOrganizerName(e.target.value)} />
             </Field>
@@ -109,9 +79,7 @@ export function SignupPage() {
             {signup.isError && (
               <FormError>
                 {signup.error instanceof ApiError && signup.error.status === 409
-                  ? signup.error.message === "slug_taken"
-                    ? "That URL slug is already taken — try a different one."
-                    : "That email already has an account. Log in, then add another organization from the organization menu in the top bar."
+                  ? "That email already has an account — log in instead."
                   : signup.error instanceof ApiError && signup.error.status === 403
                     ? "Signups just closed — ask whoever's running this instance."
                     : "Something went wrong. Try again."}
@@ -119,7 +87,7 @@ export function SignupPage() {
             )}
 
             <Button type="submit" variant="primary" disabled={signup.isPending}>
-              {signup.isPending ? "Creating…" : "Create organization"}
+              {signup.isPending ? "Creating…" : "Create account"}
             </Button>
           </form>
         </Card>
@@ -134,11 +102,11 @@ export function SignupPage() {
 
       {appConfig?.legalPageEnabled !== false && (
         <p className="mt-3 text-center text-[12px] text-ink-muted">
-          By creating an organization you acknowledge the{" "}
+          By creating an account you acknowledge the{" "}
           <Link to="/legal" className="underline hover:text-ink-secondary">
             legal notice
           </Link>
-          . As the organizer you are the data controller for the people you add.
+          . As an organizer you are the data controller for the people you add.
         </p>
       )}
     </div>
