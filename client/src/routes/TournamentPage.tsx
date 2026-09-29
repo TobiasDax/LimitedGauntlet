@@ -186,6 +186,79 @@ function DescriptionSection({ tournament }: { tournament: TournamentDetail }) {
   );
 }
 
+// PI-140 — the private counterpart to DescriptionSection. Same shape (one
+// editable free-text field), deliberately different framing: the heading and
+// border say "organizers only" because the whole value of the field is that
+// the writer can trust it is not public. It never reaches a public page —
+// the public routes allowlist what they serve (PI-141) — but the UI has to
+// make that legible, or nobody will write anything candid in it.
+function InternalNotesSection({ tournament }: { tournament: TournamentDetail }) {
+  const update = useUpdateTournament(tournament.id);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(tournament.internalNotes ?? "");
+
+  const editedLine =
+    tournament.internalNotesEditedAt &&
+    `Last edited ${new Date(tournament.internalNotesEditedAt).toLocaleString()}${
+      tournament.internalNotesEditedByName ? ` by ${tournament.internalNotesEditedByName}` : ""
+    }`;
+
+  return (
+    <div className="border-border mb-6 rounded-md border border-dashed p-4">
+      <div className="mb-2 flex items-baseline gap-2">
+        <h2 className="text-[11.5px] font-semibold tracking-wide text-ink-muted uppercase">Internal notes</h2>
+        <span className="text-[11.5px] text-ink-muted">Organizers only — never shown on public pages</span>
+      </div>
+
+      {editing ? (
+        <div className="flex flex-col gap-2">
+          <Textarea
+            rows={6}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={"Rulings, table restarts, who turned up late…\n\nOnly organizers of this org can read this."}
+          />
+          <div className="flex gap-2">
+            <Button
+              variant="primary"
+              disabled={update.isPending}
+              onClick={() =>
+                update.mutate({ internalNotes: text.trim() || null }, { onSuccess: () => setEditing(false) })
+              }
+            >
+              {update.isPending ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="ghost" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {tournament.internalNotes ? (
+            // Plain text, not RichText: these are working notes, and rendering
+            // them as Markdown would invite pasting something that reformats
+            // oddly mid-event. whitespace-pre-wrap keeps the line breaks.
+            <p className="text-[13px] whitespace-pre-wrap text-ink">{tournament.internalNotes}</p>
+          ) : (
+            <p className="text-[13px] text-ink-muted">No internal notes yet.</p>
+          )}
+          {editedLine && <p className="mt-1.5 text-[11.5px] text-ink-muted">{editedLine}</p>}
+          <button
+            onClick={() => {
+              setText(tournament.internalNotes ?? "");
+              setEditing(true);
+            }}
+            className="mt-1.5 text-[12px] tracking-wide text-link uppercase hover:text-link-strong"
+          >
+            {tournament.internalNotes ? "Edit notes" : "+ Add notes"}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 const podFormats: PodFormat[] = ["DRAFT", "SEALED", "CHAOS_DRAFT", "CONSTRUCTED", "CUSTOM"];
 
 function NewPodForm({
@@ -508,6 +581,8 @@ export function TournamentPage() {
       {editingTournament && <EditTournamentForm tournament={tournament} onDone={() => setEditingTournament(false)} />}
 
       <DescriptionSection tournament={tournament} />
+
+      <InternalNotesSection tournament={tournament} />
 
       {tournament.playersPlayed > 0 && (
         <div className="mb-6 flex gap-5">

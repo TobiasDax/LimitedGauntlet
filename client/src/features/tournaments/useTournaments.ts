@@ -33,6 +33,8 @@ export interface UpdateTournamentInput {
   endDate?: string;
   location?: string | null;
   description?: string | null;
+  // PI-140 — organizer-only notes; null clears them.
+  internalNotes?: string | null;
   status?: TournamentStatus;
   tokenParticipation?: number;
   tokenStandingBonuses?: StandingBonusRow[];

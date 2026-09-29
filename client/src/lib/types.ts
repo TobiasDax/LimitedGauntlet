@@ -82,6 +82,12 @@ export interface Tournament {
   endDate: string;
   location: string | null;
   description: string | null;
+  // PI-140 — organizer-only notes, the private counterpart to `description`.
+  // Only ever present on authenticated organizer responses: the public routes
+  // allowlist what they serve (PI-141), so this never reaches a public page.
+  internalNotes?: string | null;
+  internalNotesEditedAt?: string | null;
+  internalNotesEditedByName?: string | null;
   status: TournamentStatus;
   // PI-72 — default token rewards for this tournament's pods.
   tokenParticipation: number;

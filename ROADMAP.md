@@ -57,26 +57,28 @@ So every column on `Tournament` and `Pod` is published by default, and **any new
 - [x] Caught while building: the tournament page's pods carry a nested `rounds` summary (PI-58) that is not part of the Pod row, so the allowlist stripped the public progress labels. Now carried through explicitly.
 - [ ] **Not browser-verified**: Tobias should load a public tournament page and a public pod page and confirm nothing visibly changed — pod progress labels, timers, capacity cues and token displays in particular.
 
-### PI-140 — Internal notes for a tournament (organizer-only) ⏳ (idea from Tobias 2026-09-28, not started)
+### PI-140 — Internal notes for a tournament (organizer-only) ⏳ (built 2026-09-29, browser-verify pending)
 An organizer-only free-text field for notes the TOs keep between themselves — a table restart, a late player, a ruling, anything that shouldn't be on a public page. Shown as its own tab.
 
 **Scope corrected by Tobias (2026-09-28): tournament level, not pod.** Descriptions live on `Tournament`, so internal notes belong beside `Tournament.description` as a true private mirror of it. (The original write-up put this on `Pod`, which has no text field at all.)
 
 **Shape decided (2026-09-28):** a *single editable notes field*, mirroring how `description` already works — not a threaded comment log with per-entry authors. One nullable column, no new table.
 
-**To build:**
-- [ ] `Tournament.internalNotes String?` (+ migration). Optionally `internalNotesEditedById` / `internalNotesEditedAt` so a co-organizer can see who last touched it — cheap, and useful once an org has more than one TO.
-- [ ] Read/write through the existing organizer routes: `GET /api/tournaments/:id` and `PATCH /api/tournaments/:id` (add the field to `tournamentUpdateSchema`). Both already require org membership, so no new auth surface.
-- [ ] A "Notes" tab on the organizer's tournament page.
-- [ ] Include it in the org export (`services/orgExport.ts`, alongside `description`) — that export is the backup/round-trip format, so omitting it would silently lose the notes on a restore.
+**Built:**
+- [x] `Tournament.internalNotes`, `internalNotesEditedAt`, `internalNotesEditedById` (migration `20260929100000_tournament_internal_notes`; additive, drift check clean). The editor id is a plain column, not an FK — a co-organizer who is later removed leaves the notes readable with the attribution simply unresolved.
+- [x] Read/write through the existing organizer routes. `PATCH` stamps the editor **only when the request actually changes the notes**, so an unrelated edit (a rename, a status change) can't rewrite the attribution. `GET` resolves the editor id to a name for display.
+- [x] Rendered as a section on the organizer's tournament page, directly below the description it mirrors. Not a tab: that page has no tab structure, and mirroring `description` means matching how `description` is presented. Shown as plain text with preserved line breaks, not Markdown — working notes typed mid-event shouldn't reformat surprisingly.
+- [x] Included in the org export and import (optional in the import schema, so an export predating the field still restores). Round-trip test covers a tournament with notes, one without (must stay null, not `""`), and a legacy export with no key at all.
 
-**Must not leak — the whole point of the feature:**
-- [ ] **Do PI-141 first.** Because the public tournament route spreads the raw row, adding this column leaks it publicly on day one unless the allowlist lands first. This ordering is the single thing not to get wrong.
-- [ ] Never in webhook payloads (`services/webhooks.ts`).
-- [ ] Never in the player self-service data export (`services/playerDataExport.ts`).
-- [ ] Test that the public tournament response has no `internalNotes` key.
+**Leak surfaces — all verified:**
+- [x] **Public pages:** excluded *by construction* thanks to PI-141 landing first — `publicTournamentFields()` copies a fixed list, so the new column was never published at any point. `publicVisibility.test.ts` already asserts an `internalNotes`-shaped column is dropped.
+- [x] **Webhooks:** `services/webhooks.ts` selects only `tournament: { select: { name: true } }` — narrow by construction, no raw row.
+- [x] **Player self-service export:** `services/playerDataExport.ts` selects only `name/startDate/endDate`. Deliberately excluded (see GDPR note below), and structurally unable to carry it regardless.
 
-**GDPR:** free text about players *is* personal data, and a note naming someone falls in scope of a real subject access request. Keeping it out of the self-service player export is right — it is org-internal working material, not something to auto-publish to the player — but the org export must therefore be able to produce it. Worth a line in `docs/gdpr.md` so a deployer knows notes are discoverable and shouldn't be used for anything they wouldn't stand behind.
+This is the ordering paying off: had PI-140 been built first, the field would have been public the moment the migration ran.
+
+- [x] **GDPR** documented in `docs/gdpr.md` §3.3: notes are excluded from public pages and the self-service export, but *are* in scope of an Art. 15 request, which is why the whole-org export carries them. Includes the two practical warnings for organizers — write notes you'd be willing to show the person, and don't record Art. 9 special-category data in them.
+- [ ] **Not browser-verified**: Tobias should confirm the section saves, clears back to empty, shows the "last edited by" line, and — the one that matters — that the notes appear nowhere on the public tournament page.
 
 ### PI-138 — Greedy pairing emitted a silent repeat opponent ⏳ (fixed 2026-09-26, browser-verify pending)
 Reported by Tobias (2026-09-26) from the live `app.` instance: a 42-entrant SEALED pod re-paired two players in round 6 who had already met in round 3. Confirmed against the real data — at that moment every player still had 26–29 legal partners out of 31, and a repeat-free perfect matching demonstrably existed, so nothing about the round forced it.
