@@ -23,6 +23,7 @@
     "nodemailer": "^10.0.2",
     "openid-client": "^6.8.8",
     "socket.io": "^4.8.1",
+    "stripe": "^22.6.2",
     "write-excel-file": "^4.1.1",
     "zod": "^4.6.0"
   },

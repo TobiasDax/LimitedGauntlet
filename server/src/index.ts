@@ -22,6 +22,7 @@ import { settingsRoutes } from "./routes/settings.js";
 import { publicRoutes } from "./routes/public.js";
 import { trackingRoutes } from "./routes/tracking.js";
 import { legalRoutes } from "./routes/legal.js";
+import { billingRoutes } from "./routes/billing.js";
 import { createAppRealtimeRoomAuthorizer, initRealtime } from "./realtime.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -174,6 +175,7 @@ await app.register(settingsRoutes);
 await app.register(publicRoutes);
 await app.register(trackingRoutes);
 await app.register(legalRoutes);
+await app.register(billingRoutes);
 
 // Serves the built SPA in production. During `npm run dev`, the Vite dev
 // server runs separately and this directory won't exist yet — that's fine,

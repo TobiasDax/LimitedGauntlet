@@ -159,6 +159,19 @@ export const config = {
     url: process.env.ADMIN_WEBHOOK_URL,
     secret: process.env.ADMIN_WEBHOOK_SECRET,
   }),
+  // HI-7 — Stripe Managed Payments (the hosted instance's payment processor).
+  // Fully inert unless secretKey + webhookSecret are set, same off-by-default
+  // posture as everything else here: a self-hosted or un-configured deployment
+  // exposes no checkout/webhook routes. The price IDs are created in the Stripe
+  // dashboard (the €5 pass, the monthly + annual subscription prices) and
+  // referenced here by id — never the amounts, which live only in Stripe.
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY ?? "",
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+    pricePass: process.env.STRIPE_PRICE_PASS ?? "",
+    priceSubscriptionMonthly: process.env.STRIPE_PRICE_SUB_MONTHLY ?? "",
+    priceSubscriptionAnnual: process.env.STRIPE_PRICE_SUB_ANNUAL ?? "",
+  },
   // PI-108 — how much of each HTTP request the access log records.
   //   "minimal" (default): method, url path, status, duration — no client IP,
   //                        no query string.
@@ -191,6 +204,13 @@ export const config = {
 
 export function isEmailConfigured(): boolean {
   return config.smtp.host.length > 0 && config.smtp.from.length > 0;
+}
+
+// HI-7 — Stripe is usable only with both a secret key and a webhook secret;
+// without the webhook secret we couldn't verify events, so checkout would be
+// pointless. The routes register only when this is true.
+export function isStripeConfigured(): boolean {
+  return config.stripe.secretKey.length > 0 && config.stripe.webhookSecret.length > 0;
 }
 
 export function isOidcConfigured(): boolean {

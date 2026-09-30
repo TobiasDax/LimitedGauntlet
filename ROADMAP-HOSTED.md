@@ -118,12 +118,19 @@ Thin guard calls only; no logic here.
 - [x] One-free-org-per-account check (`canCreateFreeOrganization`) — done earlier, now on the uniform path.
 - [ ] **Not browser-verified**: Tobias should confirm on a live hosted instance: password + SSO registration land on the org chooser; creating the free org requires tournament name/dates, rejects a >7-day span, and spends the free slot (a second tournament is then blocked); a self-hosted instance (entitlements off) creates an org with no tournament step; and an SSO user can create their first org with `ALLOW_SIGNUP` off.
 
-### HI-7 — Payment integration ⛔ (blocked on processor account setup)
-- [ ] Checkout initiation route passing the org id as processor metadata.
-- [ ] Signed webhook receiver: one-time purchase and subscription lifecycle events → ledger write → derived-state recompute.
-- [ ] Idempotency on processor event id; verify replayed deliveries are no-ops.
-- [ ] Pass-application choice (rule 3) captured at or immediately after checkout.
-- [ ] Secrets via `.env` on the hosted deployment only.
+### HI-7 — Payment integration ◐ (Layer A + B code-complete 2026-09-30; Stripe dashboard setup + live-verify pending)
+**Processor decided: Stripe Managed Payments** — a Merchant-of-Record flag on standard Stripe Checkout (Stripe handles EU VAT/OSS). Integration facts live in the private monetization memory; the code split into two layers:
+
+**Layer A — processor-agnostic billing application (`services/billing.ts`), done + tested:**
+- [x] `recordPassPurchase` (unused TOURNAMENT_PASS ledger row = spendable capacity), `applySubscriptionPayment` (SERIES + expiry set to Stripe's paid-through date + banked months; initial and renewals same path), `recordSubscriptionCancellation` (recorded, not revoked — the paid period isn't cut off).
+- [x] Idempotent on the unique `processorEventId`; ledger insert + org update share a transaction so a redelivered webhook rolls back rather than double-applying. 7 real-DB tests.
+
+**Layer B — the Stripe adapter (`routes/billing.ts`), code-complete:**
+- [x] `POST /api/billing/checkout` creates a hosted Checkout Session (`managed_payments: { enabled: true }`; `client_reference_id`/metadata carry the org id), returns the URL to redirect to. Pass = `mode: payment`; subscription = `mode: subscription`.
+- [x] `POST /api/billing/webhook` verifies the signature (`constructEvent`) with a raw-body parser encapsulated to just that route, and routes events: the pass on `checkout.session.completed`/`async_payment_succeeded` (keyed on session id), subscriptions on `invoice.paid` (initial + renewals, keyed on invoice id, period/interval read off the retrieved subscription), cancellation on `customer.subscription.deleted`. Subscriptions deliberately handled *only* via `invoice.paid` so the first period isn't double-applied by the session event too.
+- [x] Config (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, three price IDs) off by default; routes register only when `isStripeConfigured()`. `stripe` SDK added (also to root `package.json` per the PI-102 de-hoist rule). API version pinned to `2025-03-31.basil`.
+- [ ] **Stripe dashboard setup (Tobias):** create the products/prices (€5 pass; monthly + annual subscription) with a Managed-Payments-eligible tax code; put the secret key, webhook signing secret, and the three price IDs into the hosted instance's `.env` + the override's `environment:` block (above). Register the webhook endpoint (`/api/billing/webhook`) in the Stripe dashboard / CLI.
+- [ ] **Live-verify (Tobias, sandbox):** a test-card pass purchase records an unused pass; a subscription checkout sets SERIES with the right expiry; a renewal (Stripe CLI clock or `trigger`) extends it; a redelivered event doesn't double-apply. No client checkout buttons yet — test via the Stripe CLI / a direct POST until the HI-9 pricing page wires them.
 
 ### HI-8 — Admin CLI ✅ (code-complete 2026-09-22, DB-backed tests not yet run)
 Built early — it is the escape hatch if the webhook path misbehaves in production.
@@ -171,7 +178,7 @@ only reaches the container when it is listed under `environment:`. Putting
 `HOSTED_ENTITLEMENTS=true` in `.env` therefore does nothing on its own.
 
 The hosted deployment injects it through its own (private, not in this repo)
-`docker-compose.override.yml`:
+`docker-compose.override.yml`, alongside the Stripe billing config (HI-7):
 
 ```yaml
 services:
@@ -179,11 +186,19 @@ services:
     environment:
       HOSTED_ENTITLEMENTS: ${HOSTED_ENTITLEMENTS:-}
       HOSTED_SUPPORT_EMAIL: ${HOSTED_SUPPORT_EMAIL:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PASS: ${STRIPE_PRICE_PASS:-}
+      STRIPE_PRICE_SUB_MONTHLY: ${STRIPE_PRICE_SUB_MONTHLY:-}
+      STRIPE_PRICE_SUB_ANNUAL: ${STRIPE_PRICE_SUB_ANNUAL:-}
 ```
 
 With that in place the values come from `.env` as usual. A self-hosted
-deployment has no such override, so the flag cannot be switched on by
-accident — which is the point.
+deployment has no such override, so nothing about billing can switch on by
+accident — which is the point. The billing routes also self-gate: they only
+register when `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` are both set
+(`isStripeConfigured`), so even the override does nothing until the keys are
+filled in.
 
 ## Next steps
 
