@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   useTournament,
+  useApplyPass,
   useExportTournamentXlsx,
   tournamentStatusLabel,
   type TournamentDetail,
@@ -676,6 +677,7 @@ export function TournamentPage() {
   // the tournament-wide standings, without a manual refresh.
   useTournamentRealtime(id);
   const exportXlsx = useExportTournamentXlsx(id ?? "");
+  const applyPass = useApplyPass(id ?? "");
   const reorderPods = useReorderPods(id ?? "");
   const [showPodForm, setShowPodForm] = useState(false);
   const [editingTournament, setEditingTournament] = useState(false);
@@ -710,6 +712,31 @@ export function TournamentPage() {
         <DeleteTournamentButton tournament={tournament} />
       </div>
       {editingTournament && <EditTournamentForm tournament={tournament} onDone={() => setEditingTournament(false)} />}
+
+      {/* HI-9 rule 3 — apply a banked pass to this (free-covered) tournament,
+          reclaiming the free slot. Only on a hosted instance, only when a pass
+          is available and this tournament is still on the free slot. */}
+      {me?.entitlement?.enforced &&
+        (me.entitlement.unusedPasses ?? 0) > 0 &&
+        tournament.coveringEntitlement === "FREE" && (
+          <Card className="mb-6 border-accent/40 bg-surface-sunken p-4">
+            <div className="text-[14px] font-semibold text-ink">Upgrade this tournament with a pass</div>
+            <p className="mt-1 text-[13px] text-ink-secondary">
+              You have {me.entitlement.unusedPasses} unused tournament{" "}
+              {me.entitlement.unusedPasses === 1 ? "pass" : "passes"}. Applying one here unlocks unlimited pods for this
+              tournament and returns your free-tournament slot, so you can still run a separate free event.
+            </p>
+            <Button
+              variant="primary"
+              className="mt-3"
+              disabled={applyPass.isPending}
+              onClick={() => applyPass.mutate()}
+            >
+              {applyPass.isPending ? "Applying…" : "Use a pass on this tournament"}
+            </Button>
+            {applyPass.isError && <FormError>Couldn't apply the pass — try again.</FormError>}
+          </Card>
+        )}
 
       <TournamentNotesSection tournament={tournament} />
 

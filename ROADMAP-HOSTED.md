@@ -224,7 +224,7 @@ Ordered by what blocks what. Everything below HI-7 can proceed in parallel.
 
 HI-6, HI-7 and HI-9 are code-complete (see those items above — org/tournament decoupled, Stripe checkout + webhook done and sandbox-verified, plan & billing UI + the global 402→upsell sweep done, subscriber management via link.com). What's left:
 
-- [ ] **Rule 3 pass-application choice** — let a user apply a bought pass to the *existing* free tournament (reclaiming the free slot) rather than only to an additional one. Today a pass auto-applies to the next tournament created (`claimTournamentCoverage`); the reclaim-the-slot half (`applyPassToTournament`) already exists server-side, so this is a small UI + endpoint to expose the choice. Deferred — not blocking launch.
+- [x] **Rule 3 pass-application choice** — a free org with a banked pass can apply it to its *existing* free tournament (unlocks unlimited pods there and returns the free slot) via `POST /api/tournaments/:id/apply-pass` (mapping `applyPassToTournament`) and a "Use a pass on this tournament" control on the tournament page, shown only when hosted, a pass is available, and the tournament is still free-covered (`coveringEntitlement === "FREE"`). The other half — a pass auto-covering the *next* tournament created — was already handled by `claimTournamentCoverage`. So both paths of the rule-3 choice now exist.
 - [ ] **Reconciliation backstop** — optional, post-v1: periodically re-poll Stripe for subscription state as a safety net for missed webhooks.
 
 ### 4. Rollout, in this order

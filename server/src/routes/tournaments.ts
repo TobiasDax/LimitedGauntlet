@@ -9,6 +9,7 @@ import { computeGesamtwertung, countTournamentParticipants } from "../services/g
 import { buildTournamentWorkbook } from "../services/tournamentSpreadsheet.js";
 import { zStandingBonuses, syncPodTokenAwards } from "../services/tokens.js";
 import {
+  applyPassToTournament,
   canCreateTournament,
   claimTournamentCoverage,
   ENTITLEMENT_REQUIRED,
@@ -138,6 +139,39 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
     reply.send({
       tournament: { ...tournament, pods, playersPlayed, internalNotesEditedByName: notesEditor?.name ?? null },
     });
+  });
+
+  // ROADMAP-HOSTED.md rule 3 — spend a banked pass on an *existing* free
+  // tournament (vs. the next one created). Upgrading the free-covered
+  // tournament hands the free slot back, so the org still ends with one free +
+  // one paid. applyPassToTournament is the transactional half; this just maps
+  // its outcomes. No-op path for non-hosted deployments: they have no passes,
+  // so the client never shows the control and a stray call 409s.
+  app.post("/api/tournaments/:id/apply-pass", async (request, reply) => {
+    const params = idParams.safeParse(request.params);
+    if (!params.success) {
+      reply.code(400).send({ error: "invalid_input" });
+      return;
+    }
+    try {
+      await applyPassToTournament(request.organizer!.orgId, params.data.id);
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "";
+      if (code === "tournament_not_found") {
+        reply.code(404).send({ error: "not_found" });
+        return;
+      }
+      if (code === "already_upgraded") {
+        reply.code(409).send({ error: "already_upgraded" });
+        return;
+      }
+      if (code === "no_unused_pass") {
+        reply.code(409).send({ error: "no_unused_pass" });
+        return;
+      }
+      throw err;
+    }
+    reply.send({ ok: true });
   });
 
   app.patch("/api/tournaments/:id", async (request, reply) => {
