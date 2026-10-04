@@ -26,6 +26,10 @@ build/
 # touching the tracked file.
 docker-compose.override.yml
 
+# Private hosted-launch runbook (Stripe / pricing / rollout ops) — local-only,
+# same reasoning as .env: deliberately kept out of git history.
+/GO-LIVE.md
+
 # Real historical tournament data (names, results) for whoever's running
 # their own LimitedGauntlet instance -- never belongs in git history, even
 # on a private remote. See README's "History import" section.
