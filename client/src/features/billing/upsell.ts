@@ -47,6 +47,11 @@ export function upsellCopy({ reason, maxDays }: EntitlementRefusal): { title: st
         title: "Edit dates with Series",
         body: "Tournament dates are fixed on the free and pass tiers. A Series subscription lets you change them.",
       };
+    case "window_closed":
+      return {
+        title: "Outside your tournament's dates",
+        body: "Free and pass tournaments can only run rounds within their dates. A Series subscription removes the window so you can play on any schedule.",
+      };
     case "organizer.invite":
       return {
         title: "Co-organizers are a Series feature",

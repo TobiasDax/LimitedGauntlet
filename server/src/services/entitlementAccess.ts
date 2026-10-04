@@ -22,6 +22,7 @@ import {
   isEntitlementEnforcementActive,
   isSubscriptionActive,
   isWithinDurationLimit,
+  isWithinPlayWindow,
   maxTournamentDays,
 } from "./entitlements.js";
 
@@ -110,6 +111,21 @@ export async function orgAllowsTournamentSpan(
 export async function orgMaxTournamentDays(orgId: string, now: Date = new Date()): Promise<number | null> {
   if (!isEntitlementEnforcementActive()) return null;
   return maxTournamentDays(await loadEntitlementState(orgId), now);
+}
+
+/**
+ * Whether a round in this tournament may be started or finished now — the
+ * rule-4 play window. Free/pass tournaments are hard-closed outside their
+ * dates; a subscribed org (and self-hosted) is unrestricted.
+ */
+export async function canAdvancePlay(tournamentId: string, now: Date = new Date()): Promise<boolean> {
+  if (!isEntitlementEnforcementActive()) return true;
+  const tournament = await prisma.tournament.findUniqueOrThrow({
+    where: { id: tournamentId },
+    select: { orgId: true, startDate: true, endDate: true },
+  });
+  const state = await loadEntitlementState(tournament.orgId);
+  return isWithinPlayWindow(state, tournament.startDate, tournament.endDate, now);
 }
 
 export async function countUnusedPasses(orgId: string): Promise<number> {

@@ -111,14 +111,14 @@ Thin guard calls only; no logic here.
 ### HI-5 — Date immutability and duration cap ✅ (code-complete 2026-09-22)
 - [x] Date edits rejected on `FREE`/`TOURNAMENT_PASS` (402 `dates_locked`).
 - [x] 7-day maximum span enforced on create and on any date-changing update.
-- [ ] Pod start/finish window enforcement, including the mid-round hard close.
+- [x] Pod start/finish window enforcement, including the mid-round hard close — `isWithinPlayWindow` (pure, tested) + `canAdvancePlay` (DB) gate round creation (auto + manual pairing) and round completion in `routes/rounds.ts`, returning 402 `window_closed`. The window is inclusive of the whole end-date day (dates are day-granular); SERIES and self-hosted are unrestricted.
 
 ### HI-6 — Account/org decoupling ✅ (code-complete 2026-09-29, browser-verify pending)
 - [x] **Registration creates an account only.** Both `/api/auth/signup` (password) and `/api/auth/oidc/complete-registration` (SSO) now create a passwordless-or-password account with no org/membership and return org-less (`activeOrgId: null`); `ProtectedRoute` already routes that to the org chooser. Client signup + OIDC-setup forms dropped their org fields accordingly.
 - [x] **Org creation is the sole guarded path** (`POST /api/auth/organizations`), now reached by first-org creation too. Decision 1 fix: the blunt `allowSignup` gate would have locked SSO users out of their first org (hosted runs `allowSignup` off) — replaced with "first org allowed for any authenticated identity; *additional* orgs still need `allowSignup`". The `canCreateFreeOrganization` (rule 8) check applies uniformly now; the old signup-route exemption is gone because signup no longer makes orgs.
 - [x] **Combined org + first-tournament creation, free-tier only** (decision 3). When entitlements are enforced, creating the org also creates its one tournament (name + dates, ≤7-day span validated) in a transaction, then `claimTournamentCoverage` spends the free slot — the moment the free tournament is committed. When enforcement is off (self-hosted, decision 2), org creation stays a plain one-org step and tournaments are added separately as before. Client create-org form shows the tournament fields only when `appConfig.hostedEntitlements`.
 - [x] One-free-org-per-account check (`canCreateFreeOrganization`) — done earlier, now on the uniform path.
-- [ ] **Not browser-verified**: Tobias should confirm on a live hosted instance: password + SSO registration land on the org chooser; creating the free org requires tournament name/dates, rejects a >7-day span, and spends the free slot (a second tournament is then blocked); a self-hosted instance (entitlements off) creates an org with no tournament step; and an SSO user can create their first org with `ALLOW_SIGNUP` off.
+- [ ] **Not browser-verified**: Tobias should confirm on a live hosted instance: password + SSO registration land on the org chooser; creating an org makes just the org (no tournament step, free slot unspent); creating the *first tournament* then locks its dates, rejects a >7-day span, and spends the free slot (a second tournament is then blocked, as is running a round outside the window); a self-hosted instance (entitlements off) is unrestricted; and an SSO user can create their first org with `ALLOW_SIGNUP` off.
 
 ### HI-7 — Payment integration ◐ (Layer A + B code-complete 2026-09-30; Stripe dashboard setup + live-verify pending)
 **Processor decided: Stripe Managed Payments** — a Merchant-of-Record flag on standard Stripe Checkout (Stripe handles EU VAT/OSS). Integration facts live in the private monetization memory; the code split into two layers:
@@ -132,7 +132,8 @@ Thin guard calls only; no logic here.
 - [x] `POST /api/billing/webhook` verifies the signature (`constructEvent`) with a raw-body parser encapsulated to just that route, and routes events: the pass on `checkout.session.completed`/`async_payment_succeeded` (keyed on session id), subscriptions on `invoice.paid` (initial + renewals, keyed on invoice id, period/interval read off the retrieved subscription), cancellation on `customer.subscription.deleted`. Subscriptions deliberately handled *only* via `invoice.paid` so the first period isn't double-applied by the session event too.
 - [x] Config (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, three price IDs) off by default; routes register only when `isStripeConfigured()`. `stripe` SDK added (also to root `package.json` per the PI-102 de-hoist rule). API version pinned to `2026-02-25.preview` (Managed Payments' `managed_payments[enabled]` is preview-gated; a stable version header rejects it).
 - [ ] **Stripe dashboard setup (Tobias):** create the products/prices (€5 pass; monthly + annual subscription) with a Managed-Payments-eligible tax code; put the secret key, webhook signing secret, and the three price IDs into the hosted instance's `.env` + the override's `environment:` block (above). Register the webhook endpoint (`/api/billing/webhook`) in the Stripe dashboard / CLI.
-- [ ] **Live-verify (Tobias, sandbox):** a test-card pass purchase records an unused pass; a subscription checkout sets SERIES with the right expiry; a renewal (Stripe CLI clock or `trigger`) extends it; a redelivered event doesn't double-apply. No client checkout buttons yet — test via the Stripe CLI / a direct POST until the HI-9 pricing page wires them.
+- [x] **Sandbox-verified (2026-10-04):** a test-card pass purchase recorded an unused pass (org stays FREE); a subscription checkout set the org SERIES with the right expiry and `cumulativePaidMonths`; the accompanying non-subscription invoice was correctly ignored (no double-count); Managed Payments added VAT (MoR confirmed). Done end-to-end via the Settings "Plan & billing" buttons.
+- [ ] **Still to verify (Tobias, sandbox):** a renewal (Stripe CLI test clock or `trigger invoice.paid`) extends the expiry, and a redelivered event doesn't double-apply.
 
 ### HI-8 — Admin CLI ✅ (code-complete 2026-09-22, DB-backed tests not yet run)
 Built early — it is the escape hatch if the webhook path misbehaves in production.
@@ -221,9 +222,10 @@ Ordered by what blocks what. Everything below HI-7 can proceed in parallel.
 
 ### 3. Remaining code
 
-- [ ] **HI-6** — stop signup creating an org; move combined org + tournament creation onto the org-creation step; then drop the signup-route exemption in `canCreateFreeOrganization` so every org creation flows through one guarded path.
-- [ ] **HI-7** — checkout initiation (org id as metadata), signed webhook receiver writing the ledger, the rule 3 pass-application choice, and optionally the reconciliation poll.
-- [ ] **HI-9 (rest)** — tier badge in settings, upsell prompts on gated controls, a pricing page, the date-immutability note with its support link, and the customer-portal link.
+HI-6, HI-7 and HI-9 are code-complete (see those items above — org/tournament decoupled, Stripe checkout + webhook done and sandbox-verified, plan & billing UI + the global 402→upsell sweep done, subscriber management via link.com). What's left:
+
+- [ ] **Rule 3 pass-application choice** — let a user apply a bought pass to the *existing* free tournament (reclaiming the free slot) rather than only to an additional one. Today a pass auto-applies to the next tournament created (`claimTournamentCoverage`); the reclaim-the-slot half (`applyPassToTournament`) already exists server-side, so this is a small UI + endpoint to expose the choice. Deferred — not blocking launch.
+- [ ] **Reconciliation backstop** — optional, post-v1: periodically re-poll Stripe for subscription state as a safety net for missed webhooks.
 
 ### 4. Rollout, in this order
 

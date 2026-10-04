@@ -11,6 +11,7 @@ import {
   isEntitlementEnforcementActive,
   isSubscriptionActive,
   isWithinDurationLimit,
+  isWithinPlayWindow,
   maxTournamentDays,
 } from "./entitlements.js";
 
@@ -216,5 +217,42 @@ describe("tournament duration limits", () => {
     config.hostedEntitlements.enforced = true;
     const lapsed = state({ tier: "SERIES", subscriptionExpiresAt: days(-1) });
     expect(isWithinDurationLimit(lapsed, NOW, days(8), NOW)).toBe(false);
+  });
+});
+
+describe("isWithinPlayWindow (rule 4 — the hard-close play window)", () => {
+  const start = days(0); // a 7-day span, stored day-granular (UTC midnight in practice)
+  const end = days(7);
+
+  it("is permissive when enforcement is off, whatever the clock says", () => {
+    config.hostedEntitlements.enforced = false;
+    expect(isWithinPlayWindow(state(), start, end, days(100))).toBe(true);
+  });
+
+  it("allows play from the start through the end of the end-date day", () => {
+    config.hostedEntitlements.enforced = true;
+    expect(isWithinPlayWindow(state(), start, end, start)).toBe(true); // first instant
+    expect(isWithinPlayWindow(state(), start, end, days(3))).toBe(true); // mid-event
+    // still open late on the end day itself, up to (not including) the next day
+    expect(isWithinPlayWindow(state(), start, end, new Date(days(8).getTime() - 1))).toBe(true);
+  });
+
+  it("hard-closes before the start and once the end-date day is over", () => {
+    config.hostedEntitlements.enforced = true;
+    expect(isWithinPlayWindow(state(), start, end, new Date(start.getTime() - 1))).toBe(false);
+    expect(isWithinPlayWindow(state(), start, end, days(8))).toBe(false);
+  });
+
+  it("imposes no window on an active SERIES subscription", () => {
+    config.hostedEntitlements.enforced = true;
+    const series = state({ tier: "SERIES", subscriptionExpiresAt: days(365) });
+    expect(isWithinPlayWindow(series, start, end, days(100))).toBe(true);
+  });
+
+  it("applies the window again once a SERIES subscription has lapsed", () => {
+    config.hostedEntitlements.enforced = true;
+    const lapsed = state({ tier: "SERIES", subscriptionExpiresAt: days(30) });
+    // At day 100 the sub has lapsed → effective FREE → the tournament window bites.
+    expect(isWithinPlayWindow(lapsed, start, end, days(100))).toBe(false);
   });
 });

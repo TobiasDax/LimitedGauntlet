@@ -193,3 +193,28 @@ export function isWithinDurationLimit(
   if (limitDays === null) return true;
   return endDate.getTime() - startDate.getTime() <= limitDays * MS_PER_DAY;
 }
+
+/**
+ * ROADMAP-HOSTED.md rule 4 — the play window. A free/pass tournament's rounds
+ * may only be started or finished between its start date and the end of its
+ * end-date day; a hard close, not before and not after, including mid-round. A
+ * subscribed org (or self-hosted) has no window.
+ *
+ * The end is inclusive of the whole end-date day: dates are collected
+ * day-granular (an HTML date input, stored as that day's UTC midnight), and a
+ * real event runs through its final day — so the window closes 24h after the
+ * stored `endDate`, not at the instant of it (which would make the last day
+ * unplayable). `startDate` is already that day's start, so the open side needs
+ * no adjustment.
+ */
+export function isWithinPlayWindow(
+  state: EntitlementState,
+  startDate: Date,
+  endDate: Date,
+  now: Date = new Date(),
+): boolean {
+  if (!isEntitlementEnforcementActive()) return true;
+  if (isSubscriptionActive(state, now)) return true;
+  const windowEndExclusive = endDate.getTime() + MS_PER_DAY;
+  return now.getTime() >= startDate.getTime() && now.getTime() < windowEndExclusive;
+}

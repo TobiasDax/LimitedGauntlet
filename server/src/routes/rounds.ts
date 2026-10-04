@@ -5,6 +5,7 @@ import { prisma } from "../prisma.js";
 import { requireAuth } from "../auth/middleware.js";
 import { requireOrgDataAccessible } from "../auth/entitlementGate.js";
 import { findOwnedPod, findOwnedRound, findOwnedMatch } from "../services/ownership.js";
+import { canAdvancePlay, ENTITLEMENT_REQUIRED } from "../services/entitlementAccess.js";
 import {
   generatePairings,
   getActiveEntrants,
@@ -172,6 +173,13 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
+    // HI-5 rule 4 — a free/pass tournament's rounds may only be started inside
+    // its date window (SERIES and self-hosted are unrestricted).
+    if (!(await canAdvancePlay(pod.tournamentId))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "window_closed" });
+      return;
+    }
+
     const precheck = await checkNextRoundAllowed(pod);
     if ("error" in precheck) {
       reply.code(400).send(precheck);
@@ -262,6 +270,13 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     const pod = await findOwnedPod(params.data.id, request.organizer!.orgId);
     if (!pod) {
       reply.code(404).send({ error: "not_found" });
+      return;
+    }
+
+    // HI-5 rule 4 — a free/pass tournament's rounds may only be started inside
+    // its date window (SERIES and self-hosted are unrestricted).
+    if (!(await canAdvancePlay(pod.tournamentId))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "window_closed" });
       return;
     }
 
@@ -623,6 +638,17 @@ export async function roundRoutes(app: FastifyInstance): Promise<void> {
     }
     if (round.status !== "ACTIVE") {
       reply.code(400).send({ error: "round_not_active" });
+      return;
+    }
+
+    // HI-5 rule 4 — the hard close: a free/pass tournament's rounds may only be
+    // finished inside its date window, including mid-round.
+    const completePod = await prisma.pod.findUniqueOrThrow({
+      where: { id: round.podId },
+      select: { tournamentId: true },
+    });
+    if (!(await canAdvancePlay(completePod.tournamentId))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "window_closed" });
       return;
     }
 
