@@ -120,16 +120,12 @@ export function useSwitchOrg() {
 
 // PI-86 / HI-6 — the sole org-creation path: an authenticated identity (fresh
 // from registration, or an existing organizer adding another) creates an org.
-// On the hosted free tier it also creates the org's first tournament, so the
-// `tournament*` fields are sent when entitlements are on (see OrganizationsPage
-// for the conditional form). Full reload for the same reason as useSwitchOrg —
-// you land in a fresh tenant.
+// Creates only the org; the first tournament is a separate step via the normal
+// tournament flow (that's when the free slot is spent). Full reload for the
+// same reason as useSwitchOrg — you land in a fresh tenant.
 export interface CreateOrganizationInput {
   orgName: string;
   orgSlug: string;
-  tournamentName?: string;
-  startDate?: string;
-  endDate?: string;
 }
 
 export function useCreateOrganization() {

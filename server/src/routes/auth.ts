@@ -10,18 +10,12 @@ import { beginSso, completeSso, isProviderConfigured, linkOrProvisionFromSso } f
 import { confirmOidcRelink } from "../services/oidcRelink.js";
 import { fireAndForget, sendAdminWebhookEvent } from "../services/webhooks.js";
 import { refreshRealtimeAuthorization } from "../realtime.js";
-import {
-  canCreateFreeOrganization,
-  claimTournamentCoverage,
-  countUnusedPasses,
-  ENTITLEMENT_REQUIRED,
-} from "../services/entitlementAccess.js";
+import { canCreateFreeOrganization, countUnusedPasses, ENTITLEMENT_REQUIRED } from "../services/entitlementAccess.js";
 import {
   allows,
   effectiveTier,
   type EntitlementState,
   isEntitlementEnforcementActive,
-  UNSUBSCRIBED_MAX_TOURNAMENT_DAYS,
 } from "../services/entitlements.js";
 
 // HI-9 — the org's entitlement state as the client needs it, derived so the
@@ -56,10 +50,10 @@ function entitlementSummary(org: {
 
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-// HI-6 — registration creates an account only, never an org. The org (and,
-// on the hosted free tier, its first tournament) is created as a separate,
-// deliberate step via POST /api/auth/organizations — so registering never
-// silently spends the account's one free org / free tournament.
+// HI-6 — registration creates an account only, never an org. The org is
+// created as a separate, deliberate step via POST /api/auth/organizations, and
+// the first tournament is a step after that — so registering never silently
+// spends the account's one free org, and neither does creating the org.
 const signupSchema = z.object({
   organizerName: z.string().trim().min(1).max(100),
   organizerEmail: z.string().trim().toLowerCase().email(),
@@ -88,17 +82,14 @@ const completeOidcRegistrationSchema = z.object({
   organizerName: z.string().trim().min(1).max(100),
 });
 
-// HI-6 — the sole org-creation path now. `tournament*` fields drive the
-// hosted free tier's combined org + first-tournament creation; they are
-// required when entitlements are enforced and ignored when they aren't
-// (self-hosted creates the org here and adds tournaments separately, as
-// before). Decision (2026-09-29): combined creation is free-tier only.
+// The sole org-creation path. Creates only the organization — never a
+// tournament. The free slot is spent later, when the first tournament is
+// created via POST /api/tournaments (which is where its dates lock in and the
+// span cap applies). Decoupling org creation from the first tournament means
+// an account isn't forced to pick tournament dates just to get an org.
 const createOrgSchema = z.object({
   orgName: z.string().trim().min(1).max(100),
   orgSlug: z.string().trim().min(3).max(40).regex(slugPattern, "lowercase letters, numbers, and hyphens only"),
-  tournamentName: z.string().trim().min(1).max(150).optional(),
-  startDate: z.coerce.date().optional(),
-  endDate: z.coerce.date().optional(),
 });
 
 const oidcRelinkSchema = z.object({ token: z.string().min(1).max(200) });
@@ -778,65 +769,22 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
 
-      // HI-6 — free-tier combined creation: when entitlements are enforced,
-      // creating the org also creates its one tournament (the moment the free
-      // slot is spent), so the dates are locked in up front. Required here;
-      // ignored entirely when enforcement is off.
-      const enforced = isEntitlementEnforcementActive();
-      let startDate: Date | undefined;
-      let endDate: Date | undefined;
-      if (enforced) {
-        if (!parsed.data.tournamentName || !parsed.data.startDate || !parsed.data.endDate) {
-          reply.code(400).send({ error: "tournament_required" });
-          return;
-        }
-        startDate = parsed.data.startDate;
-        endDate = parsed.data.endDate;
-        if (endDate < startDate) {
-          reply.code(400).send({ error: "invalid_date_range" });
-          return;
-        }
-        const spanDays = (endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000);
-        if (spanDays > UNSUBSCRIBED_MAX_TOURNAMENT_DAYS) {
-          reply.code(402).send({
-            error: ENTITLEMENT_REQUIRED,
-            reason: "tournament_duration",
-            maxDays: UNSUBSCRIBED_MAX_TOURNAMENT_DAYS,
-          });
-          return;
-        }
-      }
-
+      // Create only the organization — never a tournament. The free slot is
+      // spent when the first tournament is created via POST /api/tournaments,
+      // which is where its dates lock in and the span cap applies. (Self-hosted
+      // has always added tournaments separately; the hosted free tier now does
+      // too, so an account isn't forced to pick dates just to get an org.)
       let organization;
-      let tournamentId: string | null = null;
       try {
-        const result = await prisma.$transaction(async (tx) => {
-          const org = await tx.organization.create({
-            data: { name: parsed.data.orgName, slug: parsed.data.orgSlug, memberships: { create: { accountId } } },
-          });
-          let tId: string | null = null;
-          if (enforced) {
-            const t = await tx.tournament.create({
-              data: { orgId: org.id, name: parsed.data.tournamentName!, startDate: startDate!, endDate: endDate! },
-            });
-            tId = t.id;
-          }
-          return { org, tId };
+        organization = await prisma.organization.create({
+          data: { name: parsed.data.orgName, slug: parsed.data.orgSlug, memberships: { create: { accountId } } },
         });
-        organization = result.org;
-        tournamentId = result.tId;
       } catch (err) {
         if (isUniqueConstraintError(err, "slug")) {
           reply.code(409).send({ error: "slug_taken" });
           return;
         }
         throw err;
-      }
-
-      // Spend the free slot on the just-created tournament. Runs its own
-      // transaction, so it follows the create above rather than nesting.
-      if (enforced && tournamentId) {
-        await claimTournamentCoverage(organization.id, tournamentId);
       }
 
       notifyAdminOfNewOrg(organization, request.identity!.email);
@@ -846,7 +794,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         identity: request.identity,
         organizations,
         activeOrgId: organization.id,
-        tournamentId,
         organizer: {
           id: accountId,
           orgId: organization.id,
