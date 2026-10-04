@@ -18,9 +18,11 @@ import { requireAuth } from "../auth/middleware.js";
 import { resolveBaseUrl } from "../services/mailer.js";
 import { applySubscriptionPayment, recordPassPurchase, recordSubscriptionCancellation } from "../services/billing.js";
 
-// Pin the API version Managed Payments requires (see docs/set-up). The SDK
-// types a specific literal; this deployment is validated against it.
-const STRIPE_API_VERSION = "2025-03-31.basil";
+// Managed Payments' `managed_payments[enabled]` param is a preview feature:
+// Stripe's integration blueprint requires the 2026-02-25.preview version
+// header (or above) on both product-create and checkout-session-create. It's a
+// preview string outside Stripe.LatestApiVersion, hence the cast below.
+const STRIPE_API_VERSION = "2026-02-25.preview";
 
 function stripeClient(): Stripe {
   return new Stripe(config.stripe.secretKey, { apiVersion: STRIPE_API_VERSION as Stripe.LatestApiVersion });
