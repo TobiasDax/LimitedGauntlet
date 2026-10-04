@@ -99,6 +99,40 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     reply.send({ url: session.url });
   });
 
+  // The amounts for the pricing/upgrade UI, read live from Stripe so the price
+  // figures never live in this repo (only the price *ids* do, via env) — see
+  // the monetization-privacy note. unit_amount is the tax-exclusive base; as a
+  // Merchant of Record, Stripe adds indirect tax at checkout, so the UI labels
+  // these "+ tax". A price that fails to retrieve is just omitted.
+  app.get("/api/billing/prices", { preHandler: requireAuth }, async (_request, reply) => {
+    const configured = (
+      [
+        { product: "pass", id: config.stripe.pricePass },
+        { product: "subscription_monthly", id: config.stripe.priceSubscriptionMonthly },
+        { product: "subscription_annual", id: config.stripe.priceSubscriptionAnnual },
+      ] as Array<{ product: "pass" | "subscription_monthly" | "subscription_annual"; id: string }>
+    ).filter((e) => e.id.length > 0);
+
+    const client = stripeClient();
+    const results = await Promise.all(
+      configured.map(async (e) => {
+        try {
+          const price = await client.prices.retrieve(e.id);
+          if (price.unit_amount == null) return null;
+          return {
+            product: e.product,
+            unitAmount: price.unit_amount,
+            currency: price.currency,
+            interval: price.recurring?.interval ?? null,
+          };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    reply.send({ prices: results.filter((p) => p !== null) });
+  });
+
   // The webhook needs the raw request bytes for signature verification, but
   // the app parses JSON globally. Registering the webhook inside its own
   // encapsulated context lets it swap in a raw-buffer parser for just this

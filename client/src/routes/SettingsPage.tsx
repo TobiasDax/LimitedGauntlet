@@ -8,6 +8,7 @@ import { ExportImportSection } from "../components/settings/ExportImportSection"
 import { WebhookSection } from "../components/settings/WebhookSection";
 import { TokensSection } from "../components/settings/TokensSection";
 import { OrgDangerSection } from "../components/settings/OrgDangerSection";
+import { BillingSection } from "../components/settings/BillingSection";
 
 // Org-scoped settings hub (PI-26; PI-87 split the identity bits out to
 // /profile). Everything here acts on the *active* organization — switch orgs
@@ -21,19 +22,13 @@ export function SettingsPage() {
       <ScreenTitle>Settings</ScreenTitle>
       <ScreenDek>Settings for {me?.organization?.name ?? "this organization"}. Your login lives on Profile.</ScreenDek>
 
-      {/* HI-9 — plan badge, only on a hosted (entitlements-enforced) instance.
-          Self-hosted has no tiers, so it never renders. */}
+      {/* HI-9 — plan + upgrade, only on a hosted (entitlements-enforced)
+          instance. Self-hosted has no tiers, so this whole section never
+          renders (BillingSection also guards internally). */}
       {me?.entitlement?.enforced && (
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface-sunken px-3 py-1 text-[12px]">
-          <span className="tracking-wide text-ink-muted uppercase">Plan</span>
-          <span className="font-semibold text-ink">
-            {me.entitlement.tier === "SERIES"
-              ? "Series subscription"
-              : me.entitlement.tier === "TOURNAMENT_PASS"
-                ? "Tournament pass"
-                : "Free"}
-          </span>
-        </div>
+        <SettingsSection title="Plan & billing" description="Your organization's plan on this hosted instance.">
+          <BillingSection />
+        </SettingsSection>
       )}
 
       <SettingsSection

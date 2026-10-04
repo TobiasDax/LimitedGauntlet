@@ -36,6 +36,10 @@ export interface MeResponse {
     enforced: boolean;
     tier: "FREE" | "TOURNAMENT_PASS" | "SERIES";
     canEditTournamentDates: boolean;
+    // ISO date a SERIES subscription is paid through, else null (HI-9).
+    subscriptionExpiresAt?: string | null;
+    // Bought-but-not-yet-applied tournament passes; 0 on self-hosted (HI-9).
+    unusedPasses?: number;
   };
   // Whether this account has ever set a local password (PI-42). false = SSO
   // only. Drives the Profile page. Treat undefined as "has one".

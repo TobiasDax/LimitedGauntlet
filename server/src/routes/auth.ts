@@ -13,6 +13,7 @@ import { refreshRealtimeAuthorization } from "../realtime.js";
 import {
   canCreateFreeOrganization,
   claimTournamentCoverage,
+  countUnusedPasses,
   ENTITLEMENT_REQUIRED,
 } from "../services/entitlementAccess.js";
 import {
@@ -46,6 +47,10 @@ function entitlementSummary(org: {
     enforced: isEntitlementEnforcementActive(),
     tier: effectiveTier(state),
     canEditTournamentDates: allows(state, "tournament.editDates"),
+    // Paid-through date for an active SERIES subscription (null otherwise) —
+    // the UI shows "active until …". Note it's the raw stored expiry, so a
+    // lapsed one still carries a (past) date while `tier` already reads FREE.
+    subscriptionExpiresAt: org.subscriptionExpiresAt ? org.subscriptionExpiresAt.toISOString() : null,
   };
 }
 
@@ -713,6 +718,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       prisma.organization.findUniqueOrThrow({ where: { id: orgId } }),
       prisma.organizerMembership.count({ where: { orgId } }),
     ]);
+    // Banked, not-yet-applied tournament passes — only meaningful (and only
+    // worth a query) when entitlements are enforced; always 0 on self-hosted.
+    const unusedPasses = isEntitlementEnforcementActive() ? await countUnusedPasses(orgId) : 0;
     reply.send({
       identity,
       organizations,
@@ -722,7 +730,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       publicLockEnabled: !!organization.publicPasswordHash,
       tokensEnabled: organization.tokensEnabled,
       organizerCount,
-      entitlement: entitlementSummary(organization),
+      entitlement: { ...entitlementSummary(organization), unusedPasses },
       // PI-42 follow-up — drives Settings → Account: an SSO-only account
       // (never set a local password) shows "Set password" instead of
       // "Change password", and skips the current-password field on the
