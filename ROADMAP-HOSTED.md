@@ -162,7 +162,7 @@ Built early — it is the escape hatch if the webhook path misbehaves in product
 ### HI-10 — Grandfathering and rollout ✅ (code-complete 2026-09-22, rehearsal pending)
 - [x] `admin-entitlements.js grandfather` — previews every affected org, then applies *exactly that list* so nothing created mid-confirmation is swept in. Safe to re-run; skips orgs already on SERIES.
 - [ ] Rehearse on a copy of hosted data before touching production.
-- [ ] Reconciliation backstop (periodic re-poll of processor subscription state) — optional, post-v1.
+- [x] Reconciliation backstop (periodic re-poll of processor subscription state) — `services/reconcileSubscriptions.ts` + `scripts/reconcile-subscriptions.js`, run from a host cron (see "Deploying with entitlements on"). Replays each live subscription's latest paid invoice through the idempotent `applySubscriptionPayment`, so a missed webhook is caught and an already-handled one is a no-op; never revokes.
 
 ## Branch conventions
 
@@ -203,6 +203,19 @@ register when `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` are both set
 (`isStripeConfigured`), so even the override does nothing until the keys are
 filled in.
 
+**Reconciliation cron (optional backstop).** Webhooks are the primary path;
+schedule the reconciliation job as a safety net for a missed one. It replays
+each live subscription's latest paid invoice through the same idempotent path,
+so it never double-grants and never revokes. A daily run is plenty:
+
+```cron
+# e.g. 04:17 daily, in the host's crontab
+17 4 * * * docker compose -f /path/to/compose.yaml exec -T app node server/dist/scripts/reconcile-subscriptions.js >> /var/log/lg-reconcile.log 2>&1
+```
+
+`--dry-run` lists what it *would* apply without writing. The job exits non-zero
+if any subscription errored, so cron can alert.
+
 ## Next steps
 
 Ordered by what blocks what. Everything below HI-7 can proceed in parallel.
@@ -225,7 +238,7 @@ Ordered by what blocks what. Everything below HI-7 can proceed in parallel.
 HI-6, HI-7 and HI-9 are code-complete (see those items above — org/tournament decoupled, Stripe checkout + webhook done and sandbox-verified, plan & billing UI + the global 402→upsell sweep done, subscriber management via link.com). What's left:
 
 - [x] **Rule 3 pass-application choice** — a free org with a banked pass can apply it to its *existing* free tournament (unlocks unlimited pods there and returns the free slot) via `POST /api/tournaments/:id/apply-pass` (mapping `applyPassToTournament`) and a "Use a pass on this tournament" control on the tournament page, shown only when hosted, a pass is available, and the tournament is still free-covered (`coveringEntitlement === "FREE"`). The other half — a pass auto-covering the *next* tournament created — was already handled by `claimTournamentCoverage`. So both paths of the rule-3 choice now exist.
-- [ ] **Reconciliation backstop** — optional, post-v1: periodically re-poll Stripe for subscription state as a safety net for missed webhooks.
+- [x] **Reconciliation backstop** — done: `scripts/reconcile-subscriptions.js` (service in `services/reconcileSubscriptions.ts`), run from a host cron. Replays live subscriptions' latest paid invoices through the idempotent apply path; `--dry-run` previews. See the cron snippet under "Deploying with entitlements on".
 
 ### 4. Rollout, in this order
 

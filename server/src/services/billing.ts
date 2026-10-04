@@ -2,10 +2,12 @@
 //
 // Deliberately processor-agnostic: these take normalised primitives (an org
 // id, the processor's event id, a period end, a month count), never a Stripe
-// object. The Stripe adapter (routes/stripe.ts) verifies + parses the webhook
-// and calls in here; swapping processors would touch only that adapter, not
-// this. The ledger (BillingEvent) is the source of truth — the fields on
-// Organization are a cache these functions keep in step.
+// object. The Stripe adapter (routes/billing.ts) verifies + parses the webhook
+// and calls in here, and the reconciliation job
+// (services/reconcileSubscriptions.ts) replays missed payments through the same
+// functions; swapping processors would touch only those, not this. The ledger
+// (BillingEvent) is the source of truth — the fields on Organization are a
+// cache these functions keep in step.
 //
 // Every write is idempotent on `processorEventId`, which is unique on
 // BillingEvent: a webhook Stripe redelivers (it retries until it gets a 2xx)
