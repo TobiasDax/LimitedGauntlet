@@ -38,3 +38,13 @@ docker-compose.override.yml
 # Prisma 7 generates the client into the source tree (PI-109). Regenerated
 # in CI and the Docker build; never committed.
 /server/src/generated/
+
+# Agent/editor tooling dropped by plugin installs (e.g. the Stripe MCP plugin) —
+# not part of the project. The repo's own skills live in the repo-root .claude/
+# (tracked), so only the per-workspace copies are ignored, never root.
+.agents/
+.windsurf/
+skills-lock.json
+/server/.claude/
+/client/.claude/
+/mcp/.claude/
