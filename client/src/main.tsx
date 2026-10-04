@@ -1,8 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { TrackingScript } from "./components/TrackingScript.tsx";
+import { UpsellModal } from "./components/UpsellModal.tsx";
+import { maybeShowUpsell } from "./features/billing/upsell.ts";
 import { Layout } from "./components/Layout.tsx";
 import { PublicLayout } from "./components/PublicLayout.tsx";
 import { PlayerLayout, PlayerProtectedRoute } from "./components/PlayerLayout.tsx";
@@ -46,6 +48,10 @@ import "./index.css";
 // aggressive default refetching just multiplies load at a venue — every phone-unlock
 // / tab-refocus would refetch every query on screen. See ROADMAP PI-95.
 const queryClient = new QueryClient({
+  // HI-9 — one place turns every entitlement refusal (402) into the upsell
+  // modal, so no individual mutation has to know about tiers. Non-entitlement
+  // errors (and inline-handled reasons) are ignored by maybeShowUpsell.
+  mutationCache: new MutationCache({ onError: (err) => maybeShowUpsell(err) }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,
@@ -110,6 +116,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
+        <UpsellModal />
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,
