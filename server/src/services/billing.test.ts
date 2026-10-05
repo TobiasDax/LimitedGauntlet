@@ -27,7 +27,7 @@ describe("recordPassPurchase", () => {
   it("records an unused pass as spendable capacity without changing org tier", async () => {
     const org = await makeOrg();
 
-    const result = await recordPassPurchase(org.id, evtId(), { amountCents: 500, currency: "eur" });
+    const result = await recordPassPurchase(org.id, evtId(), { amountCents: 1111, currency: "eur" });
 
     expect(result).toEqual({ applied: true });
     expect(await countUnusedPasses(org.id)).toBe(1);
@@ -58,7 +58,7 @@ describe("applySubscriptionPayment", () => {
     const periodEnd = new Date(Date.now() + 30 * MS_PER_DAY);
 
     const result = await applySubscriptionPayment(org.id, evtId(), periodEnd, 1, {
-      amountCents: 300,
+      amountCents: 2222,
       currency: "eur",
     });
 

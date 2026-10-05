@@ -163,7 +163,7 @@ export const config = {
   // Fully inert unless secretKey + webhookSecret are set, same off-by-default
   // posture as everything else here: a self-hosted or un-configured deployment
   // exposes no checkout/webhook routes. The price IDs are created in the Stripe
-  // dashboard (the €5 pass, the monthly + annual subscription prices) and
+  // dashboard (the one-time pass, the monthly + annual subscription prices) and
   // referenced here by id — never the amounts, which live only in Stripe.
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY ?? "",
