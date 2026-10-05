@@ -22,7 +22,8 @@ function GitHubMark() {
 // Impressum + privacy notice rendered from LEGAL_* env) shows unless the
 // operator turned it off with LEGAL_PAGE_ENABLED=false. LEGAL_LINK_URL /
 // LEGAL_LINK_LABEL (PI-35) is an optional *additional* link for a
-// separately-hosted policy, and renders alongside it when set.
+// separately-hosted policy, and renders alongside it when set. "Terms"
+// (HI-10) appears only on a hosted deployment that sells plans.
 export function Footer() {
   const { data } = useAppConfig();
 
@@ -48,6 +49,11 @@ export function Footer() {
       {data?.legalPageEnabled !== false && (
         <Link to="/legal" className={linkClass}>
           Legal notice
+        </Link>
+      )}
+      {data?.hostedEntitlements === true && (
+        <Link to="/terms" className={linkClass}>
+          Terms
         </Link>
       )}
       {data?.legalLinkUrl && data.legalLinkLabel && (

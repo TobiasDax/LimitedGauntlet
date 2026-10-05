@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useMe } from "../../features/auth/useAuth";
 import { useAppConfig } from "../../features/config/useAppConfig";
 import {
@@ -139,7 +140,12 @@ export function BillingSection() {
 
           {checkout.isError && <FormError>Couldn't start checkout — try again.</FormError>}
           <p className="mt-3 text-[12px] text-ink-muted">
-            Payments are handled by Stripe as merchant of record; applicable tax is added at checkout.
+            Payments are handled by Link (Stripe) as merchant of record; applicable tax is added at checkout. By buying
+            you agree to the{" "}
+            <Link to="/terms" className="text-accent underline">
+              Terms of Service
+            </Link>
+            , including the refund policy.
           </p>
         </div>
       )}

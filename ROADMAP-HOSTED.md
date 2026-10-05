@@ -240,6 +240,8 @@ HI-6, HI-7 and HI-9 are code-complete (see those items above — org/tournament 
 - [x] **Rule 3 pass-application choice** — a free org with a banked pass can apply it to its *existing* free tournament (unlocks unlimited pods there and returns the free slot) via `POST /api/tournaments/:id/apply-pass` (mapping `applyPassToTournament`) and a "Use a pass on this tournament" control on the tournament page, shown only when hosted, a pass is available, and the tournament is still free-covered (`coveringEntitlement === "FREE"`). The other half — a pass auto-covering the *next* tournament created — was already handled by `claimTournamentCoverage`. So both paths of the rule-3 choice now exist.
 - [x] **Reconciliation backstop** — done: `scripts/reconcile-subscriptions.js` (service in `services/reconcileSubscriptions.ts`), run from a host cron. Replays live subscriptions' latest paid invoices through the idempotent apply path; `--dry-run` previews. See the cron snippet under "Deploying with entitlements on".
 
+- [x] **HI-10 — Terms of Service + refund/cancellation policy** — `server/src/legal/terms.ts` assembles the terms (operator identity from `LEGAL_CONTROLLER_*`, contact from `HOSTED_SUPPORT_EMAIL`, no prices), served at `GET /api/terms` and rendered at `/terms`. Hosted-only: a self-hosted deployment gets `enabled: false` and no footer link. Linked from the footer and the "Plan & billing" purchase note. Operator to-do: have the text reviewed, and put the `/terms` URL into the Stripe dashboard (Settings → Checkout → terms of service) so checkout shows it.
+
 ### 4. Rollout, in this order
 
 The order matters: grandfathering **must** precede enforcement, or every existing org is retroactively restricted the moment the flag flips.

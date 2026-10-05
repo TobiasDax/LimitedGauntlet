@@ -42,6 +42,7 @@ import { PublicHallOfFamePage } from "./routes/PublicHallOfFamePage.tsx";
 import { PublicPlayerStatsPage } from "./routes/PublicPlayerStatsPage.tsx";
 import { PublicTreasureChestPage } from "./routes/PublicTreasureChestPage.tsx";
 import { LegalPage } from "./routes/LegalPage.tsx";
+import { TermsPage } from "./routes/TermsPage.tsx";
 import "./index.css";
 
 // Realtime (Socket.IO) invalidation keeps watched data fresh where it matters, so
@@ -85,6 +86,7 @@ createRoot(document.getElementById("root")!).render(
               outside every layout: reachable with or without a session or an
               org slug, and outside the PI-27 public-password lock. */}
           <Route path="/legal" element={<LegalPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route element={<Layout />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />

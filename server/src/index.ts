@@ -22,6 +22,7 @@ import { settingsRoutes } from "./routes/settings.js";
 import { publicRoutes } from "./routes/public.js";
 import { trackingRoutes } from "./routes/tracking.js";
 import { legalRoutes } from "./routes/legal.js";
+import { termsRoutes } from "./routes/terms.js";
 import { billingRoutes } from "./routes/billing.js";
 import { createAppRealtimeRoomAuthorizer, initRealtime } from "./realtime.js";
 
@@ -175,6 +176,7 @@ await app.register(settingsRoutes);
 await app.register(publicRoutes);
 await app.register(trackingRoutes);
 await app.register(legalRoutes);
+await app.register(termsRoutes);
 await app.register(billingRoutes);
 
 // Serves the built SPA in production. During `npm run dev`, the Vite dev
