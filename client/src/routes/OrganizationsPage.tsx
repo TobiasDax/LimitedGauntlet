@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ApiError } from "../lib/api";
+import { entitlementRefusal } from "../features/billing/upsell";
 import { useMe, useSwitchOrg, useSignupStatus, useCreateOrganization } from "../features/auth/useAuth";
 import { Button, Card, Field, FormError, TextField } from "../components/ui";
 import { useAppConfig } from "../features/config/useAppConfig";
@@ -89,8 +90,8 @@ export function OrganizationsPage() {
   const createError =
     createOrg.error instanceof ApiError && createOrg.error.message === "slug_taken"
       ? "That URL is already taken — pick another."
-      : createOrg.error instanceof ApiError && createOrg.error.message === "free_org_limit"
-        ? "You've already used your free organization."
+      : entitlementRefusal(createOrg.error)?.reason === "free_org_limit"
+        ? "Your free organization is already in use. To create another one, upgrade your existing organization to a tournament pass or a Series subscription first (Settings → Plan & billing)."
         : createOrg.isError
           ? "Something went wrong."
           : null;
