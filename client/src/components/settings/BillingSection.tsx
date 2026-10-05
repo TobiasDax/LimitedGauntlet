@@ -56,7 +56,7 @@ export function BillingSection() {
 
   if (!ent?.enforced) return null;
 
-  const planLabel = isSeries ? "Series subscription" : ent.tier === "TOURNAMENT_PASS" ? "Tournament pass" : "Free";
+  const planLabel = isSeries ? (ent.subscriptionExpiresAt ? "Series subscription" : "Series") : ent.tier === "TOURNAMENT_PASS" ? "Tournament pass" : "Free";
   const activeUntil = ent.subscriptionExpiresAt ? new Date(ent.subscriptionExpiresAt) : null;
   const unused = ent.unusedPasses ?? 0;
   const sorted = [...(prices.data?.prices ?? [])].sort((a, b) => PRODUCT_ORDER[a.product] - PRODUCT_ORDER[b.product]);
@@ -79,13 +79,18 @@ export function BillingSection() {
         </p>
       )}
 
-      {isSeries ? (
+      {isSeries && !activeUntil ? (
+        <p className="mt-3 text-[13px] text-ink-secondary">
+          Unlimited tournaments and pods — this organization has a complimentary Series plan, so there is nothing to
+          manage or renew.
+        </p>
+      ) : isSeries ? (
         <p className="mt-3 text-[13px] text-ink-secondary">
           Unlimited tournaments while your subscription is active. Manage payment method, renewal, or cancellation at{" "}
           <a href="https://link.com" target="_blank" rel="noreferrer" className="text-accent underline">
             link.com
           </a>
-          {activeUntil ? ` — cancelling keeps access until ${activeUntil.toLocaleDateString()}.` : "."}
+          {` — cancelling keeps access until ${activeUntil!.toLocaleDateString()}.`}
         </p>
       ) : (
         <div className="mt-4">
