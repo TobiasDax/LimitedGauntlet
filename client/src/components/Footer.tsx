@@ -23,7 +23,7 @@ function GitHubMark() {
 // operator turned it off with LEGAL_PAGE_ENABLED=false. LEGAL_LINK_URL /
 // LEGAL_LINK_LABEL (PI-35) is an optional *additional* link for a
 // separately-hosted policy, and renders alongside it when set. "Terms"
-// (HI-10) appears only on a hosted deployment that sells plans.
+// (HI-11) appears only on a hosted deployment that sells plans.
 export function Footer() {
   const { data } = useAppConfig();
 

@@ -1,4 +1,4 @@
-// HI-10 — the hosted instance's Terms of Service + refund/cancellation policy.
+// HI-11 — the hosted instance's Terms of Service + refund/cancellation policy.
 //
 // Served only when HOSTED_ENTITLEMENTS is on (routes/terms.ts): a self-hosted
 // deployment sells nothing, so it has no terms to publish and never shows this

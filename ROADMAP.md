@@ -4,7 +4,9 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.18.1**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.18.2**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+
+**v0.18.2:** hosted-instance polish for the first paying customers; no effect on self-hosted deployments. A Settings banner now tells an organization with an unused tournament pass to create a tournament with it, and the Tournaments page offers "Create free tournament" and "Buy Tournament / Series pass" (which becomes "Create paid tournament" once a pass is banked — a paid tournament keeps the free slot available). Series subscribers are now pointed to the Link web app (app.link.com) with sign-in instructions, and the hosted instance publishes Terms of Service and a refund/cancellation policy at `/terms` (HI-11; hosted-only, linked from the footer and the purchase note).
 
 **v0.18.1:** two hosted-instance UI fixes. Creating a second organization on a free account now explains that the free organization is in use and points to upgrading it (Settings → Plan & billing), instead of a generic error; and organizations with a complimentary/perpetual Series plan (grandfathered or operator-granted) no longer see the subscription-management text and link meant for paying subscribers. No effect on self-hosted deployments.
 

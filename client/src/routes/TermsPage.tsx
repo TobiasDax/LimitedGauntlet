@@ -4,7 +4,7 @@ import { RichText } from "../components/RichText";
 import { Footer } from "../components/Footer";
 import { Logo } from "../components/Logo";
 
-// HI-10 — Terms of Service of the hosted instance. Same standalone chrome as
+// HI-11 — Terms of Service of the hosted instance. Same standalone chrome as
 // /legal, for the same reasons: reachable with or without a session or org,
 // and outside the PI-27 public-password lock. A self-hosted install has no
 // terms, so the route answers with a short notice instead.
