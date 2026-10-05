@@ -31,6 +31,11 @@ export function upsellCopy({ reason, maxDays }: EntitlementRefusal): { title: st
         title: "Add another tournament",
         body: "You've used your organization's free tournament. Add one more with a one-time pass, or subscribe to Series for unlimited tournaments.",
       };
+    case "no_unused_pass":
+      return {
+        title: "No tournament pass available",
+        body: "You don't have an unused tournament pass. Buy one in Settings → Plan & billing, or subscribe to Series for unlimited tournaments.",
+      };
     case "pod_limit":
       return {
         title: "Add another pod",

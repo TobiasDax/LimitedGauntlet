@@ -56,9 +56,14 @@ export function BillingSection() {
 
   if (!ent?.enforced) return null;
 
-  const planLabel = isSeries ? (ent.subscriptionExpiresAt ? "Series subscription" : "Series") : ent.tier === "TOURNAMENT_PASS" ? "Tournament pass" : "Free";
+  const planLabel = isSeries
+    ? ent.subscriptionExpiresAt
+      ? "Series subscription"
+      : "Series"
+    : ent.tier === "TOURNAMENT_PASS"
+      ? "Tournament pass"
+      : "Free";
   const activeUntil = ent.subscriptionExpiresAt ? new Date(ent.subscriptionExpiresAt) : null;
-  const unused = ent.unusedPasses ?? 0;
   const sorted = [...(prices.data?.prices ?? [])].sort((a, b) => PRODUCT_ORDER[a.product] - PRODUCT_ORDER[b.product]);
 
   return (
@@ -70,14 +75,6 @@ export function BillingSection() {
           <span className="text-[13px] text-ink-muted">· active until {activeUntil.toLocaleDateString()}</span>
         )}
       </div>
-
-      {unused > 0 && (
-        <p className="mt-2 text-[13px] text-ink-secondary">
-          You have {unused} unused tournament {unused === 1 ? "pass" : "passes"} — the next tournament you create will
-          use
-          {unused === 1 ? " it" : " one"} automatically.
-        </p>
-      )}
 
       {isSeries && !activeUntil ? (
         <p className="mt-3 text-[13px] text-ink-secondary">

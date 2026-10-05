@@ -134,6 +134,15 @@ export async function countUnusedPasses(orgId: string): Promise<number> {
   });
 }
 
+/** Whether an explicit "create with a pass" request has a pass to spend. */
+export async function canCreateWithPass(orgId: string, now: Date = new Date()): Promise<boolean> {
+  if (!isEntitlementEnforcementActive()) return true;
+
+  const state = await loadEntitlementState(orgId);
+  if (isSubscriptionActive(state, now)) return true;
+  return (await countUnusedPasses(orgId)) > 0;
+}
+
 export async function canCreateTournament(orgId: string, now: Date = new Date()): Promise<boolean> {
   if (!isEntitlementEnforcementActive()) return true;
 
@@ -175,6 +184,7 @@ export async function claimTournamentCoverage(
   orgId: string,
   tournamentId: string,
   now: Date = new Date(),
+  options: { preferPass?: boolean } = {},
 ): Promise<EntitlementTier | null> {
   if (!isEntitlementEnforcementActive()) return null;
 
@@ -184,8 +194,10 @@ export async function claimTournamentCoverage(
   // Spend the free slot before a paid pass. The other order would quietly burn
   // a pass the moment it was bought while the free slot sat unused, which is
   // both worse for the customer and not what rule 3 describes: a pass is spent
-  // by an explicit upgrade, or once the free slot is genuinely gone.
-  if (!state.freeTournamentUsed) {
+  // by an explicit upgrade, or once the free slot is genuinely gone. The one
+  // exception is `preferPass`: the organizer explicitly chose to create a paid
+  // tournament, so the pass is spent and the free slot is left for later.
+  if (!state.freeTournamentUsed && !options.preferPass) {
     await prisma.$transaction([
       prisma.organization.update({ where: { id: orgId }, data: { freeTournamentUsed: true } }),
       prisma.tournament.update({ where: { id: tournamentId }, data: { coveringEntitlement: "FREE" } }),

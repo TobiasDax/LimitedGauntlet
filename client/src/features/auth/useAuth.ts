@@ -40,6 +40,8 @@ export interface MeResponse {
     subscriptionExpiresAt?: string | null;
     // Bought-but-not-yet-applied tournament passes; 0 on self-hosted (HI-9).
     unusedPasses?: number;
+    // Whether the org's one-time free tournament slot has been spent.
+    freeTournamentUsed?: boolean;
   };
   // Whether this account has ever set a local password (PI-42). false = SSO
   // only. Drives the Profile page. Treat undefined as "has one".

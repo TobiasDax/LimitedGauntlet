@@ -40,6 +40,9 @@ function entitlementSummary(org: {
   return {
     enforced: isEntitlementEnforcementActive(),
     tier: effectiveTier(state),
+    // Whether the org's one-time free tournament slot has been spent — lets the
+    // UI offer "create free tournament" only while it's still available.
+    freeTournamentUsed: org.freeTournamentUsed,
     canEditTournamentDates: allows(state, "tournament.editDates"),
     // Paid-through date for an active SERIES subscription (null otherwise) —
     // the UI shows "active until …". Note it's the raw stored expiry, so a

@@ -6,6 +6,7 @@ import {
   canCreateFreeOrganization,
   canCreatePod,
   canCreateTournament,
+  canCreateWithPass,
   claimTournamentCoverage,
   countUnusedPasses,
   isOrgDataAccessible,
@@ -249,6 +250,21 @@ describe("claimTournamentCoverage", () => {
     expect(await countUnusedPasses(org.id)).toBe(1);
   });
 
+  it("spends the pass instead when preferPass is set, leaving the free slot available", async () => {
+    const org = await makeOrg();
+    const pass = await buyPass(org.id);
+    const tournament = await makeTournament(org.id);
+
+    expect(await claimTournamentCoverage(org.id, tournament.id, new Date(), { preferPass: true })).toBe(
+      "TOURNAMENT_PASS",
+    );
+
+    const after = await prisma.organization.findUniqueOrThrow({ where: { id: org.id } });
+    expect(after.freeTournamentUsed).toBe(false);
+    const attached = await prisma.billingEvent.findUniqueOrThrow({ where: { id: pass.id } });
+    expect(attached.tournamentId).toBe(tournament.id);
+  });
+
   it("spends a pass once the free slot is gone, attaching it to the tournament", async () => {
     const org = await makeOrg({ freeTournamentUsed: true });
     const pass = await buyPass(org.id);
@@ -287,6 +303,24 @@ describe("claimTournamentCoverage", () => {
     const tournament = await makeTournament(org.id);
 
     await expect(claimTournamentCoverage(org.id, tournament.id)).rejects.toThrow("no_tournament_entitlement");
+  });
+});
+
+describe("canCreateWithPass", () => {
+  it("is true only while an unused pass exists", async () => {
+    const org = await makeOrg();
+    expect(await canCreateWithPass(org.id)).toBe(false);
+    await buyPass(org.id);
+    expect(await canCreateWithPass(org.id)).toBe(true);
+  });
+
+  it("is true on an active subscription and when enforcement is off", async () => {
+    const series = await makeOrg({ entitlementTier: "SERIES", subscriptionExpiresAt: daysFromNow(30) });
+    expect(await canCreateWithPass(series.id)).toBe(true);
+
+    config.hostedEntitlements.enforced = false;
+    const free = await makeOrg();
+    expect(await canCreateWithPass(free.id)).toBe(true);
   });
 });
 

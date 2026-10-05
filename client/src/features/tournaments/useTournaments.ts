@@ -17,6 +17,8 @@ export interface CreateTournamentInput {
   endDate: string;
   location?: string;
   description?: string;
+  // Hosted only: spend a bought pass on this tournament rather than the free slot.
+  usePass?: boolean;
 }
 
 export function useCreateTournament() {
@@ -25,6 +27,8 @@ export function useCreateTournament() {
     mutationFn: (input: CreateTournamentInput) => api.post<{ tournament: Tournament }>("/tournaments", input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      // Creating spends the free slot or a pass, which the plan UI reads from /me.
+      void queryClient.invalidateQueries({ queryKey: ["me"] });
     },
   });
 }

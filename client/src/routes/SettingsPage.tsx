@@ -9,6 +9,7 @@ import { WebhookSection } from "../components/settings/WebhookSection";
 import { TokensSection } from "../components/settings/TokensSection";
 import { OrgDangerSection } from "../components/settings/OrgDangerSection";
 import { BillingSection } from "../components/settings/BillingSection";
+import { UnusedPassBanner } from "../components/settings/UnusedPassBanner";
 
 // Org-scoped settings hub (PI-26; PI-87 split the identity bits out to
 // /profile). Everything here acts on the *active* organization — switch orgs
@@ -21,6 +22,8 @@ export function SettingsPage() {
       <Eyebrow>Your organization</Eyebrow>
       <ScreenTitle>Settings</ScreenTitle>
       <ScreenDek>Settings for {me?.organization?.name ?? "this organization"}. Your login lives on Profile.</ScreenDek>
+
+      <UnusedPassBanner />
 
       {/* HI-9 — plan + upgrade, only on a hosted (entitlements-enforced)
           instance. Self-hosted has no tiers, so this whole section never

@@ -11,6 +11,7 @@ import { zStandingBonuses, syncPodTokenAwards } from "../services/tokens.js";
 import {
   applyPassToTournament,
   canCreateTournament,
+  canCreateWithPass,
   claimTournamentCoverage,
   ENTITLEMENT_REQUIRED,
   orgAllows,
@@ -25,6 +26,9 @@ const tournamentCreateSchema = z.object({
   location: z.string().trim().max(200).optional(),
   // Roomy cap for detailed Markdown descriptions (PI-31): headings, lists, tables.
   description: z.string().trim().max(10000).optional(),
+  // Hosted only: spend a bought pass on this tournament instead of the free
+  // slot. Ignored when entitlements aren't enforced or a subscription is active.
+  usePass: z.boolean().optional(),
 });
 
 const tournamentUpdateSchema = z.object({
@@ -74,9 +78,14 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const orgId = request.organizer!.orgId;
+    const { usePass, ...tournamentData } = parsed.data;
 
     // HI-4 — both checks are no-ops unless the deployment opted into hosted
     // entitlements, so a self-hosted instance falls straight through.
+    if (usePass && !(await canCreateWithPass(orgId))) {
+      reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "no_unused_pass" });
+      return;
+    }
     if (!(await canCreateTournament(orgId))) {
       reply.code(402).send({ error: ENTITLEMENT_REQUIRED, reason: "tournament_limit" });
       return;
@@ -91,12 +100,12 @@ export async function tournamentRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const tournament = await prisma.tournament.create({
-      data: { ...parsed.data, orgId },
+      data: { ...tournamentData, orgId },
     });
     // Consumes the free slot or an unused pass. Throws only if a concurrent
     // create beat this one to the last entitlement, which the 402 above
     // normally prevents.
-    await claimTournamentCoverage(orgId, tournament.id);
+    await claimTournamentCoverage(orgId, tournament.id, new Date(), { preferPass: usePass });
 
     reply.code(201).send({ tournament });
   });

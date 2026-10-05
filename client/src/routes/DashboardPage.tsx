@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useCreateTournament, useTournaments } from "../features/tournaments/useTournaments";
 import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
@@ -22,13 +22,59 @@ export function DashboardPage() {
   const { data, isLoading } = useTournaments();
   const { data: me } = useMe();
   const createTournament = useCreateTournament();
-  const [showForm, setShowForm] = useState(false);
+  const navigate = useNavigate();
+  // `?new=paid` is the Settings banner's deep link: open the form already set
+  // to spend a bought pass.
+  const [searchParams] = useSearchParams();
+  const [showForm, setShowForm] = useState(searchParams.has("new"));
+  const [paidMode, setPaidMode] = useState(searchParams.get("new") === "paid");
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [sharing, setSharing] = useState(false);
+
+  // Hosted-only: a non-subscriber's creation choices depend on whether the free
+  // slot is still unspent and whether they hold an unused pass. Self-hosted and
+  // Series orgs keep the single plain button.
+  const ent = me?.entitlement;
+  const hosted = !!ent?.enforced && ent.tier !== "SERIES";
+  const passes = ent?.unusedPasses ?? 0;
+  const freeAvailable = hosted && !ent?.freeTournamentUsed;
+
+  const openForm = (paid: boolean) => {
+    setPaidMode(paid);
+    setShowForm(true);
+  };
+
+  const newTournamentActions = (first: boolean) => {
+    if (!hosted) {
+      return (
+        <Button variant={first ? "primary" : "default"} onClick={() => openForm(false)}>
+          {first ? "Create your first tournament" : "+ New tournament"}
+        </Button>
+      );
+    }
+    return (
+      <div className={`flex flex-wrap gap-2 ${first ? "justify-center" : ""}`}>
+        {freeAvailable && (
+          <Button variant="primary" onClick={() => openForm(false)}>
+            Create free tournament
+          </Button>
+        )}
+        {passes > 0 ? (
+          <Button variant={freeAvailable ? "default" : "primary"} onClick={() => openForm(true)}>
+            Create paid tournament
+          </Button>
+        ) : (
+          <Button variant={freeAvailable ? "default" : "primary"} onClick={() => navigate("/settings")}>
+            Buy Tournament / Series pass
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -57,9 +103,13 @@ export function DashboardPage() {
       {data && data.tournaments.length === 0 && !showForm && (
         <Card className="p-8 text-center">
           <p className="mb-4 text-ink-secondary">No tournaments yet.</p>
-          <Button variant="primary" onClick={() => setShowForm(true)}>
-            Create your first tournament
-          </Button>
+          {newTournamentActions(true)}
+          {hosted && passes === 0 && (
+            <p className="mt-4 text-[12.5px] text-ink-muted">
+              A free tournament includes one pod. A tournament pass unlocks unlimited pods for a tournament; Series
+              unlocks unlimited tournaments.
+            </p>
+          )}
         </Card>
       )}
 
@@ -84,9 +134,7 @@ export function DashboardPage() {
         </div>
       )}
 
-      {data && data.tournaments.length > 0 && !showForm && (
-        <Button onClick={() => setShowForm(true)}>+ New tournament</Button>
-      )}
+      {data && data.tournaments.length > 0 && !showForm && newTournamentActions(false)}
 
       {showForm && (
         <Card className="mt-2 p-6">
@@ -101,6 +149,7 @@ export function DashboardPage() {
                   endDate,
                   location: location || undefined,
                   description: description.trim() || undefined,
+                  usePass: paidMode || undefined,
                 },
                 {
                   onSuccess: () => {
@@ -147,7 +196,13 @@ export function DashboardPage() {
             </Field>
             <div className="flex gap-2">
               <Button type="submit" variant="primary" disabled={createTournament.isPending}>
-                {createTournament.isPending ? "Creating…" : "Create tournament"}
+                {createTournament.isPending
+                  ? "Creating…"
+                  : paidMode
+                    ? "Create paid tournament"
+                    : hosted && freeAvailable
+                      ? "Create free tournament"
+                      : "Create tournament"}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
                 Cancel
