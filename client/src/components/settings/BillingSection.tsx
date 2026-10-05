@@ -1,4 +1,5 @@
 import { useMe } from "../../features/auth/useAuth";
+import { useAppConfig } from "../../features/config/useAppConfig";
 import {
   useBillingPrices,
   useStartCheckout,
@@ -49,6 +50,8 @@ function priceLine(p: BillingPrice): string {
 
 export function BillingSection() {
   const { data: me } = useMe();
+  const { data: appConfig } = useAppConfig();
+  const supportEmail = appConfig?.supportEmail ?? null;
   const ent = me?.entitlement;
   const isSeries = ent?.tier === "SERIES";
   const prices = useBillingPrices(!!ent?.enforced && !isSeries);
@@ -82,13 +85,28 @@ export function BillingSection() {
           manage or renew.
         </p>
       ) : isSeries ? (
-        <p className="mt-3 text-[13px] text-ink-secondary">
-          Unlimited tournaments while your subscription is active. Manage payment method, renewal, or cancellation at{" "}
-          <a href="https://link.com" target="_blank" rel="noreferrer" className="text-accent underline">
-            link.com
-          </a>
-          {` — cancelling keeps access until ${activeUntil!.toLocaleDateString()}.`}
-        </p>
+        <div className="mt-3 flex flex-col gap-2 text-[13px] text-ink-secondary">
+          <p>
+            Unlimited tournaments while your subscription is active. Cancelling keeps access until{" "}
+            {activeUntil!.toLocaleDateString()}.
+          </p>
+          <p>
+            <a href="https://app.link.com" target="_blank" rel="noreferrer" className="text-accent underline">
+              Manage your subscription on Link
+            </a>{" "}
+            — view orders, cancel, or update your payment method. Sign in with the email address you used at checkout;
+            if you paid as a guest, create a Link account with that same email.
+          </p>
+          {supportEmail && (
+            <p className="text-ink-muted">
+              Trouble signing in? Email{" "}
+              <a href={`mailto:${supportEmail}`} className="text-accent underline">
+                {supportEmail}
+              </a>{" "}
+              and we'll sort it out.
+            </p>
+          )}
+        </div>
       ) : (
         <div className="mt-4">
           <p className="mb-3 text-[13px] text-ink-secondary">
