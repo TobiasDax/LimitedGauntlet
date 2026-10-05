@@ -1,10 +1,10 @@
 # Hosted Instance Roadmap
 
-**Branch-scoped working document for `feat/hosted-entitlements`.** Everything here concerns the *hosted* deployment only. The main [`ROADMAP.md`](ROADMAP.md) tracks the app itself; this file tracks the optional, deployment-gated entitlement layer that only the hosted instance switches on.
+**Working document for the hosted-instance entitlement layer (shipped in v0.18.0).** Everything here concerns the *hosted* deployment only. The main [`ROADMAP.md`](ROADMAP.md) tracks the app itself; this file tracks the optional, deployment-gated entitlement layer that only the hosted instance switches on.
 
 Items use an `HI-` prefix (hosted instance) deliberately, so they never collide with `main`'s `PI-` sequence while both tracks move in parallel.
 
-> Commercial details — pricing, payment-processor choice, fee structure, business rationale — are intentionally **not** in this repo. This file specifies behaviour only.
+> This file specifies behaviour. Current pricing is published on the marketing site, not maintained here; amounts are read live from the payment processor and never hard-coded.
 
 ## The non-negotiable
 
