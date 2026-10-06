@@ -17,7 +17,7 @@
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "prisma": "^7.10.0",
-    "stripe": "^22.6.2"
+    "stripe": "^23.0.0"
   },
   "scripts": {
     "dev:server": "npm run dev --workspace server",
