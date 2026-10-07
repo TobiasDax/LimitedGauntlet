@@ -4,7 +4,9 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.18.2**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.18.3**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+
+**v0.18.3:** dependency maintenance, no functional changes. In-range updates across the server, client and MCP workspaces (fastify 5.12.5, nodemailer 10.0.15, fast-uri, ip-address, brace-expansion and others), which clear the open Dependabot security advisories, plus the dev tooling (eslint, typescript-eslint, prettier). Major bumps (stripe 23, dotenv 18, @types/node 26, Prisma 8) are deliberately held back; the one remaining advisory (mysql2) comes from Prisma's own dev tooling.
 
 **v0.18.2:** hosted-instance polish for the first paying customers; no effect on self-hosted deployments. A Settings banner now tells an organization with an unused tournament pass to create a tournament with it, and the Tournaments page offers "Create free tournament" and "Buy Tournament / Series pass" (which becomes "Create paid tournament" once a pass is banked — a paid tournament keeps the free slot available). Series subscribers are now pointed to the Link web app (app.link.com) with sign-in instructions, and the hosted instance publishes Terms of Service and a refund/cancellation policy at `/terms` (HI-11; hosted-only, linked from the footer and the purchase note).
 
