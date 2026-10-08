@@ -49,7 +49,7 @@ export function PlayerAcceptInvitePage() {
 
         {invite && (
           <>
-            <p className="mb-4 text-[14px] text-ink-muted">
+            <p className="mb-4 text-md text-ink-muted">
               Set a password to sign in as <strong>{invite.playerName}</strong> for{" "}
               <strong>{invite.organizationName}</strong> ({invite.email}).
             </p>

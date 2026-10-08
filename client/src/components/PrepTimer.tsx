@@ -25,17 +25,15 @@ export function PrepTimerDisplay({
   const big = size === "large";
   return (
     <div className="mb-6 rounded-md border border-border bg-surface px-5 py-4">
-      <div className="text-[11px] tracking-wide text-ink-muted uppercase">{label || "Prep timer"}</div>
+      <div className="text-2xs tracking-wide text-ink-muted uppercase">{label || "Prep timer"}</div>
       <div
         className={`font-display font-bold tabular-nums ${
           countdown.expired ? "text-accent" : "text-ink"
-        } ${big ? "text-[64px] leading-none" : "text-[34px] leading-tight"}`}
+        } ${big ? "text-display leading-none" : "text-3xl leading-tight"}`}
       >
         {countdown.expired ? "0:00" : countdown.formatted}
       </div>
-      {countdown.expired && (
-        <div className="text-[12px] font-semibold tracking-wide text-accent uppercase">Time's up</div>
-      )}
+      {countdown.expired && <div className="text-xs font-semibold tracking-wide text-accent uppercase">Time's up</div>}
     </div>
   );
 }
@@ -65,8 +63,8 @@ export function PrepTimer({ pod }: { pod: Pod }) {
 
   return (
     <div className="mb-6 rounded-md border border-border bg-surface px-5 py-4">
-      <div className="mb-2 text-[11px] tracking-wide text-ink-muted uppercase">Pre-round timer</div>
-      <p className="mb-3 max-w-lg text-[13px] text-ink-muted">
+      <div className="mb-2 text-2xs tracking-wide text-ink-muted uppercase">Pre-round timer</div>
+      <p className="mb-3 max-w-lg text-sm text-ink-muted">
         A standalone timer for draft / deck-building, before any round is paired. Shows live on every device, including
         the public link.
       </p>
@@ -83,7 +81,7 @@ export function PrepTimer({ pod }: { pod: Pod }) {
         }}
       >
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] tracking-wide text-ink-muted uppercase">Minutes</span>
+          <span className="text-2xs tracking-wide text-ink-muted uppercase">Minutes</span>
           <TextField
             type="number"
             min={1}
@@ -94,7 +92,7 @@ export function PrepTimer({ pod }: { pod: Pod }) {
           />
         </label>
         <label className="flex flex-1 flex-col gap-1">
-          <span className="text-[11px] tracking-wide text-ink-muted uppercase">Label (optional)</span>
+          <span className="text-2xs tracking-wide text-ink-muted uppercase">Label (optional)</span>
           <TextField placeholder="Draft, Deck-building…" value={label} onChange={(e) => setLabel(e.target.value)} />
         </label>
         <Button type="submit" variant="primary" disabled={setTimer.isPending}>

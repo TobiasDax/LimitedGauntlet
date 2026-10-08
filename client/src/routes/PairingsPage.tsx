@@ -74,11 +74,11 @@ function ResultEntry({
     return (
       <div className="flex items-center gap-3">
         <div className="text-right">
-          <div className="font-display tabular-nums text-[15px] font-bold">
+          <div className="font-display tabular-nums text-base font-bold">
             {match.gamesWonA}–{match.gamesWonB}
             {match.gamesDrawn > 0 && <span className="text-ink-muted">–{match.gamesDrawn}</span>}
           </div>
-          <div className="text-[11px] text-ink-muted">{label}</div>
+          <div className="text-2xs text-ink-muted">{label}</div>
         </div>
         <button
           type="button"
@@ -89,7 +89,7 @@ function ResultEntry({
             setDropped("NONE");
             setEditing(true);
           }}
-          className="text-[11px] text-link underline hover:text-link-hover"
+          className="text-2xs text-link underline hover:text-link-hover"
         >
           Edit
         </button>
@@ -122,7 +122,7 @@ function ResultEntry({
       <select
         value={dropped}
         onChange={(e) => setDropped(e.target.value as DroppedSelection)}
-        className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-[12.5px] text-ink outline-none focus:border-accent"
+        className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-xs text-ink outline-none focus:border-accent"
       >
         {droppedOptions(entrantA, entrantB).map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -138,13 +138,13 @@ function ResultEntry({
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="shrink-0 text-[11px] text-ink-muted underline hover:text-accent"
+            className="shrink-0 text-2xs text-ink-muted underline hover:text-accent"
           >
             Cancel
           </button>
         )}
       </div>
-      {!resultsOpen && <p className="text-[11px] text-ink-muted">Start the round to enter results.</p>}
+      {!resultsOpen && <p className="text-2xs text-ink-muted">Start the round to enter results.</p>}
     </form>
   );
 }
@@ -198,16 +198,16 @@ function MatchCard({
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border bg-surface px-4 py-3">
       <div className="min-w-0">
-        <div className="mb-1 text-[11px] tracking-wide text-ink-muted uppercase">Table {match.tableNumber}</div>
-        <div className="font-display text-[15px] font-bold">
+        <div className="mb-1 text-2xs tracking-wide text-ink-muted uppercase">Table {match.tableNumber}</div>
+        <div className="font-display text-base font-bold">
           {a ? renderSeat(a, "A") : "—"}
           {b ? (
             <>
-              <span className="mx-2 text-[11px] font-normal text-ink-muted">vs</span>
+              <span className="mx-2 text-2xs font-normal text-ink-muted">vs</span>
               {renderSeat(b, "B")}
             </>
           ) : (
-            <span className="ml-2 text-[11px] font-normal text-ink-muted uppercase">Bye</span>
+            <span className="ml-2 text-2xs font-normal text-ink-muted uppercase">Bye</span>
           )}
         </div>
       </div>
@@ -254,7 +254,7 @@ function RoundTimer({ round, displayMode }: { round: Round; displayMode: boolean
   return (
     <div
       className={`font-display tabular-nums font-bold ${countdown.expired ? "text-critical" : "text-accent"} ${
-        displayMode ? "text-[64px]" : "text-[26px]"
+        displayMode ? "text-display" : "text-2xl"
       }`}
     >
       {countdown.formatted}
@@ -328,8 +328,8 @@ function RoundCard({
     <div className="rounded-lg border border-border bg-bg p-5">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <div className="font-display text-[18px] font-bold">Round {round.roundNumber}</div>
-          <div className="text-[11.5px] tracking-wide text-ink-muted uppercase">{round.status}</div>
+          <div className="font-display text-lg font-bold">Round {round.roundNumber}</div>
+          <div className="text-2xs tracking-wide text-ink-muted uppercase">{round.status}</div>
         </div>
         {round.status === "ACTIVE" && <RoundTimer round={round} displayMode={displayMode} />}
         <div className="flex items-center gap-2">
@@ -386,14 +386,14 @@ function RoundCard({
       </div>
 
       {!revealed ? (
-        <p className="text-[13px] text-ink-muted">
+        <p className="text-sm text-ink-muted">
           Pairings are generated but hidden — find seatings on the Seatings tab, then reveal here once everyone's ready
           to see their opponent.
         </p>
       ) : (
         <>
           {swappable && (
-            <p className="mb-3 text-[12px] text-ink-muted">
+            <p className="mb-3 text-xs text-ink-muted">
               Click a name, then click another to swap their seats — only works before the round starts.
             </p>
           )}
@@ -419,10 +419,7 @@ function RoundCard({
       {completeRound.isError && <FormError>{roundErrorMessage(completeRound.error)}</FormError>}
       {swapPairing.isError && <FormError>{roundErrorMessage(swapPairing.error)}</FormError>}
       {repeatWarnings.length > 0 && (
-        <div
-          role="alert"
-          className="border-warning/40 bg-warning/14 mt-3 rounded-md border px-4 py-3 text-[13px] text-ink"
-        >
+        <div role="alert" className="border-warning/40 bg-warning/14 mt-3 rounded-md border px-4 py-3 text-sm text-ink">
           <div className="font-semibold">
             {repeatWarnings.length === 1 ? "This pairing is a rematch" : "These pairings are rematches"}
           </div>
@@ -504,7 +501,7 @@ export function PairingsPage() {
         </Button>
       </div>
       {displayMode && (
-        <p className="mb-6 -mt-4 text-[12px] text-ink-muted">
+        <p className="mb-6 -mt-4 text-xs text-ink-muted">
           This device will chime when the round timer hits zero. Leave other devices out of display mode so the room
           doesn't fill with simultaneous beeps.
         </p>
@@ -526,7 +523,7 @@ export function PairingsPage() {
         <Card className="mb-5 divide-y divide-border">
           {pod.entrants.map((e) => (
             <div key={e.id} className="flex items-center justify-between px-4 py-2.5">
-              <span className="text-[13.5px] font-semibold">{entrantDisplayName(e)}</span>
+              <span className="text-sm font-semibold">{entrantDisplayName(e)}</span>
               <EntrantDropControl podId={pod.id} entrant={e} canModifyRoster={canModifyRoster} />
             </div>
           ))}
@@ -534,7 +531,7 @@ export function PairingsPage() {
       )}
 
       {canGenerateNext && nextRoundNumber === 1 && seatingFormats.has(pod.format) && (
-        <p className="mb-3 text-[12px] text-ink-muted">
+        <p className="mb-3 text-xs text-ink-muted">
           Want a seating chart first? Head to the{" "}
           <Link to={`/pods/${id}/seating`} className="text-link underline hover:text-link-hover">
             Seatings tab
@@ -561,7 +558,7 @@ export function PairingsPage() {
           <button
             type="button"
             onClick={() => setShowManual(true)}
-            className="text-[12.5px] text-ink-muted underline hover:text-accent"
+            className="text-xs text-ink-muted underline hover:text-accent"
           >
             Pair manually instead
           </button>
@@ -580,7 +577,7 @@ export function PairingsPage() {
       )}
 
       {rounds.length >= pod.roundCount && rounds.length > 0 && lastRound?.status === "COMPLETED" && (
-        <p className="mb-5 text-[13px] text-ink-muted">All {pod.roundCount} rounds complete.</p>
+        <p className="mb-5 text-sm text-ink-muted">All {pod.roundCount} rounds complete.</p>
       )}
 
       <div className="flex flex-col gap-5">

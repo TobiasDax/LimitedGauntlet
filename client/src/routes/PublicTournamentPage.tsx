@@ -60,8 +60,8 @@ export function PublicTournamentPage() {
         podHref={(pod) => `/o/${slug}/tournaments/${id}/pods/${pod.id}`}
       />
 
-      <h2 className="font-display mb-1 text-[22px] font-bold">Tournament Standings</h2>
-      <p className="mb-6 text-[13px] text-ink-muted">Ranked by average points per pod played, not raw total.</p>
+      <h2 className="font-display mb-1 text-xl font-bold">Tournament Standings</h2>
+      <p className="mb-6 text-sm text-ink-muted">Ranked by average points per pod played, not raw total.</p>
       {gwData ? (
         <GesamtwertungList
           pods={gwData.pods}
@@ -76,23 +76,23 @@ export function PublicTournamentPage() {
       {podValueGroups.length > 0 && (
         <section className="mt-12">
           <div className="mb-1 flex items-baseline justify-between gap-4">
-            <h2 className="font-display text-[22px] font-bold">Card values</h2>
+            <h2 className="font-display text-xl font-bold">Card values</h2>
             <div className="flex items-baseline gap-2">
-              <span className="font-display text-[20px] font-bold text-accent tabular-nums">
+              <span className="font-display text-xl font-bold text-accent tabular-nums">
                 {formatEur(pullsData?.total ?? 0)}
               </span>
-              <span className="text-[11px] tracking-wide text-ink-muted uppercase">tournament total</span>
+              <span className="text-2xs tracking-wide text-ink-muted uppercase">tournament total</span>
             </div>
           </div>
-          <p className="mb-6 text-[13px] text-ink-muted">
+          <p className="mb-6 text-sm text-ink-muted">
             Every card logged across the tournament, by pod, highest value first.
           </p>
           <div className="flex flex-col gap-8">
             {podValueGroups.map(({ pod, pulls, subtotal }) => (
               <div key={pod.id}>
                 <div className="mb-3 flex items-baseline justify-between gap-4 border-b border-border pb-1.5">
-                  <h3 className="font-display text-[16px] font-bold">{pod.name}</h3>
-                  <span className="text-[12.5px] font-bold text-accent tabular-nums">{formatEur(subtotal)}</span>
+                  <h3 className="font-display text-base font-bold">{pod.name}</h3>
+                  <span className="text-xs font-bold text-accent tabular-nums">{formatEur(subtotal)}</span>
                 </div>
                 <CardGallery pulls={pulls} />
               </div>

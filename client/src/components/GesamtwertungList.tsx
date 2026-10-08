@@ -47,7 +47,7 @@ export function GesamtwertungList({
             >
               <div className="grid grid-cols-[44px_1fr_auto] items-center gap-5">
                 <div
-                  className={`grid h-[34px] w-[34px] place-items-center rounded border font-display text-[15px] font-bold ${rankBadgeClasses(rank)}`}
+                  className={`grid h-[34px] w-[34px] place-items-center rounded border font-display text-base font-bold ${rankBadgeClasses(rank)}`}
                 >
                   {rank}
                 </div>
@@ -55,22 +55,22 @@ export function GesamtwertungList({
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <Link
                     to={playerLinkTo(row.playerId)}
-                    className="truncate font-display text-[17px] font-bold hover:text-accent"
+                    className="truncate font-display text-lg font-bold hover:text-accent"
                   >
                     {row.player.displayName}
                   </Link>
-                  <span className="text-[12px] text-ink-muted">
+                  <span className="text-xs text-ink-muted">
                     {row.eventsPlayed} of {pods.length} pod{pods.length === 1 ? "" : "s"} played
                   </span>
                 </div>
 
                 <div className="text-right">
                   <div
-                    className={`font-display tabular-nums text-[26px] leading-none font-bold ${rank === 1 ? "text-accent" : ""}`}
+                    className={`font-display tabular-nums text-2xl leading-none font-bold ${rank === 1 ? "text-accent" : ""}`}
                   >
                     {row.average.toFixed(1)}
                   </div>
-                  <div className="mt-0.5 text-[10.5px] tracking-wide text-ink-muted uppercase">
+                  <div className="mt-0.5 text-2xs tracking-wide text-ink-muted uppercase">
                     avg · {row.totalPoints} total
                   </div>
                 </div>
@@ -85,7 +85,7 @@ export function GesamtwertungList({
                       key={pod.id}
                       to={podLinkTo(pod.id)}
                       title={pod.name}
-                      className={`grid h-[26px] min-w-[26px] place-items-center rounded border border-border px-1 text-[11px] tabular-nums transition-colors hover:border-accent hover:text-ink ${
+                      className={`grid h-[26px] min-w-[26px] place-items-center rounded border border-border px-1 text-2xs tabular-nums transition-colors hover:border-accent hover:text-ink ${
                         attended && points > 0 ? "bg-surface-raised text-ink-muted" : "text-ink-muted"
                       }`}
                     >
@@ -100,7 +100,7 @@ export function GesamtwertungList({
       </div>
 
       {pods.length > 0 && (
-        <p className="mt-4 text-[11.5px] text-ink-muted">
+        <p className="mt-4 text-2xs text-ink-muted">
           Pips, left to right: {pods.map((p) => p.name).join(" · ")}
           <br />
           Only pods that have started appear here — a pod still in setup gets a column once its first round begins.

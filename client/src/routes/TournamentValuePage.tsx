@@ -24,10 +24,10 @@ export function TournamentValuePage() {
       ) : (
         <>
           <div className="mb-4 flex items-baseline gap-2">
-            <span className="font-display text-[24px] font-bold text-accent tabular-nums">
+            <span className="font-display text-2xl font-bold text-accent tabular-nums">
               {formatEur(data?.total ?? 0)}
             </span>
-            <span className="text-[11px] tracking-wide text-ink-muted uppercase">tournament total</span>
+            <span className="text-2xs tracking-wide text-ink-muted uppercase">tournament total</span>
           </div>
           <CardGallery pulls={data?.cardPulls ?? []} />
         </>

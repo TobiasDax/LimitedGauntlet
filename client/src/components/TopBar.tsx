@@ -18,7 +18,7 @@ export interface NavItem {
 // automatically, so assistive tech announces the current page.
 function navLinkClass({ isActive }: { isActive: boolean }): string {
   return [
-    "shrink-0 rounded px-3 py-1.5 text-[12.5px] tracking-wide uppercase transition-colors",
+    "shrink-0 rounded px-3 py-1.5 text-xs tracking-wide uppercase transition-colors",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
     isActive
       ? "font-bold text-accent underline decoration-2 underline-offset-[6px]"
@@ -72,7 +72,7 @@ export function TopBar({
       >
         <Link
           to={brandTo}
-          className="font-display flex items-center gap-2.5 text-[17px] font-bold whitespace-nowrap sm:text-[19px]"
+          className="font-display flex items-center gap-2.5 text-lg font-bold whitespace-nowrap sm:text-lg"
         >
           <Logo className="h-7 w-7" />
           LimitedGauntlet
@@ -80,7 +80,7 @@ export function TopBar({
 
         {(orgSlot || orgName) && (
           <div className="border-border hidden flex-col gap-px border-l pl-5 sm:flex">
-            {orgSlot ?? <span className="text-[13px] text-ink-muted">{orgName}</span>}
+            {orgSlot ?? <span className="text-sm text-ink-muted">{orgName}</span>}
           </div>
         )}
 

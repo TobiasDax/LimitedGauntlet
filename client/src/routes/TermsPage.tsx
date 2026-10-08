@@ -16,7 +16,7 @@ export function TermsPage() {
       <header className="mx-auto flex w-full max-w-[820px] items-center px-4 py-5 sm:px-8">
         <Link
           to="/"
-          className="flex items-center gap-2 text-[13px] tracking-wide text-ink-muted uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex items-center gap-2 text-sm tracking-wide text-ink-muted uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <Logo className="h-7 w-7" />
           Limited Gauntlet
@@ -24,14 +24,14 @@ export function TermsPage() {
       </header>
 
       <main className="mx-auto w-full max-w-[820px] flex-1 px-4 pb-24 pt-4 sm:px-8">
-        {isLoading && <p className="text-[14px] text-ink-muted">Loading…</p>}
+        {isLoading && <p className="text-md text-ink-muted">Loading…</p>}
 
-        {isError && <p className="text-[14px] text-ink-muted">This page couldn't be loaded. Please try again.</p>}
+        {isError && <p className="text-md text-ink-muted">This page couldn't be loaded. Please try again.</p>}
 
         {data && !data.enabled && (
           <div className="py-8">
-            <h1 className="font-display mb-2 text-[24px] font-bold">Terms of Service</h1>
-            <p className="text-[14px] text-ink-muted">
+            <h1 className="font-display mb-2 text-2xl font-bold">Terms of Service</h1>
+            <p className="text-md text-ink-muted">
               This is a self-hosted installation: there is no paid plan here, so there are no hosted-service terms. The
               software itself is covered by its open-source license.
             </p>
@@ -43,7 +43,7 @@ export function TermsPage() {
             {data.incomplete && (
               <div
                 role="alert"
-                className="border-warning/40 bg-warning/14 mb-6 rounded-md border px-4 py-3 text-[13px] text-ink"
+                className="border-warning/40 bg-warning/14 mb-6 rounded-md border px-4 py-3 text-sm text-ink"
               >
                 <strong>These terms are incomplete.</strong> The operator of this deployment has not filled in their
                 name or support contact (<code>LEGAL_CONTROLLER_NAME</code> / <code>HOSTED_SUPPORT_EMAIL</code>).

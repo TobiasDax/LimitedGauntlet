@@ -49,14 +49,14 @@ export function SharePopup({
         <div className="rounded-lg bg-white p-3">
           <QRCodeSVG value={url} size={196} marginSize={0} />
         </div>
-        <p className="text-center text-[12.5px] text-ink-muted">Scan to open the public page on a phone.</p>
+        <p className="text-center text-xs text-ink-muted">Scan to open the public page on a phone.</p>
         <div className="flex w-full gap-2">
           <input
             ref={inputRef}
             readOnly
             value={url}
             onFocus={(e) => e.currentTarget.select()}
-            className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-accent"
+            className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent"
           />
           <Button variant="primary" onClick={copy}>
             {copied ? "Copied!" : "Copy"}

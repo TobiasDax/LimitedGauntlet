@@ -32,8 +32,8 @@ export function LoginPage() {
 
   return (
     <div className="mx-auto max-w-[380px] py-16">
-      <h1 className="font-display mb-1 text-[26px] font-bold">Log in</h1>
-      <p className="mb-8 text-[14px] text-ink-muted">Back to running the tournament.</p>
+      <h1 className="font-display mb-1 text-2xl font-bold">Log in</h1>
+      <p className="mb-8 text-md text-ink-muted">Back to running the tournament.</p>
 
       {oidcErrorText && (
         <div className="mb-4">
@@ -46,7 +46,7 @@ export function LoginPage() {
           <SsoButtons providers={appConfig.ssoProviders} />
           {/* The local form is hidden entirely in SSO-only mode, so no divider then. */}
           {!appConfig.localLoginDisabled && (
-            <div className="my-5 flex items-center gap-3 text-[11.5px] tracking-wide text-ink-muted uppercase">
+            <div className="my-5 flex items-center gap-3 text-2xs tracking-wide text-ink-muted uppercase">
               <span className="h-px flex-1 bg-border" />
               or
               <span className="h-px flex-1 bg-border" />
@@ -98,7 +98,7 @@ export function LoginPage() {
             </form>
           </Card>
 
-          <p className="mt-5 text-center text-[13px] text-ink-muted">
+          <p className="mt-5 text-center text-sm text-ink-muted">
             New group?{" "}
             <Link to="/signup" className="text-accent hover:text-accent-hover">
               Create an organization

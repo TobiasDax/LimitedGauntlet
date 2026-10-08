@@ -38,9 +38,9 @@ export function SettingsPage() {
         title="Public page access"
         description={
           <>
-            Your public pages (<code className="text-[12px]">/o/{me?.organization.slug ?? "…"}</code>) are open to
-            anyone with the link by default. Set a password to require it before anyone can view them — visitors enter
-            it once per browser.
+            Your public pages (<code className="text-xs">/o/{me?.organization.slug ?? "…"}</code>) are open to anyone
+            with the link by default. Set a password to require it before anyone can view them — visitors enter it once
+            per browser.
           </>
         }
       >

@@ -16,14 +16,12 @@ export function StandingBonusEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="text-[11px] tracking-wide text-ink-muted uppercase">
-        Standing bonus (tokens by finishing place)
-      </div>
+      <div className="text-2xs tracking-wide text-ink-muted uppercase">Standing bonus (tokens by finishing place)</div>
       {rows.length === 0 && (
-        <p className="text-[12px] text-ink-muted">No standing bonus — only participation is awarded.</p>
+        <p className="text-xs text-ink-muted">No standing bonus — only participation is awarded.</p>
       )}
       {rows.map((row, i) => (
-        <div key={i} className="flex flex-wrap items-center gap-2 text-[13px]">
+        <div key={i} className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-ink-muted">Places</span>
           <TextField
             type="number"

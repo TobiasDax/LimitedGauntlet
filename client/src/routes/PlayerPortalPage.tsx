@@ -29,11 +29,11 @@ function MyMatchCard({ match }: { match: PlayerPortalMatch }) {
 
   return (
     <Card className="p-4">
-      <div className="mb-1 text-[11px] tracking-wide text-ink-muted uppercase">
+      <div className="mb-1 text-2xs tracking-wide text-ink-muted uppercase">
         {match.podName} · Round {match.roundNumber}
       </div>
-      <div className="mb-3 font-display text-[15px] font-bold">
-        You <span className="mx-2 text-[11px] font-normal text-ink-muted">vs</span> {match.opponentName}
+      <div className="mb-3 font-display text-base font-bold">
+        You <span className="mx-2 text-2xs font-normal text-ink-muted">vs</span> {match.opponentName}
       </div>
       <form
         className="flex flex-col gap-2"
@@ -59,7 +59,7 @@ function MyMatchCard({ match }: { match: PlayerPortalMatch }) {
           {reported ? "Update result" : "Submit result"}
         </Button>
         {reported && !submit.isPending && (
-          <p className="text-[11px] text-ink-muted">
+          <p className="text-2xs text-ink-muted">
             Reported {match.gamesWonA}–{match.gamesWonB}. You or your opponent can still fix it until the organizer
             closes the round.
           </p>
@@ -90,13 +90,13 @@ function MyPodCard({ pod, slug }: { pod: PlayerPortalPod; slug: string }) {
     <Card className="p-4">
       <div className="flex items-center justify-between">
         <div>
-          <Link to={podHref} className="font-display text-[14.5px] font-bold hover:text-accent">
+          <Link to={podHref} className="font-display text-md font-bold hover:text-accent">
             {pod.podName}
           </Link>
-          <div className="text-[11.5px] text-ink-muted">{pod.tournamentName}</div>
+          <div className="text-2xs text-ink-muted">{pod.tournamentName}</div>
         </div>
         {pod.dropped ? (
-          <span className="text-[11px] tracking-wide text-ink-muted uppercase">Dropped</span>
+          <span className="text-2xs tracking-wide text-ink-muted uppercase">Dropped</span>
         ) : (
           <Button
             variant="ghost"
@@ -137,10 +137,10 @@ function AccountSection({ currentName }: { currentName: string }) {
 
   return (
     <section>
-      <h2 className="mb-3 font-display text-[16px] font-bold">Your account</h2>
+      <h2 className="mb-3 font-display text-base font-bold">Your account</h2>
       <Card className="flex flex-col gap-4 p-4">
         <div>
-          <div className="mb-1 text-[11px] tracking-wide text-ink-muted uppercase">Display name</div>
+          <div className="mb-1 text-2xs tracking-wide text-ink-muted uppercase">Display name</div>
           {editing ? (
             <form
               className="flex flex-wrap items-center gap-2"
@@ -177,7 +177,7 @@ function AccountSection({ currentName }: { currentName: string }) {
             </form>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="font-display text-[15px] font-bold">{currentName}</span>
+              <span className="font-display text-base font-bold">{currentName}</span>
               <Button variant="ghost" onClick={() => setEditing(true)}>
                 Edit
               </Button>
@@ -198,12 +198,12 @@ function AccountSection({ currentName }: { currentName: string }) {
         {showRemoval && (
           <div className="flex flex-col gap-2 rounded-md border border-border bg-bg p-3">
             {removal.isSuccess ? (
-              <p className="text-[13px] text-good">
+              <p className="text-sm text-good">
                 Sent. The organizers have been notified and will remove or anonymise you.
               </p>
             ) : (
               <>
-                <p className="text-[12.5px] text-ink-muted">
+                <p className="text-xs text-ink-muted">
                   This asks the organizers to anonymise you or hide you from the public pages — they action it by hand.
                   Add anything they should know:
                 </p>
@@ -247,17 +247,15 @@ export function PlayerPortalPage() {
 
       {tokens && (
         <section>
-          <h2 className="mb-3 font-display text-[16px] font-bold">Your tokens</h2>
+          <h2 className="mb-3 font-display text-base font-bold">Your tokens</h2>
           <PlayerTokenLedger ledger={tokens} />
         </section>
       )}
 
       <section>
-        <h2 className="mb-3 font-display text-[16px] font-bold">Your matches</h2>
+        <h2 className="mb-3 font-display text-base font-bold">Your matches</h2>
         {data.matches.length === 0 ? (
-          <p className="text-[13px] text-ink-muted">
-            No match to report right now — check back when your round starts.
-          </p>
+          <p className="text-sm text-ink-muted">No match to report right now — check back when your round starts.</p>
         ) : (
           <div className="flex flex-col gap-3">
             {data.matches.map((m) => (
@@ -270,9 +268,9 @@ export function PlayerPortalPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 font-display text-[16px] font-bold">Your pods</h2>
+        <h2 className="mb-3 font-display text-base font-bold">Your pods</h2>
         {data.pods.length === 0 ? (
-          <p className="text-[13px] text-ink-muted">You're not signed up for any pods right now.</p>
+          <p className="text-sm text-ink-muted">You're not signed up for any pods right now.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {data.pods.map((p) => (
@@ -283,9 +281,9 @@ export function PlayerPortalPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 font-display text-[16px] font-bold">Tournaments</h2>
+        <h2 className="mb-3 font-display text-base font-bold">Tournaments</h2>
         {data.tournaments.length === 0 ? (
-          <p className="text-[13px] text-ink-muted">This group has no tournaments yet.</p>
+          <p className="text-sm text-ink-muted">This group has no tournaments yet.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {data.tournaments.map((t) => (
@@ -293,13 +291,11 @@ export function PlayerPortalPage() {
                 <div>
                   <Link
                     to={`/o/${slug}/tournaments/${t.id}`}
-                    className="font-display text-[14.5px] font-bold hover:text-accent"
+                    className="font-display text-md font-bold hover:text-accent"
                   >
                     {t.name}
                   </Link>
-                  <div className="text-[11.5px] text-ink-muted">
-                    {t.checkedIn ? "You're checked in" : "Not checked in"}
-                  </div>
+                  <div className="text-2xs text-ink-muted">{t.checkedIn ? "You're checked in" : "Not checked in"}</div>
                 </div>
                 <Button
                   variant={t.checkedIn ? "ghost" : "primary"}

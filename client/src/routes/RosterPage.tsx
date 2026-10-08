@@ -66,7 +66,7 @@ function PrivacyControls({ player }: { player: Player }) {
               {player.publicHidden ? "Show name on public pages" : "Pseudonymise on public pages"}
             </Button>
             {player.publicHidden && player.publicAlias && (
-              <span className="px-4 text-[11px] text-ink-muted">
+              <span className="px-4 text-2xs text-ink-muted">
                 Shown publicly as <span className="font-semibold text-ink-muted">{player.publicAlias}</span>
               </span>
             )}
@@ -82,7 +82,7 @@ function PrivacyControls({ player }: { player: Player }) {
 
       {confirmAnon && (
         <Modal title={`Anonymise ${player.displayName}?`} onClose={() => setConfirmAnon(false)}>
-          <div className="flex flex-col gap-3 text-[13px] text-ink-muted">
+          <div className="flex flex-col gap-3 text-sm text-ink-muted">
             <p>
               This scrubs the name to a non-identifying label and removes their login, any pending invite, and
               token-ledger notes. Their match results, standings, Gesamtwertung and Hall of Fame numbers stay exactly
@@ -128,7 +128,7 @@ function AccountControls({ player, orgSlug }: { player: Player; orgSlug: string 
   if (player.hasAccount) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-[11px] tracking-wide text-good uppercase">Has login</span>
+        <span className="text-2xs tracking-wide text-good uppercase">Has login</span>
         <Button
           variant="ghost"
           onClick={() => {
@@ -172,7 +172,7 @@ function AccountControls({ player, orgSlug }: { player: Player; orgSlug: string 
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] tracking-wide text-ink-muted uppercase">No login</span>
+      <span className="text-2xs tracking-wide text-ink-muted uppercase">No login</span>
       <Button variant="ghost" onClick={() => setShowForm(true)} disabled={!orgSlug}>
         Invite
       </Button>
@@ -254,10 +254,7 @@ function RosterRow({
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Link
-          to={`/hall-of-fame/players/${player.id}`}
-          className="font-display text-[15.5px] font-bold hover:text-accent"
-        >
+        <Link to={`/hall-of-fame/players/${player.id}`} className="font-display text-base font-bold hover:text-accent">
           {player.displayName}
         </Link>
         {player.anonymised && <StatusPill tone="critical">Anonymised</StatusPill>}
@@ -324,7 +321,7 @@ export function RosterPage() {
       <ScreenDek>
         Players persist across every tournament your group runs — add them once here. Invite a player to a login and
         they can check themselves in and report their own results at{" "}
-        <code className="text-[13px]">/o/{me?.organization.slug ?? "…"}/player</code>.
+        <code className="text-sm">/o/{me?.organization.slug ?? "…"}/player</code>.
       </ScreenDek>
 
       {isLoading && <p className="text-ink-muted">Loading…</p>}

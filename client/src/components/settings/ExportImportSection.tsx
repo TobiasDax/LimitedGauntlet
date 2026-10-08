@@ -64,7 +64,7 @@ export function ExportImportSection() {
   return (
     <div>
       <Card className="mb-4 p-5">
-        <p className="mb-4 text-[13.5px] text-ink-muted">
+        <p className="mb-4 text-sm text-ink-muted">
           Download a machine-readable copy of your organization's data — for a backup, or to move it to another
           LimitedGauntlet instance.
         </p>
@@ -74,8 +74,8 @@ export function ExportImportSection() {
       </Card>
 
       <Card className="p-5">
-        <p className="mb-1 font-display text-[15px] font-bold">Import</p>
-        <p className="mb-4 text-[13.5px] text-ink-muted">
+        <p className="mb-1 font-display text-base font-bold">Import</p>
+        <p className="mb-4 text-sm text-ink-muted">
           Load a LimitedGauntlet export file, or a legacy-data.json history file, into this organization. Tournaments
           already here (matched by name) are left untouched, so re-importing is safe.
         </p>
@@ -97,7 +97,7 @@ export function ExportImportSection() {
         </Button>
         {importOrg.isError && <FormError>{importErrorText(importOrg.error)}</FormError>}
         {imported && (
-          <p className="mt-3 text-[13px] text-good">
+          <p className="mt-3 text-sm text-good">
             Imported {imported.tournamentsCreated} tournament{imported.tournamentsCreated === 1 ? "" : "s"} (
             {imported.podsCreated} pod{imported.podsCreated === 1 ? "" : "s"}, {imported.playersCreated} new player
             {imported.playersCreated === 1 ? "" : "s"})
@@ -108,7 +108,7 @@ export function ExportImportSection() {
 
       {open && (
         <Modal title="Export data" onClose={() => setOpen(false)}>
-          <p className="mb-4 text-[13.5px] text-ink-muted">Choose what to include in the export file.</p>
+          <p className="mb-4 text-sm text-ink-muted">Choose what to include in the export file.</p>
           <div className="mb-5 flex flex-col gap-3">
             {EXPORT_OPTIONS.map((opt) => (
               <label key={opt.key} className="flex cursor-pointer gap-3">
@@ -119,8 +119,8 @@ export function ExportImportSection() {
                   onChange={(e) => setSelection((s) => ({ ...s, [opt.key]: e.target.checked }))}
                 />
                 <span>
-                  <span className="block text-[14px] font-semibold text-ink">{opt.label}</span>
-                  <span className="block text-[12px] text-ink-muted">{opt.description}</span>
+                  <span className="block text-md font-semibold text-ink">{opt.label}</span>
+                  <span className="block text-xs text-ink-muted">{opt.description}</span>
                 </span>
               </label>
             ))}

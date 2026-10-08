@@ -19,10 +19,10 @@ export function ApiTokensSection() {
     <div>
       {justMinted && (
         <Card className="mb-6 border-accent/40 p-5">
-          <div className="mb-2 text-[12px] font-semibold tracking-wide text-accent uppercase">
+          <div className="mb-2 text-xs font-semibold tracking-wide text-accent uppercase">
             Copy this now — it won't be shown again
           </div>
-          <code className="block overflow-x-auto rounded bg-bg px-3 py-2 text-[13px] break-all">{justMinted}</code>
+          <code className="block overflow-x-auto rounded bg-bg px-3 py-2 text-sm break-all">{justMinted}</code>
           <Button variant="ghost" className="mt-2" onClick={() => setJustMinted(null)}>
             Done
           </Button>
@@ -65,8 +65,8 @@ export function ApiTokensSection() {
           {data.apiTokens.map((t) => (
             <div key={t.id} className="flex items-center justify-between px-5 py-3.5">
               <div>
-                <div className="font-display text-[15px] font-bold">{t.name}</div>
-                <div className="text-[12px] text-ink-muted">
+                <div className="text-base font-bold">{t.name}</div>
+                <div className="text-xs text-ink-muted">
                   Created {formatDate(t.createdAt)}
                   {t.lastUsedAt ? ` · last used ${formatDate(t.lastUsedAt)}` : " · never used"}
                 </div>

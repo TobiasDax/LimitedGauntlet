@@ -99,18 +99,18 @@ export function SeatingChart({
           isBye ? "border-dashed border-border bg-bg" : "border-border bg-surface"
         }`}
       >
-        <span className="text-[10.5px] font-semibold tracking-wide text-accent uppercase">Seat {seat}</span>
-        <span className="w-full min-w-0 font-display text-[14px] leading-tight font-bold break-words">
+        <span className="text-2xs font-semibold tracking-wide text-accent uppercase">Seat {seat}</span>
+        <span className="w-full min-w-0 font-display text-md leading-tight font-bold break-words">
           {entrant ? entrantDisplayName(entrant) : "—"}
         </span>
-        {isBye && <span className="text-[10px] tracking-wide text-ink-muted uppercase">Round 1 bye</span>}
+        {isBye && <span className="text-2xs tracking-wide text-ink-muted uppercase">Round 1 bye</span>}
       </div>
     );
   };
 
   return (
     <Card className="mb-6 p-5">
-      <div className="mb-3 text-[11.5px] font-semibold tracking-wide text-ink-muted uppercase">Seating chart</div>
+      <div className="mb-3 text-2xs font-semibold tracking-wide text-ink-muted uppercase">Seating chart</div>
       {/* w-full on the flex wrapper, each grid row (row mode), and each
           column (column mode): a grid/column nested in a flex container
           should stretch to the cross-axis size via the default
@@ -153,7 +153,7 @@ export function SeatingChart({
           </>
         )}
       </div>
-      <p className="mt-3 text-[11.5px] text-ink-muted">
+      <p className="mt-3 text-2xs text-ink-muted">
         {isColumnMode
           ? "Read top-to-bottom on the right, then bottom-to-top on the left — that's the seating order clockwise around the table."
           : "Read left-to-right, then right-to-left along the bottom row — that's the seating order clockwise around the table."}

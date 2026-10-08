@@ -115,7 +115,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
           </Field>
           <Field label="Format">
             <select
-              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-md text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
               value={format}
               onChange={(e) => setFormat(e.target.value as PodFormat)}
             >
@@ -137,7 +137,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
           </Field>
         </div>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+        <label className="flex items-center gap-2 text-sm text-ink-muted">
           <input type="checkbox" checked={isOnDemand} onChange={(e) => setIsOnDemand(e.target.checked)} />
           On demand — not part of the planned schedule (a spontaneous pod, e.g. an impromptu Chaosdraft)
         </label>
@@ -176,7 +176,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
           </Field>
           <Field label="Match format">
             <select
-              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-md text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
               value={matchFormat}
               onChange={(e) => setMatchFormat(e.target.value as MatchFormat)}
             >
@@ -213,23 +213,23 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
           </Field>
         </div>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+        <label className="flex items-center gap-2 text-sm text-ink-muted">
           <input type="checkbox" checked={excludeFromStats} onChange={(e) => setExcludeFromStats(e.target.checked)} />
           Exclude from org-wide stats (Hall of Fame, Treasure Chest) — for one-off, joke, or test pods
         </label>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+        <label className="flex items-center gap-2 text-sm text-ink-muted">
           <input type="checkbox" checked={rarePicksEnabled} onChange={(e) => setRarePicksEnabled(e.target.checked)} />
           Track rare picks (card values) for this pod — off hides the Value tab and blocks adding pulls; existing pulls
           are kept and reappear if you turn it back on
         </label>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+        <label className="flex items-center gap-2 text-sm text-ink-muted">
           <input type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
           Send events to the org's configured webhook for this pod (Settings → Webhook)
         </label>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+        <label className="flex items-center gap-2 text-sm text-ink-muted">
           <input type="checkbox" checked={isMainEvent} onChange={(e) => setIsMainEvent(e.target.checked)} />
           Mark as this tournament's main event — the winner earns a crown on the Hall of Fame (only one pod per
           tournament can be the main event; checking this unchecks any other)
@@ -237,7 +237,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
 
         {me?.tokensEnabled && (
           <div className="flex flex-col gap-3">
-            <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+            <label className="flex items-center gap-2 text-sm text-ink-muted">
               <input type="checkbox" checked={tokenOverride} onChange={(e) => setTokenOverride(e.target.checked)} />
               Override the tournament's token rewards for this pod
             </label>
@@ -283,7 +283,7 @@ function DeletePodButton({ pod }: { pod: PodDetail }) {
         if (!confirm(`Delete "${pod.name}"? This removes its rounds, matches, and entrants too.`)) return;
         deletePod.mutate(pod.id, { onSuccess: () => navigate(`/tournaments/${pod.tournamentId}`) });
       }}
-      className="text-[12.5px] tracking-wide text-critical uppercase hover:text-critical/80 disabled:opacity-50"
+      className="text-xs tracking-wide text-critical uppercase hover:text-critical/80 disabled:opacity-50"
     >
       Delete pod
     </button>
@@ -305,7 +305,7 @@ function CancelPodControl({ pod }: { pod: PodDetail }) {
       <button
         onClick={() => uncancelPod.mutate()}
         disabled={uncancelPod.isPending}
-        className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-hover hover:underline disabled:opacity-50"
+        className="text-xs tracking-wide text-link uppercase hover:text-link-hover hover:underline disabled:opacity-50"
       >
         {uncancelPod.isPending ? "Restoring…" : "Un-cancel pod"}
       </button>
@@ -316,13 +316,13 @@ function CancelPodControl({ pod }: { pod: PodDetail }) {
     <>
       <button
         onClick={() => setConfirming(true)}
-        className="text-[12.5px] tracking-wide text-critical uppercase hover:text-critical/80"
+        className="text-xs tracking-wide text-critical uppercase hover:text-critical/80"
       >
         Cancel pod
       </button>
       {confirming && (
         <Modal title="Cancel this pod?" onClose={() => setConfirming(false)}>
-          <p className="mb-4 text-[13px] text-ink-muted">
+          <p className="mb-4 text-sm text-ink-muted">
             "{pod.name}" will be marked canceled — excluded from stats and token awards, and moved into the finished
             area of the pod list. Nothing is deleted, and this can be undone.
           </p>
@@ -359,7 +359,7 @@ function alreadyEnteredPlayerIds(entrants: Entrant[]): Set<string> {
 function CapacityNote({ capacity, count }: { capacity: number | null; count: number }) {
   if (capacity == null || count < capacity) return null;
   return (
-    <p className="mb-3 text-[12.5px] text-ink-muted">
+    <p className="mb-3 text-xs text-ink-muted">
       {count === capacity ? `At capacity (${capacity}).` : `Over capacity — ${count} of ${capacity}.`} You can still add
       more.
     </p>
@@ -380,7 +380,7 @@ function EntrantHeadcount({
   noun: "players" | "teams";
 }) {
   return (
-    <p className="mb-2 text-[12.5px] text-ink-muted">
+    <p className="mb-2 text-xs text-ink-muted">
       {capacity != null ? `${count} / ${capacity} ${noun}` : `${count} ${noun}`}
     </p>
   );
@@ -409,18 +409,18 @@ function IndividualEntrants({
       <EntrantHeadcount count={entrants.length} capacity={capacity} noun="players" />
       <CapacityNote capacity={capacity} count={entrants.length} />
       <Card className="mb-4 divide-y divide-border">
-        {entrants.length === 0 && <p className="px-5 py-4 text-[13.5px] text-ink-muted">No entrants yet.</p>}
+        {entrants.length === 0 && <p className="px-5 py-4 text-sm text-ink-muted">No entrants yet.</p>}
         {entrants.map((e) => (
           <div key={e.id} className="flex items-center justify-between px-5 py-3">
             {e.player ? (
               <Link
                 to={`/hall-of-fame/players/${e.player.id}`}
-                className="font-display text-[15px] font-bold hover:text-accent"
+                className="font-display text-base font-bold hover:text-accent"
               >
                 {entrantDisplayName(e)}
               </Link>
             ) : (
-              <span className="font-display text-[15px] font-bold">{entrantDisplayName(e)}</span>
+              <span className="font-display text-base font-bold">{entrantDisplayName(e)}</span>
             )}
             <div className="flex items-center gap-2">
               {canAddEntrants ? (
@@ -440,7 +440,7 @@ function IndividualEntrants({
           + Add players
         </Button>
       ) : (
-        <p className="text-[13px] text-ink-muted">
+        <p className="text-sm text-ink-muted">
           Round 1 has already been paired — undo the pairing on the Pairings tab to add more players.
         </p>
       )}
@@ -488,12 +488,12 @@ function TeamEntrants({
       <EntrantHeadcount count={entrants.length} capacity={capacity} noun="teams" />
       <CapacityNote capacity={capacity} count={entrants.length} />
       <Card className="mb-4 divide-y divide-border">
-        {entrants.length === 0 && <p className="px-5 py-4 text-[13.5px] text-ink-muted">No teams yet.</p>}
+        {entrants.length === 0 && <p className="px-5 py-4 text-sm text-ink-muted">No teams yet.</p>}
         {entrants.map((e) => (
           <div key={e.id} className="flex items-center justify-between px-5 py-3">
             <div>
-              <div className="font-display text-[15px] font-bold">{entrantDisplayName(e)}</div>
-              <div className="flex flex-wrap gap-x-1 text-[12px] text-ink-muted">
+              <div className="font-display text-base font-bold">{entrantDisplayName(e)}</div>
+              <div className="flex flex-wrap gap-x-1 text-xs text-ink-muted">
                 {e.team?.members.map((m, mi) => (
                   <span key={m.playerId}>
                     <Link to={`/hall-of-fame/players/${m.playerId}`} className="hover:text-accent">
@@ -518,7 +518,7 @@ function TeamEntrants({
       </Card>
 
       {!canAddEntrants ? (
-        <p className="text-[13px] text-ink-muted">
+        <p className="text-sm text-ink-muted">
           Round 1 has already been paired — undo the pairing on the Pairings tab to add more teams.
         </p>
       ) : available.length > 0 ? (
@@ -542,7 +542,7 @@ function TeamEntrants({
             <TextField placeholder="Team name" value={teamName} onChange={(e) => setTeamName(e.target.value)} />
             <div className="flex flex-wrap gap-3">
               {available.map((p) => (
-                <label key={p.id} className="flex items-center gap-1.5 text-[13px] text-ink-muted">
+                <label key={p.id} className="flex items-center gap-1.5 text-sm text-ink-muted">
                   <input
                     type="checkbox"
                     checked={memberIds.includes(p.id)}
@@ -555,7 +555,7 @@ function TeamEntrants({
               ))}
             </div>
             {teamSize != null && (
-              <p className={`text-[12px] ${wrongSize ? "text-critical" : "text-ink-muted"}`}>
+              <p className={`text-xs ${wrongSize ? "text-critical" : "text-ink-muted"}`}>
                 {memberIds.length} / {teamSize} selected
               </p>
             )}
@@ -569,7 +569,7 @@ function TeamEntrants({
           </form>
         </Card>
       ) : (
-        <p className="text-[13px] text-ink-muted">
+        <p className="text-sm text-ink-muted">
           Every roster player is already entered. Add more players on the Roster page.
         </p>
       )}
@@ -646,7 +646,7 @@ export function PodPage() {
         {me && (
           <button
             onClick={() => setSharing(true)}
-            className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-muted uppercase hover:text-ink"
+            className="inline-flex items-center gap-1.5 text-xs tracking-wide text-ink-muted uppercase hover:text-ink"
           >
             Share public link <ExternalLink size={13} aria-hidden="true" />
           </button>
@@ -661,7 +661,7 @@ export function PodPage() {
         {!editing && (
           <button
             onClick={() => setEditing(true)}
-            className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-hover hover:underline"
+            className="text-xs tracking-wide text-link uppercase hover:text-link-hover hover:underline"
           >
             Edit pod
           </button>

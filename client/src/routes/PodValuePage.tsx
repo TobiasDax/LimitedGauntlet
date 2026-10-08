@@ -126,13 +126,13 @@ function AddPullForm({
             <option key={s.code} value={s.name} />
           ))}
         </datalist>
-        <label className="flex items-center gap-1.5 text-[12.5px] text-ink-muted" title="Price the foil printing">
+        <label className="flex items-center gap-1.5 text-xs text-ink-muted" title="Price the foil printing">
           <input type="checkbox" checked={foil} onChange={(e) => setFoil(e.target.checked)} />
           Foil
         </label>
         {players.length > 0 && (
           <select
-            className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+            className="rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             value={playerId}
             onChange={(e) => setPlayerId(e.target.value)}
             title="Pulled by (optional) — feeds the Hall of Fame's value stats"
@@ -161,7 +161,7 @@ function AddPullForm({
               key={name}
               type="button"
               onClick={() => submit(name)}
-              className="block w-full px-3 py-2 text-left text-[13px] hover:bg-surface"
+              className="block w-full px-3 py-2 text-left text-sm hover:bg-surface"
             >
               {name}
             </button>
@@ -199,7 +199,7 @@ export function PodValuePage() {
       <PodTabs podId={id ?? ""} />
 
       {pod && !pod.rarePicksEnabled ? (
-        <p className="rounded-md border border-border bg-bg px-4 py-3 text-[13.5px] text-ink-muted">
+        <p className="rounded-md border border-border bg-bg px-4 py-3 text-sm text-ink-muted">
           Rare-picks tracking is turned off for this pod. Turn it back on from the pod's edit form to add or view card
           pulls.
         </p>
@@ -212,10 +212,10 @@ export function PodValuePage() {
           ) : (
             <>
               <div className="mb-4 flex items-baseline gap-2">
-                <span className="font-display text-[24px] font-bold text-accent tabular-nums">
+                <span className="font-display text-2xl font-bold text-accent tabular-nums">
                   {formatEur(data?.total ?? 0)}
                 </span>
-                <span className="text-[11px] tracking-wide text-ink-muted uppercase">pod total</span>
+                <span className="text-2xs tracking-wide text-ink-muted uppercase">pod total</span>
               </div>
               <CardGallery
                 pulls={data?.cardPulls ?? []}

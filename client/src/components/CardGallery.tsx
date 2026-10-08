@@ -31,7 +31,7 @@ function AttributionEditor({
         </span>
       )}
       <select
-        className="min-w-0 flex-1 rounded border border-border-strong bg-surface px-1 py-0.5 text-[10.5px] text-ink outline-none focus:border-accent"
+        className="min-w-0 flex-1 rounded border border-border-strong bg-surface px-1 py-0.5 text-2xs text-ink outline-none focus:border-accent"
         value={selected}
         onChange={(e) => setSelected(e.target.value)}
       >
@@ -46,7 +46,7 @@ function AttributionEditor({
         onClick={() => onSet(selected)}
         disabled={!selected}
         title={pull.playerId ? "Confirm this attribution" : "Assign to this player"}
-        className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10.5px] font-bold text-on-accent hover:bg-accent-hover disabled:opacity-50"
+        className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-2xs font-bold text-on-accent hover:bg-accent-hover disabled:opacity-50"
       >
         <Check size={12} strokeWidth={3} aria-hidden="true" />
       </button>
@@ -87,7 +87,7 @@ export function CardGallery({
   onSetAttribution?: (pullId: string, playerId: string | null) => void;
 }) {
   if (pulls.length === 0) {
-    return <p className="text-[13px] text-ink-muted">No pulls recorded yet.</p>;
+    return <p className="text-sm text-ink-muted">No pulls recorded yet.</p>;
   }
 
   return (
@@ -98,7 +98,7 @@ export function CardGallery({
             {pull.imageUri ? (
               <img src={pull.imageUri} alt={pull.cardName} className="h-full w-full object-cover" loading="lazy" />
             ) : (
-              <div className="grid h-full w-full place-items-center text-[11px] text-ink-muted">No image</div>
+              <div className="grid h-full w-full place-items-center text-2xs text-ink-muted">No image</div>
             )}
             {pull.foil && (
               <span
@@ -119,11 +119,11 @@ export function CardGallery({
             )}
           </div>
           <div className="p-2.5">
-            <div className="font-display mb-1 text-[13px] leading-tight font-bold">{pull.cardName}</div>
+            <div className="font-display mb-1 text-sm leading-tight font-bold">{pull.cardName}</div>
             <div className="flex items-center justify-between">
-              <span className="text-[12.5px] font-bold text-accent tabular-nums">{formatEur(pull.priceEur)}</span>
+              <span className="text-xs font-bold text-accent tabular-nums">{formatEur(pull.priceEur)}</span>
               {pull.setCode && (
-                <span className="text-[10px] tracking-wide text-ink-muted uppercase">
+                <span className="text-2xs tracking-wide text-ink-muted uppercase">
                   {pull.setCode}
                   {pull.foil && " · foil"}
                 </span>
@@ -140,7 +140,7 @@ export function CardGallery({
               />
             ) : (
               pull.player && (
-                <div className="mt-1 truncate text-[10.5px] text-ink-muted">
+                <div className="mt-1 truncate text-2xs text-ink-muted">
                   {pull.playerIdInferred && (
                     <span title="Guessed from finish + card value — not yet confirmed">
                       <CircleHelp size={12} className="mr-1 inline align-[-2px]" aria-hidden="true" />
@@ -153,7 +153,7 @@ export function CardGallery({
             {tournamentLinkTo && pull.pod?.tournament && (
               <Link
                 to={tournamentLinkTo(pull.pod.tournament.id)}
-                className="mt-1 block truncate text-[10.5px] text-ink-muted hover:text-accent"
+                className="mt-1 block truncate text-2xs text-ink-muted hover:text-accent"
               >
                 {pull.pod.tournament.name}
               </Link>

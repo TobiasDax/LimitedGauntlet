@@ -34,7 +34,7 @@ export function TableShapeForm({
 
   return (
     <div className="mb-5 rounded-lg border border-border bg-bg p-4">
-      <div className="mb-3 text-[11.5px] font-semibold tracking-wide text-ink-muted uppercase">Table layout</div>
+      <div className="mb-3 text-2xs font-semibold tracking-wide text-ink-muted uppercase">Table layout</div>
       <div className="mb-3 flex items-center gap-2">
         <Button variant={split ? "ghost" : "primary"} onClick={() => toggle(false)}>
           One big table
@@ -49,7 +49,7 @@ export function TableShapeForm({
           <div className="flex flex-col gap-2">
             {sizes.map((size, i) => (
               <div key={i} className="flex items-center gap-2">
-                <span className="w-16 shrink-0 text-[11px] tracking-wide text-ink-muted uppercase">Table {i + 1}</span>
+                <span className="w-16 shrink-0 text-2xs tracking-wide text-ink-muted uppercase">Table {i + 1}</span>
                 <input
                   type="number"
                   min={MIN_TABLE_SIZE}
@@ -58,14 +58,14 @@ export function TableShapeForm({
                     const n = Number(e.target.value);
                     update(sizes.map((s, idx) => (idx === i ? (Number.isNaN(n) ? 0 : n) : s)));
                   }}
-                  className="w-20 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+                  className="w-20 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
                 />
-                <span className="text-[11.5px] text-ink-muted">players</span>
+                <span className="text-2xs text-ink-muted">players</span>
                 {sizes.length > 1 && (
                   <button
                     type="button"
                     onClick={() => update(sizes.filter((_, idx) => idx !== i))}
-                    className="text-[12px] text-ink-muted underline hover:text-critical"
+                    className="text-xs text-ink-muted underline hover:text-critical"
                   >
                     Remove
                   </button>
@@ -77,19 +77,19 @@ export function TableShapeForm({
             <button
               type="button"
               onClick={() => update([...sizes, MIN_TABLE_SIZE])}
-              className="text-[12.5px] text-ink-muted underline hover:text-accent"
+              className="text-xs text-ink-muted underline hover:text-accent"
             >
               Add table
             </button>
-            <span className="text-[12px] text-ink-muted">
+            <span className="text-xs text-ink-muted">
               {total} of {entrantCount} players placed
             </span>
           </div>
           {error === "table_too_small" && (
-            <p className="mt-2 text-[12px] text-critical">Every table needs at least {MIN_TABLE_SIZE} players.</p>
+            <p className="mt-2 text-xs text-critical">Every table needs at least {MIN_TABLE_SIZE} players.</p>
           )}
           {error === "size_mismatch" && (
-            <p className="mt-2 text-[12px] text-critical">Table sizes need to add up to all {entrantCount} entrants.</p>
+            <p className="mt-2 text-xs text-critical">Table sizes need to add up to all {entrantCount} entrants.</p>
           )}
         </>
       )}

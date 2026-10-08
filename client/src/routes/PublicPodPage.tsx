@@ -44,21 +44,21 @@ function PublicMatchRow({
   return (
     <div className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
       <div>
-        <div className="mb-1 text-[11px] tracking-wide text-ink-muted uppercase">Table {match.tableNumber}</div>
-        <div className="font-display text-[15px] font-bold">
+        <div className="mb-1 text-2xs tracking-wide text-ink-muted uppercase">Table {match.tableNumber}</div>
+        <div className="font-display text-base font-bold">
           {a ? entrantLink(a, slug, entrantDisplayName(a)) : "—"}
           {b ? (
             <>
-              <span className="mx-2 text-[11px] font-normal text-ink-muted">vs</span>
+              <span className="mx-2 text-2xs font-normal text-ink-muted">vs</span>
               {entrantLink(b, slug, entrantDisplayName(b))}
             </>
           ) : (
-            <span className="ml-2 text-[11px] font-normal text-ink-muted uppercase">Bye</span>
+            <span className="ml-2 text-2xs font-normal text-ink-muted uppercase">Bye</span>
           )}
         </div>
       </div>
       {b && match.result !== "PENDING" && (
-        <div className="font-display text-[15px] font-bold tabular-nums">
+        <div className="font-display text-base font-bold tabular-nums">
           {match.gamesWonA}–{match.gamesWonB}
           {match.gamesDrawn > 0 && <span className="text-ink-muted">–{match.gamesDrawn}</span>}
         </div>
@@ -85,19 +85,19 @@ function PublicRoundSection({
     <div className="rounded-lg border border-border bg-bg p-5">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <div className="font-display text-[18px] font-bold">Round {round.roundNumber}</div>
-          <div className="text-[11.5px] tracking-wide text-ink-muted uppercase">{round.status}</div>
+          <div className="font-display text-lg font-bold">Round {round.roundNumber}</div>
+          <div className="text-2xs tracking-wide text-ink-muted uppercase">{round.status}</div>
         </div>
         {round.status === "ACTIVE" && (
           <div
-            className={`font-display text-[32px] font-bold tabular-nums ${countdown.expired ? "text-critical" : "text-accent"}`}
+            className={`font-display text-3xl font-bold tabular-nums ${countdown.expired ? "text-critical" : "text-accent"}`}
           >
             {countdown.formatted}
           </div>
         )}
       </div>
       {hidden ? (
-        <p className="text-[13px] text-ink-muted">
+        <p className="text-sm text-ink-muted">
           Pairings aren't revealed yet — check the Seating section above to find your table.
         </p>
       ) : (
@@ -161,13 +161,13 @@ export function PublicPodPage() {
 
       {showSeating && (
         <section className="mb-12">
-          <h2 className="font-display mb-4 text-[20px] font-bold">Seating</h2>
+          <h2 className="font-display mb-4 text-xl font-bold">Seating</h2>
           {splitSeats ? (
             [...splitSeats.entries()]
               .sort(([a], [b]) => a - b)
               .map(([table, seatByEntrantIdForTable]) => (
                 <div key={table} className="mb-6">
-                  <h3 className="mb-2 font-display text-[14px] font-bold">
+                  <h3 className="mb-2 font-display text-md font-bold">
                     Table {table} ({seatByEntrantIdForTable.size} players)
                   </h3>
                   <SeatingChart
@@ -191,7 +191,7 @@ export function PublicPodPage() {
       )}
 
       <section className="mb-12">
-        <h2 className="font-display mb-4 text-[20px] font-bold">Pairings</h2>
+        <h2 className="font-display mb-4 text-xl font-bold">Pairings</h2>
         {rounds.length === 0 ? (
           <p className="text-ink-muted">Not paired yet.</p>
         ) : (
@@ -204,28 +204,28 @@ export function PublicPodPage() {
       </section>
 
       <section className="mb-12">
-        <h2 className="font-display mb-4 text-[20px] font-bold">Standings</h2>
+        <h2 className="font-display mb-4 text-xl font-bold">Standings</h2>
         {standingsData && standingsData.standings.length > 0 ? (
           <div className="overflow-x-auto rounded-md border border-border">
             <table className="w-full min-w-[600px] border-collapse">
               <thead>
                 <tr>
-                  <th className="w-[1%] bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="w-[1%] bg-bg px-4 py-3 text-right text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                     #
                   </th>
-                  <th className="bg-bg px-4 py-3 text-left text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="bg-bg px-4 py-3 text-left text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                     {pod.isTeamEvent ? "Team" : "Player"}
                   </th>
-                  <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="bg-bg px-4 py-3 text-right text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                     Points
                   </th>
-                  <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="bg-bg px-4 py-3 text-right text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                     OMW%
                   </th>
-                  <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="bg-bg px-4 py-3 text-right text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                     GW%
                   </th>
-                  <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="bg-bg px-4 py-3 text-right text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                     OGW%
                   </th>
                 </tr>
@@ -236,13 +236,13 @@ export function PublicPodPage() {
                     key={row.entrantId}
                     className={i === 0 ? "bg-accent/14 shadow-[inset_3px_0_0_var(--color-accent)]" : ""}
                   >
-                    <td className="border-t border-border px-4 py-3.5 text-right text-[13px] font-semibold tabular-nums text-ink-muted">
+                    <td className="border-t border-border px-4 py-3.5 text-right text-sm font-semibold tabular-nums text-ink-muted">
                       {i + 1}
                     </td>
                     <td className="border-t border-border px-4 py-3.5 font-semibold">
                       {entrantLink(row.entrant, slug!, entrantDisplayName(row.entrant))}
                     </td>
-                    <td className="border-t border-border px-4 py-3.5 text-right text-[15px] font-bold tabular-nums">
+                    <td className="border-t border-border px-4 py-3.5 text-right text-base font-bold tabular-nums">
                       {row.points}
                     </td>
                     <td className="border-t border-border px-4 py-3.5 text-right text-ink-muted tabular-nums">
@@ -270,12 +270,12 @@ export function PublicPodPage() {
 
       {pod.rarePicksEnabled && (
         <section>
-          <h2 className="font-display mb-4 text-[20px] font-bold">Value</h2>
+          <h2 className="font-display mb-4 text-xl font-bold">Value</h2>
           <div className="mb-4 flex items-baseline gap-2">
-            <span className="font-display text-[22px] font-bold text-accent tabular-nums">
+            <span className="font-display text-xl font-bold text-accent tabular-nums">
               {formatEur(valueData?.total ?? 0)}
             </span>
-            <span className="text-[11px] tracking-wide text-ink-muted uppercase">pod total</span>
+            <span className="text-2xs tracking-wide text-ink-muted uppercase">pod total</span>
           </div>
           <CardGallery pulls={valueData?.cardPulls ?? []} />
         </section>

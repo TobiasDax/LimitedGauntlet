@@ -24,7 +24,7 @@ export function HallOfFamePage() {
       {me && (
         <button
           onClick={() => setSharing(true)}
-          className="mb-6 inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-muted uppercase hover:text-ink"
+          className="mb-6 inline-flex items-center gap-1.5 text-xs tracking-wide text-ink-muted uppercase hover:text-ink"
         >
           Share public link <ExternalLink size={13} aria-hidden="true" />
         </button>

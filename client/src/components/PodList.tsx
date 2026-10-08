@@ -56,7 +56,7 @@ function PodRow({ pod, href, reorder }: PodRowProps) {
       )}
       <Link to={href} className="flex flex-1 items-center justify-between gap-3 transition-colors hover:opacity-80">
         <div>
-          <div className="font-display text-[16px] font-bold">
+          <div className="font-display text-base font-bold">
             {pod.isMainEvent && (
               <span title="This tournament's main event">
                 <Crown size={15} className="mr-1.5 inline align-[-2px] text-accent" aria-hidden="true" />
@@ -64,19 +64,19 @@ function PodRow({ pod, href, reorder }: PodRowProps) {
             )}
             {pod.name}
             {isFull && (
-              <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-[10.5px] font-semibold tracking-wide text-accent uppercase">
+              <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-semibold tracking-wide text-accent uppercase">
                 Ready
               </span>
             )}
           </div>
-          <div className="text-[12.5px] text-ink-muted">
+          <div className="text-xs text-ink-muted">
             {podFormatDisplay(pod)}
             {pod.isTeamEvent && ` · teams of ${pod.teamSize}`} · {pod.roundCount} rounds
             {countLabel && ` · ${countLabel}`}
             {pod.date && ` · ${pod.date.slice(0, 10)}${pod.startTime ? ` ${pod.startTime}` : ""}`}
           </div>
         </div>
-        <span className="shrink-0 text-[11.5px] tracking-wide text-ink-muted uppercase">{podProgressStatus(pod)}</span>
+        <span className="shrink-0 text-2xs tracking-wide text-ink-muted uppercase">{podProgressStatus(pod)}</span>
       </Link>
     </Card>
   );
@@ -123,7 +123,7 @@ function PodGroup({ pods, podHref, showDateDividers, reorder }: PodGroupProps) {
     <div className="flex flex-col gap-4">
       {groups.map((group, gi) => (
         <div key={group.date ?? `unscheduled-${gi}`} className="flex flex-col gap-2">
-          <div className="text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+          <div className="text-2xs font-semibold tracking-wide text-ink-muted uppercase">
             {group.date ? dateDividerLabel(group.date) : "Unscheduled"}
           </div>
           {rows(group.pods)}
@@ -168,7 +168,7 @@ export function PodList({ podsManuallyReordered, pods, podHref, reorder }: PodLi
 
   return (
     <div className="mb-6">
-      <div className="mb-3 flex gap-1 border-b border-border text-[12.5px] tracking-wide uppercase">
+      <div className="mb-3 flex gap-1 border-b border-border text-xs tracking-wide uppercase">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -181,7 +181,7 @@ export function PodList({ podsManuallyReordered, pods, podHref, reorder }: PodLi
       </div>
 
       {unfinished.length === 0 && finished.length === 0 ? (
-        <p className="text-[13px] text-ink-muted">
+        <p className="text-sm text-ink-muted">
           {tab === "onDemand" ? "No on-demand pods this weekend." : "No scheduled pods yet."}
         </p>
       ) : (
@@ -199,7 +199,7 @@ export function PodList({ podsManuallyReordered, pods, podHref, reorder }: PodLi
           />
           {finished.length > 0 && (
             <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-3 text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+              <div className="flex items-center gap-3 text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                 <span className="h-px flex-1 bg-border" />
                 Finished
                 <span className="h-px flex-1 bg-border" />

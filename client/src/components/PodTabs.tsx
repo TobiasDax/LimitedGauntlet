@@ -38,7 +38,7 @@ export function PodTabs({ podId }: { podId: string }) {
           <Link
             key={tab.suffix}
             to={href}
-            className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-[12.5px] tracking-wide whitespace-nowrap uppercase ${
+            className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-xs tracking-wide whitespace-nowrap uppercase ${
               active ? "border-accent text-ink" : "border-transparent text-ink-muted hover:text-ink"
             }`}
           >

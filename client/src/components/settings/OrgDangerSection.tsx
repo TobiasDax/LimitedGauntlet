@@ -37,10 +37,10 @@ function DeleteAccountForm({
 
   return (
     <Card className="border-critical/40 p-5">
-      <div className="mb-1 text-[14px] font-semibold text-critical">
+      <div className="mb-1 text-md font-semibold text-critical">
         {leaving ? "Leave organization" : "Delete organization"}
       </div>
-      <p className="mb-3 text-[13px] text-ink-muted">
+      <p className="mb-3 text-sm text-ink-muted">
         {leaving ? (
           <>
             This removes your access to <strong>{orgName}</strong>. The other{" "}
@@ -127,8 +127,8 @@ function DeleteOrganizationForm({ orgName, hasPassword }: { orgName: string; has
 
   return (
     <Card className="border-critical/40 p-5">
-      <div className="mb-1 text-[14px] font-semibold text-critical">Delete organization</div>
-      <p className="mb-3 text-[13px] text-ink-muted">
+      <div className="mb-1 text-md font-semibold text-critical">Delete organization</div>
+      <p className="mb-3 text-sm text-ink-muted">
         This permanently deletes <strong>{orgName}</strong> and everything in it — every organizer, tournament, pod,
         result, and card pull. This cannot be undone.
       </p>

@@ -52,8 +52,8 @@ export function PlayerTokenLedger({ ledger, adjust }: { ledger: TokenLedger; adj
   return (
     <div className="flex flex-col gap-5">
       <Card className="p-5">
-        <div className="text-[11px] tracking-wide text-ink-muted uppercase">Token balance</div>
-        <div className="font-display text-[32px] font-bold tabular-nums">{ledger.balance}</div>
+        <div className="text-2xs tracking-wide text-ink-muted uppercase">Token balance</div>
+        <div className="font-display text-3xl font-bold tabular-nums">{ledger.balance}</div>
       </Card>
 
       {adjust && (
@@ -64,7 +64,7 @@ export function PlayerTokenLedger({ ledger, adjust }: { ledger: TokenLedger; adj
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
-                className={`rounded px-2.5 py-1 text-[12px] tracking-wide uppercase ${
+                className={`rounded px-2.5 py-1 text-xs tracking-wide uppercase ${
                   mode === m ? "bg-accent/14 text-accent" : "text-ink-muted hover:text-ink"
                 }`}
               >
@@ -80,13 +80,13 @@ export function PlayerTokenLedger({ ledger, adjust }: { ledger: TokenLedger; adj
             }}
           >
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] tracking-wide text-ink-muted uppercase">
+              <span className="text-2xs tracking-wide text-ink-muted uppercase">
                 {mode === "set" ? "New balance" : "Amount"}
               </span>
               <TextField type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-28" />
             </label>
             <label className="flex flex-1 flex-col gap-1">
-              <span className="text-[11px] tracking-wide text-ink-muted uppercase">Note (optional)</span>
+              <span className="text-2xs tracking-wide text-ink-muted uppercase">Note (optional)</span>
               <TextField
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -103,16 +103,16 @@ export function PlayerTokenLedger({ ledger, adjust }: { ledger: TokenLedger; adj
       )}
 
       {ledger.transactions.length === 0 ? (
-        <p className="text-[13px] text-ink-muted">No token transactions yet.</p>
+        <p className="text-sm text-ink-muted">No token transactions yet.</p>
       ) : (
         <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full min-w-[520px] border-collapse text-[13px]">
+          <table className="w-full min-w-[520px] border-collapse text-sm">
             <thead>
               <tr>
                 {["Change", "Reason", "Note", "Date"].map((h, i) => (
                   <th
                     key={h}
-                    className={`bg-bg px-4 py-2.5 text-[11px] font-semibold tracking-wide text-ink-muted uppercase ${
+                    className={`bg-bg px-4 py-2.5 text-2xs font-semibold tracking-wide text-ink-muted uppercase ${
                       i === 0 ? "text-right" : "text-left"
                     }`}
                   >

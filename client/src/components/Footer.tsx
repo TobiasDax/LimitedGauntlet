@@ -4,7 +4,7 @@ import { useAppConfig } from "../features/config/useAppConfig";
 const GITHUB_URL = "https://github.com/TobiasDax/LimitedGauntlet";
 
 const linkClass =
-  "inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-muted uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "inline-flex items-center gap-1.5 text-xs tracking-wide text-ink-muted uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 function GitHubMark() {
   return (

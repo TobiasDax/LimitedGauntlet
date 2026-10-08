@@ -21,9 +21,9 @@ function ChangePasswordForm({ hasPassword }: { hasPassword: boolean }) {
 
   return (
     <Card className="p-5">
-      <div className="mb-3 text-[14px] font-semibold">{hasPassword ? "Change password" : "Set password"}</div>
+      <div className="mb-3 text-md font-semibold">{hasPassword ? "Change password" : "Set password"}</div>
       {!hasPassword && (
-        <p className="mb-3 text-[13px] text-ink-muted">
+        <p className="mb-3 text-sm text-ink-muted">
           You sign in with SSO and have no password set. Adding one is optional — it lets you also sign in with email
           and password.
         </p>
@@ -96,7 +96,7 @@ function ChangePasswordForm({ hasPassword }: { hasPassword: boolean }) {
             : "Something went wrong."}
         </FormError>
       )}
-      {done && <p className="mt-2 text-[13px] text-good">{hasPassword ? "Password changed." : "Password set."}</p>}
+      {done && <p className="mt-2 text-sm text-good">{hasPassword ? "Password changed." : "Password set."}</p>}
     </Card>
   );
 }
@@ -123,8 +123,8 @@ function ChangeEmailForm({ currentEmail, hasPassword }: { currentEmail: string; 
 
   return (
     <Card className="p-5">
-      <div className="mb-1 text-[14px] font-semibold">Change email</div>
-      <p className="mb-3 text-[13px] text-ink-muted">
+      <div className="mb-1 text-md font-semibold">Change email</div>
+      <p className="mb-3 text-sm text-ink-muted">
         Current: {currentEmail}. We'll send a confirmation link to the new address; the change takes effect once you
         click it.
       </p>
@@ -172,7 +172,7 @@ function ChangeEmailForm({ currentEmail, hasPassword }: { currentEmail: string; 
       </form>
       {errorText && <FormError>{errorText}</FormError>}
       {sent && (
-        <p className="mt-2 text-[13px] text-good">Check your new inbox for a confirmation link (expires in 1 hour).</p>
+        <p className="mt-2 text-sm text-good">Check your new inbox for a confirmation link (expires in 1 hour).</p>
       )}
     </Card>
   );

@@ -66,13 +66,13 @@ export function ManualPairingForm({
 
   return (
     <div className="mt-5 rounded-lg border border-border bg-bg p-5">
-      <div className="mb-4 font-display text-[16px] font-bold">Manual pairing — round {roundNumber}</div>
+      <div className="mb-4 font-display text-base font-bold">Manual pairing — round {roundNumber}</div>
       <div className="flex flex-col gap-2">
         {pairs.map((pair, i) => (
           <div key={i} className="flex items-center gap-2">
-            <span className="w-14 shrink-0 text-[11px] tracking-wide text-ink-muted uppercase">Table {i + 1}</span>
+            <span className="w-14 shrink-0 text-2xs tracking-wide text-ink-muted uppercase">Table {i + 1}</span>
             <select
-              className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+              className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
               value={pair.a}
               onChange={(e) => update(i, "a", e.target.value)}
             >
@@ -83,9 +83,9 @@ export function ManualPairingForm({
                 </option>
               ))}
             </select>
-            <span className="text-[11px] text-ink-muted">vs</span>
+            <span className="text-2xs text-ink-muted">vs</span>
             <select
-              className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+              className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
               value={pair.b}
               onChange={(e) => update(i, "b", e.target.value)}
             >

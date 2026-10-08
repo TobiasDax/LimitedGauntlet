@@ -17,8 +17,8 @@ export function SignupPage() {
 
   return (
     <div className="mx-auto max-w-[420px] py-16">
-      <h1 className="font-display mb-1 text-[26px] font-bold">Create your account</h1>
-      <p className="mb-8 text-[14px] text-ink-muted">
+      <h1 className="font-display mb-1 text-2xl font-bold">Create your account</h1>
+      <p className="mb-8 text-md text-ink-muted">
         {/* HI-6 — registration is account-only now; the org is the next step. */}
         Register first — you'll set up your organization right after, so nothing's committed until you do.
       </p>
@@ -27,7 +27,7 @@ export function SignupPage() {
         // SSO-only mode: no local accounts. Registration happens by signing in
         // with SSO, which drops the first-time user into the org-setup screen.
         <Card className="p-6 text-center">
-          <p className="mb-4 text-[14px] text-ink-muted">
+          <p className="mb-4 text-md text-ink-muted">
             This instance uses single sign-on — if you don't have an organization yet, you'll be prompted to create one
             after signing in.
           </p>
@@ -35,7 +35,7 @@ export function SignupPage() {
         </Card>
       ) : statusLoading ? null : !signupStatus?.allowSignup ? (
         <Card className="p-6 text-center">
-          <p className="text-[14px] text-ink-muted">
+          <p className="text-md text-ink-muted">
             Signups are closed right now. Ask whoever's running this instance for an invite, or to open signups briefly.
           </p>
         </Card>
@@ -93,7 +93,7 @@ export function SignupPage() {
         </Card>
       )}
 
-      <p className="mt-5 text-center text-[13px] text-ink-muted">
+      <p className="mt-5 text-center text-sm text-ink-muted">
         Already have an account?{" "}
         <Link to="/login" className="text-accent hover:text-accent-hover">
           Log in
@@ -101,7 +101,7 @@ export function SignupPage() {
       </p>
 
       {appConfig?.legalPageEnabled !== false && (
-        <p className="mt-3 text-center text-[12px] text-ink-muted">
+        <p className="mt-3 text-center text-xs text-ink-muted">
           By creating an account you acknowledge the{" "}
           <Link to="/legal" className="underline hover:text-ink-muted">
             legal notice

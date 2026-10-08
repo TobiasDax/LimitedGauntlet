@@ -21,7 +21,7 @@ export function PublicRosterPage() {
         <Card className="divide-y divide-border">
           {data.players.map((p) => (
             <div key={p.id} className="px-5 py-3">
-              <span className="font-display text-[15.5px] font-bold">{p.displayName}</span>
+              <span className="font-display text-base font-bold">{p.displayName}</span>
             </div>
           ))}
         </Card>

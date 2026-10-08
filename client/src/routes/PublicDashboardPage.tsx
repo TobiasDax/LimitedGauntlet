@@ -37,13 +37,13 @@ export function PublicDashboardPage() {
             <Link key={t.id} to={`/o/${slug}/tournaments/${t.id}`}>
               <Card className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-surface-raised">
                 <div>
-                  <div className="font-display text-[17px] font-bold">{t.name}</div>
-                  <div className="text-[12.5px] text-ink-muted">
+                  <div className="font-display text-lg font-bold">{t.name}</div>
+                  <div className="text-xs text-ink-muted">
                     {formatDateRange(t.startDate, t.endDate)}
                     {t.location && ` · ${t.location}`}
                   </div>
                 </div>
-                <span className="text-[11.5px] tracking-wide text-ink-muted uppercase">{statusLabel[t.status]}</span>
+                <span className="text-2xs tracking-wide text-ink-muted uppercase">{statusLabel[t.status]}</span>
               </Card>
             </Link>
           ))}

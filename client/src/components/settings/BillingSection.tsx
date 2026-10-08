@@ -73,20 +73,20 @@ export function BillingSection() {
   return (
     <Card className="p-5">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-[12px] tracking-wide text-ink-muted uppercase">Current plan</span>
-        <span className="text-[15px] font-semibold text-ink">{planLabel}</span>
+        <span className="text-xs tracking-wide text-ink-muted uppercase">Current plan</span>
+        <span className="text-base font-semibold text-ink">{planLabel}</span>
         {isSeries && activeUntil && (
-          <span className="text-[13px] text-ink-muted">· active until {activeUntil.toLocaleDateString()}</span>
+          <span className="text-sm text-ink-muted">· active until {activeUntil.toLocaleDateString()}</span>
         )}
       </div>
 
       {isSeries && !activeUntil ? (
-        <p className="mt-3 text-[13px] text-ink-muted">
+        <p className="mt-3 text-sm text-ink-muted">
           Unlimited tournaments and pods — this organization has a complimentary Series plan, so there is nothing to
           manage or renew.
         </p>
       ) : isSeries ? (
-        <div className="mt-3 flex flex-col gap-2 text-[13px] text-ink-muted">
+        <div className="mt-3 flex flex-col gap-2 text-sm text-ink-muted">
           <p>
             Unlimited tournaments while your subscription is active. Cancelling keeps access until{" "}
             {activeUntil!.toLocaleDateString()}.
@@ -110,12 +110,12 @@ export function BillingSection() {
         </div>
       ) : (
         <div className="mt-4">
-          <p className="mb-3 text-[13px] text-ink-muted">
+          <p className="mb-3 text-sm text-ink-muted">
             Upgrade to run more tournaments. A one-time pass covers a single tournament; a Series subscription unlocks
             unlimited tournaments while it's active.
           </p>
 
-          {prices.isLoading && <p className="text-[13px] text-ink-muted">Loading plans…</p>}
+          {prices.isLoading && <p className="text-sm text-ink-muted">Loading plans…</p>}
           {prices.isError && <FormError>Couldn't load plans right now — try again shortly.</FormError>}
 
           <div className="flex flex-col gap-2">
@@ -125,11 +125,11 @@ export function BillingSection() {
                 className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-bg px-4 py-3"
               >
                 <div>
-                  <div className="text-[14px] font-semibold text-ink">{PRODUCT_LABEL[p.product]}</div>
-                  <div className="text-[12.5px] text-ink-muted">{PRODUCT_BLURB[p.product]}</div>
+                  <div className="text-md font-semibold text-ink">{PRODUCT_LABEL[p.product]}</div>
+                  <div className="text-xs text-ink-muted">{PRODUCT_BLURB[p.product]}</div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-[13px] font-medium text-ink-muted">{priceLine(p)}</span>
+                  <span className="text-sm font-medium text-ink-muted">{priceLine(p)}</span>
                   <Button variant="primary" disabled={checkout.isPending} onClick={() => checkout.mutate(p.product)}>
                     {checkout.isPending ? "Redirecting…" : p.product === "pass" ? "Buy pass" : "Subscribe"}
                   </Button>
@@ -139,7 +139,7 @@ export function BillingSection() {
           </div>
 
           {checkout.isError && <FormError>Couldn't start checkout — try again.</FormError>}
-          <p className="mt-3 text-[12px] text-ink-muted">
+          <p className="mt-3 text-xs text-ink-muted">
             Payments are handled by Link (Stripe) as merchant of record; applicable tax is added at checkout. By buying
             you agree to the{" "}
             <Link to="/terms" className="text-accent underline">

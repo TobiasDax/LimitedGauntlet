@@ -77,13 +77,13 @@ export function OrganizersSection() {
             {data?.organizers.map((o) => (
               <div key={o.id} className="flex items-center justify-between px-5 py-3.5">
                 <div>
-                  <div className="font-display text-[15px] font-bold">
+                  <div className="font-display text-base font-bold">
                     {o.name}
                     {o.id === me?.organizer.id && (
-                      <span className="ml-2 text-[11px] font-normal tracking-wide text-ink-muted uppercase">you</span>
+                      <span className="ml-2 text-2xs font-normal tracking-wide text-ink-muted uppercase">you</span>
                     )}
                   </div>
-                  <div className="text-[12px] text-ink-muted">
+                  <div className="text-xs text-ink-muted">
                     {o.email} · joined {formatDate(o.createdAt)}
                   </div>
                 </div>
@@ -105,8 +105,8 @@ export function OrganizersSection() {
               {data.invites.map((i) => (
                 <div key={i.id} className="flex items-center justify-between px-5 py-3.5">
                   <div>
-                    <div className="font-display text-[15px] font-bold">{i.email}</div>
-                    <div className="text-[12px] text-ink-muted">
+                    <div className="text-base font-bold">{i.email}</div>
+                    <div className="text-xs text-ink-muted">
                       Invited by {i.invitedByName} · expires {formatDate(i.expiresAt)}
                     </div>
                   </div>

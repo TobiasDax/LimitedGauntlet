@@ -22,7 +22,7 @@ export function EntrantDropControl({
 
   return (
     <div className="flex items-center gap-3">
-      {dropped && <span className="text-[12px] tracking-wide text-ink-muted uppercase">Dropped</span>}
+      {dropped && <span className="text-xs tracking-wide text-ink-muted uppercase">Dropped</span>}
       <Button
         variant="ghost"
         disabled={!canModifyRoster || pending}

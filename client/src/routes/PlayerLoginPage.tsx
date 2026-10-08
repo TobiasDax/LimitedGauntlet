@@ -21,7 +21,7 @@ export function PlayerLoginPage() {
     <div className="pt-8">
       <Eyebrow>Players</Eyebrow>
       <ScreenTitle>Sign in</ScreenTitle>
-      <p className="mb-6 max-w-[52ch] text-[14px] text-ink-muted">
+      <p className="mb-6 max-w-[52ch] text-md text-ink-muted">
         Check yourself into tournaments and report your own match results. Ask an organizer for an invite link if you
         don't have a login yet.
       </p>

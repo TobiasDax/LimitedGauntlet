@@ -41,7 +41,7 @@ export function OrgSwitcher() {
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={switchOrg.isPending}
-        className="flex items-center gap-1.5 rounded px-1.5 py-1 text-[13px] text-ink-muted hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="flex items-center gap-1.5 rounded px-1.5 py-1 text-sm text-ink-muted hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         {switchOrg.isPending ? "Switching…" : me.organization.name}
         <ChevronDown size={12} strokeWidth={2.5} aria-hidden="true" />
@@ -60,7 +60,7 @@ export function OrgSwitcher() {
                 setOpen(false);
                 if (o.id !== me.activeOrgId) switchOrg.mutate(o.id);
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-surface-raised"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-raised"
             >
               <span className="w-3 text-accent">
                 {o.id === me.activeOrgId && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
@@ -71,7 +71,7 @@ export function OrgSwitcher() {
           <Link
             to="/organizations"
             onClick={() => setOpen(false)}
-            className="border-border mt-1 block border-t px-3 py-2 text-[12px] text-ink-muted hover:text-ink"
+            className="border-border mt-1 block border-t px-3 py-2 text-xs text-ink-muted hover:text-ink"
           >
             Manage organizations
           </Link>

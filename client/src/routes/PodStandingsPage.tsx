@@ -68,25 +68,25 @@ export function PodStandingsPage() {
           <table className="w-full min-w-[680px] border-collapse">
             <thead>
               <tr>
-                <th className="w-[1%] bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="w-[1%] bg-bg px-4 py-3 text-right text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                   #
                 </th>
-                <th className="bg-bg px-4 py-3 text-left text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-left text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                   {pod?.isTeamEvent ? "Team" : "Player"}
                 </th>
-                <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-right text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                   Points
                 </th>
-                <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-right text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                   OMW%
                 </th>
-                <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-right text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                   GW%
                 </th>
-                <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-right text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                   OGW%
                 </th>
-                <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-right text-2xs font-semibold tracking-wide text-ink-muted uppercase">
                   Order
                 </th>
               </tr>
@@ -100,7 +100,7 @@ export function PodStandingsPage() {
                     key={row.entrantId}
                     className={i === 0 ? "bg-accent/14 shadow-[inset_3px_0_0_var(--color-accent)]" : ""}
                   >
-                    <td className="border-t border-border px-4 py-3.5 text-right text-[13px] font-semibold tabular-nums text-ink-muted">
+                    <td className="border-t border-border px-4 py-3.5 text-right text-sm font-semibold tabular-nums text-ink-muted">
                       {i + 1}
                     </td>
                     <td className="border-t border-border px-4 py-3.5 font-semibold">
@@ -108,14 +108,14 @@ export function PodStandingsPage() {
                       {row.manualTiebreak !== null && (
                         <span
                           title="This tied position was set manually, not computed"
-                          className="ml-2 text-[10.5px] font-normal tracking-wide text-ink-muted uppercase"
+                          className="ml-2 text-2xs font-normal tracking-wide text-ink-muted uppercase"
                         >
                           <Pencil size={11} className="mr-1 inline align-[-1px]" aria-hidden="true" />
                           manual
                         </span>
                       )}
                     </td>
-                    <td className="border-t border-border px-4 py-3.5 text-right text-[15px] font-bold tabular-nums">
+                    <td className="border-t border-border px-4 py-3.5 text-right text-base font-bold tabular-nums">
                       {row.points}
                     </td>
                     <td className="border-t border-border px-4 py-3.5 text-right text-ink-muted tabular-nums">

@@ -63,13 +63,13 @@ export function EntrantPickerModal({
     <Modal title={`Add players to ${podName}`} onClose={onClose}>
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <span className="text-[12px] text-ink-muted">
+          <span className="text-xs text-ink-muted">
             {selectable.length === 0 ? "Everyone's already in this pod" : `${selectable.length} available`}
           </span>
           {selectable.length > 0 && (
             <button
               type="button"
-              className="text-[12px] text-link hover:text-link-hover hover:underline"
+              className="text-xs text-link hover:text-link-hover hover:underline"
               onClick={() => setChecked(allSelected ? new Set() : new Set(selectable.map((p) => p.id)))}
             >
               {allSelected ? "Clear all" : "Select all"}
@@ -78,13 +78,13 @@ export function EntrantPickerModal({
         </div>
 
         <div className="max-h-64 overflow-y-auto rounded-md border border-border divide-y divide-border">
-          {roster.length === 0 && <p className="px-3 py-3 text-[13px] text-ink-muted">The roster is empty.</p>}
+          {roster.length === 0 && <p className="px-3 py-3 text-sm text-ink-muted">The roster is empty.</p>}
           {roster.map((p) => {
             const entered = enteredPlayerIds.has(p.id);
             return (
               <label
                 key={p.id}
-                className={`flex items-center gap-2.5 px-3 py-2 text-[14px] ${entered ? "text-ink-muted" : "cursor-pointer hover:bg-surface-raised"}`}
+                className={`flex items-center gap-2.5 px-3 py-2 text-md ${entered ? "text-ink-muted" : "cursor-pointer hover:bg-surface-raised"}`}
               >
                 <input
                   type="checkbox"
@@ -94,20 +94,20 @@ export function EntrantPickerModal({
                   className="accent-accent"
                 />
                 <span className="flex-1 font-medium">{p.displayName}</span>
-                {entered && <span className="text-[11px] tracking-wide uppercase">In pod</span>}
+                {entered && <span className="text-2xs tracking-wide uppercase">In pod</span>}
               </label>
             );
           })}
         </div>
 
         <div>
-          <div className="mb-1.5 text-[12px] font-medium text-ink-muted">New player</div>
+          <div className="mb-1.5 text-xs font-medium text-ink-muted">New player</div>
           {newNames.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {newNames.map((n) => (
                 <span
                   key={n}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-accent/14 px-2.5 py-1 text-[12px]"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-accent/14 px-2.5 py-1 text-xs"
                 >
                   {n}
                   <button
@@ -142,7 +142,7 @@ export function EntrantPickerModal({
               Add
             </Button>
           </div>
-          {newError && <p className="mt-1.5 text-[12px] text-critical">{newError}</p>}
+          {newError && <p className="mt-1.5 text-xs text-critical">{newError}</p>}
         </div>
 
         {add.isError && <FormError>{entrantErrorMessage(add.error)}</FormError>}

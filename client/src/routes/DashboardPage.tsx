@@ -86,7 +86,7 @@ export function DashboardPage() {
       {me && (
         <button
           onClick={() => setSharing(true)}
-          className="mb-6 inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-muted uppercase hover:text-ink"
+          className="mb-6 inline-flex items-center gap-1.5 text-xs tracking-wide text-ink-muted uppercase hover:text-ink"
         >
           Share public link (with your group) <ExternalLink size={13} aria-hidden="true" />
         </button>
@@ -106,7 +106,7 @@ export function DashboardPage() {
           <p className="mb-4 text-ink-muted">No tournaments yet.</p>
           {newTournamentActions(true)}
           {hosted && passes === 0 && (
-            <p className="mt-4 text-[12.5px] text-ink-muted">
+            <p className="mt-4 text-xs text-ink-muted">
               A free tournament includes one pod. A tournament pass unlocks unlimited pods for a tournament; Series
               unlocks unlimited tournaments.
             </p>
@@ -120,13 +120,13 @@ export function DashboardPage() {
             <Link key={t.id} to={`/tournaments/${t.id}`}>
               <Card className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-surface-raised">
                 <div>
-                  <div className="font-display text-[17px] font-bold">{t.name}</div>
-                  <div className="text-[12.5px] text-ink-muted">
+                  <div className="font-display text-lg font-bold">{t.name}</div>
+                  <div className="text-xs text-ink-muted">
                     {formatDateRange(t.startDate, t.endDate)}
                     {t.location && ` · ${t.location}`}
                   </div>
                 </div>
-                <span className="text-[11.5px] tracking-wide text-ink-muted uppercase">{statusLabel[t.status]}</span>
+                <span className="text-2xs tracking-wide text-ink-muted uppercase">{statusLabel[t.status]}</span>
               </Card>
             </Link>
           ))}

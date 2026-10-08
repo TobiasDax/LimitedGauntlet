@@ -20,21 +20,21 @@ function PodHistoryRow({ entry, linkTo }: { entry: PlayerPodEntry; linkTo: strin
   return (
     <Card className="flex items-center justify-between gap-3 px-5 py-3">
       <Link to={linkTo} className="min-w-0 flex-1 hover:opacity-80">
-        <div className="font-display truncate text-[15px] font-bold">{entry.podName}</div>
-        <div className="text-[12px] text-ink-muted">
+        <div className="font-display truncate text-base font-bold">{entry.podName}</div>
+        <div className="text-xs text-ink-muted">
           {entry.tournamentName} · {podFormatLabel[entry.format]}
           {entry.date && ` · ${entry.date.slice(0, 10)}`}
         </div>
       </Link>
       {done && entry.finish !== null && (
         <span
-          className={`font-display shrink-0 text-[14px] font-bold tabular-nums ${entry.finish === 1 ? "text-accent" : "text-ink-muted"}`}
+          className={`font-display shrink-0 text-md font-bold tabular-nums ${entry.finish === 1 ? "text-accent" : "text-ink-muted"}`}
         >
           {ordinal(entry.finish)}
         </span>
       )}
       {status === "Canceled" && (
-        <span className="shrink-0 text-[11px] tracking-wide text-ink-muted uppercase">Canceled</span>
+        <span className="shrink-0 text-2xs tracking-wide text-ink-muted uppercase">Canceled</span>
       )}
     </Card>
   );
@@ -71,11 +71,11 @@ export function PlayerPodHistory({ pods, podLinkTo }: PlayerPodHistoryProps) {
 
   return (
     <div className="mt-8">
-      <h2 className="font-display mb-4 text-[20px] font-bold">Events</h2>
+      <h2 className="font-display mb-4 text-xl font-bold">Events</h2>
 
       {active.length > 0 && (
         <div className="mb-6">
-          <div className="mb-2 text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+          <div className="mb-2 text-2xs font-semibold tracking-wide text-ink-muted uppercase">
             Upcoming & in progress
           </div>
           <div className="flex flex-col gap-2">
@@ -88,7 +88,7 @@ export function PlayerPodHistory({ pods, podLinkTo }: PlayerPodHistoryProps) {
 
       {finished.length > 0 && (
         <div>
-          <div className="mb-2 text-[11px] font-semibold tracking-wide text-ink-muted uppercase">Finished</div>
+          <div className="mb-2 text-2xs font-semibold tracking-wide text-ink-muted uppercase">Finished</div>
           <div className="flex flex-col gap-2">
             {finished.map((entry) => (
               <PodHistoryRow key={entry.podId} entry={entry} linkTo={podLinkTo(entry)} />

@@ -31,7 +31,7 @@ export function ConstructedFormatPicker({
     <Field label="Constructed format" hint="Optional">
       <div className="flex flex-col gap-2">
         <select
-          className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+          className="rounded-md border border-border-strong bg-surface px-3 py-2 text-md text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           value={value}
           onChange={(e) => onChange(e.target.value as ConstructedFormat | "")}
         >

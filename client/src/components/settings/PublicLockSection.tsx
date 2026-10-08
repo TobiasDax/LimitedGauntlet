@@ -19,7 +19,7 @@ export function PublicLockSection() {
           className={`inline-block h-2 w-2 rounded-full ${enabled ? "bg-good" : "bg-ink-muted"}`}
           aria-hidden="true"
         />
-        <span className="text-[14px] font-semibold">
+        <span className="text-md font-semibold">
           {enabled ? "Public pages are password-protected" : "Public pages are open to anyone with the link"}
         </span>
       </div>
@@ -33,7 +33,7 @@ export function PublicLockSection() {
         }}
       >
         <label className="flex flex-1 flex-col gap-1">
-          <span className="text-[11px] tracking-wide text-ink-muted uppercase">
+          <span className="text-2xs tracking-wide text-ink-muted uppercase">
             {enabled ? "Change password" : "Set a password to enable"}
           </span>
           <TextField

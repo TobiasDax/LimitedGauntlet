@@ -19,7 +19,7 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
   return (
     <button
-      className={`rounded-md px-4 py-2 text-[12.5px] font-semibold tracking-wide transition-colors disabled:opacity-50 disabled:pointer-events-none ${buttonVariants[variant]} ${className}`}
+      className={`rounded-md px-4 py-2 text-xs font-semibold tracking-wide transition-colors disabled:opacity-50 disabled:pointer-events-none ${buttonVariants[variant]} ${className}`}
       {...props}
     />
   );
@@ -28,9 +28,9 @@ export function Button({
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[12px] font-medium tracking-wide text-ink-muted">{label}</span>
+      <span className="text-xs font-medium tracking-wide text-ink-muted">{label}</span>
       {children}
-      {hint && <span className="text-[11.5px] text-ink-muted">{hint}</span>}
+      {hint && <span className="text-2xs text-ink-muted">{hint}</span>}
     </label>
   );
 }
@@ -38,7 +38,7 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 export function TextField(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none placeholder:text-ink-muted focus:border-accent focus:ring-1 focus:ring-accent"
+      className="rounded-md border border-border-strong bg-surface px-3 py-2 text-md text-ink outline-none placeholder:text-ink-muted focus:border-accent focus:ring-1 focus:ring-accent"
       {...props}
     />
   );
@@ -47,7 +47,7 @@ export function TextField(props: InputHTMLAttributes<HTMLInputElement>) {
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none placeholder:text-ink-muted focus:border-accent focus:ring-1 focus:ring-accent"
+      className="rounded-md border border-border-strong bg-surface px-3 py-2 text-md text-ink outline-none placeholder:text-ink-muted focus:border-accent focus:ring-1 focus:ring-accent"
       {...props}
     />
   );
@@ -56,7 +56,7 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 export function FormError({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <div className="rounded-md border border-critical/40 bg-critical/14 px-3 py-2 text-[13px] text-critical">
+    <div className="rounded-md border border-critical/40 bg-critical/14 px-3 py-2 text-sm text-critical">
       {children}
     </div>
   );
@@ -67,15 +67,15 @@ export function Card({ className = "", children }: { className?: string; childre
 }
 
 export function Eyebrow({ children }: { children: ReactNode }) {
-  return <p className="mb-2 text-[11.5px] font-semibold tracking-[0.11em] text-accent uppercase">{children}</p>;
+  return <p className="mb-2 text-2xs font-semibold tracking-[0.11em] text-accent uppercase">{children}</p>;
 }
 
 export function ScreenTitle({ children }: { children: ReactNode }) {
-  return <h1 className="font-display mb-1.5 text-[32px] font-bold text-balance">{children}</h1>;
+  return <h1 className="font-display mb-1.5 text-3xl font-bold text-balance">{children}</h1>;
 }
 
 export function ScreenDek({ children }: { children: ReactNode }) {
-  return <p className="mb-8 max-w-[62ch] text-[14.5px] text-ink-muted">{children}</p>;
+  return <p className="mb-8 max-w-[62ch] text-md text-ink-muted">{children}</p>;
 }
 
 // Lightweight modal dialog. Closes on Escape, backdrop click, or the ✕.
@@ -95,7 +95,7 @@ export function Modal({ title, onClose, children }: { title: ReactNode; onClose:
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full max-w-md rounded-lg border border-border-strong bg-surface shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-          <h2 className="font-display text-[16px] font-bold">{title}</h2>
+          <h2 className="font-display text-base font-bold">{title}</h2>
           <button
             onClick={onClose}
             aria-label="Close"
@@ -118,7 +118,7 @@ export function StatusPill({ tone, children }: { tone: "good" | "warning" | "cri
   } as const;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-bold tracking-wide uppercase ${toneClasses[tone]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-bold tracking-wide uppercase ${toneClasses[tone]}`}
     >
       <span className="h-[5px] w-[5px] rounded-full bg-current" />
       {children}

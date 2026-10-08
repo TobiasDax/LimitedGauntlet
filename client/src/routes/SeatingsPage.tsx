@@ -118,7 +118,7 @@ export function SeatingsPage() {
                 <button
                   type="button"
                   onClick={() => setShowManual(true)}
-                  className="text-[12.5px] text-ink-muted underline hover:text-accent"
+                  className="text-xs text-ink-muted underline hover:text-accent"
                 >
                   Seat manually instead
                 </button>
@@ -142,7 +142,7 @@ export function SeatingsPage() {
             .sort(([a], [b]) => a - b)
             .map(([table, seatByEntrantIdForTable]) => (
               <div key={table} className="mb-6">
-                <h3 className="mb-2 font-display text-[14px] font-bold">
+                <h3 className="mb-2 font-display text-md font-bold">
                   Table {table} ({seatByEntrantIdForTable.size} players)
                 </h3>
                 <SeatingChart
@@ -153,7 +153,7 @@ export function SeatingsPage() {
                 />
               </div>
             ))}
-          <p className="text-[13px] text-ink-muted">
+          <p className="text-sm text-ink-muted">
             Seatings are generated. Head to the{" "}
             <Link to={`/pods/${id}/rounds`} className="text-link underline hover:text-link-hover">
               Pairings tab
@@ -172,7 +172,7 @@ export function SeatingsPage() {
             // organizer reveals round 1.
             showByeBadge={!!round1.pairingsRevealedAt}
           />
-          <p className="text-[13px] text-ink-muted">
+          <p className="text-sm text-ink-muted">
             Seatings are generated. Head to the{" "}
             <Link to={`/pods/${id}/rounds`} className="text-link underline hover:text-link-hover">
               Pairings tab

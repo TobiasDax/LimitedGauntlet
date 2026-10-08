@@ -75,13 +75,13 @@ function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDeta
         </Field>
         {datesLocked ? (
           <div className="border-border rounded-md border border-dashed p-4">
-            <div className="text-[12px] font-semibold tracking-wide text-ink-muted uppercase">Dates</div>
-            <p className="mt-1 text-[14px] text-ink">
+            <div className="text-xs font-semibold tracking-wide text-ink-muted uppercase">Dates</div>
+            <p className="mt-1 text-md text-ink">
               {tournament.startDate.slice(0, 10)}{" "}
               <ArrowRight size={14} className="inline align-[-2px] text-ink-muted" aria-hidden="true" />{" "}
               {tournament.endDate.slice(0, 10)}
             </p>
-            <p className="mt-2 text-[12px] text-ink-muted">
+            <p className="mt-2 text-xs text-ink-muted">
               A tournament's dates are fixed once set on this plan.{" "}
               {supportEmail ? (
                 <>
@@ -115,7 +115,7 @@ function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDeta
           </Field>
           <Field label="Status">
             <select
-              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-md text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
               value={status}
               onChange={(e) => setStatus(e.target.value as TournamentStatus)}
             >
@@ -130,7 +130,7 @@ function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDeta
 
         {me?.tokensEnabled && (
           <div className="flex flex-col gap-3 rounded-md border border-border bg-bg p-4">
-            <div className="text-[12px] font-semibold tracking-wide text-ink-muted uppercase">
+            <div className="text-xs font-semibold tracking-wide text-ink-muted uppercase">
               Token rewards (default for this tournament's pods)
             </div>
             <Field label="Participation — tokens for playing in a pod">
@@ -171,7 +171,7 @@ function DeleteTournamentButton({ tournament }: { tournament: TournamentDetail }
         if (!confirm(`Delete "${tournament.name}"? This removes every pod, round, and card pull in it too.`)) return;
         deleteTournament.mutate(tournament.id, { onSuccess: () => navigate("/") });
       }}
-      className="text-[12.5px] tracking-wide text-critical uppercase hover:text-critical/80 disabled:opacity-50"
+      className="text-xs tracking-wide text-critical uppercase hover:text-critical/80 disabled:opacity-50"
     >
       Delete tournament
     </button>
@@ -263,7 +263,7 @@ function NotesEditor({
         onBlur={flush}
         placeholder={placeholder}
       />
-      <p className="text-[12px] text-ink-muted">
+      <p className="text-xs text-ink-muted">
         Supports Markdown — headings, lists, <strong>bold</strong>/<em>italic</em>/<u>underline</u>, tables, and links.
         Saves automatically.
       </p>
@@ -292,18 +292,18 @@ function NotesEditor({
               autosave.mutate({ field, value: initialRef.current });
             }
           }}
-          className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-hover hover:underline disabled:opacity-40"
+          className="text-xs tracking-wide text-link uppercase hover:text-link-hover hover:underline disabled:opacity-40"
         >
           Revert
         </button>
-        <span className={`text-[11.5px] ${autosave.isError ? "text-critical" : "text-ink-muted"}`} aria-live="polite">
+        <span className={`text-2xs ${autosave.isError ? "text-critical" : "text-ink-muted"}`} aria-live="polite">
           {status}
         </span>
         {autosave.isError && (
           <button
             type="button"
             onClick={flush}
-            className="text-[11.5px] tracking-wide text-link uppercase hover:text-link-hover hover:underline"
+            className="text-2xs tracking-wide text-link uppercase hover:text-link-hover hover:underline"
           >
             Retry
           </button>
@@ -337,7 +337,7 @@ function TournamentNotesSection({ tournament }: { tournament: TournamentDetail }
 
   return (
     <div className="mb-6">
-      <div className="mb-3 flex gap-1 border-b border-border text-[12.5px] tracking-wide uppercase">
+      <div className="mb-3 flex gap-1 border-b border-border text-xs tracking-wide uppercase">
         {notesTabs.map((t) => (
           <button
             key={t.key}
@@ -349,7 +349,7 @@ function TournamentNotesSection({ tournament }: { tournament: TournamentDetail }
         ))}
       </div>
 
-      {isInternal && <p className="mb-2 text-[12px] text-ink-muted">Organizers only — never shown on public pages.</p>}
+      {isInternal && <p className="mb-2 text-xs text-ink-muted">Organizers only — never shown on public pages.</p>}
 
       {editing ? (
         // key: force a fresh editor when the tab changes, so its buffer and
@@ -371,14 +371,12 @@ function TournamentNotesSection({ tournament }: { tournament: TournamentDetail }
           {value ? (
             <RichText text={value} />
           ) : (
-            <p className="text-[13px] text-ink-muted">
-              {isInternal ? "No internal notes yet." : "No description yet."}
-            </p>
+            <p className="text-sm text-ink-muted">{isInternal ? "No internal notes yet." : "No description yet."}</p>
           )}
-          {editedLine && <p className="mt-1.5 text-[11.5px] text-ink-muted">{editedLine}</p>}
+          {editedLine && <p className="mt-1.5 text-2xs text-ink-muted">{editedLine}</p>}
           <button
             onClick={() => setEditing(true)}
-            className="mt-1.5 text-[12px] tracking-wide text-link uppercase hover:text-link-hover hover:underline"
+            className="mt-1.5 text-xs tracking-wide text-link uppercase hover:text-link-hover hover:underline"
           >
             {value
               ? isInternal
@@ -479,7 +477,7 @@ function NewPodForm({
           </Field>
           <Field label="Format">
             <select
-              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="rounded-md border border-border-strong bg-surface px-3 py-2 text-md text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
               value={format}
               onChange={(e) => setFormat(e.target.value as PodFormat)}
             >
@@ -501,7 +499,7 @@ function NewPodForm({
           </Field>
         </div>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+        <label className="flex items-center gap-2 text-sm text-ink-muted">
           <input
             type="checkbox"
             checked={isOnDemand}
@@ -537,7 +535,7 @@ function NewPodForm({
           />
         )}
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+        <label className="flex items-center gap-2 text-sm text-ink-muted">
           <input type="checkbox" checked={isTeamEvent} onChange={(e) => setIsTeamEvent(e.target.checked)} />
           Team event (2HG-style — entrants are teams, not individual players)
         </label>
@@ -553,14 +551,14 @@ function NewPodForm({
           </Field>
         )}
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+        <label className="flex items-center gap-2 text-sm text-ink-muted">
           <input type="checkbox" checked={isMainEvent} onChange={(e) => setIsMainEvent(e.target.checked)} />
           Mark as this tournament's main event — the pod winner earns a crown on the Hall of Fame (only one pod per
           tournament can be the main event; checking this unchecks any other)
         </label>
 
         <details>
-          <summary className="cursor-pointer text-[12.5px] tracking-wide text-ink-muted uppercase select-none">
+          <summary className="cursor-pointer text-xs tracking-wide text-ink-muted uppercase select-none">
             Advanced settings
           </summary>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -575,7 +573,7 @@ function NewPodForm({
             </Field>
             <Field label="Match format">
               <select
-                className="rounded-md border border-border-strong bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                className="rounded-md border border-border-strong bg-surface px-3 py-2 text-md text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 value={matchFormat}
                 onChange={(e) => setMatchFormat(e.target.value as "BO1" | "BO3")}
               >
@@ -618,7 +616,7 @@ function NewPodForm({
           </div>
 
           <div className="mt-4 flex flex-col gap-3">
-            <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+            <label className="flex items-center gap-2 text-sm text-ink-muted">
               <input
                 type="checkbox"
                 checked={rarePicksEnabled}
@@ -626,7 +624,7 @@ function NewPodForm({
               />
               Track rare picks (card values) for this pod
             </label>
-            <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+            <label className="flex items-center gap-2 text-sm text-ink-muted">
               <input
                 type="checkbox"
                 checked={excludeFromStats}
@@ -634,14 +632,14 @@ function NewPodForm({
               />
               Exclude from org-wide stats (Hall of Fame, Treasure Chest) — for one-off, joke, or test pods
             </label>
-            <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+            <label className="flex items-center gap-2 text-sm text-ink-muted">
               <input type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
               Send events to the org's configured webhook for this pod (Settings → Webhook)
             </label>
 
             {me?.tokensEnabled && (
               <div className="flex flex-col gap-3">
-                <label className="flex items-center gap-2 text-[13px] text-ink-muted">
+                <label className="flex items-center gap-2 text-sm text-ink-muted">
                   <input type="checkbox" checked={tokenOverride} onChange={(e) => setTokenOverride(e.target.checked)} />
                   Override the tournament's token rewards for this pod
                 </label>
@@ -707,7 +705,7 @@ export function TournamentPage() {
         {!editingTournament && (
           <button
             onClick={() => setEditingTournament(true)}
-            className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-hover hover:underline"
+            className="text-xs tracking-wide text-link uppercase hover:text-link-hover hover:underline"
           >
             Edit tournament
           </button>
@@ -723,8 +721,8 @@ export function TournamentPage() {
         (me.entitlement.unusedPasses ?? 0) > 0 &&
         tournament.coveringEntitlement === "FREE" && (
           <Card className="mb-6 border-accent/40 bg-bg p-4">
-            <div className="text-[14px] font-semibold text-ink">Upgrade this tournament with a pass</div>
-            <p className="mt-1 text-[13px] text-ink-muted">
+            <div className="text-md font-semibold text-ink">Upgrade this tournament with a pass</div>
+            <p className="mt-1 text-sm text-ink-muted">
               You have {me.entitlement.unusedPasses} unused tournament{" "}
               {me.entitlement.unusedPasses === 1 ? "pass" : "passes"}. Applying one here unlocks unlimited pods for this
               tournament and returns your free-tournament slot, so you can still run a separate free event.
@@ -747,20 +745,20 @@ export function TournamentPage() {
         <div className="mb-6 flex gap-5">
           <Link
             to={`/tournaments/${tournament.id}/gesamtwertung`}
-            className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-hover"
+            className="inline-flex items-center gap-1.5 text-xs tracking-wide text-accent uppercase hover:text-accent-hover"
           >
             View standings <ArrowRight size={13} aria-hidden="true" />
           </Link>
           <Link
             to={`/tournaments/${tournament.id}/value`}
-            className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-hover"
+            className="inline-flex items-center gap-1.5 text-xs tracking-wide text-accent uppercase hover:text-accent-hover"
           >
             Best pulls of the tournament <ArrowRight size={13} aria-hidden="true" />
           </Link>
           {me && (
             <button
               onClick={() => setSharing(true)}
-              className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-muted uppercase hover:text-ink"
+              className="inline-flex items-center gap-1.5 text-xs tracking-wide text-ink-muted uppercase hover:text-ink"
             >
               Share public link <ExternalLink size={13} aria-hidden="true" />
             </button>
@@ -769,7 +767,7 @@ export function TournamentPage() {
             <button
               onClick={() => exportXlsx.mutate()}
               disabled={exportXlsx.isPending}
-              className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-muted uppercase hover:text-ink disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 text-xs tracking-wide text-ink-muted uppercase hover:text-ink disabled:opacity-50"
             >
               {exportXlsx.isPending ? (
                 "Preparing…"

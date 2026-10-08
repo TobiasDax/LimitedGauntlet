@@ -15,10 +15,10 @@ export function UnusedPassBanner() {
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-accent bg-accent/14 px-5 py-4">
       <div>
-        <div className="font-display text-[16px] font-bold text-ink">
+        <div className="font-display text-base font-bold text-ink">
           You have {unused} unused tournament {unused === 1 ? "pass" : "passes"}
         </div>
-        <p className="mt-0.5 text-[13px] text-ink-muted">
+        <p className="mt-0.5 text-sm text-ink-muted">
           Create a tournament to put {unused === 1 ? "it" : "one"} to use — a pass-covered tournament can run unlimited
           pods.
         </p>
