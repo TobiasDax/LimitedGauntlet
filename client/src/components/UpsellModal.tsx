@@ -16,7 +16,7 @@ export function UpsellModal() {
 
   return (
     <Modal title={title} onClose={dismissUpsell}>
-      <p className="text-[14px] text-ink-secondary">{body}</p>
+      <p className="text-[14px] text-ink-muted">{body}</p>
       <div className="mt-5 flex gap-2">
         <Button
           variant="primary"

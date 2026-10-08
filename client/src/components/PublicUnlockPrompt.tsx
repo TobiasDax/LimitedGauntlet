@@ -19,7 +19,7 @@ export function PublicUnlockPrompt({ slug }: { slug: string | undefined }) {
       </div>
       <Card className="w-full p-6">
         <h1 className="font-display mb-1 text-[20px] font-bold">This page is private</h1>
-        <p className="mb-4 text-[13px] text-ink-secondary">Enter the password to view it.</p>
+        <p className="mb-4 text-[13px] text-ink-muted">Enter the password to view it.</p>
         <form
           onSubmit={(e) => {
             e.preventDefault();

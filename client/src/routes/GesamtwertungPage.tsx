@@ -17,7 +17,7 @@ export function GesamtwertungPage() {
   return (
     <div>
       <Eyebrow>
-        <Link to={`/tournaments/${id}`} className="hover:text-accent-strong">
+        <Link to={`/tournaments/${id}`} className="hover:text-accent">
           {tournamentData?.tournament.name ?? "Tournament overview"}
         </Link>
       </Eyebrow>

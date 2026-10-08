@@ -35,7 +35,7 @@ export function Stepper({
         onClick={() => onChange(clamp(value - 1))}
         disabled={value <= min}
         aria-label={`Decrease ${ariaLabel}`}
-        className="px-3.5 py-2.5 text-base text-ink-muted hover:text-accent-strong disabled:opacity-30 disabled:hover:text-ink-muted"
+        className="px-3.5 py-2.5 text-base text-ink-muted hover:text-accent disabled:opacity-30 disabled:hover:text-ink-muted"
       >
         <Minus size={16} aria-hidden="true" />
       </button>
@@ -53,7 +53,7 @@ export function Stepper({
         onClick={() => onChange(clamp(value + 1))}
         disabled={max !== undefined && value >= max}
         aria-label={`Increase ${ariaLabel}`}
-        className="px-3.5 py-2.5 text-base text-ink-muted hover:text-accent-strong disabled:opacity-30 disabled:hover:text-ink-muted"
+        className="px-3.5 py-2.5 text-base text-ink-muted hover:text-accent disabled:opacity-30 disabled:hover:text-ink-muted"
       >
         <Plus size={16} aria-hidden="true" />
       </button>

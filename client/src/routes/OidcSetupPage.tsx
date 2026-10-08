@@ -30,7 +30,7 @@ export function OidcSetupPage() {
   return (
     <div className="mx-auto max-w-[420px] py-16">
       <h1 className="font-display mb-1 text-[26px] font-bold">Finish setting up</h1>
-      <p className="mb-8 text-[14px] text-ink-secondary">
+      <p className="mb-8 text-[14px] text-ink-muted">
         Signed in as <span className="text-ink">{pending.email}</span>. Confirm your name — you'll set up your
         organization next.
       </p>

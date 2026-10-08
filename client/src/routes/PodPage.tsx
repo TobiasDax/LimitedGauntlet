@@ -137,7 +137,7 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
           </Field>
         </div>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
           <input type="checkbox" checked={isOnDemand} onChange={(e) => setIsOnDemand(e.target.checked)} />
           On demand — not part of the planned schedule (a spontaneous pod, e.g. an impromptu Chaosdraft)
         </label>
@@ -213,23 +213,23 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
           </Field>
         </div>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
           <input type="checkbox" checked={excludeFromStats} onChange={(e) => setExcludeFromStats(e.target.checked)} />
           Exclude from org-wide stats (Hall of Fame, Treasure Chest) — for one-off, joke, or test pods
         </label>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
           <input type="checkbox" checked={rarePicksEnabled} onChange={(e) => setRarePicksEnabled(e.target.checked)} />
           Track rare picks (card values) for this pod — off hides the Value tab and blocks adding pulls; existing pulls
           are kept and reappear if you turn it back on
         </label>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
           <input type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
           Send events to the org's configured webhook for this pod (Settings → Webhook)
         </label>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+        <label className="flex items-center gap-2 text-[13px] text-ink-muted">
           <input type="checkbox" checked={isMainEvent} onChange={(e) => setIsMainEvent(e.target.checked)} />
           Mark as this tournament's main event — the winner earns a crown on the Hall of Fame (only one pod per
           tournament can be the main event; checking this unchecks any other)
@@ -237,12 +237,12 @@ function EditPodForm({ pod, onDone }: { pod: PodDetail; onDone: () => void }) {
 
         {me?.tokensEnabled && (
           <div className="flex flex-col gap-3">
-            <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+            <label className="flex items-center gap-2 text-[13px] text-ink-muted">
               <input type="checkbox" checked={tokenOverride} onChange={(e) => setTokenOverride(e.target.checked)} />
               Override the tournament's token rewards for this pod
             </label>
             {tokenOverride && (
-              <div className="flex flex-col gap-3 rounded-md border border-border bg-surface-sunken p-3">
+              <div className="flex flex-col gap-3 rounded-md border border-border bg-bg p-3">
                 <Field label="Participation tokens">
                   <TextField
                     type="number"
@@ -305,7 +305,7 @@ function CancelPodControl({ pod }: { pod: PodDetail }) {
       <button
         onClick={() => uncancelPod.mutate()}
         disabled={uncancelPod.isPending}
-        className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-strong disabled:opacity-50"
+        className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-hover hover:underline disabled:opacity-50"
       >
         {uncancelPod.isPending ? "Restoring…" : "Un-cancel pod"}
       </button>
@@ -322,7 +322,7 @@ function CancelPodControl({ pod }: { pod: PodDetail }) {
       </button>
       {confirming && (
         <Modal title="Cancel this pod?" onClose={() => setConfirming(false)}>
-          <p className="mb-4 text-[13px] text-ink-secondary">
+          <p className="mb-4 text-[13px] text-ink-muted">
             "{pod.name}" will be marked canceled — excluded from stats and token awards, and moved into the finished
             area of the pod list. Nothing is deleted, and this can be undone.
           </p>
@@ -415,7 +415,7 @@ function IndividualEntrants({
             {e.player ? (
               <Link
                 to={`/hall-of-fame/players/${e.player.id}`}
-                className="font-display text-[15px] font-bold hover:text-accent-strong"
+                className="font-display text-[15px] font-bold hover:text-accent"
               >
                 {entrantDisplayName(e)}
               </Link>
@@ -496,7 +496,7 @@ function TeamEntrants({
               <div className="flex flex-wrap gap-x-1 text-[12px] text-ink-muted">
                 {e.team?.members.map((m, mi) => (
                   <span key={m.playerId}>
-                    <Link to={`/hall-of-fame/players/${m.playerId}`} className="hover:text-accent-strong">
+                    <Link to={`/hall-of-fame/players/${m.playerId}`} className="hover:text-accent">
                       {m.player.displayName}
                     </Link>
                     {mi < (e.team?.members.length ?? 0) - 1 && ", "}
@@ -542,7 +542,7 @@ function TeamEntrants({
             <TextField placeholder="Team name" value={teamName} onChange={(e) => setTeamName(e.target.value)} />
             <div className="flex flex-wrap gap-3">
               {available.map((p) => (
-                <label key={p.id} className="flex items-center gap-1.5 text-[13px] text-ink-secondary">
+                <label key={p.id} className="flex items-center gap-1.5 text-[13px] text-ink-muted">
                   <input
                     type="checkbox"
                     checked={memberIds.includes(p.id)}
@@ -615,7 +615,7 @@ export function PodPage() {
       <Eyebrow>
         {tournamentData && (
           <>
-            <Link to={`/tournaments/${pod.tournamentId}`} className="hover:text-accent-strong">
+            <Link to={`/tournaments/${pod.tournamentId}`} className="hover:text-accent">
               {tournamentData.tournament.name}
             </Link>{" "}
             ·{" "}
@@ -626,7 +626,7 @@ export function PodPage() {
       <ScreenTitle>
         {pod.isMainEvent && (
           <span title="This tournament's main event">
-            <Crown size={20} className="mr-2 inline align-[-2px] text-accent-strong" aria-hidden="true" />
+            <Crown size={20} className="mr-2 inline align-[-2px] text-accent" aria-hidden="true" />
           </span>
         )}
         {pod.name}
@@ -646,7 +646,7 @@ export function PodPage() {
         {me && (
           <button
             onClick={() => setSharing(true)}
-            className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+            className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-muted uppercase hover:text-ink"
           >
             Share public link <ExternalLink size={13} aria-hidden="true" />
           </button>
@@ -661,7 +661,7 @@ export function PodPage() {
         {!editing && (
           <button
             onClick={() => setEditing(true)}
-            className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-strong"
+            className="text-[12.5px] tracking-wide text-link uppercase hover:text-link-hover hover:underline"
           >
             Edit pod
           </button>

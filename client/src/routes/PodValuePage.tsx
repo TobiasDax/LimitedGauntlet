@@ -126,7 +126,7 @@ function AddPullForm({
             <option key={s.code} value={s.name} />
           ))}
         </datalist>
-        <label className="flex items-center gap-1.5 text-[12.5px] text-ink-secondary" title="Price the foil printing">
+        <label className="flex items-center gap-1.5 text-[12.5px] text-ink-muted" title="Price the foil printing">
           <input type="checkbox" checked={foil} onChange={(e) => setFoil(e.target.checked)} />
           Foil
         </label>
@@ -186,7 +186,7 @@ export function PodValuePage() {
   return (
     <div>
       <Eyebrow>
-        <Link to={`/pods/${id}`} className="hover:text-accent-strong">
+        <Link to={`/pods/${id}`} className="hover:text-accent">
           {pod ? pod.name : "Pod"}
         </Link>
         {pod && ` · ${podFormatDisplay(pod)}`}
@@ -199,7 +199,7 @@ export function PodValuePage() {
       <PodTabs podId={id ?? ""} />
 
       {pod && !pod.rarePicksEnabled ? (
-        <p className="rounded-md border border-border bg-surface-sunken px-4 py-3 text-[13.5px] text-ink-muted">
+        <p className="rounded-md border border-border bg-bg px-4 py-3 text-[13.5px] text-ink-muted">
           Rare-picks tracking is turned off for this pod. Turn it back on from the pod's edit form to add or view card
           pulls.
         </p>
@@ -212,7 +212,7 @@ export function PodValuePage() {
           ) : (
             <>
               <div className="mb-4 flex items-baseline gap-2">
-                <span className="font-display text-[24px] font-bold text-accent-strong tabular-nums">
+                <span className="font-display text-[24px] font-bold text-accent tabular-nums">
                   {formatEur(data?.total ?? 0)}
                 </span>
                 <span className="text-[11px] tracking-wide text-ink-muted uppercase">pod total</span>

@@ -29,7 +29,7 @@ export function PlayerStatsPage() {
   return (
     <div>
       <Eyebrow>
-        <Link to="/hall-of-fame" className="hover:text-accent-strong">
+        <Link to="/hall-of-fame" className="hover:text-accent">
           Hall of Fame
         </Link>
       </Eyebrow>
@@ -46,7 +46,7 @@ export function PlayerStatsPage() {
               key={t}
               onClick={() => setTab(t)}
               className={`-mb-px border-b-2 px-3 py-2 text-[12.5px] tracking-wide uppercase ${
-                tab === t ? "border-accent text-ink" : "border-transparent text-ink-secondary hover:text-ink"
+                tab === t ? "border-accent text-ink" : "border-transparent text-ink-muted hover:text-ink"
               }`}
             >
               {t}

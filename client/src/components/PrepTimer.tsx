@@ -28,7 +28,7 @@ export function PrepTimerDisplay({
       <div className="text-[11px] tracking-wide text-ink-muted uppercase">{label || "Prep timer"}</div>
       <div
         className={`font-display font-bold tabular-nums ${
-          countdown.expired ? "text-accent-strong" : "text-ink"
+          countdown.expired ? "text-accent" : "text-ink"
         } ${big ? "text-[64px] leading-none" : "text-[34px] leading-tight"}`}
       >
         {countdown.expired ? "0:00" : countdown.formatted}
@@ -66,7 +66,7 @@ export function PrepTimer({ pod }: { pod: Pod }) {
   return (
     <div className="mb-6 rounded-md border border-border bg-surface px-5 py-4">
       <div className="mb-2 text-[11px] tracking-wide text-ink-muted uppercase">Pre-round timer</div>
-      <p className="mb-3 max-w-lg text-[13px] text-ink-secondary">
+      <p className="mb-3 max-w-lg text-[13px] text-ink-muted">
         A standalone timer for draft / deck-building, before any round is paired. Shows live on every device, including
         the public link.
       </p>

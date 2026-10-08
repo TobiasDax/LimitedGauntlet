@@ -16,7 +16,7 @@ export function PublicPlayerStatsPage() {
   return (
     <div>
       <Eyebrow>
-        <Link to={`/o/${slug}/hall-of-fame`} className="hover:text-accent-strong">
+        <Link to={`/o/${slug}/hall-of-fame`} className="hover:text-accent">
           Hall of Fame
         </Link>
       </Eyebrow>

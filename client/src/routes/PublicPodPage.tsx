@@ -23,7 +23,7 @@ const seatingFormats = new Set(["DRAFT", "CHAOS_DRAFT", "SEALED"]);
 function entrantLink(entrant: Entrant, slug: string, name: string) {
   if (!entrant.playerId) return <span>{name}</span>;
   return (
-    <Link to={`/o/${slug}/hall-of-fame/players/${entrant.playerId}`} className="hover:text-accent-strong">
+    <Link to={`/o/${slug}/hall-of-fame/players/${entrant.playerId}`} className="hover:text-accent">
       {name}
     </Link>
   );
@@ -82,7 +82,7 @@ function PublicRoundSection({
   const hidden = round.roundNumber === 1 && !round.pairingsRevealedAt;
 
   return (
-    <div className="rounded-lg border border-border bg-surface-sunken p-5">
+    <div className="rounded-lg border border-border bg-bg p-5">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <div className="font-display text-[18px] font-bold">Round {round.roundNumber}</div>
@@ -90,7 +90,7 @@ function PublicRoundSection({
         </div>
         {round.status === "ACTIVE" && (
           <div
-            className={`font-display text-[32px] font-bold tabular-nums ${countdown.expired ? "text-critical" : "text-accent-strong"}`}
+            className={`font-display text-[32px] font-bold tabular-nums ${countdown.expired ? "text-critical" : "text-accent"}`}
           >
             {countdown.formatted}
           </div>
@@ -148,7 +148,7 @@ export function PublicPodPage() {
   return (
     <div>
       <Eyebrow>
-        <Link to={`/o/${slug}/tournaments/${tournamentId}`} className="hover:text-accent-strong">
+        <Link to={`/o/${slug}/tournaments/${tournamentId}`} className="hover:text-accent">
           {podFormatDisplay(pod)}
         </Link>
       </Eyebrow>
@@ -210,22 +210,22 @@ export function PublicPodPage() {
             <table className="w-full min-w-[600px] border-collapse">
               <thead>
                 <tr>
-                  <th className="w-[1%] bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="w-[1%] bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                     #
                   </th>
-                  <th className="bg-surface-sunken px-4 py-3 text-left text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="bg-bg px-4 py-3 text-left text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                     {pod.isTeamEvent ? "Team" : "Player"}
                   </th>
-                  <th className="bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                     Points
                   </th>
-                  <th className="bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                     OMW%
                   </th>
-                  <th className="bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                     GW%
                   </th>
-                  <th className="bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                  <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                     OGW%
                   </th>
                 </tr>
@@ -234,7 +234,7 @@ export function PublicPodPage() {
                 {standingsData.standings.map((row, i) => (
                   <tr
                     key={row.entrantId}
-                    className={i === 0 ? "bg-accent-wash shadow-[inset_3px_0_0_var(--color-accent)]" : ""}
+                    className={i === 0 ? "bg-accent/14 shadow-[inset_3px_0_0_var(--color-accent)]" : ""}
                   >
                     <td className="border-t border-border px-4 py-3.5 text-right text-[13px] font-semibold tabular-nums text-ink-muted">
                       {i + 1}
@@ -245,13 +245,13 @@ export function PublicPodPage() {
                     <td className="border-t border-border px-4 py-3.5 text-right text-[15px] font-bold tabular-nums">
                       {row.points}
                     </td>
-                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-secondary tabular-nums">
+                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-muted tabular-nums">
                       {pct(row.opponentsMatchWinPct)}
                     </td>
-                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-secondary tabular-nums">
+                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-muted tabular-nums">
                       {pct(row.gameWinPct)}
                     </td>
-                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-secondary tabular-nums">
+                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-muted tabular-nums">
                       {pct(row.opponentsGameWinPct)}
                     </td>
                   </tr>
@@ -272,7 +272,7 @@ export function PublicPodPage() {
         <section>
           <h2 className="font-display mb-4 text-[20px] font-bold">Value</h2>
           <div className="mb-4 flex items-baseline gap-2">
-            <span className="font-display text-[22px] font-bold text-accent-strong tabular-nums">
+            <span className="font-display text-[22px] font-bold text-accent tabular-nums">
               {formatEur(valueData?.total ?? 0)}
             </span>
             <span className="text-[11px] tracking-wide text-ink-muted uppercase">pod total</span>

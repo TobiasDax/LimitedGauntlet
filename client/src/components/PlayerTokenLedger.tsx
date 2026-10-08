@@ -65,7 +65,7 @@ export function PlayerTokenLedger({ ledger, adjust }: { ledger: TokenLedger; adj
                 type="button"
                 onClick={() => setMode(m)}
                 className={`rounded px-2.5 py-1 text-[12px] tracking-wide uppercase ${
-                  mode === m ? "bg-accent-wash text-accent" : "text-ink-secondary hover:text-ink"
+                  mode === m ? "bg-accent/14 text-accent" : "text-ink-muted hover:text-ink"
                 }`}
               >
                 {m === "set" ? "Set balance" : m}
@@ -112,7 +112,7 @@ export function PlayerTokenLedger({ ledger, adjust }: { ledger: TokenLedger; adj
                 {["Change", "Reason", "Note", "Date"].map((h, i) => (
                   <th
                     key={h}
-                    className={`bg-surface-sunken px-4 py-2.5 text-[11px] font-semibold tracking-wide text-ink-muted uppercase ${
+                    className={`bg-bg px-4 py-2.5 text-[11px] font-semibold tracking-wide text-ink-muted uppercase ${
                       i === 0 ? "text-right" : "text-left"
                     }`}
                   >
@@ -133,7 +133,7 @@ export function PlayerTokenLedger({ ledger, adjust }: { ledger: TokenLedger; adj
                     {t.delta}
                   </td>
                   <td className="border-t border-border px-4 py-2.5">{reasonLabel(t)}</td>
-                  <td className="border-t border-border px-4 py-2.5 text-ink-secondary">{t.note ?? "—"}</td>
+                  <td className="border-t border-border px-4 py-2.5 text-ink-muted">{t.note ?? "—"}</td>
                   <td className="border-t border-border px-4 py-2.5 text-ink-muted tabular-nums">
                     {new Date(t.createdAt).toLocaleDateString()}
                   </td>

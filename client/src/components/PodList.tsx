@@ -40,7 +40,7 @@ function PodRow({ pod, href, reorder }: PodRowProps) {
             onClick={reorder.onUp}
             disabled={reorder.isFirst || reorder.pending}
             title="Move up"
-            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-secondary hover:text-ink disabled:opacity-30"
+            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-muted hover:text-ink disabled:opacity-30"
           >
             <ChevronUp size={14} aria-hidden="true" />
           </button>
@@ -48,7 +48,7 @@ function PodRow({ pod, href, reorder }: PodRowProps) {
             onClick={reorder.onDown}
             disabled={reorder.isLast || reorder.pending}
             title="Move down"
-            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-secondary hover:text-ink disabled:opacity-30"
+            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-muted hover:text-ink disabled:opacity-30"
           >
             <ChevronDown size={14} aria-hidden="true" />
           </button>
@@ -59,7 +59,7 @@ function PodRow({ pod, href, reorder }: PodRowProps) {
           <div className="font-display text-[16px] font-bold">
             {pod.isMainEvent && (
               <span title="This tournament's main event">
-                <Crown size={15} className="mr-1.5 inline align-[-2px] text-accent-strong" aria-hidden="true" />
+                <Crown size={15} className="mr-1.5 inline align-[-2px] text-accent" aria-hidden="true" />
               </span>
             )}
             {pod.name}
@@ -76,9 +76,7 @@ function PodRow({ pod, href, reorder }: PodRowProps) {
             {pod.date && ` · ${pod.date.slice(0, 10)}${pod.startTime ? ` ${pod.startTime}` : ""}`}
           </div>
         </div>
-        <span className="shrink-0 text-[11.5px] tracking-wide text-ink-secondary uppercase">
-          {podProgressStatus(pod)}
-        </span>
+        <span className="shrink-0 text-[11.5px] tracking-wide text-ink-muted uppercase">{podProgressStatus(pod)}</span>
       </Link>
     </Card>
   );

@@ -35,9 +35,9 @@ export function HeadlineStats({
       {longestWinStreak && (
         <Link
           to={playerLinkTo(longestWinStreak.playerId)}
-          className="rounded-lg border border-accent/35 bg-gradient-to-br from-accent-wash to-surface p-4 text-center transition-colors hover:bg-surface-raised"
+          className="rounded-lg border border-accent/35 bg-gradient-to-br from-accent/14 to-surface p-4 text-center transition-colors hover:bg-surface-raised"
         >
-          <div className="flex items-center justify-center gap-1.5 font-display text-[28px] font-bold text-accent-strong tabular-nums">
+          <div className="flex items-center justify-center gap-1.5 font-display text-[28px] font-bold text-accent tabular-nums">
             <Flame size={26} aria-hidden="true" />
             {longestWinStreak.streak}
           </div>
@@ -91,7 +91,7 @@ export function HallOfFameList({
           <div
             key={row.playerId}
             className={`relative grid grid-cols-[44px_1fr_auto] items-center gap-5 rounded-md border px-4 py-3.5 transition-colors hover:bg-surface-raised ${
-              rank === 1 ? "border-accent/35 bg-gradient-to-r from-accent-wash to-surface" : "border-border bg-surface"
+              rank === 1 ? "border-accent/35 bg-gradient-to-r from-accent/14 to-surface" : "border-border bg-surface"
             }`}
           >
             <Link to={playerLinkTo(row.playerId)} className="absolute inset-0" aria-label={row.player.displayName} />
@@ -116,7 +116,7 @@ export function HallOfFameList({
                       to={mainEventLinkTo(win)}
                       title={`Main event win — ${win.tournamentName}: ${win.podName}`}
                       aria-label={`Main event win — ${win.tournamentName}: ${win.podName}`}
-                      className="text-accent-strong hover:scale-110"
+                      className="text-accent hover:scale-110"
                     >
                       <Crown size={14} aria-hidden="true" />
                     </Link>
@@ -127,7 +127,7 @@ export function HallOfFameList({
 
             <div className="pointer-events-none text-right">
               <div
-                className={`font-display tabular-nums text-[26px] leading-none font-bold ${rank === 1 ? "text-accent-strong" : ""}`}
+                className={`font-display tabular-nums text-[26px] leading-none font-bold ${rank === 1 ? "text-accent" : ""}`}
               >
                 {row.average.toFixed(2)}
               </div>
@@ -154,16 +154,14 @@ export function MostPlayedPairings({ pairings }: { pairings: MostPlayedPairing[]
   const max = Math.max(...pairings.map((p) => p.matches));
   return (
     <Card className="p-5">
-      <div className="mb-3 text-[12px] font-semibold tracking-wide text-ink-secondary uppercase">
-        Most-played pairings
-      </div>
+      <div className="mb-3 text-[12px] font-semibold tracking-wide text-ink-muted uppercase">Most-played pairings</div>
       <div className="flex flex-col gap-2.5">
         {pairings.map((p) => (
           <div key={`${p.playerAId}:${p.playerBId}`} className="flex items-center gap-3">
             <div className="w-[42%] shrink-0 text-right text-[13px]">
               {p.playerAName} <span className="text-ink-muted">vs</span> {p.playerBName}
             </div>
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-sunken">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg">
               <div className="h-full rounded-full bg-accent" style={{ width: `${(p.matches / max) * 100}%` }} />
             </div>
             <div className="w-6 shrink-0 text-[12px] tabular-nums text-ink-muted">{p.matches}</div>
@@ -178,15 +176,15 @@ export function BiggestPulls({ pulls }: { pulls: HallOfFameBiggestPull[] }) {
   if (pulls.length === 0) return null;
   return (
     <Card className="p-5">
-      <div className="mb-3 text-[12px] font-semibold tracking-wide text-ink-secondary uppercase">Biggest pulls</div>
+      <div className="mb-3 text-[12px] font-semibold tracking-wide text-ink-muted uppercase">Biggest pulls</div>
       <div className="flex flex-col gap-2">
         {pulls.map((p) => (
           <div key={p.id} className="flex items-center gap-3">
-            <div className="h-10 w-8 shrink-0 overflow-hidden rounded bg-surface-sunken">
+            <div className="h-10 w-8 shrink-0 overflow-hidden rounded bg-bg">
               {p.imageUri && <img src={p.imageUri} alt={p.cardName} className="h-full w-full object-cover" />}
             </div>
             <div className="min-w-0 flex-1 truncate text-[13px]">{p.cardName}</div>
-            <div className="text-[12.5px] font-bold text-accent-strong tabular-nums">{formatEur(p.priceEur)}</div>
+            <div className="text-[12.5px] font-bold text-accent tabular-nums">{formatEur(p.priceEur)}</div>
           </div>
         ))}
       </div>

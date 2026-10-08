@@ -33,7 +33,7 @@ export function LoginPage() {
   return (
     <div className="mx-auto max-w-[380px] py-16">
       <h1 className="font-display mb-1 text-[26px] font-bold">Log in</h1>
-      <p className="mb-8 text-[14px] text-ink-secondary">Back to running the tournament.</p>
+      <p className="mb-8 text-[14px] text-ink-muted">Back to running the tournament.</p>
 
       {oidcErrorText && (
         <div className="mb-4">
@@ -98,9 +98,9 @@ export function LoginPage() {
             </form>
           </Card>
 
-          <p className="mt-5 text-center text-[13px] text-ink-secondary">
+          <p className="mt-5 text-center text-[13px] text-ink-muted">
             New group?{" "}
-            <Link to="/signup" className="text-accent hover:text-accent-strong">
+            <Link to="/signup" className="text-accent hover:text-accent-hover">
               Create an organization
             </Link>
           </p>

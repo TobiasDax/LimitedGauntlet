@@ -32,7 +32,7 @@ export function PublicLayout() {
   const playerLink = (
     <Link
       to={`${base}/player`}
-      className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className="text-[12.5px] tracking-wide text-ink-muted uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
       Player sign-in
     </Link>

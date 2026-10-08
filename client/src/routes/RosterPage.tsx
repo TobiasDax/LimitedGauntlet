@@ -53,7 +53,7 @@ function PrivacyControls({ player }: { player: Player }) {
         )}
       </Button>
       {open && (
-        <div className="mt-2 flex w-full flex-wrap items-center gap-2 rounded-md border border-border bg-surface-sunken px-3 py-2">
+        <div className="mt-2 flex w-full flex-wrap items-center gap-2 rounded-md border border-border bg-bg px-3 py-2">
           <Button variant="ghost" onClick={() => download.mutate({ id: player.id, name: player.displayName })}>
             {download.isPending ? "Preparing…" : "Download data"}
           </Button>
@@ -67,7 +67,7 @@ function PrivacyControls({ player }: { player: Player }) {
             </Button>
             {player.publicHidden && player.publicAlias && (
               <span className="px-4 text-[11px] text-ink-muted">
-                Shown publicly as <span className="font-semibold text-ink-secondary">{player.publicAlias}</span>
+                Shown publicly as <span className="font-semibold text-ink-muted">{player.publicAlias}</span>
               </span>
             )}
           </div>
@@ -82,7 +82,7 @@ function PrivacyControls({ player }: { player: Player }) {
 
       {confirmAnon && (
         <Modal title={`Anonymise ${player.displayName}?`} onClose={() => setConfirmAnon(false)}>
-          <div className="flex flex-col gap-3 text-[13px] text-ink-secondary">
+          <div className="flex flex-col gap-3 text-[13px] text-ink-muted">
             <p>
               This scrubs the name to a non-identifying label and removes their login, any pending invite, and
               token-ledger notes. Their match results, standings, Gesamtwertung and Hall of Fame numbers stay exactly
@@ -256,7 +256,7 @@ function RosterRow({
       <div className="flex flex-wrap items-center gap-2">
         <Link
           to={`/hall-of-fame/players/${player.id}`}
-          className="font-display text-[15.5px] font-bold hover:text-accent-strong"
+          className="font-display text-[15.5px] font-bold hover:text-accent"
         >
           {player.displayName}
         </Link>

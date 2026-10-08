@@ -12,7 +12,7 @@ export function TournamentValuePage() {
   return (
     <div>
       <Eyebrow>
-        <Link to={`/tournaments/${id}`} className="hover:text-accent-strong">
+        <Link to={`/tournaments/${id}`} className="hover:text-accent">
           {tournamentData?.tournament.name ?? "Tournament overview"}
         </Link>
       </Eyebrow>
@@ -24,7 +24,7 @@ export function TournamentValuePage() {
       ) : (
         <>
           <div className="mb-4 flex items-baseline gap-2">
-            <span className="font-display text-[24px] font-bold text-accent-strong tabular-nums">
+            <span className="font-display text-[24px] font-bold text-accent tabular-nums">
               {formatEur(data?.total ?? 0)}
             </span>
             <span className="text-[11px] tracking-wide text-ink-muted uppercase">tournament total</span>

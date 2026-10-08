@@ -5,11 +5,11 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTML
 type ButtonVariant = "default" | "primary" | "ghost" | "danger";
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  default: "bg-surface-raised border border-border-strong text-ink hover:bg-[#2c2926]",
-  primary: "bg-accent border border-accent text-[#241c0a] hover:bg-accent-strong hover:border-accent-strong",
-  ghost: "bg-transparent border border-transparent text-ink-secondary hover:text-ink hover:bg-surface-raised",
+  default: "bg-surface-raised border border-border-strong text-ink hover:bg-ink/5",
+  primary: "bg-accent border border-accent text-on-accent hover:bg-accent-hover hover:border-accent-hover",
+  ghost: "bg-transparent border border-transparent text-ink-muted hover:text-ink hover:bg-surface-raised",
   // PI-84 — destructive confirm-modal actions (cancel pod, etc.).
-  danger: "bg-critical border border-critical text-white hover:bg-critical/90",
+  danger: "bg-critical border border-critical text-on-accent hover:bg-critical/90",
 };
 
 export function Button({
@@ -28,7 +28,7 @@ export function Button({
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[12px] font-medium tracking-wide text-ink-secondary">{label}</span>
+      <span className="text-[12px] font-medium tracking-wide text-ink-muted">{label}</span>
       {children}
       {hint && <span className="text-[11.5px] text-ink-muted">{hint}</span>}
     </label>
@@ -56,7 +56,7 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 export function FormError({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <div className="rounded-md border border-critical/40 bg-critical-wash px-3 py-2 text-[13px] text-critical">
+    <div className="rounded-md border border-critical/40 bg-critical/14 px-3 py-2 text-[13px] text-critical">
       {children}
     </div>
   );
@@ -75,7 +75,7 @@ export function ScreenTitle({ children }: { children: ReactNode }) {
 }
 
 export function ScreenDek({ children }: { children: ReactNode }) {
-  return <p className="mb-8 max-w-[62ch] text-[14.5px] text-ink-secondary">{children}</p>;
+  return <p className="mb-8 max-w-[62ch] text-[14.5px] text-ink-muted">{children}</p>;
 }
 
 // Lightweight modal dialog. Closes on Escape, backdrop click, or the ✕.
@@ -112,9 +112,9 @@ export function Modal({ title, onClose, children }: { title: ReactNode; onClose:
 
 export function StatusPill({ tone, children }: { tone: "good" | "warning" | "critical"; children: ReactNode }) {
   const toneClasses = {
-    good: "text-good bg-good-wash",
-    warning: "text-warning bg-warning-wash",
-    critical: "text-critical bg-critical-wash",
+    good: "text-good bg-good/14",
+    warning: "text-warning bg-warning/14",
+    critical: "text-critical bg-critical/14",
   } as const;
   return (
     <span

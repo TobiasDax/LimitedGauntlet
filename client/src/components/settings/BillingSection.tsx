@@ -81,12 +81,12 @@ export function BillingSection() {
       </div>
 
       {isSeries && !activeUntil ? (
-        <p className="mt-3 text-[13px] text-ink-secondary">
+        <p className="mt-3 text-[13px] text-ink-muted">
           Unlimited tournaments and pods — this organization has a complimentary Series plan, so there is nothing to
           manage or renew.
         </p>
       ) : isSeries ? (
-        <div className="mt-3 flex flex-col gap-2 text-[13px] text-ink-secondary">
+        <div className="mt-3 flex flex-col gap-2 text-[13px] text-ink-muted">
           <p>
             Unlimited tournaments while your subscription is active. Cancelling keeps access until{" "}
             {activeUntil!.toLocaleDateString()}.
@@ -110,7 +110,7 @@ export function BillingSection() {
         </div>
       ) : (
         <div className="mt-4">
-          <p className="mb-3 text-[13px] text-ink-secondary">
+          <p className="mb-3 text-[13px] text-ink-muted">
             Upgrade to run more tournaments. A one-time pass covers a single tournament; a Series subscription unlocks
             unlimited tournaments while it's active.
           </p>
@@ -122,14 +122,14 @@ export function BillingSection() {
             {sorted.map((p) => (
               <div
                 key={p.product}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-sunken px-4 py-3"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-bg px-4 py-3"
               >
                 <div>
                   <div className="text-[14px] font-semibold text-ink">{PRODUCT_LABEL[p.product]}</div>
                   <div className="text-[12.5px] text-ink-muted">{PRODUCT_BLURB[p.product]}</div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-[13px] font-medium text-ink-secondary">{priceLine(p)}</span>
+                  <span className="text-[13px] font-medium text-ink-muted">{priceLine(p)}</span>
                   <Button variant="primary" disabled={checkout.isPending} onClick={() => checkout.mutate(p.product)}>
                     {checkout.isPending ? "Redirecting…" : p.product === "pass" ? "Buy pass" : "Subscribe"}
                   </Button>

@@ -41,7 +41,7 @@ export function VerifyEmailPage() {
       <Eyebrow>Email change</Eyebrow>
       <ScreenTitle>Confirm email</ScreenTitle>
       <Card className="mt-4 p-6">
-        {status === "working" && <p className="text-ink-secondary">Confirming…</p>}
+        {status === "working" && <p className="text-ink-muted">Confirming…</p>}
         {status === "done" && (
           <>
             <p className="mb-4 text-good">Your email is now {email}.</p>

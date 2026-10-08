@@ -96,7 +96,7 @@ export function SeatingChart({
       <div
         key={seat}
         className={`flex min-w-0 flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center ${
-          isBye ? "border-dashed border-border bg-surface-sunken" : "border-border bg-surface"
+          isBye ? "border-dashed border-border bg-bg" : "border-border bg-surface"
         }`}
       >
         <span className="text-[10.5px] font-semibold tracking-wide text-accent uppercase">Seat {seat}</span>

@@ -75,7 +75,7 @@ export function SeatingsPage() {
   return (
     <div>
       <Eyebrow>
-        <Link to={`/pods/${id}`} className="hover:text-accent-strong">
+        <Link to={`/pods/${id}`} className="hover:text-accent">
           {pod.name}
         </Link>
       </Eyebrow>
@@ -118,7 +118,7 @@ export function SeatingsPage() {
                 <button
                   type="button"
                   onClick={() => setShowManual(true)}
-                  className="text-[12.5px] text-ink-secondary underline hover:text-accent-strong"
+                  className="text-[12.5px] text-ink-muted underline hover:text-accent"
                 >
                   Seat manually instead
                 </button>
@@ -153,9 +153,9 @@ export function SeatingsPage() {
                 />
               </div>
             ))}
-          <p className="text-[13px] text-ink-secondary">
+          <p className="text-[13px] text-ink-muted">
             Seatings are generated. Head to the{" "}
-            <Link to={`/pods/${id}/rounds`} className="text-link underline hover:text-link-strong">
+            <Link to={`/pods/${id}/rounds`} className="text-link underline hover:text-link-hover">
               Pairings tab
             </Link>{" "}
             to reveal round 1's pairings once everyone's found their seat.
@@ -172,9 +172,9 @@ export function SeatingsPage() {
             // organizer reveals round 1.
             showByeBadge={!!round1.pairingsRevealedAt}
           />
-          <p className="text-[13px] text-ink-secondary">
+          <p className="text-[13px] text-ink-muted">
             Seatings are generated. Head to the{" "}
-            <Link to={`/pods/${id}/rounds`} className="text-link underline hover:text-link-strong">
+            <Link to={`/pods/${id}/rounds`} className="text-link underline hover:text-link-hover">
               Pairings tab
             </Link>{" "}
             to reveal round 1's pairings once everyone's found their seat.

@@ -46,7 +46,7 @@ function AttributionEditor({
         onClick={() => onSet(selected)}
         disabled={!selected}
         title={pull.playerId ? "Confirm this attribution" : "Assign to this player"}
-        className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10.5px] font-bold text-[#241c0a] hover:bg-accent-strong disabled:opacity-50"
+        className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10.5px] font-bold text-on-accent hover:bg-accent-hover disabled:opacity-50"
       >
         <Check size={12} strokeWidth={3} aria-hidden="true" />
       </button>
@@ -54,7 +54,7 @@ function AttributionEditor({
         <button
           onClick={() => onSet(null)}
           title="Unassign — no real data to back up who pulled this"
-          className="shrink-0 rounded border border-border-strong px-1.5 py-1 text-ink-secondary hover:bg-surface-raised hover:text-ink"
+          className="shrink-0 rounded border border-border-strong px-1.5 py-1 text-ink-muted hover:bg-surface-raised hover:text-ink"
         >
           <X size={12} aria-hidden="true" />
         </button>
@@ -94,7 +94,7 @@ export function CardGallery({
     <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
       {pulls.map((pull) => (
         <div key={pull.id} className="overflow-hidden rounded-[10px] border border-border-strong bg-surface">
-          <div className="relative aspect-[5/7] bg-surface-sunken">
+          <div className="relative aspect-[5/7] bg-bg">
             {pull.imageUri ? (
               <img src={pull.imageUri} alt={pull.cardName} className="h-full w-full object-cover" loading="lazy" />
             ) : (
@@ -121,9 +121,7 @@ export function CardGallery({
           <div className="p-2.5">
             <div className="font-display mb-1 text-[13px] leading-tight font-bold">{pull.cardName}</div>
             <div className="flex items-center justify-between">
-              <span className="text-[12.5px] font-bold text-accent-strong tabular-nums">
-                {formatEur(pull.priceEur)}
-              </span>
+              <span className="text-[12.5px] font-bold text-accent tabular-nums">{formatEur(pull.priceEur)}</span>
               {pull.setCode && (
                 <span className="text-[10px] tracking-wide text-ink-muted uppercase">
                   {pull.setCode}
@@ -155,7 +153,7 @@ export function CardGallery({
             {tournamentLinkTo && pull.pod?.tournament && (
               <Link
                 to={tournamentLinkTo(pull.pod.tournament.id)}
-                className="mt-1 block truncate text-[10.5px] text-ink-muted hover:text-accent-strong"
+                className="mt-1 block truncate text-[10.5px] text-ink-muted hover:text-accent"
               >
                 {pull.pod.tournament.name}
               </Link>

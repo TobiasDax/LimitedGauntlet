@@ -40,7 +40,7 @@ export function OidcRelinkPage() {
       <Eyebrow>SSO relink</Eyebrow>
       <ScreenTitle>Confirm sign-in relink</ScreenTitle>
       <Card className="mt-4 p-6">
-        {status === "working" && <p className="text-ink-secondary">Confirming…</p>}
+        {status === "working" && <p className="text-ink-muted">Confirming…</p>}
         {status === "done" && (
           <>
             <p className="mb-4 text-good">

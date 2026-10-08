@@ -20,7 +20,7 @@ const schema: typeof defaultSchema = {
 
 export function RichText({ text, className = "" }: { text: string; className?: string }) {
   return (
-    <div className={`markdown text-[14px] leading-relaxed text-ink-secondary ${className}`}>
+    <div className={`markdown text-[14px] leading-relaxed text-ink-muted ${className}`}>
       <Markdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, schema]]}

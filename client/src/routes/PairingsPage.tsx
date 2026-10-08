@@ -89,7 +89,7 @@ function ResultEntry({
             setDropped("NONE");
             setEditing(true);
           }}
-          className="text-[11px] text-link underline hover:text-link-strong"
+          className="text-[11px] text-link underline hover:text-link-hover"
         >
           Edit
         </button>
@@ -138,7 +138,7 @@ function ResultEntry({
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="shrink-0 text-[11px] text-ink-muted underline hover:text-accent-strong"
+            className="shrink-0 text-[11px] text-ink-muted underline hover:text-accent"
           >
             Cancel
           </button>
@@ -188,7 +188,7 @@ function MatchCard({
         type="button"
         onClick={() => onSelectSlot({ matchId: match.id, side })}
         title="Click, then click another seat to swap them"
-        className={`rounded px-1 -mx-1 hover:bg-accent-wash ${isSelected ? "bg-accent-wash ring-1 ring-accent" : ""}`}
+        className={`rounded px-1 -mx-1 hover:bg-accent/14 ${isSelected ? "bg-accent/14 ring-1 ring-accent" : ""}`}
       >
         {entrantDisplayName(entrant)}
       </button>
@@ -253,7 +253,7 @@ function RoundTimer({ round, displayMode }: { round: Round; displayMode: boolean
 
   return (
     <div
-      className={`font-display tabular-nums font-bold ${countdown.expired ? "text-critical" : "text-accent-strong"} ${
+      className={`font-display tabular-nums font-bold ${countdown.expired ? "text-critical" : "text-accent"} ${
         displayMode ? "text-[64px]" : "text-[26px]"
       }`}
     >
@@ -325,7 +325,7 @@ function RoundCard({
   };
 
   return (
-    <div className="rounded-lg border border-border bg-surface-sunken p-5">
+    <div className="rounded-lg border border-border bg-bg p-5">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <div className="font-display text-[18px] font-bold">Round {round.roundNumber}</div>
@@ -421,12 +421,12 @@ function RoundCard({
       {repeatWarnings.length > 0 && (
         <div
           role="alert"
-          className="border-warning/40 bg-warning-wash mt-3 rounded-md border px-4 py-3 text-[13px] text-ink"
+          className="border-warning/40 bg-warning/14 mt-3 rounded-md border px-4 py-3 text-[13px] text-ink"
         >
           <div className="font-semibold">
             {repeatWarnings.length === 1 ? "This pairing is a rematch" : "These pairings are rematches"}
           </div>
-          <ul className="mt-1 list-disc pl-5 text-ink-secondary">
+          <ul className="mt-1 list-disc pl-5 text-ink-muted">
             {repeatWarnings.map((w) => (
               <li key={`${w.entrantAId}-${w.entrantBId}`}>
                 {entrantDisplayName(entrantById.get(w.entrantAId)!)} vs{" "}
@@ -488,7 +488,7 @@ export function PairingsPage() {
   return (
     <div>
       <Eyebrow>
-        <Link to={`/pods/${id}`} className="hover:text-accent-strong">
+        <Link to={`/pods/${id}`} className="hover:text-accent">
           {pod.name}
         </Link>
       </Eyebrow>
@@ -536,7 +536,7 @@ export function PairingsPage() {
       {canGenerateNext && nextRoundNumber === 1 && seatingFormats.has(pod.format) && (
         <p className="mb-3 text-[12px] text-ink-muted">
           Want a seating chart first? Head to the{" "}
-          <Link to={`/pods/${id}/seating`} className="text-link underline hover:text-link-strong">
+          <Link to={`/pods/${id}/seating`} className="text-link underline hover:text-link-hover">
             Seatings tab
           </Link>{" "}
           instead — it generates round 1 the same way, but shows only who sits where, not who plays whom.
@@ -561,7 +561,7 @@ export function PairingsPage() {
           <button
             type="button"
             onClick={() => setShowManual(true)}
-            className="text-[12.5px] text-ink-secondary underline hover:text-accent-strong"
+            className="text-[12.5px] text-ink-muted underline hover:text-accent"
           >
             Pair manually instead
           </button>

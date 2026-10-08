@@ -15,7 +15,7 @@ function StatTile({ label, value, sub }: { label: string; value: string; sub?: s
     <Card className="p-4">
       <div className="font-display text-[24px] font-bold tabular-nums">{value}</div>
       <div className="mt-0.5 text-[11px] tracking-wide text-ink-muted uppercase">{label}</div>
-      {sub && <div className="mt-1 text-[11.5px] text-ink-secondary">{sub}</div>}
+      {sub && <div className="mt-1 text-[11.5px] text-ink-muted">{sub}</div>}
     </Card>
   );
 }
@@ -26,7 +26,7 @@ function HeadToHeadCard({ title, entry }: { title: string; entry: HeadToHeadEntr
     <Card className="p-4">
       <div className="text-[11px] tracking-wide text-ink-muted uppercase">{title}</div>
       <div className="font-display mt-1 text-[17px] font-bold">{entry.displayName}</div>
-      <div className="mt-1 text-[12.5px] text-ink-secondary">
+      <div className="mt-1 text-[12.5px] text-ink-muted">
         {entry.wins}-{entry.losses}-{entry.draws} ({pct(entry.winPct)} win rate over {entry.matches} match
         {entry.matches === 1 ? "" : "es"})
       </div>
@@ -39,14 +39,14 @@ function HeadToHeadChart({ entries }: { entries: HeadToHeadEntry[] }) {
   const max = Math.max(...entries.map((e) => e.matches));
   return (
     <Card className="p-5">
-      <div className="mb-3 text-[12px] font-semibold tracking-wide text-ink-secondary uppercase">
+      <div className="mb-3 text-[12px] font-semibold tracking-wide text-ink-muted uppercase">
         Record vs. every opponent
       </div>
       <div className="flex flex-col gap-2.5">
         {entries.map((e) => (
           <div key={e.playerId} className="flex items-center gap-3">
             <div className="w-24 shrink-0 truncate text-right text-[13px]">{e.displayName}</div>
-            <div className="flex h-2.5 flex-1 overflow-hidden rounded-full bg-surface-sunken">
+            <div className="flex h-2.5 flex-1 overflow-hidden rounded-full bg-bg">
               {e.wins > 0 && <div className="h-full bg-good" style={{ width: `${(e.wins / max) * 100}%` }} />}
               {e.draws > 0 && <div className="h-full bg-ink-muted/50" style={{ width: `${(e.draws / max) * 100}%` }} />}
               {e.losses > 0 && <div className="h-full bg-critical" style={{ width: `${(e.losses / max) * 100}%` }} />}
@@ -123,7 +123,7 @@ export function PlayerStatsBody({
       <HeadToHeadChart entries={s.headToHead} />
 
       <div className="mt-6">
-        <div className="mb-3 text-[12px] font-semibold tracking-wide text-ink-secondary uppercase">
+        <div className="mb-3 text-[12px] font-semibold tracking-wide text-ink-muted uppercase">
           Card pulls · {formatEur(s.totalValuePulled || null)} total
         </div>
         <CardGallery pulls={s.cardPulls} tournamentLinkTo={tournamentLinkTo} />

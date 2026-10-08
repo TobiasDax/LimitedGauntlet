@@ -28,13 +28,13 @@ function PodHistoryRow({ entry, linkTo }: { entry: PlayerPodEntry; linkTo: strin
       </Link>
       {done && entry.finish !== null && (
         <span
-          className={`font-display shrink-0 text-[14px] font-bold tabular-nums ${entry.finish === 1 ? "text-accent-strong" : "text-ink-secondary"}`}
+          className={`font-display shrink-0 text-[14px] font-bold tabular-nums ${entry.finish === 1 ? "text-accent" : "text-ink-muted"}`}
         >
           {ordinal(entry.finish)}
         </span>
       )}
       {status === "Canceled" && (
-        <span className="shrink-0 text-[11px] tracking-wide text-ink-secondary uppercase">Canceled</span>
+        <span className="shrink-0 text-[11px] tracking-wide text-ink-muted uppercase">Canceled</span>
       )}
     </Card>
   );

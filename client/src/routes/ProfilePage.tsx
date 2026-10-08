@@ -25,9 +25,9 @@ export function ProfilePage() {
         title="Organizations"
         description="Organization settings — tokens, webhooks, co-organizers, leaving or deleting an org — live on the Settings page for whichever organization you're currently in."
       >
-        <p className="text-[13px] text-ink-secondary">
+        <p className="text-[13px] text-ink-muted">
           You belong to {orgCount} {orgCount === 1 ? "organization" : "organizations"}.{" "}
-          <Link to="/organizations" className="text-link underline hover:text-link-strong">
+          <Link to="/organizations" className="text-link underline hover:text-link-hover">
             Manage them
           </Link>
           .

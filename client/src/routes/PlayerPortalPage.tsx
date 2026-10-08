@@ -90,7 +90,7 @@ function MyPodCard({ pod, slug }: { pod: PlayerPortalPod; slug: string }) {
     <Card className="p-4">
       <div className="flex items-center justify-between">
         <div>
-          <Link to={podHref} className="font-display text-[14.5px] font-bold hover:text-accent-strong">
+          <Link to={podHref} className="font-display text-[14.5px] font-bold hover:text-accent">
             {pod.podName}
           </Link>
           <div className="text-[11.5px] text-ink-muted">{pod.tournamentName}</div>
@@ -196,14 +196,14 @@ function AccountSection({ currentName }: { currentName: string }) {
         </div>
 
         {showRemoval && (
-          <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-sunken p-3">
+          <div className="flex flex-col gap-2 rounded-md border border-border bg-bg p-3">
             {removal.isSuccess ? (
               <p className="text-[13px] text-good">
                 Sent. The organizers have been notified and will remove or anonymise you.
               </p>
             ) : (
               <>
-                <p className="text-[12.5px] text-ink-secondary">
+                <p className="text-[12.5px] text-ink-muted">
                   This asks the organizers to anonymise you or hide you from the public pages — they action it by hand.
                   Add anything they should know:
                 </p>
@@ -293,7 +293,7 @@ export function PlayerPortalPage() {
                 <div>
                   <Link
                     to={`/o/${slug}/tournaments/${t.id}`}
-                    className="font-display text-[14.5px] font-bold hover:text-accent-strong"
+                    className="font-display text-[14.5px] font-bold hover:text-accent"
                   >
                     {t.name}
                   </Link>

@@ -69,7 +69,7 @@ export function EntrantPickerModal({
           {selectable.length > 0 && (
             <button
               type="button"
-              className="text-[12px] text-link hover:text-link-strong"
+              className="text-[12px] text-link hover:text-link-hover hover:underline"
               onClick={() => setChecked(allSelected ? new Set() : new Set(selectable.map((p) => p.id)))}
             >
               {allSelected ? "Clear all" : "Select all"}
@@ -101,13 +101,13 @@ export function EntrantPickerModal({
         </div>
 
         <div>
-          <div className="mb-1.5 text-[12px] font-medium text-ink-secondary">New player</div>
+          <div className="mb-1.5 text-[12px] font-medium text-ink-muted">New player</div>
           {newNames.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {newNames.map((n) => (
                 <span
                   key={n}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-accent-wash px-2.5 py-1 text-[12px]"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-accent/14 px-2.5 py-1 text-[12px]"
                 >
                   {n}
                   <button

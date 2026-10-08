@@ -12,9 +12,7 @@ function PlayerOrgSwitcher() {
   const orgs = me?.organizations ?? [];
   if (!me || orgs.length <= 1) {
     return (
-      <span className="text-[13px] text-ink-secondary">
-        {me ? `${me.organization.name} · Player` : "Player sign-in"}
-      </span>
+      <span className="text-[13px] text-ink-muted">{me ? `${me.organization.name} · Player` : "Player sign-in"}</span>
     );
   }
   return (
@@ -23,7 +21,7 @@ function PlayerOrgSwitcher() {
       disabled={switchOrg.isPending}
       value={me.organization.slug}
       onChange={(e) => switchOrg.mutate(e.target.value)}
-      className="border-border-strong rounded border bg-surface px-2 py-1 text-[13px] text-ink-secondary"
+      className="border-border-strong rounded border bg-surface px-2 py-1 text-[13px] text-ink-muted"
     >
       {orgs.map((o) => (
         <option key={o.slug} value={o.slug}>
@@ -55,7 +53,7 @@ export function PlayerLayout() {
   ) : (
     <Link
       to={`/o/${slug}`}
-      className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className="text-[12.5px] tracking-wide text-ink-muted uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
       Public page
     </Link>

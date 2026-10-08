@@ -22,7 +22,7 @@ function navLinkClass({ isActive }: { isActive: boolean }): string {
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
     isActive
       ? "font-bold text-accent underline decoration-2 underline-offset-[6px]"
-      : "text-ink-secondary hover:bg-surface-raised hover:text-ink",
+      : "text-ink-muted hover:bg-surface-raised hover:text-ink",
   ].join(" ");
 }
 
@@ -80,7 +80,7 @@ export function TopBar({
 
         {(orgSlot || orgName) && (
           <div className="border-border hidden flex-col gap-px border-l pl-5 sm:flex">
-            {orgSlot ?? <span className="text-[13px] text-ink-secondary">{orgName}</span>}
+            {orgSlot ?? <span className="text-[13px] text-ink-muted">{orgName}</span>}
           </div>
         )}
 
@@ -103,7 +103,7 @@ export function TopBar({
           aria-label={open ? "Close navigation menu" : "Open navigation menu"}
           aria-expanded={open}
           aria-controls="mobile-nav"
-          className="ml-auto rounded p-2 text-ink-secondary hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:hidden"
+          className="ml-auto rounded p-2 text-ink-muted hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:hidden"
         >
           {open ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
         </button>

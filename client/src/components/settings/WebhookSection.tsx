@@ -26,7 +26,7 @@ export function WebhookSection() {
   return (
     <div>
       <Card className="mb-6 p-5">
-        <p className="mb-3 text-[12.5px] text-ink-secondary">
+        <p className="mb-3 text-[12.5px] text-ink-muted">
           Each POST carries a JSON body and an{" "}
           <code className="text-[12px]">X-LimitedGauntlet-Signature: sha256=…</code> header — an HMAC-SHA256 of the raw
           body using that webhook's own secret — so your receiving automation can verify it really came from this
@@ -116,7 +116,7 @@ function WebhookRow({ webhook }: { webhook: OrgWebhook }) {
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
           {webhook.label && <div className="font-display text-[15px] font-bold">{webhook.label}</div>}
-          <div className="truncate text-[13px] text-ink-secondary" title={webhook.url}>
+          <div className="truncate text-[13px] text-ink-muted" title={webhook.url}>
             {webhook.url}
           </div>
         </div>

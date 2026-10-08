@@ -33,7 +33,7 @@ export function TableShapeForm({
   const total = sizes.reduce((a, b) => a + b, 0);
 
   return (
-    <div className="mb-5 rounded-lg border border-border bg-surface-sunken p-4">
+    <div className="mb-5 rounded-lg border border-border bg-bg p-4">
       <div className="mb-3 text-[11.5px] font-semibold tracking-wide text-ink-muted uppercase">Table layout</div>
       <div className="mb-3 flex items-center gap-2">
         <Button variant={split ? "ghost" : "primary"} onClick={() => toggle(false)}>
@@ -65,7 +65,7 @@ export function TableShapeForm({
                   <button
                     type="button"
                     onClick={() => update(sizes.filter((_, idx) => idx !== i))}
-                    className="text-[12px] text-ink-secondary underline hover:text-critical"
+                    className="text-[12px] text-ink-muted underline hover:text-critical"
                   >
                     Remove
                   </button>
@@ -77,7 +77,7 @@ export function TableShapeForm({
             <button
               type="button"
               onClick={() => update([...sizes, MIN_TABLE_SIZE])}
-              className="text-[12.5px] text-ink-secondary underline hover:text-accent-strong"
+              className="text-[12.5px] text-ink-muted underline hover:text-accent"
             >
               Add table
             </button>

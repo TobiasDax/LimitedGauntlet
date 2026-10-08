@@ -48,7 +48,7 @@ export function PodStandingsPage() {
   return (
     <div>
       <Eyebrow>
-        <Link to={`/pods/${id}`} className="hover:text-accent-strong">
+        <Link to={`/pods/${id}`} className="hover:text-accent">
           {pod ? pod.name : "Pod"}
         </Link>
         {pod && ` · ${podFormatDisplay(pod)}`}
@@ -68,25 +68,25 @@ export function PodStandingsPage() {
           <table className="w-full min-w-[680px] border-collapse">
             <thead>
               <tr>
-                <th className="w-[1%] bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="w-[1%] bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                   #
                 </th>
-                <th className="bg-surface-sunken px-4 py-3 text-left text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-left text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                   {pod?.isTeamEvent ? "Team" : "Player"}
                 </th>
-                <th className="bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                   Points
                 </th>
-                <th className="bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                   OMW%
                 </th>
-                <th className="bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                   GW%
                 </th>
-                <th className="bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                   OGW%
                 </th>
-                <th className="bg-surface-sunken px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
+                <th className="bg-bg px-4 py-3 text-right text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
                   Order
                 </th>
               </tr>
@@ -98,7 +98,7 @@ export function PodStandingsPage() {
                 return (
                   <tr
                     key={row.entrantId}
-                    className={i === 0 ? "bg-accent-wash shadow-[inset_3px_0_0_var(--color-accent)]" : ""}
+                    className={i === 0 ? "bg-accent/14 shadow-[inset_3px_0_0_var(--color-accent)]" : ""}
                   >
                     <td className="border-t border-border px-4 py-3.5 text-right text-[13px] font-semibold tabular-nums text-ink-muted">
                       {i + 1}
@@ -118,13 +118,13 @@ export function PodStandingsPage() {
                     <td className="border-t border-border px-4 py-3.5 text-right text-[15px] font-bold tabular-nums">
                       {row.points}
                     </td>
-                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-secondary tabular-nums">
+                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-muted tabular-nums">
                       {pct(row.opponentsMatchWinPct)}
                     </td>
-                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-secondary tabular-nums">
+                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-muted tabular-nums">
                       {pct(row.gameWinPct)}
                     </td>
-                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-secondary tabular-nums">
+                    <td className="border-t border-border px-4 py-3.5 text-right text-ink-muted tabular-nums">
                       {pct(row.opponentsGameWinPct)}
                     </td>
                     <td className="border-t border-border px-4 py-3.5">
@@ -134,7 +134,7 @@ export function PodStandingsPage() {
                             onClick={() => swap(i, i - 1)}
                             disabled={!tiedAbove || setTiebreak.isPending}
                             title="Move up (tied on points)"
-                            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-secondary hover:text-ink disabled:opacity-30"
+                            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-muted hover:text-ink disabled:opacity-30"
                           >
                             <ChevronUp size={14} aria-hidden="true" />
                           </button>
@@ -142,7 +142,7 @@ export function PodStandingsPage() {
                             onClick={() => swap(i, i + 1)}
                             disabled={!tiedBelow || setTiebreak.isPending}
                             title="Move down (tied on points)"
-                            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-secondary hover:text-ink disabled:opacity-30"
+                            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-muted hover:text-ink disabled:opacity-30"
                           >
                             <ChevronDown size={14} aria-hidden="true" />
                           </button>

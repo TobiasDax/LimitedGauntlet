@@ -43,9 +43,7 @@ export function PublicDashboardPage() {
                     {t.location && ` · ${t.location}`}
                   </div>
                 </div>
-                <span className="text-[11.5px] tracking-wide text-ink-secondary uppercase">
-                  {statusLabel[t.status]}
-                </span>
+                <span className="text-[11.5px] tracking-wide text-ink-muted uppercase">{statusLabel[t.status]}</span>
               </Card>
             </Link>
           ))}

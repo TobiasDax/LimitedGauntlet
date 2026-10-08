@@ -65,7 +65,7 @@ export function ManualPairingForm({
     );
 
   return (
-    <div className="mt-5 rounded-lg border border-border bg-surface-sunken p-5">
+    <div className="mt-5 rounded-lg border border-border bg-bg p-5">
       <div className="mb-4 font-display text-[16px] font-bold">Manual pairing — round {roundNumber}</div>
       <div className="flex flex-col gap-2">
         {pairs.map((pair, i) => (

@@ -86,7 +86,7 @@ export function DashboardPage() {
       {me && (
         <button
           onClick={() => setSharing(true)}
-          className="mb-6 inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+          className="mb-6 inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-muted uppercase hover:text-ink"
         >
           Share public link (with your group) <ExternalLink size={13} aria-hidden="true" />
         </button>
@@ -103,7 +103,7 @@ export function DashboardPage() {
 
       {data && data.tournaments.length === 0 && !showForm && (
         <Card className="p-8 text-center">
-          <p className="mb-4 text-ink-secondary">No tournaments yet.</p>
+          <p className="mb-4 text-ink-muted">No tournaments yet.</p>
           {newTournamentActions(true)}
           {hosted && passes === 0 && (
             <p className="mt-4 text-[12.5px] text-ink-muted">
@@ -126,9 +126,7 @@ export function DashboardPage() {
                     {t.location && ` · ${t.location}`}
                   </div>
                 </div>
-                <span className="text-[11.5px] tracking-wide text-ink-secondary uppercase">
-                  {statusLabel[t.status]}
-                </span>
+                <span className="text-[11.5px] tracking-wide text-ink-muted uppercase">{statusLabel[t.status]}</span>
               </Card>
             </Link>
           ))}

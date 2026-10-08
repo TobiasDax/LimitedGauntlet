@@ -18,7 +18,7 @@ export function TokensSection() {
         />
         <span className="text-[14px] font-semibold">{enabled ? "Tokens are on" : "Tokens are off"}</span>
       </div>
-      <p className="mb-4 max-w-lg text-[13px] text-ink-secondary">
+      <p className="mb-4 max-w-lg text-[13px] text-ink-muted">
         Players earn <strong>tokens</strong> for playing in pods and for their finishing place — a running, org-wide
         balance you can hand-adjust and players can spend on your prize wall (which lives outside this app). Set the
         default reward values in each tournament's settings, overridable per pod.

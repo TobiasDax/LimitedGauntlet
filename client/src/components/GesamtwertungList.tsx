@@ -2,10 +2,10 @@ import { Link } from "react-router-dom";
 import type { GesamtwertungPod, GesamtwertungRow } from "../lib/types";
 
 export function rankBadgeClasses(rank: number): string {
-  if (rank === 1) return "bg-accent border-accent text-[#241c0a]";
-  if (rank === 2) return "border-[#c8c8c8]/40 text-[#d7d5cf]";
-  if (rank === 3) return "border-[#c48e58]/45 text-[#cf9a6b]";
-  return "border-border-strong text-ink-secondary";
+  if (rank === 1) return "bg-accent border-accent text-on-accent";
+  if (rank === 2) return "border-rank-silver/40 text-rank-silver";
+  if (rank === 3) return "border-rank-bronze/40 text-rank-bronze";
+  return "border-border-strong text-ink-muted";
 }
 
 export function GesamtwertungList({
@@ -42,9 +42,7 @@ export function GesamtwertungList({
             <div
               key={row.playerId}
               className={`flex flex-col gap-2.5 rounded-md border px-4 py-3.5 ${
-                rank === 1
-                  ? "border-accent/35 bg-gradient-to-r from-accent-wash to-surface"
-                  : "border-border bg-surface"
+                rank === 1 ? "border-accent/35 bg-gradient-to-r from-accent/14 to-surface" : "border-border bg-surface"
               }`}
             >
               <div className="grid grid-cols-[44px_1fr_auto] items-center gap-5">
@@ -57,7 +55,7 @@ export function GesamtwertungList({
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <Link
                     to={playerLinkTo(row.playerId)}
-                    className="truncate font-display text-[17px] font-bold hover:text-accent-strong"
+                    className="truncate font-display text-[17px] font-bold hover:text-accent"
                   >
                     {row.player.displayName}
                   </Link>
@@ -68,7 +66,7 @@ export function GesamtwertungList({
 
                 <div className="text-right">
                   <div
-                    className={`font-display tabular-nums text-[26px] leading-none font-bold ${rank === 1 ? "text-accent-strong" : ""}`}
+                    className={`font-display tabular-nums text-[26px] leading-none font-bold ${rank === 1 ? "text-accent" : ""}`}
                   >
                     {row.average.toFixed(1)}
                   </div>
@@ -88,7 +86,7 @@ export function GesamtwertungList({
                       to={podLinkTo(pod.id)}
                       title={pod.name}
                       className={`grid h-[26px] min-w-[26px] place-items-center rounded border border-border px-1 text-[11px] tabular-nums transition-colors hover:border-accent hover:text-ink ${
-                        attended && points > 0 ? "bg-surface-raised text-ink-secondary" : "text-ink-muted"
+                        attended && points > 0 ? "bg-surface-raised text-ink-muted" : "text-ink-muted"
                       }`}
                     >
                       {attended ? points : "–"}

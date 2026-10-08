@@ -43,7 +43,7 @@ export function AcceptInvitePage() {
       <Eyebrow>Invite</Eyebrow>
       <ScreenTitle>Accept invite</ScreenTitle>
       <Card className="mt-4 p-6">
-        {isLoading && <p className="text-ink-secondary">Checking invite…</p>}
+        {isLoading && <p className="text-ink-muted">Checking invite…</p>}
 
         {inviteInvalid && (
           <>
@@ -58,7 +58,7 @@ export function AcceptInvitePage() {
 
         {invite && me?.identity && me.identity.email !== invite.email && (
           <>
-            <p className="mb-4 text-[14px] text-ink-secondary">
+            <p className="mb-4 text-[14px] text-ink-muted">
               This invite is for <strong>{invite.email}</strong>, but you're signed in as{" "}
               <strong>{me.identity.email}</strong>. Log out and accept as {invite.email} (or via SSO with that
               identity).
@@ -72,7 +72,7 @@ export function AcceptInvitePage() {
         {/* PI-86 — already signed in as the invited identity: one click adds the org. */}
         {invite && me?.identity && me.identity.email === invite.email && (
           <>
-            <p className="mb-4 text-[14px] text-ink-secondary">
+            <p className="mb-4 text-[14px] text-ink-muted">
               You've been invited to co-organize <strong>{invite.organizationName}</strong>.
             </p>
             {acceptInvite.isError && (
@@ -94,7 +94,7 @@ export function AcceptInvitePage() {
 
         {invite && !me?.identity && (invite.accountExists || appConfig?.localLoginDisabled) ? (
           <>
-            <p className="mb-4 text-[14px] text-ink-secondary">
+            <p className="mb-4 text-[14px] text-ink-muted">
               {invite.accountExists ? (
                 <>
                   <strong>{invite.email}</strong> already has a LimitedGauntlet account. Log in as that identity to
@@ -119,7 +119,7 @@ export function AcceptInvitePage() {
           invite &&
           !me?.identity && (
             <>
-              <p className="mb-4 text-[14px] text-ink-secondary">
+              <p className="mb-4 text-[14px] text-ink-muted">
                 You've been invited to co-organize <strong>{invite.organizationName}</strong> as {invite.email}.
               </p>
               <form

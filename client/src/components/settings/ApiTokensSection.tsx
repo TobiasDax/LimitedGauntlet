@@ -22,9 +22,7 @@ export function ApiTokensSection() {
           <div className="mb-2 text-[12px] font-semibold tracking-wide text-accent uppercase">
             Copy this now — it won't be shown again
           </div>
-          <code className="block overflow-x-auto rounded bg-surface-sunken px-3 py-2 text-[13px] break-all">
-            {justMinted}
-          </code>
+          <code className="block overflow-x-auto rounded bg-bg px-3 py-2 text-[13px] break-all">{justMinted}</code>
           <Button variant="ghost" className="mt-2" onClick={() => setJustMinted(null)}>
             Done
           </Button>

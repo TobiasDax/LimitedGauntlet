@@ -34,7 +34,7 @@ export function PlayerAcceptInvitePage() {
       <Eyebrow>Player invite</Eyebrow>
       <ScreenTitle>Set up your login</ScreenTitle>
       <Card className="mt-4 p-6">
-        {isLoading && <p className="text-ink-secondary">Checking invite…</p>}
+        {isLoading && <p className="text-ink-muted">Checking invite…</p>}
 
         {inviteInvalid && (
           <>
@@ -49,7 +49,7 @@ export function PlayerAcceptInvitePage() {
 
         {invite && (
           <>
-            <p className="mb-4 text-[14px] text-ink-secondary">
+            <p className="mb-4 text-[14px] text-ink-muted">
               Set a password to sign in as <strong>{invite.playerName}</strong> for{" "}
               <strong>{invite.organizationName}</strong> ({invite.email}).
             </p>

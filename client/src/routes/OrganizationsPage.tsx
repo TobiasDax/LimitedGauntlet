@@ -20,7 +20,7 @@ function GettingStarted({ onCreate }: { onCreate: () => void }) {
   return (
     <Card className="mb-6 p-5">
       <div className="font-display mb-1 text-[16px] font-bold">Create your organization</div>
-      <p className="mb-4 text-[13px] text-ink-secondary">
+      <p className="mb-4 text-[13px] text-ink-muted">
         An organization holds your player roster and every tournament you run. Creating one is the first step —
         tournaments, pods, pairings and standings all live inside it.
       </p>
@@ -29,7 +29,7 @@ function GettingStarted({ onCreate }: { onCreate: () => void }) {
         <div className="mb-4 flex flex-col gap-3">
           <div className="border-border rounded-md border p-4">
             <div className="text-[14px] font-semibold">Free organization</div>
-            <p className="mt-1 text-[13px] text-ink-secondary">
+            <p className="mt-1 text-[13px] text-ink-muted">
               One tournament with one pod, for a single event of up to a week. You add the tournament after creating the
               organization; its dates are fixed once you set them, and everything stays readable for a month after it
               ends.
@@ -40,7 +40,7 @@ function GettingStarted({ onCreate }: { onCreate: () => void }) {
           </div>
           <div className="border-border rounded-md border border-dashed p-4">
             <div className="text-[14px] font-semibold">Need more than one event?</div>
-            <p className="mt-1 text-[13px] text-ink-secondary">
+            <p className="mt-1 text-[13px] text-ink-muted">
               A single tournament can be unlocked for unlimited pods, or a subscription removes the limits entirely —
               unlimited tournaments, editable dates, co-organizers, webhooks, exports and API access. You can start free
               and upgrade later; upgrading your free tournament hands the free slot back.
@@ -48,7 +48,7 @@ function GettingStarted({ onCreate }: { onCreate: () => void }) {
           </div>
         </div>
       ) : (
-        <p className="mb-4 text-[13px] text-ink-secondary">
+        <p className="mb-4 text-[13px] text-ink-muted">
           This is a self-hosted install, so your organization has everything: unlimited tournaments and pods,
           co-organizers, webhooks, exports and API access, with no limits and nothing to pay for.
         </p>
@@ -99,7 +99,7 @@ export function OrganizationsPage() {
   return (
     <div className="mx-auto max-w-[520px]">
       <h1 className="font-display mb-1 text-[26px] font-bold">Your organizations</h1>
-      <p className="mb-6 text-[14px] text-ink-secondary">
+      <p className="mb-6 text-[14px] text-ink-muted">
         {orgs.length === 0 ? "You're not a member of any organization yet." : "Pick which organization to work in."}
       </p>
 
@@ -134,7 +134,7 @@ export function OrganizationsPage() {
             <button
               type="button"
               onClick={() => setShowCreate(true)}
-              className="text-link underline hover:text-link-strong"
+              className="text-link underline hover:text-link-hover"
             >
               create another one
             </button>
