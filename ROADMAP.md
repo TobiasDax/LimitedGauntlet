@@ -4,7 +4,9 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.18.3**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.19.0**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+
+**v0.19.0:** visual restyle, no functional changes. Text glyphs, emoji and hand-drawn SVGs are replaced by Lucide icons; the color palette is consolidated from 28 to 17 values (contrast checked with WCAG math, link hover lightened to 4.5:1); image-overlay colors are `overlay` / `on-overlay` tokens; Varela Round is self-hosted as the body font (no requests to Google); and 24 ad-hoc pixel font sizes are folded into a 10-step rem type scale. Emails, API token names and webhook labels now use the sans font instead of the display serif.
 
 **v0.18.3:** dependency maintenance, no functional changes. In-range updates across the server, client and MCP workspaces (fastify 5.12.5, nodemailer 10.0.15, fast-uri, ip-address, brace-expansion and others), which clear the open Dependabot security advisories, plus the dev tooling (eslint, typescript-eslint, prettier). Major bumps (stripe 23, dotenv 18, @types/node 26, Prisma 8) are deliberately held back; the one remaining advisory (mysql2) comes from Prisma's own dev tooling.
 
