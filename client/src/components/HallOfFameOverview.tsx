@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Crown, Flame } from "lucide-react";
 import { rankBadgeClasses } from "./GesamtwertungList";
 import { formatEur } from "./CardGallery";
 import { Card } from "./ui";
@@ -36,8 +37,9 @@ export function HeadlineStats({
           to={playerLinkTo(longestWinStreak.playerId)}
           className="rounded-lg border border-accent/35 bg-gradient-to-br from-accent-wash to-surface p-4 text-center transition-colors hover:bg-surface-raised"
         >
-          <div className="font-display text-[28px] font-bold text-accent-strong tabular-nums">
-            🔥 {longestWinStreak.streak}
+          <div className="flex items-center justify-center gap-1.5 font-display text-[28px] font-bold text-accent-strong tabular-nums">
+            <Flame size={26} aria-hidden="true" />
+            {longestWinStreak.streak}
           </div>
           <div className="mt-0.5 truncate text-[11px] tracking-wide text-ink-muted uppercase">
             Win streak · {longestWinStreak.displayName}
@@ -113,9 +115,10 @@ export function HallOfFameList({
                       key={win.podId}
                       to={mainEventLinkTo(win)}
                       title={`Main event win — ${win.tournamentName}: ${win.podName}`}
-                      className="text-[13px] leading-none hover:scale-110"
+                      aria-label={`Main event win — ${win.tournamentName}: ${win.podName}`}
+                      className="text-accent-strong hover:scale-110"
                     >
-                      👑
+                      <Crown size={14} aria-hidden="true" />
                     </Link>
                   ))}
                 </div>

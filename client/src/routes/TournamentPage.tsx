@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowRight, Download, ExternalLink } from "lucide-react";
 import {
   useTournament,
   useApplyPass,
@@ -76,7 +77,9 @@ function EditTournamentForm({ tournament, onDone }: { tournament: TournamentDeta
           <div className="border-border rounded-md border border-dashed p-4">
             <div className="text-[12px] font-semibold tracking-wide text-ink-secondary uppercase">Dates</div>
             <p className="mt-1 text-[14px] text-ink">
-              {tournament.startDate.slice(0, 10)} → {tournament.endDate.slice(0, 10)}
+              {tournament.startDate.slice(0, 10)}{" "}
+              <ArrowRight size={14} className="inline align-[-2px] text-ink-muted" aria-hidden="true" />{" "}
+              {tournament.endDate.slice(0, 10)}
             </p>
             <p className="mt-2 text-[12px] text-ink-muted">
               A tournament's dates are fixed once set on this plan.{" "}
@@ -744,31 +747,37 @@ export function TournamentPage() {
         <div className="mb-6 flex gap-5">
           <Link
             to={`/tournaments/${tournament.id}/gesamtwertung`}
-            className="inline-block text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-strong"
+            className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-strong"
           >
-            View standings →
+            View standings <ArrowRight size={13} aria-hidden="true" />
           </Link>
           <Link
             to={`/tournaments/${tournament.id}/value`}
-            className="inline-block text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-strong"
+            className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-accent uppercase hover:text-accent-strong"
           >
-            Best pulls of the tournament →
+            Best pulls of the tournament <ArrowRight size={13} aria-hidden="true" />
           </Link>
           {me && (
             <button
               onClick={() => setSharing(true)}
-              className="inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+              className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
             >
-              Share public link ↗
+              Share public link <ExternalLink size={13} aria-hidden="true" />
             </button>
           )}
           {me && (
             <button
               onClick={() => exportXlsx.mutate()}
               disabled={exportXlsx.isPending}
-              className="inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink disabled:opacity-50"
             >
-              {exportXlsx.isPending ? "Preparing…" : "Export spreadsheet ↓"}
+              {exportXlsx.isPending ? (
+                "Preparing…"
+              ) : (
+                <>
+                  Export spreadsheet <Download size={13} aria-hidden="true" />
+                </>
+              )}
             </button>
           )}
           {me && sharing && (

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Check, CircleHelp, Sparkles, X } from "lucide-react";
 import type { CardPull } from "../lib/types";
 
 export function formatEur(value: number | null): string {
@@ -25,8 +26,8 @@ function AttributionEditor({
   return (
     <div className="mt-1.5 flex items-center gap-1">
       {pull.playerIdInferred && (
-        <span title="Guessed from finish + card value — not yet confirmed" className="text-[11px]">
-          🔮
+        <span title="Guessed from finish + card value — not yet confirmed" className="text-ink-muted">
+          <CircleHelp size={13} aria-hidden="true" />
         </span>
       )}
       <select
@@ -47,15 +48,15 @@ function AttributionEditor({
         title={pull.playerId ? "Confirm this attribution" : "Assign to this player"}
         className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10.5px] font-bold text-[#241c0a] hover:bg-accent-strong disabled:opacity-50"
       >
-        ✓
+        <Check size={12} strokeWidth={3} aria-hidden="true" />
       </button>
       {pull.playerId && (
         <button
           onClick={() => onSet(null)}
           title="Unassign — no real data to back up who pulled this"
-          className="shrink-0 rounded border border-border-strong px-1.5 py-0.5 text-[10.5px] text-ink-secondary hover:bg-surface-raised hover:text-ink"
+          className="shrink-0 rounded border border-border-strong px-1.5 py-1 text-ink-secondary hover:bg-surface-raised hover:text-ink"
         >
-          ✕
+          <X size={12} aria-hidden="true" />
         </button>
       )}
     </div>
@@ -102,18 +103,18 @@ export function CardGallery({
             {pull.foil && (
               <span
                 title="Foil"
-                className="absolute top-1.5 left-1.5 grid h-6 w-6 place-items-center rounded bg-black/65 text-[12px]"
+                className="absolute top-1.5 left-1.5 grid h-6 w-6 place-items-center rounded bg-black/65 text-warning"
               >
-                ✨
+                <Sparkles size={14} aria-hidden="true" />
               </span>
             )}
             {onRemove && (
               <button
                 onClick={() => onRemove(pull.id)}
                 title="Remove"
-                className="absolute top-1.5 right-1.5 grid h-6 w-6 place-items-center rounded bg-black/65 text-[12px] text-white hover:bg-black/85"
+                className="absolute top-1.5 right-1.5 grid h-6 w-6 place-items-center rounded bg-black/65 text-white hover:bg-black/85"
               >
-                ✕
+                <X size={14} aria-hidden="true" />
               </button>
             )}
           </div>
@@ -143,7 +144,9 @@ export function CardGallery({
               pull.player && (
                 <div className="mt-1 truncate text-[10.5px] text-ink-muted">
                   {pull.playerIdInferred && (
-                    <span title="Guessed from finish + card value — not yet confirmed">🔮 </span>
+                    <span title="Guessed from finish + card value — not yet confirmed">
+                      <CircleHelp size={12} className="mr-1 inline align-[-2px]" aria-hidden="true" />
+                    </span>
                   )}
                   {pull.player.displayName}
                 </div>

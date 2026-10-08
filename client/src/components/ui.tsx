@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { X } from "lucide-react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 
 type ButtonVariant = "default" | "primary" | "ghost" | "danger";
@@ -98,9 +99,9 @@ export function Modal({ title, onClose, children }: { title: ReactNode; onClose:
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded px-1.5 text-[16px] text-ink-muted hover:text-ink focus-visible:ring-1 focus-visible:ring-accent focus-visible:outline-none"
+            className="rounded p-1 text-ink-muted hover:text-ink focus-visible:ring-1 focus-visible:ring-accent focus-visible:outline-none"
           >
-            ✕
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
         <div className="p-5">{children}</div>

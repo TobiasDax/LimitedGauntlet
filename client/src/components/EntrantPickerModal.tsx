@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { usePlayers } from "../features/players/usePlayers";
 import { useAddEntrantsBulk, entrantErrorMessage } from "../features/pods/useEntrants";
 import { Button, FormError, Modal, TextField } from "./ui";
@@ -115,7 +116,7 @@ export function EntrantPickerModal({
                     className="text-ink-muted hover:text-critical"
                     aria-label={`Remove ${n}`}
                   >
-                    ✕
+                    <X size={12} strokeWidth={2.5} aria-hidden="true" />
                   </button>
                 </span>
               ))}

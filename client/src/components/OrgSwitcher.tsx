@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { Check, ChevronDown } from "lucide-react";
 import { useMe, useSwitchOrg } from "../features/auth/useAuth";
 
 // PI-86 — the active org, with a dropdown to switch when the login belongs to
@@ -43,17 +44,7 @@ export function OrgSwitcher() {
         className="flex items-center gap-1.5 rounded px-1.5 py-1 text-[13px] text-ink-secondary hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         {switchOrg.isPending ? "Switching…" : me.organization.name}
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          aria-hidden="true"
-        >
-          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <ChevronDown size={12} strokeWidth={2.5} aria-hidden="true" />
       </button>
       {open && (
         <div
@@ -71,7 +62,9 @@ export function OrgSwitcher() {
               }}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-surface-raised"
             >
-              <span className="w-3 text-accent">{o.id === me.activeOrgId ? "✓" : ""}</span>
+              <span className="w-3 text-accent">
+                {o.id === me.activeOrgId && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
+              </span>
               {o.name}
             </button>
           ))}

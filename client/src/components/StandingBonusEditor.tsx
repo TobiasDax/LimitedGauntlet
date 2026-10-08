@@ -1,3 +1,4 @@
+import { ArrowRight, X } from "lucide-react";
 import type { StandingBonusRow } from "../lib/types";
 import { Button, TextField } from "./ui";
 
@@ -39,7 +40,7 @@ export function StandingBonusEditor({
             onChange={(e) => update(i, { toPlace: Number(e.target.value) })}
             className="w-16"
           />
-          <span className="text-ink-muted">→</span>
+          <ArrowRight size={14} className="text-ink-muted" aria-hidden="true" />
           <TextField
             type="number"
             value={row.tokens}
@@ -50,10 +51,10 @@ export function StandingBonusEditor({
           <button
             type="button"
             onClick={() => onChange(rows.filter((_, idx) => idx !== i))}
-            className="text-[12px] text-ink-muted hover:text-critical"
+            className="text-ink-muted hover:text-critical"
             aria-label={`Remove row ${i + 1}`}
           >
-            ✕
+            <X size={14} aria-hidden="true" />
           </button>
         </div>
       ))}

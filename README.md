@@ -208,6 +208,8 @@ For AI-agent use, an MCP (Model Context Protocol) server ships in the repo (`mcp
 
 Node.js + TypeScript throughout — Fastify + Prisma + PostgreSQL on the backend, React + Vite + Tailwind on the frontend, Socket.IO for realtime. Ships as a single Docker image plus a Postgres container; migrations run automatically on startup.
 
+Icons are from [Lucide](https://lucide.dev) (ISC / MIT) — see [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
+
 ---
 
 # Quick Start

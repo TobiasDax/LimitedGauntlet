@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ChevronDown, ChevronUp, Crown } from "lucide-react";
 import { Card } from "./ui";
 import { podFormatDisplay, podProgressStatus } from "../features/pods/usePods";
 import { sortForDisplay, partitionFinished, groupByDate, distinctDateCount, swapPodOrder } from "../lib/podOrder";
@@ -39,24 +40,28 @@ function PodRow({ pod, href, reorder }: PodRowProps) {
             onClick={reorder.onUp}
             disabled={reorder.isFirst || reorder.pending}
             title="Move up"
-            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-[11px] text-ink-secondary hover:text-ink disabled:opacity-30"
+            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-secondary hover:text-ink disabled:opacity-30"
           >
-            ▲
+            <ChevronUp size={14} aria-hidden="true" />
           </button>
           <button
             onClick={reorder.onDown}
             disabled={reorder.isLast || reorder.pending}
             title="Move down"
-            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-[11px] text-ink-secondary hover:text-ink disabled:opacity-30"
+            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-secondary hover:text-ink disabled:opacity-30"
           >
-            ▼
+            <ChevronDown size={14} aria-hidden="true" />
           </button>
         </div>
       )}
       <Link to={href} className="flex flex-1 items-center justify-between gap-3 transition-colors hover:opacity-80">
         <div>
           <div className="font-display text-[16px] font-bold">
-            {pod.isMainEvent && <span title="This tournament's main event">👑 </span>}
+            {pod.isMainEvent && (
+              <span title="This tournament's main event">
+                <Crown size={15} className="mr-1.5 inline align-[-2px] text-accent-strong" aria-hidden="true" />
+              </span>
+            )}
             {pod.name}
             {isFull && (
               <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-[10.5px] font-semibold tracking-wide text-accent uppercase">

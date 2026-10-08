@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   useAnonymisePlayer,
   useCreatePlayer,
@@ -44,7 +45,12 @@ function PrivacyControls({ player }: { player: Player }) {
   return (
     <>
       <Button variant="ghost" onClick={() => setOpen((v) => !v)}>
-        Privacy {open ? "▴" : "▾"}
+        Privacy{" "}
+        {open ? (
+          <ChevronUp size={14} className="inline align-[-3px]" aria-hidden="true" />
+        ) : (
+          <ChevronDown size={14} className="inline align-[-3px]" aria-hidden="true" />
+        )}
       </Button>
       {open && (
         <div className="mt-2 flex w-full flex-wrap items-center gap-2 rounded-md border border-border bg-surface-sunken px-3 py-2">

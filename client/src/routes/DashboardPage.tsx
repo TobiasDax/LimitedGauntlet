@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ExternalLink } from "lucide-react";
 import { useCreateTournament, useTournaments } from "../features/tournaments/useTournaments";
 import { useMe } from "../features/auth/useAuth";
 import { Button, Card, Eyebrow, Field, ScreenDek, ScreenTitle, TextField, Textarea } from "../components/ui";
@@ -85,9 +86,9 @@ export function DashboardPage() {
       {me && (
         <button
           onClick={() => setSharing(true)}
-          className="mb-6 inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+          className="mb-6 inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
         >
-          Share public link (with your group) ↗
+          Share public link (with your group) <ExternalLink size={13} aria-hidden="true" />
         </button>
       )}
       {me && sharing && (

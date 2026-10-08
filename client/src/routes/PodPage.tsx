@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { Crown, ExternalLink } from "lucide-react";
 import {
   usePod,
   podFormatLabel,
@@ -623,7 +624,11 @@ export function PodPage() {
         {podFormatDisplay(pod)} · {pod.roundCount} rounds
       </Eyebrow>
       <ScreenTitle>
-        {pod.isMainEvent && <span title="This tournament's main event">👑 </span>}
+        {pod.isMainEvent && (
+          <span title="This tournament's main event">
+            <Crown size={20} className="mr-2 inline align-[-2px] text-accent-strong" aria-hidden="true" />
+          </span>
+        )}
         {pod.name}
         {pod.canceledAt && (
           <span className="ml-3 align-middle">
@@ -641,9 +646,9 @@ export function PodPage() {
         {me && (
           <button
             onClick={() => setSharing(true)}
-            className="text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+            className="inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
           >
-            Share public link ↗
+            Share public link <ExternalLink size={13} aria-hidden="true" />
           </button>
         )}
         {me && sharing && (

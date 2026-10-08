@@ -1,3 +1,5 @@
+import { Minus, Plus } from "lucide-react";
+
 // Compact [−] value [+] control (PI-53) for a bounded 0..N game count — the
 // number stays a real, still-typable input between the buttons rather than a
 // locked display, so a quick tap-tap works at the table but typing a value
@@ -35,7 +37,7 @@ export function Stepper({
         aria-label={`Decrease ${ariaLabel}`}
         className="px-3.5 py-2.5 text-base text-ink-muted hover:text-accent-strong disabled:opacity-30 disabled:hover:text-ink-muted"
       >
-        −
+        <Minus size={16} aria-hidden="true" />
       </button>
       <input
         type="number"
@@ -53,7 +55,7 @@ export function Stepper({
         aria-label={`Increase ${ariaLabel}`}
         className="px-3.5 py-2.5 text-base text-ink-muted hover:text-accent-strong disabled:opacity-30 disabled:hover:text-ink-muted"
       >
-        +
+        <Plus size={16} aria-hidden="true" />
       </button>
     </div>
   );

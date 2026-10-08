@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router-dom";
+import { ChevronDown, ChevronUp, Pencil, X } from "lucide-react";
 import { useStandings } from "../features/pods/useStandings";
 import { useSetManualTiebreak } from "../features/pods/useEntrants";
 import { usePod, podFormatDisplay } from "../features/pods/usePods";
@@ -109,7 +110,8 @@ export function PodStandingsPage() {
                           title="This tied position was set manually, not computed"
                           className="ml-2 text-[10.5px] font-normal tracking-wide text-ink-muted uppercase"
                         >
-                          ✋ manual
+                          <Pencil size={11} className="mr-1 inline align-[-1px]" aria-hidden="true" />
+                          manual
                         </span>
                       )}
                     </td>
@@ -132,26 +134,26 @@ export function PodStandingsPage() {
                             onClick={() => swap(i, i - 1)}
                             disabled={!tiedAbove || setTiebreak.isPending}
                             title="Move up (tied on points)"
-                            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-[11px] text-ink-secondary hover:text-ink disabled:opacity-30"
+                            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-secondary hover:text-ink disabled:opacity-30"
                           >
-                            ▲
+                            <ChevronUp size={14} aria-hidden="true" />
                           </button>
                           <button
                             onClick={() => swap(i, i + 1)}
                             disabled={!tiedBelow || setTiebreak.isPending}
                             title="Move down (tied on points)"
-                            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-[11px] text-ink-secondary hover:text-ink disabled:opacity-30"
+                            className="grid h-6 w-6 place-items-center rounded border border-border-strong text-ink-secondary hover:text-ink disabled:opacity-30"
                           >
-                            ▼
+                            <ChevronDown size={14} aria-hidden="true" />
                           </button>
                           {row.manualTiebreak !== null && (
                             <button
                               onClick={() => setTiebreak.mutate({ entrantId: row.entrantId, manualTiebreak: null })}
                               disabled={setTiebreak.isPending}
                               title="Clear manual order for this entrant"
-                              className="ml-1 text-[11px] text-ink-muted hover:text-critical disabled:opacity-30"
+                              className="ml-1 text-ink-muted hover:text-critical disabled:opacity-30"
                             >
-                              ✕
+                              <X size={14} aria-hidden="true" />
                             </button>
                           )}
                         </div>

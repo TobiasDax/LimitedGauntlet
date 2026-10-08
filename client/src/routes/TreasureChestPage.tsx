@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ExternalLink } from "lucide-react";
 import { useTreasureChest } from "../features/pods/useCardPulls";
 import { useMe } from "../features/auth/useAuth";
 import { CardGallery } from "../components/CardGallery";
@@ -19,9 +20,9 @@ export function TreasureChestPage() {
       {me && (
         <button
           onClick={() => setSharing(true)}
-          className="mb-6 inline-block text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
+          className="mb-6 inline-flex items-center gap-1.5 text-[12.5px] tracking-wide text-ink-secondary uppercase hover:text-ink"
         >
-          Share public link ↗
+          Share public link <ExternalLink size={13} aria-hidden="true" />
         </button>
       )}
       {me && sharing && (
