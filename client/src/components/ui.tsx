@@ -92,7 +92,7 @@ export function Modal({ title, onClose, children }: { title: ReactNode; onClose:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-overlay/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full max-w-md rounded-lg border border-border-strong bg-surface shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
           <h2 className="font-display text-base font-bold">{title}</h2>

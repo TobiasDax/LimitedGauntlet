@@ -353,7 +353,7 @@ A light color theme alongside the current dark one. The app is dark-only today; 
 
 - **Not yet scoped.** Open questions for scoping: follow the OS setting (`prefers-color-scheme`) vs. a manual toggle (and where it's stored), and whether the public pages get their own choice.
 - **Groundwork exists.** Colors already go through the `@theme` tokens in `index.css`, so a light palette is mostly a second set of values for those tokens.
-- **Remaining hardcoded colors.** The palette consolidation (2026-10-08) tokenized the accent-fill text, button hover, rank badges and body glow; only the `text-white` / `bg-black/*` image-overlay classes are still literal.
+- **Remaining hardcoded colors.** The palette consolidation (2026-10-08) tokenized the accent-fill text, button hover, rank badges and body glow; the image-overlay classes now use `overlay` / `on-overlay` tokens too. The only literal color left is the white QR-code tile in `SharePopup.tsx`, which must stay white to be scannable.
 - **Contrast must be re-verified.** The current palette was checked against WCAG 4.5:1 (PI-10); a light palette needs the same math, not eyeballing, for ink, accent and link colors on every surface.
 
 ## Ideas (unlikely to be built)

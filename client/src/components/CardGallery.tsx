@@ -103,7 +103,7 @@ export function CardGallery({
             {pull.foil && (
               <span
                 title="Foil"
-                className="absolute top-1.5 left-1.5 grid h-6 w-6 place-items-center rounded bg-black/65 text-warning"
+                className="absolute top-1.5 left-1.5 grid h-6 w-6 place-items-center rounded bg-overlay/65 text-warning"
               >
                 <Sparkles size={14} aria-hidden="true" />
               </span>
@@ -112,7 +112,7 @@ export function CardGallery({
               <button
                 onClick={() => onRemove(pull.id)}
                 title="Remove"
-                className="absolute top-1.5 right-1.5 grid h-6 w-6 place-items-center rounded bg-black/65 text-white hover:bg-black/85"
+                className="absolute top-1.5 right-1.5 grid h-6 w-6 place-items-center rounded bg-overlay/65 text-on-overlay hover:bg-overlay/85"
               >
                 <X size={14} aria-hidden="true" />
               </button>
