@@ -214,7 +214,7 @@ All eleven items below are **open, not implemented**. Reviewed revision: `dee64d
 
 **Suggested order:** fix PI-123 first (P1/high); then PI-124–127 (P2/medium security), coordinating PI-127 with PI-132 so revocation and reconnect behavior agree. Follow with PI-128 (P3/low security) and PI-129–133 (P2 functional priorities). Pair PI-124/125 for account-linking regression coverage and PI-127/131/132 for public-access coverage. These are implementation suggestions; check the current source before applying them. Restore dependencies from the lockfile in the implementation environment before running required checks; keep any dependency upgrades separate.
 
-### PI-123 — Reject malformed Socket.IO acknowledgment arguments (P1 / high security) ✅ (fixed 2026-09-17, browser-verified)
+### PI-123 — Reject malformed Socket.IO acknowledgment arguments (P1 / high security) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/realtime.ts`, the `join` listener, accepts an unchecked second argument. Optional calling (`ack?.(...)`) does not establish that it is a function. A malformed argument throws in both the success path and the catch block, leaving an unhandled async rejection. An anonymous client can reach this even with an invalid room. The shared HTTP/realtime process can terminate under the deployed Node default rejection behavior; process termination itself was not exercised in the audit.
 
@@ -224,7 +224,7 @@ All eleven items below are **open, not implemented**. Reviewed revision: `dee64d
 - [x] **Regression test** (`realtime.test.ts`) covers string/number/object/null/array acknowledgments, an invalid room name paired with each, and the pre-existing no-ack case — all while a live `process.on("unhandledRejection", ...)` listener asserts zero rejections, and a normal join both during and after the malformed attempts still succeeds on the same socket. Confirmed this test actually fails against the pre-fix code (reproduced the exact `TypeError: ack is not a function`, 8 uncaught) before confirming it passes against the fix.
 - [ ] **Not yet live-verified** — this sandbox has no way to load-test the production Node/container configuration directly. Tobias should confirm normal room joins/updates still work end-to-end on a real deploy.
 
-### PI-124 — Require verified SSO email before consuming any invite (P2 / medium security) ✅ (fixed 2026-09-17, browser-verified)
+### PI-124 — Require verified SSO email before consuming any invite (P2 / medium security) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/services/sso.ts`, the existing `oidcSubject` branch, calls `consumePendingInvite` before the later `emailVerified` check. A known SSO subject proves account identity, but does not prove ownership of its current email. Exploitation requires an already-linked account, a pending target invitation, and an identity provider that allows an attacker-controlled unverified email change; the result is organizer membership in the invited organization.
 
@@ -234,7 +234,7 @@ All eleven items below are **open, not implemented**. Reviewed revision: `dee64d
 - [x] **Regression test** (`sso.test.ts`, real DB): a known subject whose current login reports the invited email but `emailVerified: false` — confirmed the invite stays unconsumed and no membership is created. Confirmed this test fails against the pre-fix code first (reproduced the exact over-grant: `landOrgId` returned, membership created) before confirming the fix closes it. Full server suite: 225/225 passing.
 - [ ] **Not yet live-verified against a real identity provider** — this sandbox has no live OIDC/Discord/Google provider to round-trip against. Tobias should confirm an ordinary returning-user login (verified email, as every real provider normally reports) still works and still grants pending invites exactly as before.
 
-### PI-125 — Prevent SSO linking from retaining preregistered attacker credentials (P2 / medium security) ✅ (fixed 2026-09-17, browser-verified)
+### PI-125 — Prevent SSO linking from retaining preregistered attacker credentials (P2 / medium security) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** local signup in `server/src/routes/auth.ts` accepts an unverified email and creates a usable password/session. The `byEmail` branch in `server/src/services/sso.ts` later links a verified SSO identity to that account without replacing its password or invalidating sessions. With public signup and local login enabled, an attacker can preregister an unused victim email, then retain access after the victim signs in through SSO and receives organization membership.
 
@@ -249,7 +249,7 @@ All eleven items below are **open, not implemented**. Reviewed revision: `dee64d
 - [x] **Coverage:** already-linked subjects and verified local accounts (existing tests, updated fixture), the new unverified-email case, and the distinction between the two relink purposes (password cleared only for the unverified-local case, never for an ordinary identity conflict) — `oidcRelink.test.ts`. Concurrent-linking and disabled-signup/local-login configuration cases were not specifically added (existing atomicity guards — `updateMany`/`usedAt` count-checks — are unchanged and already covered generically elsewhere). Full server suite: 227/227 passing. Migration verified against the real schema with the exact CI drift check (`prisma migrate diff --exit-code`): no difference detected.
 - [ ] **Not yet live-verified against a real identity provider** — this sandbox has no live OIDC/Discord/Google provider. Tobias should confirm a real preregistration-then-SSO scenario end-to-end, and that ordinary verified account linking (existing organizers) is unaffected.
 
-### PI-126 — Exclude withdrawal snapshots from public responses and anonymize retained copies (P2 / medium security) ✅ (fixed 2026-09-17, browser-verified)
+### PI-126 — Exclude withdrawal snapshots from public responses and anonymize retained copies (P2 / medium security) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/services/onDemandWithdrawal.ts` stores original player IDs/names in `Round.onDemandWithdrawals`. The public rounds route in `server/src/routes/public.ts` returns full round records through a helper that only removes unrevealed matches. Visitors authorized for the public page can therefore read original names despite name hiding, unrevealed pairings, or later player anonymization.
 
@@ -262,7 +262,7 @@ New `scrubOnDemandWithdrawalSnapshots()` (`onDemandWithdrawal.ts`) retroactively
 - [x] **Tests** (real DB): `onDemandWithdrawal.test.ts` — the scrub replaces the target player's name while leaving an unrelated player's entry and `playerId` untouched, and no-ops cleanly with no matching record. `playerPrivacy.test.ts` — full integration: a real on-demand withdrawal recorded, then `anonymisePlayer()` called, confirming the stored JSON now shows the anonymized name. Full server suite: 230/230 passing.
 - [ ] **Public route change not route-tested** — matches this codebase's convention (`routes/*.ts` files aren't directly unit-tested, only the service layer is); verified by code review + typecheck instead. **Not yet live-verified**: Tobias should confirm the public pod page's rounds response never includes `onDemandWithdrawals` for a pod that had an on-demand withdrawal, and that "undo pairing" still correctly restores an anonymized player.
 
-### PI-127 — Invalidate public unlock grants when the lock changes (P2 / medium security) ✅ (fixed 2026-09-17, browser-verified)
+### PI-127 — Invalidate public unlock grants when the lock changes (P2 / medium security) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/routes/public.ts` stores unlocked organization IDs in the session. HTTP and realtime access checks do not bind these grants to the current password. A previously unlocked visitor retains access after password rotation or disable/re-enable while their cookie is still valid.
 
@@ -274,7 +274,7 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] **Tests** (real DB / mocked session codec): `realtime.test.ts` — a grant recorded at a stale version is denied, and a legacy array-shaped grant is denied (both confirmed failing against the pre-fix code first, before confirming the fix closes them); the existing "unlocked" test updated to the new grant shape. Full server suite: 231/231 passing. Migration verified against the real schema with the exact CI drift check: no difference detected.
 - [ ] **HTTP-side change not route-tested** — matches this codebase's convention (routes aren't directly unit-tested); verified by code review + typecheck, mirroring the realtime-side logic that *is* under test. **Not yet live-verified**: Tobias should confirm in two browsers — unlock both, rotate the password, then confirm both old grants require a fresh unlock (HTTP reads and room joins alike); also check disable/re-enable and organization isolation (an unlock for org A never satisfies org B's check).
 
-### PI-128 — Revoke old organizer sessions on password change (P3 / low security) ✅ (fixed 2026-09-17, browser-verified)
+### PI-128 — Revoke old organizer sessions on password change (P3 / low security) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** the password-change route in `server/src/routes/settings.ts` updates `passwordHash` only. Middleware checks `authVersion`, which stays unchanged, so an attacker already holding an organizer session remains authorized after a password change.
 
@@ -285,7 +285,7 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] Atomic password/`authVersion` update, initiating-session refresh, and realtime reauthorization implemented; API-token policy decided and documented in code.
 - [ ] **Not tested or live-verified** — this logic lives entirely in the route handler (no extracted service function), matching this codebase's convention of not directly unit-testing `routes/*.ts` files; the actual multi-session revocation behavior needs a real HTTP round-trip this sandbox can't do. Tobias should confirm with two active sessions: after one changes the password, the other's next request and any open realtime subscription are rejected; the old password fails everywhere and the new one works; a failed change attempt (wrong current password) leaves every existing session valid.
 
-### PI-129 — Correctly truncate compressed IPv6 addresses (P2 / functional) ✅ (fixed 2026-09-17, browser-verified)
+### PI-129 — Correctly truncate compressed IPv6 addresses (P2 / functional) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/services/tracking.ts` splits on colons and removes empty segments before taking a prefix. This loses the zero groups represented by `::`: `2001:db8::1234:5678` becomes `2001:db8:1234::`, retaining misplaced host bits instead of the intended `/48` prefix `2001:db8::`.
 
@@ -295,7 +295,7 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] **Tests** (`tracking.test.ts`): the reported example (`2001:db8::1234:5678` → `2001:db8::`, not the old buggy `2001:db8:1234::`), compression at the start/end/whole-address, loopback (`::1`), the unspecified address (`::`), IPv4/IPv4-mapped-IPv6 (unchanged), a zone id, an unparseable IPv6-shaped input (falls back to `::`, not the raw value), and an explicit compressed-vs-fully-spelled-out equivalence check. All new cases confirmed failing against the pre-fix code first (5 of the new assertions reproduced the bug, including two the original test suite happened not to exercise: canonicalization and the zone-id case), then confirmed passing against the fix. Full server suite: 236/236 passing.
 - [ ] **Not live-verified**: Tobias should confirm real-world IPv6 visitors' analytics prefixes look correct going forward (no easy way to force a specific IPv6 source address in this sandbox). Retained historical prefixes computed by the old buggy code are not reconstructible from the corrupted value and are not touched by this fix — informational only, per the audit's own note that this is low-stakes analytics data.
 
-### PI-130 — Validate partial CUSTOM pod updates against merged state (P2 / functional) ✅ (fixed 2026-09-17, browser-verified)
+### PI-130 — Validate partial CUSTOM pod updates against merged state (P2 / functional) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** the pod PATCH route in `server/src/routes/pods.ts` passes only submitted fields to `constructedFormatError` while falling back to the stored outer format. Valid edits such as renaming an existing custom constructed format can fail because other required values already stored on the pod are omitted from the patch.
 
@@ -304,7 +304,7 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] Validate the effective `format`, `constructedFormat`, and `constructedFormatCustom` together, respecting omitted-vs-explicit-null.
 - [ ] **Not route-tested** — matches this codebase's convention (no `routes/*.ts` file has ever had a direct unit test; `constructedFormatError` and the merge logic live entirely in the route handler, not a `services/*.ts` function). Verified by code review + typecheck. **Not yet live-verified**: Tobias should confirm a custom-name-only rename on an existing CUSTOM pod now succeeds, switching to CUSTOM with a name in the same patch still works, unrelated-field-only patches are unaffected, an explicit `constructedFormat: null` clear still works, and a genuinely incomplete resulting state (e.g. clearing `constructedFormat` while `constructedFormatCustom` is still set) is still correctly rejected.
 
-### PI-131 — Report public unlock status consistently for authenticated players (P2 / functional) ✅ (fixed 2026-09-17, browser-verified)
+### PI-131 — Report public unlock status consistently for authenticated players (P2 / functional) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** public-route authorization in `server/src/routes/public.ts` permits a valid player session for its own organization, but the status response computes `unlocked` only from the lock/password grant. `client/src/components/PublicLayout.tsx` consequently shows the password screen to players whom the server already permits.
 
@@ -313,7 +313,7 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] Access decision shared between status (`GET .../lock`) and route authorization (`preHandler`).
 - [ ] **Not route-tested** — matches this codebase's convention (no `routes/*.ts` file has a direct unit test; `hasValidPlayerSession` itself already has service-level coverage in `playerAccounts.test.ts` from when it was introduced). Verified by code review + typecheck. **Not yet live-verified**: Tobias should confirm a logged-in player of a locked org sees the content (not the password prompt) at both `/o/:slug/...` public pages and via the status check the layout renders from; an anonymous visitor and a player of a *different* org still see the prompt; and an expired/logged-out player session correctly reverts to locked.
 
-### PI-132 — Restore realtime updates after public-lock changes (P2 / functional) ✅ (fixed 2026-09-17, browser-verified)
+### PI-132 — Restore realtime updates after public-lock changes (P2 / functional) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/realtime.ts` calls `disconnectSockets(true)` when the public lock changes. Socket.IO does not automatically reconnect after an explicit server disconnect, and `client/src/lib/socket.ts` / `client/src/features/pods/usePodRealtime.ts` do not recover from it. Open pages stop receiving updates until reloaded.
 
@@ -322,7 +322,7 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] Reconnect-after-server-disconnect in `socket.ts`; ack-aware rejoin-and-recover (or re-prompt) in `usePodRealtime.ts`.
 - [ ] **Not tested** — the client has no test infrastructure at all (no test runner configured, zero `*.test.ts` files anywhere in `client/`), so this is verified by code review + typecheck only, same posture as every other client-side change this session. **Not yet live-verified**: Tobias should open a protected public pod in two browsers, rotate/disable/re-enable the lock while both are open, and confirm the still-authorized one resumes live updates without a reload while the now-revoked one stops receiving events and shows the unlock prompt on its next interaction; also check an ordinary transport blip (e.g. brief network loss) still reconnects and rejoins normally, and that repeated lock changes don't accumulate duplicate event listeners or trigger a reconnect loop.
 
-### PI-133 — Preserve card printing during foil-only edits (P2 / functional) ✅ (fixed 2026-09-17, browser-verified)
+### PI-133 — Preserve card printing during foil-only edits (P2 / functional) ⏳ (fixed 2026-09-17, live-verify pending)
 
 **Problem:** `server/src/routes/cardPulls.ts` resolves the card using `body.data.setCode` without falling back to the stored printing when that field is omitted. A `{ foil: true }` patch can therefore select Scryfall's default printing and overwrite the saved set, ID, image, and price.
 
