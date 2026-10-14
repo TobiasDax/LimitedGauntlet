@@ -1525,3 +1525,91 @@ Reauthorizing already-open sockets was already handled before this fix (`refresh
 - [x] Identity-unchanged foil edits resolve by exact `scryfallId`; legacy pulls without one fall back to a setCode-constrained name lookup; an actual setCode/collectorNumber change still re-resolves as an intentional printing change exactly as before.
 - [x] **Tests** (`scryfall.test.ts`): `lookupCardById` fetches `/cards/:id` (not a name/set search), resolves foil pricing the same way the other lookups do, and caches a genuine 404. Confirmed failing against the pre-fix code first (function didn't exist), then passing against the fix. Full server suite: 239/239 passing.
 - [x] **Route wiring not tested** — matches this codebase's convention (`routes/cardPulls.ts` itself isn't unit-tested; the new pure lookup function is). Verified by code review + typecheck. **Browser-verified:** a foil-only PATCH on an existing pull confirmed keeping its set/image/scryfallId with only the price/foil flag changing, an explicit setCode or collectorNumber change confirmed still re-resolving to the new printing as intended, and a pre-`scryfallId` legacy pull's foil-only edit confirmed still resolving within its existing set rather than drifting. Foil toggling on a non-default printing confirmed keeping the saved card as the selected printing.
+
+## v0.16.6 / v0.17.0 features (browser-verified)
+
+Internal tournament notes, the public-route field-allowlist hardening it needed first, autosave for both description/notes fields, and the automatic pre-deploy database backup.
+
+### PI-143 — Automatic pre-deploy database backup ✅ (v0.17.0)
+Idea from Tobias (2026-09-29): snapshot the database before a version change touches it, as an automatic safety net ahead of migrations.
+
+Built as a one-shot `db-backup` Compose service (Option B of the two considered — see below), in both `docker-compose.yml` and `docker-compose.image.yml`:
+- [x] Reuses the `postgres:16-alpine` image `db` already runs, so `pg_dump` always matches the server major and the app image is untouched (Option A — adding `postgresql-client-16` to the `node:22-slim` runtime — would have needed the PGDG apt repo to avoid a v15/v16 skew, and a writable mount on the `read_only` app container).
+- [x] `app` gains `depends_on: { db-backup: { condition: service_completed_successfully } }`, so it runs to completion **before the app starts**, hence before the entrypoint's `prisma migrate deploy`. Fires once per `docker compose up` (every deploy) but not on crash-loop restarts, since Compose doesn't re-run a satisfied one-shot — a close match to "before version changes" with no Prisma pending-migration gate needed.
+- [x] **Fail-closed** (Tobias's call): a failed dump leaves the condition unmet and the app won't start, so no migration ever runs without a fresh backup.
+- [x] `pg_dump -Fc` to bind-mounted `./backups`, keeping the 20 newest; `./backups/` gitignored (live player data). Shell vars in the inline command are `$$`-escaped so Compose interpolates only the `${...}` from `.env`.
+- [x] **On by default for everyone** (Tobias's call) — ships in both public compose files; `docs/deployment.md` documents it, the `pg_restore` rollback command, and how to remove it.
+- [x] **Deploy-verified on the live instance (2026-09-29):** `docker compose up -d` ran `db-backup` to exit 0 before `app` started and wrote `pre-deploy-<ts>.dump` to `./backups/`; `pg_restore -l` confirmed a valid CUSTOM archive (174 TOC entries, full schema, pg_dump 16.15 against server 16.15 — exact version match). The success-path gating (app starts only on the dependency's clean exit) exercises the fail-closed wiring; the deliberately-broken-dump case was not run against live by choice.
+
+### PI-142 — Autosave the tournament description / internal notes ✅ (v0.16.6)
+Idea from Tobias (2026-09-29): drop the Save button and have both fields save themselves, which also removes PI-140's drop-the-draft-on-tab-switch behaviour by making drafts impossible.
+
+**It does solve that cleanly** — with nothing uncommitted, switching tabs has nothing to lose or misroute. The costs below are what need deciding first.
+
+**1. It removes Cancel, and there is no undo.** Today "Cancel" means *discard what I just typed*. Autosave commits every change, so mangling the **public** description has no way back. Worth replacing with an explicit "revert to last saved" (keep the pre-edit value in component state and offer one restore), or accepting the loss deliberately.
+
+**2. The rate limit is the real constraint.** `index.ts` registers a global limit of **200 requests/minute per IP**. `useUpdateTournament` currently invalidates both `["tournaments", id]` and `["tournaments"]` on success, so each save costs a PATCH plus 1–2 refetches. At a 1s keystroke debounce that is roughly 3 requests/second from a *single* editor — and two organizers behind one venue NAT share the bucket. Per-keystroke autosave is not viable without also stopping the broad invalidation on autosaves.
+
+**3. A refetch mid-typing can clobber the textarea.** The success handler refetches the tournament; if that response lands while the organizer is still typing, naive state syncing overwrites their input. Any autosave has to either not invalidate on save, or reconcile rather than replace.
+
+**4. Venue wifi is flaky, and there would be no Save button to retry with.** A failed save must keep the text in the box, show a clear unsaved state, and retry — otherwise notes vanish silently at exactly the moment they matter. This is more important here than in a typical app.
+
+**5. Concurrent editing gets worse.** PATCH is last-write-wins on the whole field. Today the Save button makes that a discrete, visible act; with autosave two TOs editing the same notes during an event would overwrite each other continuously. Out of scope to fix properly (that needs per-field versioning or a merge), but it moves from "unlikely" to "likely" and should be a conscious call.
+
+**6. The Markdown preview needs a resting state.** The field cannot be both a live textarea and rendered Markdown. Either keep an Edit affordance and only drop Save/Cancel, or accept a permanently raw textarea and lose the rendered view.
+
+**7. Minor:** `internalNotesEditedAt`/`ById` would update on every autosave, so the attribution becomes "who typed last", not "who wrote this note".
+
+**Built (2026-09-29), the recommended shape:**
+- [x] Save on **blur**, plus a 3s debounce while typing purely as crash/wifi insurance — not per keystroke. Switching tabs blurs, so the PI-140 tab-switch hazard is gone: there is no uncommitted draft to drop or misroute.
+- [x] New `useAutosaveTournamentText` updates the detail cache **in place** instead of invalidating — so a refetch can't overwrite the textarea mid-type, and each save is one PATCH rather than a PATCH plus a full-tournament reload (the rate-limit concern). The edit stamp is set from the current user client-side, since the PATCH response is the bare row without the resolved editor name.
+- [x] The mutation **retries** (`retry: 2`) and, on failure, the text stays in the box with a `Not saved — will retry` status and an explicit **Retry** button — no Save button means a flaky-wifi failure must never lose the text silently.
+- [x] Status line replaces the Save button: `Saving…` / `Unsaved changes` / `Saved` / `Not saved — will retry` (aria-live).
+- [x] **Revert** replaces Cancel: restores the snapshot taken when editing began — a one-level undo of the current session. Documented limit: a value already autosaved over is gone (no server-side history).
+- [x] Kept a rendered resting state (RichText) with an Edit affordance, rather than a permanently-raw textarea, so the Markdown still renders when not editing. Done/Revert use `onMouseDown` preventDefault so clicking them doesn't fire the textarea's blur-save and race a second write.
+- [x] Client builds, typechecks, lints clean. No tests — client has no test infrastructure (consistent with every prior client-only change).
+- [x] **Browser-verified:** confirmed typing then clicking away saves; the status line tracks; Revert restores the pre-edit value; a dropped connection shows the error state and recovers on Retry; and switching tabs mid-edit no longer loses anything.
+
+**Not addressed (unchanged from the scope, conscious omissions):**
+- Concurrent editing by two organizers is still last-write-wins, now more reachable since every pause is a write — needs per-field versioning to fix properly, out of scope here.
+- The edit stamp becomes "who typed last", not "who authored the note".
+
+### PI-141 — Public routes publish whole DB rows ✅ (v0.16.6)
+**Prerequisite for PI-140.** Three places in `routes/public.ts` spread a raw Prisma row into the public response:
+
+- `:265` — `...tournament`, and `findPublicTournament` (`services/ownership.ts`) has no `select`
+- `:342` — `...pod`, same for `findPublicPod`
+- `:260` — each pod inside the tournament page
+
+So every column on `Tournament` and `Pod` is published by default, and **any new column is public the moment its migration runs** — no code change, nothing failing. Nothing sensitive leaks today (every current column is public-ish), which is exactly why it has gone unnoticed. This is PI-126's bug class — it fixed the same pattern for `Round.onDemandWithdrawals` — generalised to the two models that never got the treatment.
+
+- [x] `publicTournamentFields()` / `publicPodFields()` in `services/publicVisibility.ts` — exhaustive allowlists, not omit-lists — applied at all three sites. Placed in a service rather than the route so they fall under this repo's "services are tested, routes are code-reviewed" convention.
+- [x] The published field set is byte-for-byte what was public before, so nothing about the public pages moved. Only the *default* changed: a new column now publishes nothing until it is added here deliberately.
+- [x] **Tests** (`publicVisibility.test.ts`): the exact key set is pinned for both models, so adding a column makes the test fail and forces a decision instead of leaking silently; plus a direct case proving an `internalNotes`-shaped column added to the row never reaches the output. Server suite 248/248.
+- [x] Caught while building: the tournament page's pods carry a nested `rounds` summary (PI-58) that is not part of the Pod row, so the allowlist stripped the public progress labels. Now carried through explicitly.
+- [x] **Browser-verified:** loaded a public tournament page and a public pod page and confirmed nothing visibly changed — pod progress labels, timers, capacity cues and token displays in particular.
+
+### PI-140 — Internal notes for a tournament (organizer-only) ✅ (v0.16.6)
+An organizer-only free-text field for notes the TOs keep between themselves — a table restart, a late player, a ruling, anything that shouldn't be on a public page. Shown as its own tab.
+
+**Scope corrected by Tobias (2026-09-28): tournament level, not pod.** Descriptions live on `Tournament`, so internal notes belong beside `Tournament.description` as a true private mirror of it. (The original write-up put this on `Pod`, which has no text field at all.)
+
+**Shape decided (2026-09-28):** a *single editable notes field*, mirroring how `description` already works — not a threaded comment log with per-entry authors. One nullable column, no new table.
+
+**Built:**
+- [x] `Tournament.internalNotes`, `internalNotesEditedAt`, `internalNotesEditedById` (migration `20260929100000_tournament_internal_notes`; additive, drift check clean). The editor id is a plain column, not an FK — a co-organizer who is later removed leaves the notes readable with the attribution simply unresolved.
+- [x] Read/write through the existing organizer routes. `PATCH` stamps the editor **only when the request actually changes the notes**, so an unrelated edit (a rename, a status change) can't rewrite the attribution. `GET` resolves the editor id to a name for display.
+- [x] Rendered on the organizer's tournament page in a **tabbed panel shared with the public description** (Tobias, 2026-09-29), so the two don't both occupy the page at once. Tab styling mirrors `PodTabs` (the Entrants/Pairings/Standings row) so it reads as the same control; local state rather than routes, since these are two panes of one page. Switching tabs mid-edit drops the draft rather than risking it being saved into the other field — which in one direction would mean publishing private notes.
+- [x] **Same Markdown editor as the description** (Tobias, 2026-09-29): identical `Textarea` + `RichText` rendering and the same Markdown hint. An earlier pass rendered notes as plain text to avoid surprise reformatting mid-event; overruled — they are the same kind of blurb, and only *who can read them* should differ. Both fields now share one editor, so they cannot drift apart.
+- [x] Included in the org export and import (optional in the import schema, so an export predating the field still restores). Round-trip test covers a tournament with notes, one without (must stay null, not `""`), and a legacy export with no key at all.
+
+**Leak surfaces — all verified:**
+- [x] **Public pages:** excluded *by construction* thanks to PI-141 landing first — `publicTournamentFields()` copies a fixed list, so the new column was never published at any point. `publicVisibility.test.ts` already asserts an `internalNotes`-shaped column is dropped.
+- [x] **Webhooks:** `services/webhooks.ts` selects only `tournament: { select: { name: true } }` — narrow by construction, no raw row.
+- [x] **Player self-service export:** `services/playerDataExport.ts` selects only `name/startDate/endDate`. Deliberately excluded (see GDPR note below), and structurally unable to carry it regardless.
+
+This is the ordering paying off: had PI-140 been built first, the field would have been public the moment the migration ran.
+
+- [x] **GDPR** documented in `docs/gdpr.md` §3.3: notes are excluded from public pages and the self-service export, but *are* in scope of an Art. 15 request, which is why the whole-org export carries them. Includes the two practical warnings for organizers — write notes you'd be willing to show the person, and don't record Art. 9 special-category data in them.
+- [x] **Browser-verified:** confirmed the section saves, clears back to empty, shows the "last edited by" line, and — the one that matters — that the notes appear nowhere on the public tournament page.
+
