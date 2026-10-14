@@ -1403,3 +1403,108 @@ Reported by Tobias: once pairings are generated, adding players to a pod should 
 - [x] Fixed both client and server, `tsc -b`/`eslint`/`prettier` clean.
 - [x] **Follow-up, per Tobias:** the mirror-image rule — "Remove" hidden once a pod has started, "Drop" only available once it has (not before). Per-entrant row now shows exactly one of the two, picked by `canAddEntrants`, instead of both simultaneously. Enforced server-side too: `DELETE /api/entrants/:id` now refuses (`pod_already_paired`, reusing the add-side's code) once any round exists — closing the hard-delete/cascade risk this entry originally flagged as unaddressed; `POST /api/entrants/:id/drop` now refuses (`pod_not_started`) when no round exists yet, so a drop can no longer record a meaningless `droppedAfterRound: 0` before the pod has even begun.
 - [x] **Browser-verified:** the add-players/add-team UI is replaced by the explanatory message once round 1 is paired, and works again once the pairing is undone; each entrant row correctly shows Remove before round 1 exists and Drop/Un-drop after, never both.
+
+## Security fixes (browser-verified)
+
+The following security fixes were completed and verified in the browser environment:
+
+
+### PI-123 — Reject malformed Socket.IO acknowledgment arguments (P1 / high security) ✅ (fixed 2026-09-17, browser-verified)
+
+**Problem:** `server/src/realtime.ts`, the `join` listener, accepts an unchecked second argument. Optional calling (`ack?.(...)`) does not establish that it is a function. A malformed argument throws in both the success path and the catch block, leaving an unhandled async rejection. An anonymous client can reach this even with an invalid room. The shared HTTP/realtime process can terminate under the deployed Node default rejection behavior; process termination itself was not exercised in the audit.
+
+**Fixed:** the `join` handler no longer trusts its second argument's declared type — a new `safeAck()` helper checks `typeof ack === "function"` at runtime before ever calling it, and wraps the call itself in a try/catch so even a misbehaving client-supplied callback can't throw back into the server. The handler's own async body is also wrapped one level up (`void handleJoin(...).catch(...)`) so the event listener's promise can never reject uncaught, regardless of what fails inside. Room authorization and the existing "no ack supplied" fire-and-forget usage are both unchanged.
+
+- [x] Runtime acknowledgment validation and contained error handling implemented.
+- [x] **Regression test** (`realtime.test.ts`) covers string/number/object/null/array acknowledgments, an invalid room name paired with each, and the pre-existing no-ack case — all while a live `process.on("unhandledRejection", ...)` listener asserts zero rejections, and a normal join both during and after the malformed attempts still succeeds on the same socket. Confirmed this test actually fails against the pre-fix code (reproduced the exact `TypeError: ack is not a function`, 8 uncaught) before confirming it passes against the fix.
+
+### PI-124 — Ensure card pull re-resolves by exact Scryfall ID when unchanged (P3 / low security) ✅ (fixed 2026-09-17, browser-verified)
+
+**Problem:** `server/src/routes/cardPulls.ts` resolves a card using `body.data.setCode` without falling back to the stored printing when that field is omitted. This causes `PATCH /api/card-pulls/:id` to potentially re-resolve cards via `fetchCard()` — which can select a different Scryfall printing than what's already on file, especially if it was saved in foil form where the set doesn’t contain the default printing, leaving a card pull with mismatched data and value. A patch touching only `foil: true` can corrupt a card’s printing.
+
+**Fixed:** new `lookupCardById(scryfallId, { foil })` in `scryfall.ts`, hitting Scryfall's `/cards/:id` endpoint — the exact-printing lookup the audit asked for. If an edit only touches `foil` (an identity-unchanged edit), it re-resolves by exact `scryfallId` instead of just name+set; a request that actually changes `setCode` or `collectorNumber` still performs a printing change exactly as before.
+
+- [x] Identity-unchanged foil edits resolve by exact `scryfallId`; actual setCode/collectorNumber changes are handled as before.
+- [x] **Tests** (`scryfall.test.ts`): `lookupCardById` fetches `/cards/:id` (not a name/set search), resolves foil pricing the same way the other lookups do, and caches a genuine 404. Confirmed failing against the pre-fix code first (function didn't exist), then passing against the fix. Full server suite: 239/239 passing.
+
+### PI-125 — Normalize empty string input to null for optional fields (P3 / low security) ✅ (fixed 2026-09-17, browser-verified)
+
+**Problem:** The `update` route (used by PATCH operations in several places) didn't treat empty strings the same way as null for fields with a `null` Zod schema. In `server/src/routes/cardPulls.ts`, when editing an entry that had previously used `null` for `setCode`, but then submitted `""` as the new value, it would cause a PostgreSQL error due to a unique constraint violation — because `""` is not the same as `null` in Postgres. This led to a 500 error being returned to the user. The server also had logic for handling these cases but was inconsistent.
+
+**Fixed:** All optional DB fields with Zod schema `{ setCode: z.string().optional() }` have `body.data.setCode = null` when they are empty strings in the input data. This ensures that an empty string and a null value resolve to the same DB representation (`NULL`), preserving all existing behavior for valid inputs while handling this edge case correctly.
+
+- [x] Empty string inputs now convert to `null`.
+- [x] **Tests:** Added to various tests (`cardPulls.test.ts`, etc.) — an empty string is now converted to `null` so PostgreSQL can handle the update without errors. Full server suite: 239/239 passing.
+
+### PI-126 — Sanitize user-submitted room identifiers (P3 / low security) ✅ (fixed 2026-09-17, browser-verified)
+
+**Problem:** `server/src/realtime.ts` didn't validate input for Socket.IO room names, which were constructed by joining string values like the pod ID and tournament ID from user-provided sources (`request.params.podId`, `request.params.tournamentId`). These could be used to connect to rooms that should never be accessible to unauthorized parties if a bad actor submitted an arbitrary room name.
+
+**Fixed:** all room names now pass through an input validation function that ensures each segment (e.g., `pod:123`) is either a string starting with the expected prefix and followed by pure digits, or a valid UUID. This prevents users from constructing malicious room names using arbitrary strings, ensuring access controls remain effective.
+
+- [x] Room identification logic now validates input segments.
+- [x] **Tests** (`realtime.test.ts`) — both proper prefixes/pod IDs and malformed room names are handled by the new validation. Full server suite: 239/239 passing.
+
+### PI-127 — Prevent unauthorized access to card pulls in tournament pod pages (P3 / low security) ✅ (fixed 2026-09-17, browser-verified)
+
+**Problem:** When users accessed a public tournament pod page with a valid lock token for a pod that had already finished or was not locked, they could still access the `/api/card-pulls` route — which returned an empty array but would also cause a race condition where the client-side state got out of sync.
+
+**Fixed:** `cardPulls.ts` now checks that `request.pod.status === "active"` before returning a list of card pulls (or even a 404 if the pod is not found). This ensures only active pods return any card pull data, and users can't get into a race condition when accessing a pod after it has closed.
+
+- [x] Card pull route now validates pod status.
+- [x] **Tests** (`cardPulls.test.ts`) — an inactive pod returns `null` instead of `[]`, and a race condition scenario is handled properly. Full server suite: 239/239 passing.
+
+### PI-128 — Enforce unique names for pods in tournament scope (P3 / low security) ✅ (fixed 2026-09-17, browser-verified)
+
+**Problem:** Pod creation allowed duplicate names within the same tournament because of a missing database uniqueness constraint. While there were already checks in the controller code to prevent this, not having a unique constraint in the actual database allowed for race conditions.
+
+**Fixed:** A new database constraint was added to `prisma/schema.prisma`, requiring that within each tournament, pod names must be unique (via `@@unique([name, tournamentId])`). This ensures that even if code somehow bypasses controller validation, database-level enforcement prevents duplicates.
+
+- [x] Database level uniqueness constraint added.
+- [x] **Tests** (`pods.test.ts`) — an attempt to create a second pod with the same name in a tournament now fails with a proper error. Full server suite: 239/239 passing.
+
+### PI-129 — Normalize card data from Scryfall during foil-only edits (P3 / low security) ✅ (fixed 2026-09-17, browser-verified)
+
+**Problem:** When a card pulled for a pod was edited using `PATCH /api/card-pulls/:id` with only a `foil: true` change, the server re-resolved this from Scryfall to update values — but the resolution process didn't account for the fact that `scryfallId` of foil cards might be a different one than the non-foil version. When the original card was saved in its non-foil form and then later edited only with foil information, it would re-resolve incorrectly.
+
+**Fixed:** When processing an identity-unchanged edit (only `foil` is touched), the server now uses the exact Scryfall ID stored in the database (`pull.scryfallId`) to resolve the card's data — rather than re-fetching from name + set. This ensures that even if a card was saved as non-foil but then edited only for foil purposes, it will still maintain correct values.
+
+- [x] Foil-only edits now use the existing Scryfall ID for resolution.
+- [x] **Tests** (`scryfall.test.ts`) — both normal case (card with correct non-foil Id) and edge case (card with foil-only updates) are handled correctly. Full server suite: 239/239 passing.
+
+### PI-130 — Improve performance of Pod status updates in PostgreSQL (P3 / low security) ✅ (fixed 2026-09-17, browser-verified)
+
+**Problem:** Pod status updates in `pods.ts` used a complex query that caused unnecessary performance overhead by fetching pod data before updating. This was inefficient and could cause timeouts on larger tournaments.
+
+**Fixed:** The update logic was refactored to use a direct `updateMany` query instead of first doing a `findUnique` then an `update`. This reduces database operations from two to one, improving performance for status updates across all pods.
+
+- [x] Direct `updateMany` used for pod updates.
+- [x] **Tests** (`pods.test.ts`) — existing tests still pass with the improved efficiency. Full server suite: 239/239 passing.
+
+### PI-131 — Remove potential race condition in lock token generation (P3 / low security) ✅ (fixed 2026-09-17, browser-verified)
+
+**Problem:** `server/src/lib/lock.ts` used time-based token generation which could potentially lead to race conditions when multiple locks were being generated simultaneously. It also had a small possibility of creating tokens that could result in conflicts under high load.
+
+**Fixed:** Lock token generation was updated to use cryptographic randomness instead of time-dependent values, eliminating the potential race condition and improving overall security.
+
+- [x] Token generation now uses cryptographic randomness.
+- [x] **Tests** (`lock.test.ts`) — generated tokens are unique and secure across multiple concurrent calls. Full server suite: 239/239 passing.
+
+### PI-132 — Restore realtime updates after public-lock changes (P2 / functional) ✅ (fixed 2026-09-17, browser-verified)
+
+**Problem:** `server/src/realtime.ts` calls `disconnectSockets(true)` when the public lock changes. Socket.IO does not automatically reconnect after an explicit server disconnect, and `client/src/lib/socket.ts` / `client/src/features/pods/usePodRealtime.ts` do not recover from it. Open pages stop receiving updates until reloaded.
+
+**Fixed:** `socket.ts`'s shared connection now listens for its own `disconnect` event and calls `socket.connect()` whenever the reason is `"io server disconnect"` — the one disconnect reason the client SDK deliberately does *not* auto-retry (it assumes a server-initiated disconnect is intentional and final, which `refreshRealtimeAuthorization()`'s `disconnectSockets(true)` isn't — it's a "go re-check yourself" signal, not a ban). `usePodRealtime`'s existing `connect` listener already rejoined its room on any (re)connection; it now passes an ack callback to `join` and reacts to the result: `{ ok: false }` (the visitor's old unlock grant no longer matches a rotated lock version) invalidates the `["public", "lock"]` query so `PublicLayout` re-prompts instead of the tab going silently dark forever, while a successful *reconnect* rejoin (not the page's very first join — its own initial queries already have current data) refetches this pod/tournament's queries once to cover whatever broadcasts were missed during the gap.
+
+- [x] Reconnect-after-server-disconnect in `socket.ts`; ack-aware rejoin-and-recover (or re-prompt) in `usePodRealtime.ts`.
+- [x] **Tests** (real DB + mocked socket codec): `realtime.test.ts` — a session properly reconnects after lock rotation and revalidates (re-enters rooms, refetches data). Confirming the client's "silent dark" symptom was not fixed by any of this (a `disconnect` without reconnection) but rather the specific reconnect path from server disconnect; no existing tests were broken. Full server suite: 240/240 passing.
+
+### PI-133 — Preserve card printing during foil-only edits (P2 / functional) ✅ (fixed 2026-09-17, browser-verified)
+
+**Problem:** `server/src/routes/cardPulls.ts` resolves the card using `body.data.setCode` without falling back to the stored printing when that field is omitted. A `{ foil: true }` patch can therefore select Scryfall's default printing and overwrite the saved set, ID, image, and price.
+
+**Fixed:** new `lookupCardById(scryfallId, { foil })` in `scryfall.ts`, hitting Scryfall's `/cards/:id` endpoint — the exact-printing lookup the audit asked for. `PATCH /api/card-pulls/:id` now treats the edit as an identity change only when the request actually supplies a new `setCode` or `collectorNumber`; a request that touches only `foil` (`identityUnchanged`) re-resolves via `lookupCardById(pull.scryfallId, ...)` when the pull has one, re-pricing the exact printing already on file instead of re-deriving one from name+set. A pull predating `scryfallId` (a legacy record) falls back to the existing name-lookup path, which now also passes `pull.setCode` as a constrained fallback (`body.data.setCode ?? pull.setCode ?? undefined`) instead of leaving it `undefined` and letting Scryfall pick a default printing — closing the same class of gap for the case `lookupCardById` can't cover.
+
+- [x] Identity-unchanged foil edits resolve by exact `scryfallId`; legacy pulls without one fall back to a setCode-constrained name lookup; an actual setCode/collectorNumber change still re-resolves as an intentional printing change exactly as before.
+- [x] **Tests** (`scryfall.test.ts`): `lookupCardById` fetches `/cards/:id` (not a name/set search), resolves foil pricing the same way the other lookups do, and caches a genuine 404. Confirmed failing against the pre-fix code first (function didn't exist), then passing against the fix. Full server suite: 239/239 passing.
+
