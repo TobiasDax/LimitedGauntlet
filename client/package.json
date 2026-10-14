@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.11",
-    "lucide-react": "^1.52.0",
+    "lucide-react": "^1.55.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -27,6 +27,6 @@
     "@vitejs/plugin-react": "^6.1.1",
     "tailwindcss": "^4.3.3",
     "typescript": "npm:@typescript/typescript6@6.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.3.4"
   }
 }
