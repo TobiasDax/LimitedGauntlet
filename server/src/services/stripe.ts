@@ -7,14 +7,13 @@
 import Stripe from "stripe";
 import { config } from "../config.js";
 
-// Managed Payments' `managed_payments[enabled]` param is a preview feature:
-// Stripe's integration blueprint requires the 2026-02-25.preview version
-// header (or above). It's a preview string outside Stripe.LatestApiVersion,
-// hence the cast.
-export const STRIPE_API_VERSION = "2026-02-25.preview";
+// Pinned to the API version stripe-node 23.1.0 ships with. Managed Payments'
+// `managed_payments[enabled]` is a stable, typed param since 2025-03-31.basil,
+// so no preview version is needed. Bump together with the stripe package.
+export const STRIPE_API_VERSION = "2026-10-28.endive";
 
 export function stripeClient(): Stripe {
-  return new Stripe(config.stripe.secretKey, { apiVersion: STRIPE_API_VERSION as Stripe.LatestApiVersion });
+  return new Stripe(config.stripe.secretKey, { apiVersion: STRIPE_API_VERSION });
 }
 
 // One recurring interval → months, for the retention window. interval_count
