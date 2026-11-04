@@ -4,9 +4,11 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.19.4**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.19.5**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
 
 **v0.19.3:** the runtime moves from Node 22 to Node 24 LTS (PI-146): `Dockerfile`, Forgejo CI and `@types/node`. No functional changes; rollout to the DaxVPS demo, then DaxLite production, is pending.
+
+**v0.19.5:** dependency security fix, no functional changes. `@fastify/static` 10.1.9 (glob 14, minimatch 11) clears the glob AbortSignal and runtime minimatch Dependabot alerts. The remaining minimatch 10 copy sits in the ESLint/typescript-eslint dev tooling, which has no upstream fix yet.
 
 **v0.19.4:** stripe-node 22 → 23.1.0 and the API pin moved from `2026-02-25.preview` to the stable `2026-10-28.endive` (Managed Payments no longer needs a preview version). Breaking SDK changes don't touch our usage; build, lint and all 346 tests pass on Node 24. Sandbox checkout test + webhook endpoint API-version check still to do (see ROADMAP-HOSTED.md).
 
