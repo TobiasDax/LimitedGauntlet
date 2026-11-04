@@ -15,7 +15,7 @@
     "@fastify/helmet": "^13.2.0",
     "@fastify/rate-limit": "^11.2.2",
     "@fastify/secure-session": "^8.4.2",
-    "@fastify/static": "^10.1.8",
+    "@fastify/static": "^10.1.9",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "argon2": "^0.45.2",
