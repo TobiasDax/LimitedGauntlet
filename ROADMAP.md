@@ -4,7 +4,9 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.19.1**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.19.2**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+
+**v0.19.2:** dependency maintenance, no functional changes. In-range updates across the server, client and MCP workspaces, the pinned lint/format tooling and dotenv 18. Stripe 23 and Prisma 8 (still an RC) are held back.
 
 **v0.19.1:** the display font is now self-hosted. Headlines, player names and other `font-display` text use Cinzel Decorative (regular and bold, SIL OFL 1.1) instead of a Georgia-only system stack, which fell back to a generic serif on Linux. Georgia remains as the fallback. No functional changes.
 
@@ -48,7 +50,7 @@ The app is **feature-complete and running in production** — latest release **v
 
 Only genuinely-open work lives here. Everything shipped **and** browser-verified is in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md).
 
-Nothing open right now. The next candidates are the V2 ideas below (PI-144 life counter, PI-145 light mode); both wait for Tobias's design input.
+Only the rollout of PI-146 (Node 24 bump, code-complete, see backlog below). Beyond that, the next candidates are the V2 ideas below (PI-144 life counter, PI-145 light mode); both wait for Tobias's design input.
 
 ## New improvements (backlog)
 
@@ -56,7 +58,15 @@ _New feature requests go here. Keep each one self-contained enough to pick up co
 
 > **Verification note:** the dev sandbox can't run the app (no Docker) or a full `vite build`, so items are built and typechecked (`tsc -b`) there, then browser-verified separately by Tobias on a real running instance. A bare ✅ means shipped and browser-verified; "code-complete, browser-verify pending" means the code is in but not yet checked on a live deploy.
 
-_Nothing open at the moment._
+### PI-146 — Bump runtime to Node 24 LTS (noted 2026-10-23) — code-complete, rollout pending
+Move the app image and CI from Node 22 to Node 24 (the current Active LTS). Node 22 enters maintenance mode now and reaches end of life around April 2027.
+
+- **Trigger.** A Node.js security advisory (2026-10-22) affecting 26.x/24.x/22.x was handled the same day by rebuilding the image on the patched `node:22-slim` (22.23.4) — no major bump mid-incident. This item is the planned follow-up.
+- **What changes.** `FROM node:22-slim` in `Dockerfile` and `node-version: 22` in `.forgejo/workflows/ci.yml`; check any `engines` field and the local dev Node version note in the README.
+- **Done (2026-11-04).** `Dockerfile` is on `node:24-slim`, CI on `node-version: 24`, `@types/node` on ^24 (server + mcp); there is no `engines` field and the README has no Node version note. Verified in the dev sandbox on Node 24.22.2 after a clean `npm ci`: argon2 native module loads and hashes, lint, format, builds and the full server suite (346 tests) pass. The image build itself is untested there (no Docker access), so CI's `image` job is the first real check.
+- **Verify.** CI (typecheck, lint, full test suite) must pass on 24. Prisma 7 engines, Fastify 5, Socket.IO and argon2 (native module) are the pieces most likely to care.
+- **Rollout.** Try it on the DaxVPS demo first, then DaxLite production.
+- **Node 26.** Revisit once it is LTS; not worth the churn before then.
 
 ## Project-health backlog (from the 2026-09-06 code audit)
 
