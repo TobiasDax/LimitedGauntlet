@@ -4,9 +4,11 @@
 
 ## Status
 
-The app is **feature-complete and running in production** — latest release **v0.19.5**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
+The app is **feature-complete and running in production** — latest release **v0.19.6**, public demo at [limited-gauntlet.com](https://limited-gauntlet.com). The full numbered build (Steps 0–12) and the bulk of the PI-1…PI-112 backlog are shipped and browser-verified; all of that detail is archived in [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md). The roadmap below is only what's still open.
 
 **v0.19.3:** the runtime moves from Node 22 to Node 24 LTS (PI-146): `Dockerfile`, Forgejo CI and `@types/node`. No functional changes; rollout to the DaxVPS demo, then DaxLite production, is pending.
+
+**v0.19.6:** hotfix for v0.19.5, whose image crashed at boot (`dependencies missing from this image: @fastify/static`): the bump nested the package under `server/node_modules`, which the Docker runtime stage doesn't copy. `@fastify/static` is now also declared in the root `package.json`, like the other runtime deps. **Do not deploy v0.19.5.**
 
 **v0.19.5:** dependency security fix, no functional changes. `@fastify/static` 10.1.9 (glob 14, minimatch 11) clears the glob AbortSignal and runtime minimatch Dependabot alerts. The remaining minimatch 10 copy sits in the ESLint/typescript-eslint dev tooling, which has no upstream fix yet.
 
