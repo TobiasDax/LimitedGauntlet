@@ -14,7 +14,7 @@
   },
   "//dependencies": "PI-109: the Prisma 7 client, pg adapter, and CLI are declared here (not only in server/) so npm hoists them to the root node_modules the Docker runtime stage copies. npm's resolver otherwise nests a lone-consumer workspace dep under server/node_modules (the PI-102 de-hoist hazard) — and the container's entrypoint runs ./node_modules/.bin/prisma at boot, so a nested `prisma` CLI = boot failure.",
   "dependencies": {
-    "@fastify/static": "^10.1.9",
+    "@fastify/static": "^10.1.10",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "prisma": "^7.10.1",
